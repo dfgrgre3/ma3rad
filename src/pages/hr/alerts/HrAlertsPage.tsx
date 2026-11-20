@@ -7,14 +7,14 @@ import { NotificationService } from '../../../services/domains/notifications/Not
 import { usePermission } from '../../../hooks/domains/auth/usePermission';
 
 const TYPE_LABELS: Record<string, { label: string; color: string; bg: string }> = {
-  HR_CONTRACT_EXPIRY: { label: 'انتهاء عقد', color: 'text-rose-700', bg: 'bg-rose-50' },
-  HR_PROBATION_END: { label: 'انتهاء فترة اختبار', color: 'text-amber-700', bg: 'bg-amber-50' },
-  HR_DOCUMENT_EXPIRY: { label: 'انتهاء مستند', color: 'text-violet-700', bg: 'bg-violet-50' },
-  HR_LEAVE_BALANCE: { label: 'رصيد إجازات', color: 'text-emerald-700', bg: 'bg-emerald-50' },
-  HR_LOAN_DUE: { label: 'قسط قرض', color: 'text-sky-700', bg: 'bg-sky-50' },
-  HR_PAYROLL_DUE: { label: 'صرف رواتب قريب', color: 'text-sky-700', bg: 'bg-sky-50' },
-  HR_PAYROLL_OVERDUE: { label: 'صرف رواتب متأخر', color: 'text-rose-700', bg: 'bg-rose-50' },
-  SYSTEM: { label: 'نظام', color: 'text-slate-700', bg: 'bg-slate-50' },
+  HR_CONTRACT_EXPIRY: { label: 'انتهاء عقد', color: 'text-danger', bg: 'bg-danger-soft' },
+  HR_PROBATION_END: { label: 'انتهاء فترة اختبار', color: 'text-warning', bg: 'bg-warning-soft' },
+  HR_DOCUMENT_EXPIRY: { label: 'انتهاء مستند', color: 'text-primary', bg: 'bg-accent-soft' },
+  HR_LEAVE_BALANCE: { label: 'رصيد إجازات', color: 'text-success', bg: 'bg-success-soft' },
+  HR_LOAN_DUE: { label: 'قسط قرض', color: 'text-primary', bg: 'bg-accent-soft' },
+  HR_PAYROLL_DUE: { label: 'صرف رواتب قريب', color: 'text-primary', bg: 'bg-accent-soft' },
+  HR_PAYROLL_OVERDUE: { label: 'صرف رواتب متأخر', color: 'text-danger', bg: 'bg-danger-soft' },
+  SYSTEM: { label: 'نظام', color: 'text-ink', bg: 'bg-surface-muted' },
 };
 
 export const HrAlertsPage: React.FC = () => {
@@ -85,7 +85,7 @@ export const HrAlertsPage: React.FC = () => {
 
   if (!canView) {
     return (
-      <div className="h-full flex items-center justify-center text-slate-500">
+      <div className="h-full flex items-center justify-center text-muted">
         ليس لديك صلاحية عرض تنبيهات الموارد البشرية.
       </div>
     );
@@ -93,20 +93,20 @@ export const HrAlertsPage: React.FC = () => {
 
   const unreadCount = alerts.filter((a) => !a.isRead).length;
 
-  const typeMeta = (type: string) => TYPE_LABELS[type] ?? { label: type, color: 'text-slate-600', bg: 'bg-slate-50' };
+  const typeMeta = (type: string) => TYPE_LABELS[type] ?? { label: type, color: 'text-ink-secondary', bg: 'bg-surface-muted' };
 
   return (
-    <div className="h-full overflow-y-auto p-6 space-y-6 bg-slate-50 text-slate-900">
-      <div className="bg-white px-6 pt-4 pb-1 flex-shrink-0">
+    <div className="h-full overflow-y-auto p-6 space-y-6 bg-surface-muted text-ink">
+      <div className="bg-surface px-6 pt-4 pb-1 flex-shrink-0">
         <PageHeader
           icon={<Bell className="h-5 w-5" />}
           title="تنبيهات الموارد البشرية"
           description="عقود، فترات اختبار، مستندات، إجازات، أقساط قروض، صرف الرواتب"
           actions={<>
-            <span className={`px-2.5 py-1 rounded text-xs font-bold ${unreadCount > 0 ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'}`}>
+            <span className={`px-2.5 py-1 rounded text-xs font-bold ${unreadCount > 0 ? 'bg-danger-soft text-danger' : 'bg-success-soft text-success'}`}>
               {unreadCount} غير مقروءة
             </span>
-            <button onClick={runChecks} disabled={loading} className="px-3 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium text-xs transition disabled:opacity-50 flex items-center gap-1.5">
+            <button onClick={runChecks} disabled={loading} className="px-3 py-2 rounded-lg bg-surface-sunken hover:bg-surface-sunken text-ink font-medium text-xs transition disabled:opacity-50 flex items-center gap-1.5">
               {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />} تشغيل الفحص الآن
             </button>
           </>}
@@ -114,7 +114,7 @@ export const HrAlertsPage: React.FC = () => {
       </div>
 
       {error && (
-        <div className="mx-6 px-4 py-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs font-semibold flex items-center gap-2">
+        <div className="mx-6 px-4 py-3 bg-danger-soft border border-danger-border rounded-xl text-danger text-xs font-semibold flex items-center gap-2">
           <AlertTriangle className="w-4 h-4 shrink-0" /> {error}
         </div>
       )}
@@ -122,16 +122,16 @@ export const HrAlertsPage: React.FC = () => {
       <div className="mx-6">
         {loading ? (
           <div className="flex items-center justify-center py-20">
-            <Loader2 className="w-8 h-8 animate-spin text-teal-500" />
+            <Loader2 className="w-8 h-8 animate-spin text-success" />
           </div>
         ) : alerts.length === 0 ? (
-          <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center">
-            <CheckCircle2 className="w-12 h-12 text-emerald-400 mx-auto mb-3" />
-            <h3 className="text-sm font-black text-slate-900">لا توجد تنبيهات</h3>
-            <p className="text-xs text-slate-500 mt-1">جميع العقود والمستندات والإجازات والأقساط في وضع طبيعي.</p>
+          <div className="bg-surface rounded-2xl border border-line p-12 text-center">
+            <CheckCircle2 className="w-12 h-12 text-success mx-auto mb-3" />
+            <h3 className="text-sm font-black text-ink">لا توجد تنبيهات</h3>
+            <p className="text-xs text-muted mt-1">جميع العقود والمستندات والإجازات والأقساط في وضع طبيعي.</p>
           </div>
         ) : (
-          <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
+          <div className="rounded-xl border border-line bg-surface overflow-hidden">
             <DataTable
               ariaLabel="تنبيهات الموارد البشرية"
               rows={alerts}
@@ -140,7 +140,7 @@ export const HrAlertsPage: React.FC = () => {
               tableClassName="text-sm"
               rowClassName={(alert: any) => {
                 const isUrgent = alert.type.startsWith('HR_') && !alert.isRead;
-                return `transition-colors border-b border-slate-50/50 last:border-0 ${isUrgent ? 'bg-rose-25' : ''}`;
+                return `transition-colors border-b border-line/50 last:border-0 ${isUrgent ? 'bg-danger-soft' : ''}`;
               }}
               columns={[
                 {
@@ -155,16 +155,16 @@ export const HrAlertsPage: React.FC = () => {
                     );
                   },
                 },
-                { key: 'title', header: 'العنوان', render: (alert: any) => <span className="font-medium text-slate-800">{alert.title}</span> },
-                { key: 'details', header: 'التفاصيل', render: (alert: any) => <span className="text-slate-600">{alert.message}</span> },
+                { key: 'title', header: 'العنوان', render: (alert: any) => <span className="font-medium text-ink">{alert.title}</span> },
+                { key: 'details', header: 'التفاصيل', render: (alert: any) => <span className="text-ink-secondary">{alert.message}</span> },
                 {
                   key: 'date', header: 'التاريخ',
-                  render: (alert: any) => <span className="text-slate-500">{new Date(alert.createdAt).toLocaleDateString('ar-EG', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>,
+                  render: (alert: any) => <span className="text-muted">{new Date(alert.createdAt).toLocaleDateString('ar-EG', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>,
                 },
                 {
                   key: 'status', header: 'الحالة',
                   render: (alert: any) => (
-                    <span className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs font-bold ${alert.isRead ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                    <span className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs font-bold ${alert.isRead ? 'bg-success-soft text-success' : 'bg-warning-soft text-warning'}`}>
                       {alert.isRead ? <CheckCircle2 className="h-2.5 w-2.5" /> : <Clock className="h-2.5 w-2.5" />}
                       {alert.isRead ? 'مقروءة' : 'جديدة'}
                     </span>
@@ -176,7 +176,7 @@ export const HrAlertsPage: React.FC = () => {
         )}
       </div>
 
-      <div className="mx-6 text-xs text-slate-500">
+      <div className="mx-6 text-xs text-muted">
         يتم تشغيل الفحص التلقائي لهذه التنبيهات كل 30 ثانية عند تشغيل النظام، ويشمل: العقود المنتهية أو القريبة من الانتهاء، فترات الاختبار، مستندات الموظفين المنتهية الصلاحية، أرصدة الإجازات المنخفضة، وأقساط القروض المستحقة، ومواعيد صرف الرواتب.
       </div>
     </div>

@@ -45,11 +45,11 @@
   "support": {
     "profileDefaults": "implemented",
     "projectModule": "available",
-    "industrySpecificWorkflows": "not-implemented",
-    "industrySpecificReports": "not-implemented",
-    "industrySpecificDocumentTemplates": "not-implemented",
-    "typedCustomFieldStorage": "not-implemented",
-    "timeTrackingAndServiceBilling": "not-implemented"
+    "industrySpecificWorkflows": "partially-implemented",
+    "industrySpecificReports": "implemented",
+    "industrySpecificDocumentTemplates": "partially-implemented",
+    "typedCustomFieldStorage": "implemented-for-profile-declared-fields",
+    "timeTrackingAndServiceBilling": "implemented"
   },
   "printTemplates": [
     {

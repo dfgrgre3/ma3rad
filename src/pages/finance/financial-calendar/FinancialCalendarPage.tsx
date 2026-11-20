@@ -9,14 +9,14 @@ export const FinancialCalendarPage: React.FC = () => {
   const canViewFinance = PermissionService.can(AuthService.getCurrentUser(), 'ui.finance.calendar.view');
 
   return (
-    <div className="min-h-full space-y-4 bg-slate-50 p-4 text-slate-900 sm:p-6">
+    <div className="min-h-full space-y-4 bg-surface-muted p-4 text-ink sm:p-6">
       {canViewFinance && (
         <nav aria-label="صفحات التقويم المالي" className="flex justify-start">
           <Link
             to="/finance/fiscal-closing"
-            className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm font-bold text-slate-700 transition hover:border-cyan-300 hover:bg-cyan-50 hover:text-cyan-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-600"
+            className="inline-flex items-center gap-2 rounded-xl border border-line-strong bg-surface px-3.5 py-2.5 text-sm font-bold text-ink transition hover:border-accent-border hover:bg-accent-soft hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           >
-            <LockKeyhole className="h-4 w-4 text-cyan-700" />
+            <LockKeyhole className="h-4 w-4 text-primary" />
             إدارة السنة المالية والإقفال
           </Link>
         </nav>

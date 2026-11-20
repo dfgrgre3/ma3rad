@@ -847,6 +847,25 @@ async function createTables() {
       updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
     CREATE INDEX IF NOT EXISTS idx_platform_notification_deliveries_notification ON platform_notification_deliveries(notification_id, created_at);
+
+    -- IP-level bans enforced globally by middleware/ipBan.js. A ban blocks every
+    -- /api/v1 request originating from the address (exact IP or IPv4 CIDR),
+    -- which effectively cuts the whole device off from the central platform.
+    CREATE TABLE IF NOT EXISTS platform_ip_bans (
+      id TEXT PRIMARY KEY,
+      ip_address TEXT NOT NULL,
+      reason TEXT,
+      is_active INTEGER NOT NULL DEFAULT 1 CHECK(is_active IN (0,1)),
+      expires_at TEXT,
+      banned_by TEXT,
+      banned_by_name TEXT,
+      lifted_at TEXT,
+      lifted_by TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_platform_ip_bans_active_address ON platform_ip_bans(ip_address) WHERE is_active = 1;
+    CREATE INDEX IF NOT EXISTS idx_platform_ip_bans_active ON platform_ip_bans(is_active);
   `);
 
   // Upgrade stub tables created by earlier versions (CREATE IF NOT EXISTS

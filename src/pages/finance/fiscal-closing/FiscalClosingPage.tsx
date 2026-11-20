@@ -105,7 +105,7 @@ export const FiscalClosingPage: FC = () => {
   ];
 
   return (
-    <div className="min-h-full space-y-5 bg-slate-50 p-4 text-slate-900 sm:p-6">
+    <div className="min-h-full space-y-5 bg-surface-muted p-4 text-ink sm:p-6">
       <PageHeader
         className="px-1"
         eyebrow="إدارة الفترات المالية"
@@ -116,7 +116,7 @@ export const FiscalClosingPage: FC = () => {
           {canViewFinance && (
             <Link
               to="/finance/calendar"
-              className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-slate-100"
+              className="inline-flex items-center gap-2 rounded-xl border border-line-strong bg-surface px-3.5 py-2.5 text-sm font-bold text-ink transition hover:bg-surface-sunken"
             >
               <CalendarDays className="h-4 w-4" />
               التقويم المالي
@@ -130,7 +130,7 @@ export const FiscalClosingPage: FC = () => {
               loadData(event.target.value);
             }}
             disabled={loading || years.length === 0}
-            className="min-w-52 rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm font-semibold text-slate-700 outline-none focus:border-cyan-500"
+            className="min-w-52 rounded-xl border border-line-strong bg-surface px-3 py-2.5 text-sm font-semibold text-ink outline-none focus:border-primary"
           >
             {years.length === 0 && <option value="">لا توجد سنوات مالية</option>}
             {years.map((year) => <option key={year.id} value={year.id}>{year.name} · {year.status === 'OPEN' ? 'مفتوحة' : 'مقفلة'}</option>)}
@@ -140,7 +140,7 @@ export const FiscalClosingPage: FC = () => {
             onClick={() => loadData()}
             disabled={loading}
             aria-label="تحديث بيانات السنة المالية"
-            className="rounded-xl border border-slate-300 bg-white p-2.5 text-slate-600 transition hover:bg-slate-100 disabled:opacity-50"
+            className="rounded-xl border border-line-strong bg-surface p-2.5 text-ink-secondary transition hover:bg-surface-sunken disabled:opacity-50"
           >
             <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
           </button>
@@ -161,7 +161,7 @@ export const FiscalClosingPage: FC = () => {
                 });
                 setShowYearModal(true);
               }}
-              className="inline-flex items-center gap-2 rounded-xl bg-cyan-700 px-3.5 py-2.5 text-sm font-bold text-white transition hover:bg-cyan-800"
+              className="inline-flex items-center gap-2 rounded-xl bg-primary px-3.5 py-2.5 text-sm font-bold text-white transition hover:bg-primary"
             >
               <Plus className="h-4 w-4" />
               سنة مالية جديدة
@@ -171,17 +171,17 @@ export const FiscalClosingPage: FC = () => {
       />
 
       {loadError && (
-        <div role="alert" className="flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+        <div role="alert" className="flex items-center gap-2 rounded-xl border border-danger-border bg-danger-soft px-4 py-3 text-sm text-danger">
           <AlertCircle className="h-4 w-4 shrink-0" />
           تعذر تحميل بيانات السنة المالية: {loadError}
         </div>
       )}
 
       {!loading && years.length === 0 && !loadError && (
-        <section className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center">
-          <CalendarDays className="mx-auto h-10 w-10 text-slate-300" />
-          <h2 className="mt-4 font-bold text-slate-800">لا توجد سنوات مالية مسجلة</h2>
-          <p className="mt-1 text-sm text-slate-500">
+        <section className="rounded-2xl border border-dashed border-line-strong bg-surface p-10 text-center">
+          <CalendarDays className="mx-auto h-10 w-10 text-muted" />
+          <h2 className="mt-4 font-bold text-ink">لا توجد سنوات مالية مسجلة</h2>
+          <p className="mt-1 text-sm text-muted">
             {canManage ? 'أنشئ سنة مالية لبدء دورة الإقفال.' : 'لا توجد سنوات مالية لعرضها.'}
           </p>
         </section>

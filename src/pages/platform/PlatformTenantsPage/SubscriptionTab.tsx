@@ -46,7 +46,7 @@ export const SubscriptionTab: React.FC<SubscriptionTabProps> = ({
                           تجديد الاشتراك
                         </Button>
                       </div>
-                      <p className="text-[10.5px] text-slate-500 sm:col-span-2">
+                      <p className="text-[10.5px] text-muted sm:col-span-2">
                         تاريخ الانتهاء الحالي: <b>{formatDate(tenant.subscriptionExpiresAt)}</b>
                       </p>
                     </div>
@@ -73,7 +73,7 @@ export const SubscriptionTab: React.FC<SubscriptionTabProps> = ({
                           نقل العميل إلى الباقة الجديدة
                         </Button>
                       </div>
-                      <p className="text-[10.5px] text-amber-700 sm:col-span-2">
+                      <p className="text-[10.5px] text-warning sm:col-span-2">
                         سيتم إلغاء التراخيص والاشتراكات الحالية واستبدالها بترخيص جديد بالباقة المختارة.
                       </p>
                     </div>
@@ -91,7 +91,7 @@ export const SubscriptionTab: React.FC<SubscriptionTabProps> = ({
                       minWidth={720}
                       dense
                       columns={[
-                        { key: 'plan', header: 'الباقة', render: (item) => <span className="text-[11px] font-semibold text-slate-700">{item.planName || '—'}</span> },
+                        { key: 'plan', header: 'الباقة', render: (item) => <span className="text-[11px] font-semibold text-ink">{item.planName || '—'}</span> },
                         { key: 'status', header: 'الحالة', render: (item) => <StatusBadge value={item.status} label={item.status} /> },
                         { key: 'start', header: 'البداية', render: (item) => <span className="text-[10.5px]">{formatDate(item.startDate)}</span> },
                         { key: 'end', header: 'النهاية', render: (item) => <span className="text-[10.5px]">{formatDate(item.endDate)}</span> },

@@ -31,21 +31,21 @@ interface LedgerEntry {
 }
 
 const TYPE_LABELS: Record<string, { label: string; color: string }> = {
-  PURCHASE:         { label: 'شراء', color: 'text-emerald-600' },
-  SALE:             { label: 'بيع', color: 'text-sky-600' },
-  PURCHASE_RETURN:  { label: 'مرتجع شراء', color: 'text-amber-600' },
-  SALES_RETURN:     { label: 'مرتجع بيع', color: 'text-violet-600' },
-  RETURN_IN:        { label: 'مرتجع وارد', color: 'text-violet-600' },
-  RETURN_OUT:       { label: 'مرتجع صادر', color: 'text-amber-600' },
-  TRANSFER_IN:      { label: 'تحويل وارد', color: 'text-teal-600' },
-  TRANSFER_OUT:     { label: 'تحويل صادر', color: 'text-orange-600' },
-  ADJUSTMENT_ADD:   { label: 'تسوية إضافة', color: 'text-emerald-600' },
-  ADJUSTMENT_SUB:   { label: 'تسوية خصم', color: 'text-yellow-600' },
-  ADJUSTMENT:       { label: 'تسوية', color: 'text-yellow-400' },
-  OPENING_BALANCE:  { label: 'رصيد افتتاحي', color: 'text-slate-500' },
-  STOCK_COUNT:      { label: 'تسوية جرد', color: 'text-indigo-600' },
-  DAMAGE:           { label: 'تالف', color: 'text-rose-600' },
-  VOID:             { label: 'إلغاء', color: 'text-slate-500' },
+  PURCHASE:         { label: 'شراء', color: 'text-success' },
+  SALE:             { label: 'بيع', color: 'text-primary' },
+  PURCHASE_RETURN:  { label: 'مرتجع شراء', color: 'text-warning' },
+  SALES_RETURN:     { label: 'مرتجع بيع', color: 'text-primary' },
+  RETURN_IN:        { label: 'مرتجع وارد', color: 'text-primary' },
+  RETURN_OUT:       { label: 'مرتجع صادر', color: 'text-warning' },
+  TRANSFER_IN:      { label: 'تحويل وارد', color: 'text-success' },
+  TRANSFER_OUT:     { label: 'تحويل صادر', color: 'text-warning' },
+  ADJUSTMENT_ADD:   { label: 'تسوية إضافة', color: 'text-success' },
+  ADJUSTMENT_SUB:   { label: 'تسوية خصم', color: 'text-warning' },
+  ADJUSTMENT:       { label: 'تسوية', color: 'text-warning' },
+  OPENING_BALANCE:  { label: 'رصيد افتتاحي', color: 'text-muted' },
+  STOCK_COUNT:      { label: 'تسوية جرد', color: 'text-primary' },
+  DAMAGE:           { label: 'تالف', color: 'text-danger' },
+  VOID:             { label: 'إلغاء', color: 'text-muted' },
 };
 
 const branchAccess = new BranchAccessService();
@@ -250,13 +250,13 @@ export const StockLedgerPage: React.FC = () => {
   };
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
+    <div className="h-full flex flex-col bg-surface-muted text-ink overflow-hidden">
       {/* Header */}
-      <div className="bg-white border-b border-slate-200 px-6 pt-4">
+      <div className="bg-surface border-b border-line px-6 pt-4">
         <PageHeader
           icon={<BookOpen className="w-5 h-5" />}
           title="سجل المخزون (Stock Ledger)"
-          meta={<span className="text-xs bg-violet-500/20 text-violet-600 px-2 py-0.5 rounded-full font-bold">
+          meta={<span className="text-xs bg-primary/20 text-primary px-2 py-0.5 rounded-full font-bold">
             {entries.length} حركة
           </span>}
           actions={
@@ -265,7 +265,7 @@ export const StockLedgerPage: React.FC = () => {
               onClick={exportLedger}
               disabled={!entries.length || !can('inventory.export')}
               title={can('inventory.export') ? 'تصدير سجل الحركة إلى Excel' : 'لا تملك صلاحية تصدير حركة المخزون'}
-              className="flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-medium transition disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex items-center gap-1.5 px-3 py-2 bg-surface-sunken hover:bg-surface-sunken text-ink rounded-lg text-xs font-medium transition disabled:cursor-not-allowed disabled:opacity-50"
             >
               <Download className="w-3.5 h-3.5" />
               تصدير
@@ -275,21 +275,21 @@ export const StockLedgerPage: React.FC = () => {
       </div>
 
       {/* Filters */}
-      <div className="bg-white border-b border-slate-200 px-6 py-3 flex items-center gap-3 flex-wrap">
+      <div className="bg-surface border-b border-line px-6 py-3 flex items-center gap-3 flex-wrap">
         <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+          <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
           <input
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="بحث بالمنتج أو رقم المرجع..."
-            className="w-full pr-9 pl-4 py-2 bg-slate-100 text-sm text-slate-900 placeholder-slate-400 rounded-lg border border-slate-300 focus:border-sky-500 focus:outline-none"
+            className="w-full pr-9 pl-4 py-2 bg-surface-sunken text-sm text-ink placeholder-muted rounded-lg border border-line-strong focus:border-primary focus:outline-none"
           />
         </div>
 
         <select
           value={typeFilter}
           onChange={e => setTypeFilter(e.target.value)}
-          className="px-3 py-2 bg-slate-100 text-sm text-slate-700 rounded-lg border border-slate-300 focus:border-sky-500 focus:outline-none"
+          className="px-3 py-2 bg-surface-sunken text-sm text-ink rounded-lg border border-line-strong focus:border-primary focus:outline-none"
         >
           <option value="">كل الأنواع</option>
           {Object.entries(TYPE_LABELS).map(([k, v]) => (
@@ -300,30 +300,30 @@ export const StockLedgerPage: React.FC = () => {
         <select
           value={warehouseFilter}
           onChange={e => setWarehouseFilter(e.target.value)}
-          className="px-3 py-2 bg-slate-100 text-sm text-slate-700 rounded-lg border border-slate-300 focus:border-sky-500 focus:outline-none"
+          className="px-3 py-2 bg-surface-sunken text-sm text-ink rounded-lg border border-line-strong focus:border-primary focus:outline-none"
         >
           <option value="">كل المخازن</option>
           {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
         </select>
 
-        <label className="flex items-center gap-2 text-xs text-slate-500">
+        <label className="flex items-center gap-2 text-xs text-muted">
           من
           <input
             type="date"
             value={fromDate}
             onChange={e => setFromDate(e.target.value)}
             aria-label="من تاريخ"
-            className="px-2 py-2 bg-slate-100 text-sm text-slate-700 rounded-lg border border-slate-300 focus:border-sky-500 focus:outline-none"
+            className="px-2 py-2 bg-surface-sunken text-sm text-ink rounded-lg border border-line-strong focus:border-primary focus:outline-none"
           />
         </label>
-        <label className="flex items-center gap-2 text-xs text-slate-500">
+        <label className="flex items-center gap-2 text-xs text-muted">
           إلى
           <input
             type="date"
             value={toDate}
             onChange={e => setToDate(e.target.value)}
             aria-label="إلى تاريخ"
-            className="px-2 py-2 bg-slate-100 text-sm text-slate-700 rounded-lg border border-slate-300 focus:border-sky-500 focus:outline-none"
+            className="px-2 py-2 bg-surface-sunken text-sm text-ink rounded-lg border border-line-strong focus:border-primary focus:outline-none"
           />
         </label>
       </div>
@@ -332,10 +332,10 @@ export const StockLedgerPage: React.FC = () => {
       <div className="flex-1 overflow-auto">
         {loading ? (
           <div className="flex items-center justify-center h-32">
-            <div className="w-6 h-6 bg-sky-600 rounded-lg animate-bounce" />
+            <div className="w-6 h-6 bg-primary rounded-lg animate-bounce" />
           </div>
         ) : paginated.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-48 gap-3 text-slate-500">
+          <div className="flex flex-col items-center justify-center h-48 gap-3 text-muted">
             <BookOpen className="w-10 h-10 opacity-30" />
             <p className="text-sm">لا توجد حركات مطابقة</p>
           </div>
@@ -348,23 +348,23 @@ export const StockLedgerPage: React.FC = () => {
             stickyHeader
             tableClassName="text-xs"
             columns={[
-              { key: 'date', header: 'التاريخ', render: (r: any) => <span className="whitespace-nowrap font-mono text-slate-500">{r.date}</span> },
-              { key: 'product', header: 'المنتج', render: (r: any) => <span className="block max-w-[200px] truncate font-medium text-slate-900">{r.product}</span> },
-              { key: 'wh', header: 'المخزن', render: (r: any) => <span className="text-slate-700">{r.warehouse}</span> },
+              { key: 'date', header: 'التاريخ', render: (r: any) => <span className="whitespace-nowrap font-mono text-muted">{r.date}</span> },
+              { key: 'product', header: 'المنتج', render: (r: any) => <span className="block max-w-[200px] truncate font-medium text-ink">{r.product}</span> },
+              { key: 'wh', header: 'المخزن', render: (r: any) => <span className="text-ink">{r.warehouse}</span> },
               {
                 key: 'type', header: 'النوع',
                 render: (r: any) => {
-                  const typeInfo = TYPE_LABELS[r.type] ?? { label: r.type, color: 'text-slate-500' };
+                  const typeInfo = TYPE_LABELS[r.type] ?? { label: r.type, color: 'text-muted' };
                   return <span className={`font-bold ${typeInfo.color}`}>{typeInfo.label}</span>;
                 },
               },
-              { key: 'in', header: 'وارد', render: (r: any) => <span className="font-bold text-emerald-600">{r.qtyIn > 0 ? `+${formatProductQuantity(r.qtyIn, r)}` : '—'}</span> },
-              { key: 'out', header: 'صادر', render: (r: any) => <span className="font-bold text-rose-600">{r.qtyOut > 0 ? `-${formatProductQuantity(r.qtyOut, r)}` : '—'}</span> },
-              { key: 'loss', header: 'فقد / تلف', render: (r: any) => <span className="font-bold text-amber-600">{r.qtyLoss > 0 ? `-${formatProductQuantity(r.qtyLoss, r)}` : '—'}</span> },
-              { key: 'prev', header: 'الرصيد السابق', render: (r: any) => <span className="font-bold text-slate-700">{formatProductQuantity(r.previousBalance, r)}</span> },
-              { key: 'balance', header: 'الرصيد بعد الحركة', render: (r: any) => <span className="font-bold text-slate-900">{formatProductQuantity(r.balance, r)}</span> },
-              { key: 'ref', header: 'المرجع الأصلي', render: (r: any) => <span className="font-mono text-slate-500">{r.ref || '—'}</span> },
-              { key: 'user', header: 'المستخدم', render: (r: any) => <span className="text-slate-500">{r.user}</span> },
+              { key: 'in', header: 'وارد', render: (r: any) => <span className="font-bold text-success">{r.qtyIn > 0 ? `+${formatProductQuantity(r.qtyIn, r)}` : '—'}</span> },
+              { key: 'out', header: 'صادر', render: (r: any) => <span className="font-bold text-danger">{r.qtyOut > 0 ? `-${formatProductQuantity(r.qtyOut, r)}` : '—'}</span> },
+              { key: 'loss', header: 'فقد / تلف', render: (r: any) => <span className="font-bold text-warning">{r.qtyLoss > 0 ? `-${formatProductQuantity(r.qtyLoss, r)}` : '—'}</span> },
+              { key: 'prev', header: 'الرصيد السابق', render: (r: any) => <span className="font-bold text-ink">{formatProductQuantity(r.previousBalance, r)}</span> },
+              { key: 'balance', header: 'الرصيد بعد الحركة', render: (r: any) => <span className="font-bold text-ink">{formatProductQuantity(r.balance, r)}</span> },
+              { key: 'ref', header: 'المرجع الأصلي', render: (r: any) => <span className="font-mono text-muted">{r.ref || '—'}</span> },
+              { key: 'user', header: 'المستخدم', render: (r: any) => <span className="text-muted">{r.user}</span> },
             ]}
           />
         )}
@@ -372,22 +372,22 @@ export const StockLedgerPage: React.FC = () => {
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="bg-white border-t border-slate-200 px-6 py-3 flex items-center justify-between">
-          <span className="text-xs text-slate-500">
+        <div className="bg-surface border-t border-line px-6 py-3 flex items-center justify-between">
+          <span className="text-xs text-muted">
             صفحة {page} من {totalPages} — {entries.length} نتيجة
           </span>
           <div className="flex items-center gap-2">
             <button
               onClick={() => setPage(p => Math.max(1, p - 1))}
               disabled={page === 1}
-              className="px-3 py-1.5 bg-slate-100 text-slate-700 rounded-lg text-xs disabled:opacity-40 hover:bg-slate-200 transition"
+              className="px-3 py-1.5 bg-surface-sunken text-ink rounded-lg text-xs disabled:opacity-40 hover:bg-surface-sunken transition"
             >
               السابق
             </button>
             <button
               onClick={() => setPage(p => Math.min(totalPages, p + 1))}
               disabled={page === totalPages}
-              className="px-3 py-1.5 bg-slate-100 text-slate-700 rounded-lg text-xs disabled:opacity-40 hover:bg-slate-200 transition"
+              className="px-3 py-1.5 bg-surface-sunken text-ink rounded-lg text-xs disabled:opacity-40 hover:bg-surface-sunken transition"
             >
               التالي
             </button>

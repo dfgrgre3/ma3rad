@@ -196,10 +196,10 @@ export const DocumentsPage: React.FC<{ mode?: Mode }> = ({ mode = 'documents' })
 
   if (!canViewDocuments && !canViewContracts) {
     return (
-      <div className="h-full flex items-center justify-center bg-slate-50 dark:bg-slate-950">
+      <div className="h-full flex items-center justify-center bg-surface-muted ">
         <div className="text-center">
-          <LockKeyhole className="w-10 h-10 text-slate-400 mx-auto mb-2" />
-          <p className="text-sm font-bold text-slate-600 dark:text-slate-300">ليس لديك صلاحية الوصول إلى المستندات أو العقود.</p>
+          <LockKeyhole className="w-10 h-10 text-muted mx-auto mb-2" />
+          <p className="text-sm font-bold text-ink-secondary ">ليس لديك صلاحية الوصول إلى المستندات أو العقود.</p>
         </div>
       </div>
     );
@@ -445,23 +445,23 @@ export const DocumentsPage: React.FC<{ mode?: Mode }> = ({ mode = 'documents' })
     : Object.entries(CONTRACT_STATUS_LABEL);
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 overflow-hidden">
-      <div className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-6 pt-4">
+    <div className="h-full flex flex-col bg-surface-muted text-ink overflow-hidden">
+      <div className="bg-surface border-b border-line px-6 pt-4">
         <PageHeader
           icon={<FileText className="w-5 h-5" />}
           title={pageCopy?.title || 'مركز المستندات والعقود'}
           description={pageCopy?.description || 'نسخ موثقة، صلاحيات وصول، ومتابعة تجديد العقود'}
           actions={<>
-            <button onClick={load} className="p-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50" title="تحديث">
+            <button onClick={load} className="p-2 rounded-xl border border-line bg-surface hover:bg-surface-muted" title="تحديث">
               <RefreshCw className="w-4 h-4" />
             </button>
             {(tab === 'documents' ? can('documents.create') : can('contracts.create')) && (
-              <button onClick={openCreate} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold transition">
+              <button onClick={openCreate} className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary text-white rounded-xl text-sm font-semibold transition">
                 <Plus className="w-4 h-4" /> {tab === 'documents' ? 'مستند جديد' : 'عقد جديد'}
               </button>
             )}
             {(tab === 'documents' ? canExportDocuments : canExportContracts) && (
-              <button onClick={tab === 'documents' ? exportDocuments : exportContracts} className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-semibold">
+              <button onClick={tab === 'documents' ? exportDocuments : exportContracts} className="flex items-center gap-2 px-4 py-2 bg-surface border border-line rounded-xl text-sm font-semibold">
                 <Download className="w-4 h-4" /> تصدير
               </button>
             )}
@@ -469,7 +469,7 @@ export const DocumentsPage: React.FC<{ mode?: Mode }> = ({ mode = 'documents' })
         />
       </div>
 
-      <div className="grid grid-cols-1 gap-3 border-b border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-900 sm:grid-cols-2 md:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 border-b border-line bg-surface px-4 py-3 sm:grid-cols-2 md:grid-cols-4">
         {canViewDocuments && <SummaryCard label="المستندات" value={summary.documents} hint={`${summary.activeDocuments} نشط`} icon={FileText} />}
         {canViewDocuments && <SummaryCard label="مستندات قاربت الانتهاء" value={summary.expiringDocuments} hint="خلال 30 يومًا" icon={CalendarClock} tone="amber" />}
         {canViewContracts && <SummaryCard label="العقود السارية" value={summary.activeContracts} hint={`من ${summary.contracts} عقد`} icon={CheckCircle2} tone="emerald" />}
@@ -479,26 +479,26 @@ export const DocumentsPage: React.FC<{ mode?: Mode }> = ({ mode = 'documents' })
       <div className="flex items-center gap-2 px-4 pt-3">
         {canViewDocuments && <button
           onClick={() => { navigate('/documents'); setStatusFilter('ALL'); }}
-          className={`px-4 py-2 rounded-xl text-xs font-bold border ${tab === 'documents' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700'}`}
+          className={`px-4 py-2 rounded-xl text-xs font-bold border ${tab === 'documents' ? 'bg-primary text-white border-primary' : 'bg-surface border-line'}`}
         >
           المستندات ({documentTotal})
         </button>}
         {canViewContracts && <button
           onClick={() => { navigate('/contracts'); setStatusFilter('ALL'); }}
-          className={`px-4 py-2 rounded-xl text-xs font-bold border ${tab === 'contracts' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700'}`}
+          className={`px-4 py-2 rounded-xl text-xs font-bold border ${tab === 'contracts' ? 'bg-primary text-white border-primary' : 'bg-surface border-line'}`}
         >
           العقود ({contractTotal})
         </button>}
       </div>
 
-      <div className="p-4 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 mt-3 flex flex-col sm:flex-row gap-2">
+      <div className="p-4 bg-surface border-b border-line mt-3 flex flex-col sm:flex-row gap-2">
         <div className="relative flex-1">
-          <Search className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+          <Search className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder={tab === 'documents' ? 'بحث بالعنوان أو الرقم...' : 'بحث بالعقد أو الطرف...'}
-            className="w-full pl-4 pr-10 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:border-indigo-400"
+            className="w-full pl-4 pr-10 py-2.5 bg-surface border border-line rounded-xl text-sm focus:outline-none focus:border-primary"
           />
         </div>
         <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className={`${inputCls} sm:w-48 py-2.5`}>
@@ -508,9 +508,9 @@ export const DocumentsPage: React.FC<{ mode?: Mode }> = ({ mode = 'documents' })
       </div>
 
       <div className="flex-1 overflow-y-auto p-4">
-        {error && <div className="mb-3 px-4 py-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold">{error}</div>}
+        {error && <div className="mb-3 px-4 py-2.5 rounded-xl bg-danger-soft border border-danger-border text-danger text-xs font-semibold">{error}</div>}
         {loading ? (
-          <div className="py-16 flex justify-center"><Loader2 className="w-6 h-6 animate-spin text-indigo-500" /></div>
+          <div className="py-16 flex justify-center"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>
         ) : tab === 'documents' ? (
           <DocumentsTable documents={documents} onOpen={openDocument} />
         ) : (

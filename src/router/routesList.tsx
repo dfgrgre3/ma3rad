@@ -23,6 +23,12 @@ export const appRoutes: RouteDef[] = [
   { path: 'sales/reservations', element: <Navigate to="/sales/orders-deposits" replace /> },
   { path: 'sales/after-sales', element: <P.AfterSalesPage /> },
   { path: 'restaurant', element: <P.RestaurantPage /> },
+  { path: 'hospitality', element: <P.HotelPage /> },
+  { path: 'workshop', element: <P.WorkshopPage /> },
+  { path: 'education', element: <P.EducationPage /> },
+  { path: 'time-billing', element: <P.TimeBillingPage /> },
+  { path: 'ceramics', element: <P.CeramicsPage /> },
+  { path: 'retail', element: <P.RetailWorkspacePage /> },
   { path: 'pos', element: <P.PosView /> },
   { path: 'sales', element: <P.SalesHubPage /> },
   { path: 'daily/sales', element: <P.TodaySalesPage /> },
@@ -62,6 +68,7 @@ export const appRoutes: RouteDef[] = [
   { path: 'inventory/damage-quarantine', element: <P.DamageQuarantinePage /> },
   { path: 'inventory/reconciliation', element: <P.InventoryReconciliationPage /> },
   { path: 'inventory/alerts', element: <P.InventoryAlertsPage /> },
+  { path: 'inventory/expiry', element: <P.ExpiryPage /> },
 
   // Branches & Warehouses
   { path: 'branches', element: <P.BranchesPage /> },
@@ -84,7 +91,7 @@ export const appRoutes: RouteDef[] = [
   // Purchasing
   { path: 'suppliers', element: <P.SuppliersView /> },
   { path: 'suppliers/:id', element: <P.SupplierDetailPage /> },
-  { path: 'purchases', element: <P.PurchasesView /> },
+  { path: 'purchases', element: <P.PurchasingHubPage /> },
   { path: 'purchases/requests', element: <P.PurchaseRequestsPage /> },
   { path: 'purchases/quotations', element: <P.SupplierQuotationsPage /> },
   { path: 'purchases/orders', element: <P.PurchaseOrdersPage /> },
@@ -116,6 +123,9 @@ export const appRoutes: RouteDef[] = [
 
   // Projects & Operations
   { path: 'projects', element: <P.ProjectsPage /> },
+  { path: 'projects/execution', element: <P.ProjectExecutionPage /> },
+  { path: 'projects/sites', element: <P.SiteManagementPage /> },
+  { path: 'projects/boq', element: <P.GeneralBoqPage /> },
   { path: 'projects/:id', element: <P.ProjectDetailPage /> },
   { path: 'fleet/dashboard', element: <P.FleetDashboardPage /> },
   { path: 'facility-management', element: <P.FacilityManagementPage /> },

@@ -152,26 +152,26 @@ export const PlatformSyncMonitorPage: React.FC = () => {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <div className="p-3 bg-slate-900/60 border border-slate-800 rounded-xl">
-          <p className="text-[11px] font-semibold text-slate-400">إجمالي عمليات المزامنة الموثقة</p>
-          <p className="text-xl font-black text-slate-100 mt-1">{filteredLogs.length}</p>
+        <div className="p-3 bg-primary/60 border border-line-strong rounded-xl">
+          <p className="text-[11px] font-semibold text-muted">إجمالي عمليات المزامنة الموثقة</p>
+          <p className="text-xl font-black text-muted mt-1">{filteredLogs.length}</p>
         </div>
-        <div className="p-3 bg-emerald-950/20 border border-emerald-500/20 rounded-xl">
-          <p className="text-[11px] font-semibold text-emerald-400">مزامنة ناجحة</p>
-          <p className="text-xl font-black text-emerald-300 mt-1">{successCount}</p>
+        <div className="p-3 bg-success/20 border border-success/20 rounded-xl">
+          <p className="text-[11px] font-semibold text-success">مزامنة ناجحة</p>
+          <p className="text-xl font-black text-success mt-1">{successCount}</p>
         </div>
-        <div className="p-3 bg-rose-950/20 border border-rose-500/20 rounded-xl">
-          <p className="text-[11px] font-semibold text-rose-400">فشل أو تعارض (Conflicts)</p>
-          <p className="text-xl font-black text-rose-300 mt-1">{failedCount}</p>
+        <div className="p-3 bg-danger/20 border border-danger/20 rounded-xl">
+          <p className="text-[11px] font-semibold text-danger">فشل أو تعارض (Conflicts)</p>
+          <p className="text-xl font-black text-danger mt-1">{failedCount}</p>
         </div>
-        <div className="p-3 bg-amber-950/20 border border-amber-500/20 rounded-xl">
-          <p className="text-[11px] font-semibold text-amber-400">معلقة أو جزئية</p>
-          <p className="text-xl font-black text-amber-300 mt-1">{pendingCount}</p>
+        <div className="p-3 bg-warning/20 border border-warning/20 rounded-xl">
+          <p className="text-[11px] font-semibold text-warning">معلقة أو جزئية</p>
+          <p className="text-xl font-black text-warning mt-1">{pendingCount}</p>
         </div>
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-800 bg-slate-900/60 p-3 shadow-sm">
+      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-line-strong bg-primary/60 p-3 shadow-sm">
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
@@ -198,18 +198,18 @@ export const PlatformSyncMonitorPage: React.FC = () => {
       </div>
 
       {error && (
-        <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-lg text-xs font-bold text-rose-300">
+        <div className="p-3 bg-danger/10 border border-danger/20 rounded-lg text-xs font-bold text-danger">
           {error}
         </div>
       )}
 
       {/* Sync Log Table */}
-      <div className="overflow-hidden rounded-xl border border-slate-800 bg-slate-900/70 shadow-sm">
+      <div className="overflow-hidden rounded-xl border border-line-strong bg-primary/70 shadow-sm">
         {loading ? (
-          <div className="py-16 text-center text-sm font-semibold text-slate-500">جارٍ قراءة سجلات المزامنة...</div>
+          <div className="py-16 text-center text-sm font-semibold text-muted">جارٍ قراءة سجلات المزامنة...</div>
         ) : filteredLogs.length === 0 ? (
           <EmptyState
-            icon={<RefreshCw className="h-6 w-6 text-slate-500" />}
+            icon={<RefreshCw className="h-6 w-6 text-muted" />}
             title="لا توجد عمليات مزامنة مسجلة"
             description="السجل هادئ حالياً ولا توجد تعارضات أو عمليات فاشلة مسجلة."
           />
@@ -222,7 +222,7 @@ export const PlatformSyncMonitorPage: React.FC = () => {
               minWidth={900}
               dense
               tableClassName="text-xs"
-              rowClassName={() => 'transition-colors hover:bg-slate-800/30'}
+              rowClassName={() => 'transition-colors hover:bg-primary/30'}
               columns={[
                 {
                   key: 'tenant', header: 'العميل / الجهاز',
@@ -230,9 +230,9 @@ export const PlatformSyncMonitorPage: React.FC = () => {
                     const tenantObj = tenants.find((t: any) => t.id === log.tenantId);
                     return (
                       <span className="block">
-                        <span className="block font-bold text-slate-100">{tenantObj ? tenantObj.name : log.tenantId ? log.tenantId : 'عام للمنصة'}</span>
+                        <span className="block font-bold text-muted">{tenantObj ? tenantObj.name : log.tenantId ? log.tenantId : 'عام للمنصة'}</span>
                         {log.deviceId && (
-                          <span className="mt-0.5 flex items-center gap-1 font-mono text-[10px] text-slate-400">
+                          <span className="mt-0.5 flex items-center gap-1 font-mono text-[10px] text-muted">
                             <Smartphone className="h-3 w-3" />
                             {log.deviceId}
                           </span>
@@ -243,12 +243,12 @@ export const PlatformSyncMonitorPage: React.FC = () => {
                 },
                 {
                   key: 'type', header: 'نوع المزامنة',
-                  render: (log: any) => <span className="rounded bg-slate-800 px-2 py-0.5 font-mono text-[10px] text-slate-300">{log.syncType}</span>,
+                  render: (log: any) => <span className="rounded bg-primary px-2 py-0.5 font-mono text-[10px] text-muted">{log.syncType}</span>,
                 },
                 {
                   key: 'status', header: 'الحالة',
                   render: (log: any) => (
-                    <span className={`inline-flex items-center gap-1 font-bold ${log.status === 'SUCCESS' ? 'text-emerald-400' : log.status === 'FAIL' ? 'text-rose-400' : log.status === 'PARTIAL' ? 'font-black text-amber-400' : 'text-sky-400'}`}>
+                    <span className={`inline-flex items-center gap-1 font-bold ${log.status === 'SUCCESS' ? 'text-success' : log.status === 'FAIL' ? 'text-danger' : log.status === 'PARTIAL' ? 'font-black text-warning' : 'text-primary'}`}>
                       {log.status === 'SUCCESS' ? (<><CheckCircle2 className="h-3 w-3" /> نجاح</>)
                         : log.status === 'FAIL' ? (<><XCircle className="h-3 w-3" /> فشل</>)
                         : log.status === 'PARTIAL' ? (<><AlertTriangle className="h-3 w-3" /> تعارض بيانات</>)
@@ -256,18 +256,18 @@ export const PlatformSyncMonitorPage: React.FC = () => {
                     </span>
                   ),
                 },
-                { key: 'records', header: 'السجلات المنقولة', render: (log: any) => <span className="font-semibold text-slate-200">{formatNumber(log.recordsSynced)} سجل</span> },
+                { key: 'records', header: 'السجلات المنقولة', render: (log: any) => <span className="font-semibold text-muted">{formatNumber(log.recordsSynced)} سجل</span> },
                 {
                   key: 'detail', header: 'تفاصيل أو أخطاء',
                   render: (log: any) => log.errorDetail ? (
-                    <span className="block max-w-xs truncate font-mono text-[11px] text-rose-400">{log.errorDetail}</span>
-                  ) : <span className="text-slate-400">مزامنة سليمة تماماً</span>,
+                    <span className="block max-w-xs truncate font-mono text-[11px] text-danger">{log.errorDetail}</span>
+                  ) : <span className="text-muted">مزامنة سليمة تماماً</span>,
                 },
-                { key: 'time', header: 'التوقيت', render: (log: any) => <span className="text-slate-400">{formatDateTime(log.createdAt)}</span> },
+                { key: 'time', header: 'التوقيت', render: (log: any) => <span className="text-muted">{formatDateTime(log.createdAt)}</span> },
                 {
                   key: 'action', header: 'إجراء', align: 'center',
                   render: (log: any) => (
-                    <button onClick={() => void handleRunSync(log.tenantId)} className="mx-auto flex items-center gap-1 text-xs text-sky-400 hover:text-sky-300" title="إعادة المزامنة فوراً">
+                    <button onClick={() => void handleRunSync(log.tenantId)} className="mx-auto flex items-center gap-1 text-xs text-primary hover:text-primary" title="إعادة المزامنة فوراً">
                       <RotateCcw className="h-3 w-3" />
                       إعادة
                     </button>

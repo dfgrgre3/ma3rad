@@ -1,5 +1,5 @@
 import React from 'react';
-import { Shield, Laptop, Clock, Key, FileWarning } from 'lucide-react';
+import { Shield, Laptop, Clock, Key, FileWarning, Ban } from 'lucide-react';
 import type { SecurityTab } from './constants';
 
 interface TabsBarProps {
@@ -10,13 +10,13 @@ interface TabsBarProps {
 }
 
 export const TabsBar: React.FC<TabsBarProps> = ({ tab, onTabChange, sessionsCount, incidentsCount }) => (
-  <div className="flex border-b border-slate-800 pb-0">
+  <div className="flex border-b border-line-strong pb-0">
     <button
       onClick={() => onTabChange('OVERVIEW')}
       className={`flex items-center gap-2 px-5 py-3 text-xs font-bold border-b-2 transition-all ${
         tab === 'OVERVIEW'
-          ? 'border-emerald-500 text-emerald-400 bg-slate-900/60'
-          : 'border-transparent text-slate-400 hover:text-slate-200'
+          ? 'border-success text-success bg-primary/60'
+          : 'border-transparent text-muted hover:text-muted'
       }`}
     >
       <Shield className="h-4 w-4" />
@@ -27,8 +27,8 @@ export const TabsBar: React.FC<TabsBarProps> = ({ tab, onTabChange, sessionsCoun
       onClick={() => onTabChange('SESSIONS')}
       className={`flex items-center gap-2 px-5 py-3 text-xs font-bold border-b-2 transition-all ${
         tab === 'SESSIONS'
-          ? 'border-emerald-500 text-emerald-400 bg-slate-900/60'
-          : 'border-transparent text-slate-400 hover:text-slate-200'
+          ? 'border-success text-success bg-primary/60'
+          : 'border-transparent text-muted hover:text-muted'
       }`}
     >
       <Laptop className="h-4 w-4" />
@@ -39,8 +39,8 @@ export const TabsBar: React.FC<TabsBarProps> = ({ tab, onTabChange, sessionsCoun
       onClick={() => onTabChange('LOGINS')}
       className={`flex items-center gap-2 px-5 py-3 text-xs font-bold border-b-2 transition-all ${
         tab === 'LOGINS'
-          ? 'border-emerald-500 text-emerald-400 bg-slate-900/60'
-          : 'border-transparent text-slate-400 hover:text-slate-200'
+          ? 'border-success text-success bg-primary/60'
+          : 'border-transparent text-muted hover:text-muted'
       }`}
     >
       <Clock className="h-4 w-4" />
@@ -51,8 +51,8 @@ export const TabsBar: React.FC<TabsBarProps> = ({ tab, onTabChange, sessionsCoun
       onClick={() => onTabChange('KEYS')}
       className={`flex items-center gap-2 px-5 py-3 text-xs font-bold border-b-2 transition-all ${
         tab === 'KEYS'
-          ? 'border-emerald-500 text-emerald-400 bg-slate-900/60'
-          : 'border-transparent text-slate-400 hover:text-slate-200'
+          ? 'border-success text-success bg-primary/60'
+          : 'border-transparent text-muted hover:text-muted'
       }`}
     >
       <Key className="h-4 w-4" />
@@ -63,12 +63,24 @@ export const TabsBar: React.FC<TabsBarProps> = ({ tab, onTabChange, sessionsCoun
       onClick={() => onTabChange('INCIDENTS')}
       className={`flex items-center gap-2 px-5 py-3 text-xs font-bold border-b-2 transition-all ${
         tab === 'INCIDENTS'
-          ? 'border-emerald-500 text-emerald-400 bg-slate-900/60'
-          : 'border-transparent text-slate-400 hover:text-slate-200'
+          ? 'border-success text-success bg-primary/60'
+          : 'border-transparent text-muted hover:text-muted'
       }`}
     >
       <FileWarning className="h-4 w-4" />
       <span>سجل الحوادث والاستجابة ({incidentsCount})</span>
+    </button>
+
+    <button
+      onClick={() => onTabChange('IP_BANS')}
+      className={`flex items-center gap-2 px-5 py-3 text-xs font-bold border-b-2 transition-all ${
+        tab === 'IP_BANS'
+          ? 'border-success text-success bg-primary/60'
+          : 'border-transparent text-muted hover:text-muted'
+      }`}
+    >
+      <Ban className="h-4 w-4" />
+      <span>حظر عناوين IP</span>
     </button>
   </div>
 );

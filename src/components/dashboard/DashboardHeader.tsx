@@ -80,7 +80,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
 
       <section
         aria-label="عناصر التحكم في لوحة المعلومات"
-        className="grid min-w-0 grid-cols-1 gap-2 rounded-[2px] border border-[#d9d9d9] bg-white p-2.5 dark:border-[#3d3d3d] dark:bg-[#2b2b2b] sm:grid-cols-2 sm:items-center lg:grid-cols-[minmax(12rem,1fr)_minmax(15rem,1.2fr)_minmax(10rem,auto)_auto]"
+        className="grid min-w-0 grid-cols-1 gap-2 rounded-[2px] border border-[#d9d9d9] bg-surface p-2.5 dark:border-[#3d3d3d] dark:bg-[#2b2b2b] sm:grid-cols-2 sm:items-center lg:grid-cols-[minmax(12rem,1fr)_minmax(15rem,1.2fr)_minmax(10rem,auto)_auto]"
       >
         <div className="flex min-w-0 items-center gap-2">
           <Building2 className="h-4 w-4 shrink-0 text-[#0078d4]" aria-hidden="true" />
@@ -90,7 +90,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
               id="dashboard-active-branch"
               value={activeBranchId}
               onChange={(event) => switchBranch(event.target.value)}
-              className="min-h-8 min-w-0 flex-1 rounded-[2px] border border-[#c8c8c8] bg-white px-2 text-[12px] font-semibold text-[#1b1b1b] outline-none focus-visible:border-[#0078d4] focus-visible:ring-2 focus-visible:ring-[#0078d4]/25 dark:border-[#565656] dark:bg-[#252525] dark:text-[#f0f0f0]"
+              className="min-h-8 min-w-0 flex-1 rounded-[2px] border border-[#c8c8c8] bg-surface px-2 text-[12px] font-semibold text-[#1b1b1b] outline-none focus-visible:border-[#0078d4] focus-visible:ring-2 focus-visible:ring-[#0078d4]/25 dark:border-[#565656] dark:bg-[#252525] dark:text-[#f0f0f0]"
               aria-label="الفرع النشط"
             >
               {branches.map((branch) => (
@@ -133,7 +133,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
         </Button>
 
         {branchError && (
-          <p className="sm:col-span-2 lg:col-span-4 text-[11px] font-semibold text-rose-700 dark:text-rose-300" role="alert">
+          <p className="sm:col-span-2 lg:col-span-4 text-[11px] font-semibold text-danger " role="alert">
             تعذر تحديث الفرع: {branchError}
           </p>
         )}

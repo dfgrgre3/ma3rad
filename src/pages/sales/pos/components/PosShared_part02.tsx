@@ -10,7 +10,7 @@ export const Field: React.FC<{ label: string; id?: string; children: React.React
   if (!hasControl) {
     return (
       <div className="block">
-        <span className="block text-[11px] font-bold text-slate-500 mb-1">{label}</span>
+        <span className="block text-[11px] font-bold text-muted mb-1">{label}</span>
         {fieldChildren}
       </div>
     );
@@ -18,7 +18,7 @@ export const Field: React.FC<{ label: string; id?: string; children: React.React
 
   return (
     <label htmlFor={controlId} className="block">
-      <span className="block text-[11px] font-bold text-slate-500 mb-1">{label}</span>
+      <span className="block text-[11px] font-bold text-muted mb-1">{label}</span>
       {fieldChildren}
     </label>
   );
@@ -34,21 +34,21 @@ export const Modal: React.FC<{
     <button
       type="button"
       aria-label="إغلاق النافذة"
-      className="absolute inset-0 h-full w-full border-0 bg-slate-900/50 p-0 backdrop-blur-sm"
+      className="absolute inset-0 h-full w-full border-0 bg-primary/50 p-0 backdrop-blur-sm"
       onClick={onClose}
     />
     <div
       role="dialog"
       aria-modal="true"
       aria-label={title}
-      className="relative bg-white border border-slate-200 rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl"
+      className="relative bg-surface border border-line rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl"
     >
-      <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
-        <div className="flex items-center gap-2 text-sky-600">
+      <div className="px-5 py-4 border-b border-line flex items-center justify-between">
+        <div className="flex items-center gap-2 text-primary">
           {icon}
-          <h2 className="text-sm font-black text-slate-900">{title}</h2>
+          <h2 className="text-sm font-black text-ink">{title}</h2>
         </div>
-        <button onClick={onClose} aria-label="إغلاق النافذة" className="text-slate-500 hover:text-slate-900">
+        <button onClick={onClose} aria-label="إغلاق النافذة" className="text-muted hover:text-ink">
           <X className="w-5 h-5" />
         </button>
       </div>

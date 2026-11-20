@@ -13,7 +13,7 @@ export const PriceListsForProduct: React.FC<PriceListsForProductProps> = ({ prod
      FROM price_list_items pli JOIN price_lists pl ON pl.id = pli.price_list_id
      WHERE pli.product_id = ? ORDER BY pl.name`, [productId]
   );
-  if (rows.length === 0) return <div className="text-center text-slate-500 py-8 text-sm">لا توجد قوائم أسعار مرتبطة</div>;
+  if (rows.length === 0) return <div className="text-center text-muted py-8 text-sm">لا توجد قوائم أسعار مرتبطة</div>;
   return (
     <DataTable
       ariaLabel="قوائم أسعار المنتج"
@@ -23,8 +23,8 @@ export const PriceListsForProduct: React.FC<PriceListsForProductProps> = ({ prod
       tableClassName="text-sm"
       columns={[
         { key: 'name', header: 'قائمة الأسعار', render: (r: any) => <span className="font-medium">{r.name}</span> },
-        { key: 'price', header: `السعر (${unitLabel})`, render: (r: any) => <span className="font-mono font-bold text-sky-600">{r.priceM2}</span> },
-        { key: 'cur', header: 'العملة', render: (r: any) => <span className="text-slate-500">{r.currency}</span> },
+        { key: 'price', header: `السعر (${unitLabel})`, render: (r: any) => <span className="font-mono font-bold text-primary">{r.priceM2}</span> },
+        { key: 'cur', header: 'العملة', render: (r: any) => <span className="text-muted">{r.currency}</span> },
       ]}
     />
   );

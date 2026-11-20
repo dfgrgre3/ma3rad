@@ -173,22 +173,7 @@ export const GRANULAR_PAGE_PERMISSIONS: PermissionDef[] = [
   { code: 'projects.documents.view', name: 'عرض مستندات المشروع', module: 'PROJECTS' },
   { code: 'projects.print', name: 'طباعة تقارير المشاريع', module: 'PROJECTS' },
 
-  // Manufacturing
-  { code: 'manufacturing.orders.view', name: 'عرض أوامر التصنيع', module: 'MANUFACTURING' },
-  { code: 'manufacturing.orders.create', name: 'إنشاء أمر تصنيع', module: 'MANUFACTURING' },
-  { code: 'manufacturing.orders.approve', name: 'اعتماد أمر تصنيع', module: 'MANUFACTURING' },
-  { code: 'manufacturing.orders.execute', name: 'تنفيذ أمر تصنيع', module: 'MANUFACTURING' },
-  { code: 'manufacturing.bom.view', name: 'عرض قوائم المواد', module: 'MANUFACTURING' },
-  { code: 'manufacturing.bom.manage', name: 'إدارة قوائم المواد', module: 'MANUFACTURING' },
-  { code: 'manufacturing.quality.view', name: 'عرض مراقبة الجودة', module: 'MANUFACTURING' },
-  { code: 'manufacturing.quality.manage', name: 'إدارة مراقبة الجودة', module: 'MANUFACTURING' },
-  { code: 'manufacturing.maintenance.view', name: 'عرض الصيانة', module: 'MANUFACTURING' },
-  { code: 'manufacturing.maintenance.manage', name: 'إدارة الصيانة', module: 'MANUFACTURING' },
-  { code: 'manufacturing.wip.view', name: 'عرض الإنتاج تحت التشغيل', module: 'MANUFACTURING' },
-  { code: 'manufacturing.wip.manage', name: 'إدارة الإنتاج تحت التشغيل', module: 'MANUFACTURING' },
-  { code: 'manufacturing.disposition.view', name: 'عرض التصرف في المخلفات', module: 'MANUFACTURING' },
-  { code: 'manufacturing.disposition.manage', name: 'إدارة التصرف في المخلفات', module: 'MANUFACTURING' },
-  { code: 'manufacturing.export', name: 'تصدير بيانات التصنيع', module: 'MANUFACTURING' },
+  // Manufacturing — defined in businessPermissions.ts (single source of truth).
 
   // Employees / operations
   { code: 'employees.attendance.view', name: 'عرض الحضور والانصراف', module: 'EMPLOYEES' },

@@ -126,7 +126,7 @@ export const AuditLogPage: React.FC = () => {
           title={
             <span className="flex flex-wrap items-center gap-2">
               سجل المراجعة والأمان
-              <span className="inline-flex items-center gap-1 rounded-full border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-[10px] font-bold text-indigo-800">
+              <span className="inline-flex items-center gap-1 rounded-full border border-accent-border bg-accent-soft px-2.5 py-1 text-[10px] font-bold text-primary">
                 <Fingerprint className="h-3 w-3" aria-hidden="true" />
                 مصدران محفوظان
               </span>
@@ -139,7 +139,7 @@ export const AuditLogPage: React.FC = () => {
                 type="button"
                 onClick={handleExport}
                 disabled={!logs.length || isLoadingLogs}
-                className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-3.5 text-xs font-bold text-slate-700 shadow-sm transition hover:border-indigo-300 hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-line-strong bg-surface px-3.5 text-xs font-bold text-ink shadow-sm transition hover:border-accent-border hover:bg-accent-soft focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <ArrowDownToLine className="h-4 w-4" aria-hidden="true" />
                 تصدير النتائج المعروضة
@@ -149,7 +149,7 @@ export const AuditLogPage: React.FC = () => {
               type="button"
               onClick={() => void refresh()}
               disabled={isLoadingInitial || isLoadingLogs}
-              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-indigo-950 px-3.5 text-xs font-bold text-white shadow-sm transition hover:bg-indigo-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-primary px-3.5 text-xs font-bold text-white shadow-sm transition hover:bg-primary focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
             >
               <RefreshCw className={`h-4 w-4 ${isLoadingInitial || isLoadingLogs ? 'animate-spin' : ''}`} aria-hidden="true" />
               تحديث السجل
@@ -158,22 +158,22 @@ export const AuditLogPage: React.FC = () => {
         />
 
         {error && (
-          <div role="alert" className="flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">
+          <div role="alert" className="flex items-start gap-3 rounded-lg border border-danger-border bg-danger-soft px-4 py-3 text-sm text-danger">
             <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
             <div>
               <p className="font-bold">تعذر تحميل بيانات سجل المراجعة</p>
-              <p className="mt-0.5 break-words text-red-800">{error}</p>
+              <p className="mt-0.5 break-words text-danger">{error}</p>
             </div>
           </div>
         )}
         {exportError && (
-          <div role="alert" className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">
+          <div role="alert" className="flex items-start gap-2 rounded-lg border border-danger-border bg-danger-soft px-4 py-3 text-sm text-danger">
             <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
             <span>{exportError}</span>
           </div>
         )}
 
-        <section aria-label="ملخص السجلات" className="grid grid-cols-2 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm md:grid-cols-4">
+        <section aria-label="ملخص السجلات" className="grid grid-cols-2 overflow-hidden rounded-xl border border-line bg-surface shadow-sm md:grid-cols-4">
           <SummaryMetric
             label="كل الأحداث"
             value={stats?.totalEvents}
@@ -208,10 +208,10 @@ export const AuditLogPage: React.FC = () => {
           />
         </section>
 
-        <section aria-label="تصفية سجل المراجعة" className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <section aria-label="تصفية سجل المراجعة" className="rounded-xl border border-line bg-surface p-4 shadow-sm">
           <div className="mb-3 flex items-center justify-between gap-3">
-            <h2 className="flex items-center gap-2 text-sm font-extrabold text-slate-800">
-              <SlidersHorizontal className="h-4 w-4 text-indigo-700" aria-hidden="true" />
+            <h2 className="flex items-center gap-2 text-sm font-extrabold text-ink">
+              <SlidersHorizontal className="h-4 w-4 text-primary" aria-hidden="true" />
               تصفية الأحداث
             </h2>
             {activeFilters && (
@@ -224,7 +224,7 @@ export const AuditLogPage: React.FC = () => {
                   setSelectedModule('');
                   setSelectedSource('');
                 }}
-                className="text-xs font-bold text-indigo-800 underline decoration-indigo-300 underline-offset-4 hover:text-indigo-950 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="text-xs font-bold text-primary underline decoration-primary underline-offset-4 hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary"
               >
                 مسح التصفية
               </button>
@@ -233,13 +233,13 @@ export const AuditLogPage: React.FC = () => {
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(240px,1fr)_170px_190px_190px]">
             <label className="relative block">
               <span className="sr-only">ابحث في أحداث السجل</span>
-              <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" aria-hidden="true" />
+              <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" aria-hidden="true" />
               <input
                 type="search"
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder="بحث باسم المستخدم أو الإجراء أو معرف الحدث..."
-                className="min-h-10 w-full rounded-lg border border-slate-300 bg-slate-50 py-2 pe-9 ps-3 text-sm text-slate-900 placeholder:text-slate-500 focus:border-indigo-600 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                className="min-h-10 w-full rounded-lg border border-line-strong bg-surface-muted py-2 pe-9 ps-3 text-sm text-ink placeholder:text-muted focus:border-primary focus:bg-surface focus:outline-none focus:ring-2 focus:ring-primary"
               />
             </label>
             <label className="block">
@@ -247,7 +247,7 @@ export const AuditLogPage: React.FC = () => {
               <select
                 value={selectedSource}
                 onChange={(event) => setSelectedSource(event.target.value as '' | 'business' | 'login')}
-                className="min-h-10 w-full rounded-lg border border-slate-300 bg-slate-50 px-3 text-sm text-slate-800 focus:border-indigo-600 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                className="min-h-10 w-full rounded-lg border border-line-strong bg-surface-muted px-3 text-sm text-ink focus:border-primary focus:bg-surface focus:outline-none focus:ring-2 focus:ring-primary"
               >
                 <option value="">كل المصادر</option>
                 <option value="business">عمليات الأعمال</option>
@@ -259,7 +259,7 @@ export const AuditLogPage: React.FC = () => {
               <select
                 value={selectedModule}
                 onChange={(event) => setSelectedModule(event.target.value)}
-                className="min-h-10 w-full rounded-lg border border-slate-300 bg-slate-50 px-3 text-sm text-slate-800 focus:border-indigo-600 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                className="min-h-10 w-full rounded-lg border border-line-strong bg-surface-muted px-3 text-sm text-ink focus:border-primary focus:bg-surface focus:outline-none focus:ring-2 focus:ring-primary"
               >
                 <option value="">كل الأنواع والوحدات</option>
                 {modules.map((module) => (
@@ -270,53 +270,53 @@ export const AuditLogPage: React.FC = () => {
             <div className="grid grid-cols-2 gap-2">
               <label className="relative">
                 <span className="sr-only">من تاريخ</span>
-                <CalendarDays className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" aria-hidden="true" />
+                <CalendarDays className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" aria-hidden="true" />
                 <input
                   type="date"
                   value={dateFrom}
                   max={dateTo || undefined}
                   onChange={(event) => setDateFrom(event.target.value)}
-                  className="min-h-10 w-full rounded-lg border border-slate-300 bg-slate-50 py-2 pe-8 ps-2 text-xs text-slate-800 focus:border-indigo-600 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                  className="min-h-10 w-full rounded-lg border border-line-strong bg-surface-muted py-2 pe-8 ps-2 text-xs text-ink focus:border-primary focus:bg-surface focus:outline-none focus:ring-2 focus:ring-primary"
                 />
               </label>
               <label className="relative">
                 <span className="sr-only">إلى تاريخ</span>
-                <CalendarDays className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" aria-hidden="true" />
+                <CalendarDays className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" aria-hidden="true" />
                 <input
                   type="date"
                   value={dateTo}
                   min={dateFrom || undefined}
                   onChange={(event) => setDateTo(event.target.value)}
-                  className="min-h-10 w-full rounded-lg border border-slate-300 bg-slate-50 py-2 pe-8 ps-2 text-xs text-slate-800 focus:border-indigo-600 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                  className="min-h-10 w-full rounded-lg border border-line-strong bg-surface-muted py-2 pe-8 ps-2 text-xs text-ink focus:border-primary focus:bg-surface focus:outline-none focus:ring-2 focus:ring-primary"
                 />
               </label>
             </div>
           </div>
         </section>
 
-        <section aria-label="الأحداث المسجلة" className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-          <div className="flex flex-col gap-2 border-b border-slate-200 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+        <section aria-label="الأحداث المسجلة" className="overflow-hidden rounded-xl border border-line bg-surface shadow-sm">
+          <div className="flex flex-col gap-2 border-b border-line px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2 className="text-sm font-extrabold text-slate-900">الأحداث المسجلة</h2>
-              <p className="mt-0.5 text-xs text-slate-600">
+              <h2 className="text-sm font-extrabold text-ink">الأحداث المسجلة</h2>
+              <p className="mt-0.5 text-xs text-ink-secondary">
                 {isLoadingInitial ? 'جارٍ تحميل السجل...' : `${number(total)} حدث مطابق`}
                 {totalPages > 0 && ` · صفحة ${number(page)} من ${number(totalPages)}`}
               </p>
             </div>
-            <div className="inline-flex items-center gap-1.5 self-start rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-[11px] font-semibold text-slate-700 sm:self-auto">
-              <span className="h-2 w-2 rounded-full bg-emerald-500" />
+            <div className="inline-flex items-center gap-1.5 self-start rounded-md border border-line bg-surface-muted px-2.5 py-1.5 text-[11px] font-semibold text-ink sm:self-auto">
+              <span className="h-2 w-2 rounded-full bg-success" />
               عمليات الأعمال
-              <span className="mx-1 text-slate-400">/</span>
-              <span className="h-2 w-2 rounded-full bg-amber-500" />
+              <span className="mx-1 text-muted">/</span>
+              <span className="h-2 w-2 rounded-full bg-warning" />
               محاولات الدخول
             </div>
           </div>
 
           <div className="relative min-h-[300px]">
             {(isLoadingInitial || isLoadingLogs) && (
-              <div className="absolute inset-0 z-10 flex items-start justify-center bg-white/75 pt-14" aria-live="polite">
-                <span className="inline-flex items-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm">
-                  <Loader2 className="h-4 w-4 animate-spin text-indigo-700" aria-hidden="true" />
+              <div className="absolute inset-0 z-10 flex items-start justify-center bg-surface/75 pt-14" aria-live="polite">
+                <span className="inline-flex items-center gap-2 rounded-md border border-line bg-surface px-3 py-2 text-sm font-semibold text-ink shadow-sm">
+                  <Loader2 className="h-4 w-4 animate-spin text-primary" aria-hidden="true" />
                   جارٍ تحميل الأحداث...
                 </span>
               </div>
@@ -325,15 +325,15 @@ export const AuditLogPage: React.FC = () => {
               <div className="flex min-h-[300px] flex-col items-center justify-center px-6 text-center">
                 {error ? (
                   <>
-                    <AlertCircle className="h-9 w-9 text-red-500" aria-hidden="true" />
-                    <p className="mt-3 text-sm font-bold text-slate-800">لا يمكن عرض السجل حتى تكتمل عملية التحميل.</p>
-                    <button type="button" onClick={() => void refresh()} className="mt-3 text-sm font-bold text-indigo-800 underline underline-offset-4">إعادة المحاولة</button>
+                    <AlertCircle className="h-9 w-9 text-danger" aria-hidden="true" />
+                    <p className="mt-3 text-sm font-bold text-ink">لا يمكن عرض السجل حتى تكتمل عملية التحميل.</p>
+                    <button type="button" onClick={() => void refresh()} className="mt-3 text-sm font-bold text-primary underline underline-offset-4">إعادة المحاولة</button>
                   </>
                 ) : (
                   <>
-                    <Search className="h-9 w-9 text-slate-400" aria-hidden="true" />
-                    <p className="mt-3 text-sm font-bold text-slate-800">{activeFilters ? 'لا توجد أحداث تطابق عوامل التصفية.' : 'لا توجد أحداث محفوظة لعرضها.'}</p>
-                    <p className="mt-1 max-w-md text-xs leading-5 text-slate-600">
+                    <Search className="h-9 w-9 text-muted" aria-hidden="true" />
+                    <p className="mt-3 text-sm font-bold text-ink">{activeFilters ? 'لا توجد أحداث تطابق عوامل التصفية.' : 'لا توجد أحداث محفوظة لعرضها.'}</p>
+                    <p className="mt-1 max-w-md text-xs leading-5 text-ink-secondary">
                       {activeFilters ? 'جرّب تغيير البحث أو نطاق التاريخ.' : 'ستظهر هنا عمليات الأعمال ومحاولات الدخول بعد تسجيلها في قاعدة البيانات.'}
                     </p>
                   </>
@@ -341,7 +341,7 @@ export const AuditLogPage: React.FC = () => {
               </div>
             ) : (
               <div>
-                <p className="flex items-center justify-between gap-2 border-b border-indigo-100 bg-indigo-50 px-4 py-2 text-xs font-semibold text-indigo-900 md:hidden">
+                <p className="flex items-center justify-between gap-2 border-b border-accent-border bg-accent-soft px-4 py-2 text-xs font-semibold text-primary md:hidden">
                   <span>اسحب الجدول أفقيًا لعرض بقية الأعمدة</span>
                   <span className="shrink-0 text-base" aria-hidden="true">â†”</span>
                 </p>
@@ -354,7 +354,7 @@ export const AuditLogPage: React.FC = () => {
                   stickyHeader
                   tableClassName="text-sm"
                   isRowExpanded={(log) => expandedLog === `${log.source}:${log.id}`}
-                  rowClassName={(log) => (expandedLog === `${log.source}:${log.id}` ? 'bg-indigo-50/50' : '')}
+                  rowClassName={(log) => (expandedLog === `${log.source}:${log.id}` ? 'bg-accent-soft/50' : '')}
                   renderExpandedRow={(log) => (
                     <div className="grid gap-3 px-4 py-4 sm:grid-cols-2 lg:grid-cols-3">
                       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -367,14 +367,14 @@ export const AuditLogPage: React.FC = () => {
                                       {log.failureReason && <Detail label="سبب الإخفاق المسجل" value={log.failureReason} />}
                                       {log.deviceLabel && <Detail label="الجهاز المسجل" value={log.deviceLabel} />}
                                       {!log.failureReason && !log.deviceLabel && (
-                                        <p className="text-xs text-slate-600 sm:col-span-2">لا يتضمن هذا الحدث بيانات إضافية محفوظة.</p>
+                                        <p className="text-xs text-ink-secondary sm:col-span-2">لا يتضمن هذا الحدث بيانات إضافية محفوظة.</p>
                                       )}
                                     </>
                                   ) : (
                                     <>
                                       {log.ipAddress && <Detail label="عنوان IP المسجل" value={log.ipAddress} mono />}
                                       {!log.oldValues && !log.newValues && !log.ipAddress && (
-                                        <p className="text-xs text-slate-600 sm:col-span-2">لا توجد تفاصيل إضافية محفوظة لهذا الحدث.</p>
+                                        <p className="text-xs text-ink-secondary sm:col-span-2">لا توجد تفاصيل إضافية محفوظة لهذا الحدث.</p>
                                       )}
                                     </>
                                   )}
@@ -384,12 +384,12 @@ export const AuditLogPage: React.FC = () => {
                     </div>
                   )}
                   columns={[
-                    { key: 'date', header: 'التاريخ والوقت', render: (log) => <span className="whitespace-nowrap text-xs tabular-nums text-slate-700">{formatTimestamp(log.createdAt)}</span> },
+                    { key: 'date', header: 'التاريخ والوقت', render: (log) => <span className="whitespace-nowrap text-xs tabular-nums text-ink">{formatTimestamp(log.createdAt)}</span> },
                     {
                       key: 'source', header: 'المصدر',
                       render: (log) => (
-                        <span className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-[11px] font-bold ${log.source === 'business' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-amber-200 bg-amber-50 text-amber-900'}`}>
-                          <span className={`h-1.5 w-1.5 rounded-full ${log.source === 'business' ? 'bg-emerald-600' : 'bg-amber-600'}`} />
+                        <span className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-[11px] font-bold ${log.source === 'business' ? 'border-success-border bg-success-soft text-success' : 'border-warning-border bg-warning-soft text-warning'}`}>
+                          <span className={`h-1.5 w-1.5 rounded-full ${log.source === 'business' ? 'bg-success' : 'bg-warning'}`} />
                           {log.source === 'business' ? 'عملية أعمال' : 'محاولة دخول'}
                         </span>
                       ),
@@ -397,10 +397,10 @@ export const AuditLogPage: React.FC = () => {
                     {
                       key: 'user', header: 'المستخدم',
                       render: (log) => (
-                        <span className="block max-w-[200px] truncate font-semibold text-slate-800" title={log.userName}>
+                        <span className="block max-w-[200px] truncate font-semibold text-ink" title={log.userName}>
                           {log.userName || 'غير مسجل'}
                           {log.source === 'login' && (
-                            <span className={`ms-2 inline-flex items-center gap-1 text-[10px] font-bold ${log.succeeded ? 'text-emerald-700' : 'text-red-700'}`}>
+                            <span className={`ms-2 inline-flex items-center gap-1 text-[10px] font-bold ${log.succeeded ? 'text-success' : 'text-danger'}`}>
                               {log.succeeded
                                 ? <><CheckCircle2 className="h-3 w-3" aria-hidden="true" /> ناجح</>
                                 : <><XCircle className="h-3 w-3" aria-hidden="true" /> فاشل</>}
@@ -409,10 +409,10 @@ export const AuditLogPage: React.FC = () => {
                         </span>
                       ),
                     },
-                    { key: 'action', header: 'الحدث', render: (log) => <span className="block max-w-[320px] truncate font-semibold text-slate-800" title={log.action}>{log.action}</span> },
+                    { key: 'action', header: 'الحدث', render: (log) => <span className="block max-w-[320px] truncate font-semibold text-ink" title={log.action}>{log.action}</span> },
                     {
                       key: 'module', header: 'النوع / الوحدة',
-                      render: (log) => <span className={`inline-flex rounded-md border px-2 py-1 text-[10px] font-bold ${log.module === 'LOGIN' ? 'border-amber-200 bg-amber-50 text-amber-900' : getModuleColor(log.module)}`}>{moduleLabel(log.module)}</span>,
+                      render: (log) => <span className={`inline-flex rounded-md border px-2 py-1 text-[10px] font-bold ${log.module === 'LOGIN' ? 'border-warning-border bg-warning-soft text-warning' : getModuleColor(log.module)}`}>{moduleLabel(log.module)}</span>,
                     },
                     {
                       key: 'details', header: 'التفاصيل', align: 'center',
@@ -425,7 +425,7 @@ export const AuditLogPage: React.FC = () => {
                             onClick={() => toggleExpand(rowKey)}
                             aria-expanded={isExpanded}
                             aria-label={`${isExpanded ? 'إخفاء' : 'عرض'} تفاصيل ${log.action}`}
-                            className="rounded-md p-1.5 text-slate-600 transition hover:bg-slate-200 hover:text-slate-950 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                            className="rounded-md p-1.5 text-ink-secondary transition hover:bg-surface-sunken hover:text-ink focus:outline-none focus:ring-2 focus:ring-primary"
                           >
                             {isExpanded ? <ChevronUp className="h-4 w-4" aria-hidden="true" /> : <ChevronDown className="h-4 w-4" aria-hidden="true" />}
                           </button>
@@ -440,8 +440,8 @@ export const AuditLogPage: React.FC = () => {
           </div>
 
           {totalPages > 1 && (
-            <footer className="flex flex-col gap-3 border-t border-slate-200 bg-slate-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-              <span className="text-xs text-slate-700">
+            <footer className="flex flex-col gap-3 border-t border-line bg-surface-muted px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+              <span className="text-xs text-ink">
                 عرض {number(logs.length)} من {number(total)} حدث
               </span>
               <nav aria-label="صفحات سجل المراجعة" className="flex items-center gap-2">
@@ -449,17 +449,17 @@ export const AuditLogPage: React.FC = () => {
                   type="button"
                   onClick={() => setPage(Math.max(1, page - 1))}
                   disabled={page <= 1 || isLoadingLogs}
-                  className="inline-flex min-h-9 items-center gap-1 rounded-md border border-slate-300 bg-white px-3 text-xs font-bold text-slate-700 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="inline-flex min-h-9 items-center gap-1 rounded-md border border-line-strong bg-surface px-3 text-xs font-bold text-ink hover:bg-surface-sunken focus:outline-none focus:ring-2 focus:ring-primary disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <ArrowLeft className="h-3.5 w-3.5 rotate-180" aria-hidden="true" />
                   السابق
                 </button>
-                <span className="min-w-[82px] text-center text-xs font-bold tabular-nums text-slate-800">{number(page)} / {number(totalPages)}</span>
+                <span className="min-w-[82px] text-center text-xs font-bold tabular-nums text-ink">{number(page)} / {number(totalPages)}</span>
                 <button
                   type="button"
                   onClick={() => setPage(Math.min(totalPages, page + 1))}
                   disabled={page >= totalPages || isLoadingLogs}
-                  className="inline-flex min-h-9 items-center gap-1 rounded-md border border-slate-300 bg-white px-3 text-xs font-bold text-slate-700 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="inline-flex min-h-9 items-center gap-1 rounded-md border border-line-strong bg-surface px-3 text-xs font-bold text-ink hover:bg-surface-sunken focus:outline-none focus:ring-2 focus:ring-primary disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   التالي
                   <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
@@ -468,8 +468,8 @@ export const AuditLogPage: React.FC = () => {
             </footer>
           )}
         </section>
-        <p className="flex items-center gap-1.5 px-1 text-[11px] text-slate-600">
-          <ShieldCheck className="h-3.5 w-3.5 text-slate-500" aria-hidden="true" />
+        <p className="flex items-center gap-1.5 px-1 text-[11px] text-ink-secondary">
+          <ShieldCheck className="h-3.5 w-3.5 text-muted" aria-hidden="true" />
           تُعرض بيانات الدخول المتاحة في السجل فقط؛ لا تُعرض عناوين IP أو معلومات جهاز غير محفوظة.
         </p>
       </div>
@@ -488,39 +488,39 @@ interface SummaryMetricProps {
 
 const SummaryMetric: React.FC<SummaryMetricProps> = ({ label, value, note, icon, tone, loading }) => {
   const tones = {
-    slate: 'text-slate-600 bg-slate-100',
-    indigo: 'text-indigo-800 bg-indigo-50',
-    amber: 'text-amber-800 bg-amber-50',
+    slate: 'text-ink-secondary bg-surface-sunken',
+    indigo: 'text-primary bg-accent-soft',
+    amber: 'text-warning bg-warning-soft',
   };
   return (
-    <div className="flex min-h-[104px] items-start gap-3 border-b border-slate-100 p-4 last:border-b-0 sm:odd:border-l sm:even:border-l-0 md:border-b-0 md:border-l md:last:border-l-0">
+    <div className="flex min-h-[104px] items-start gap-3 border-b border-line p-4 last:border-b-0 sm:odd:border-l sm:even:border-l-0 md:border-b-0 md:border-l md:last:border-l-0">
       <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${tones[tone]}`}>{icon}</div>
       <div className="min-w-0">
-        <p className="text-xs font-bold text-slate-600">{label}</p>
-        <p className="mt-1 text-xl font-extrabold leading-none tabular-nums text-slate-950">
+        <p className="text-xs font-bold text-ink-secondary">{label}</p>
+        <p className="mt-1 text-xl font-extrabold leading-none tabular-nums text-ink">
           {loading
-            ? <span className="inline-block h-5 w-12 animate-pulse rounded bg-slate-200" aria-label="جارٍ التحميل" />
+            ? <span className="inline-block h-5 w-12 animate-pulse rounded bg-surface-sunken" aria-label="جارٍ التحميل" />
             : value === undefined || value === null
               ? '—'
               : number(value)}
         </p>
-        <p className="mt-1.5 text-[10px] leading-4 text-slate-600">{note}</p>
+        <p className="mt-1.5 text-[10px] leading-4 text-ink-secondary">{note}</p>
       </div>
     </div>
   );
 };
 
 const Detail: React.FC<{ label: string; value: string; mono?: boolean }> = ({ label, value, mono }) => (
-  <div className="min-w-0 rounded-md border border-slate-200 bg-white px-3 py-2">
-    <p className="text-[10px] font-bold text-slate-600">{label}</p>
-    <p className={`mt-1 break-all text-xs text-slate-900 ${mono ? 'font-mono' : 'font-medium'}`}>{value}</p>
+  <div className="min-w-0 rounded-md border border-line bg-surface px-3 py-2">
+    <p className="text-[10px] font-bold text-ink-secondary">{label}</p>
+    <p className={`mt-1 break-all text-xs text-ink ${mono ? 'font-mono' : 'font-medium'}`}>{value}</p>
   </div>
 );
 
 const JsonDetail: React.FC<{ label: string; value: string; tone: 'red' | 'green' }> = ({ label, value, tone }) => (
   <div className="min-w-0 sm:col-span-2 lg:col-span-3">
-    <p className={`mb-1 text-xs font-bold ${tone === 'red' ? 'text-red-800' : 'text-emerald-800'}`}>{label}</p>
-    <pre className="max-h-64 overflow-auto rounded-md border border-slate-200 bg-white p-3 text-[11px] leading-5 text-slate-800" dir="ltr">
+    <p className={`mb-1 text-xs font-bold ${tone === 'red' ? 'text-danger' : 'text-success'}`}>{label}</p>
+    <pre className="max-h-64 overflow-auto rounded-md border border-line bg-surface p-3 text-[11px] leading-5 text-ink" dir="ltr">
       {formatJson(value)}
     </pre>
   </div>

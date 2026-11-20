@@ -33,16 +33,16 @@ export const CompanyStep: React.FC<CompanyStepProps> = ({
   optionControl,
 }) => (
   <div className="space-y-4">
-    <section className="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800/50" aria-labelledby="setup-system-checks">
+    <section className="rounded-xl border border-line bg-surface-muted p-3 dark:bg-primary/50" aria-labelledby="setup-system-checks">
       <div className="mb-2 flex items-center justify-between gap-2">
-        <h2 id="setup-system-checks" className="text-xs font-bold text-slate-800 dark:text-slate-100">فحص النظام الفعلي</h2>
+        <h2 id="setup-system-checks" className="text-xs font-bold text-ink ">فحص النظام الفعلي</h2>
         <div className="flex items-center gap-2">
-          <span className="text-[10px] text-slate-500 dark:text-slate-400">سيراميسيس {systemChecks.version}</span>
+          <span className="text-[10px] text-muted ">سيراميسيس {systemChecks.version}</span>
           <button
             type="button"
             onClick={onRecheckSystemChecks}
             disabled={systemChecksRunning}
-            className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1 text-[10px] font-bold text-slate-600 hover:bg-slate-100 disabled:cursor-wait disabled:opacity-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+            className="inline-flex items-center gap-1 rounded-lg border border-line px-2 py-1 text-[10px] font-bold text-ink-secondary hover:bg-surface-sunken disabled:cursor-wait disabled:opacity-50 dark:hover:bg-primary"
           >
             <RefreshCw className={`h-3 w-3 ${systemChecksRunning ? 'animate-spin' : ''}`} aria-hidden="true" />
             إعادة الفحص
@@ -52,25 +52,25 @@ export const CompanyStep: React.FC<CompanyStepProps> = ({
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
         {visibleSystemChecks.map(([label, result]) => {
           const color = result.state === 'ready'
-            ? 'bg-emerald-500'
+            ? 'bg-success'
             : result.state === 'error'
-              ? 'bg-rose-500'
+              ? 'bg-danger'
               : result.state === 'warning'
-                ? 'bg-amber-500'
-                : 'bg-slate-400 animate-pulse';
+                ? 'bg-warning'
+                : 'bg-line-strong animate-pulse';
           return (
-            <div key={label} className="rounded-lg border border-slate-200 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-900">
-              <div className="flex items-center gap-2 text-[11px] font-bold text-slate-800 dark:text-slate-100">
+            <div key={label} className="rounded-lg border border-line bg-surface px-3 py-2 ">
+              <div className="flex items-center gap-2 text-[11px] font-bold text-ink ">
                 <span className={`h-2 w-2 shrink-0 rounded-full ${color}`} aria-hidden="true" />
                 {label}
               </div>
-              <p className="mt-1 break-words text-[10px] text-slate-500 dark:text-slate-400">{result.detail}</p>
+              <p className="mt-1 break-words text-[10px] text-muted ">{result.detail}</p>
             </div>
           );
         })}
       </div>
       {systemChecks.database.state === 'error' && (
-        <p role="alert" className="mt-2 text-[10px] font-semibold text-rose-700 dark:text-rose-300">
+        <p role="alert" className="mt-2 text-[10px] font-semibold text-danger ">
           لا تتابع إعداد النظام حتى تُحل مشكلة سلامة قاعدة البيانات.
         </p>
       )}
@@ -124,7 +124,7 @@ export const CompanyStep: React.FC<CompanyStepProps> = ({
       <label htmlFor="setup-address" className={labelClass}>العنوان</label>
       <input id="setup-address" value={form.address} onChange={(e) => set('address', e.target.value)} className={inputClass} placeholder="المدينة - الشارع" disabled={!options.company} />
     </div>
-    <p className="text-xs font-semibold text-slate-600 dark:text-slate-300">بيانات التسجيل الاختيارية</p>
+    <p className="text-xs font-semibold text-ink-secondary ">بيانات التسجيل الاختيارية</p>
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
       <div>
         <label htmlFor="setup-tax-number" className={labelClass}>الرقم الضريبي</label>

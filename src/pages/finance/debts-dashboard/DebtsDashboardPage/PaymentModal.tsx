@@ -49,27 +49,27 @@ export const PaymentModal: React.FC<Props> = ({
     saving,
   } = form;
   return (
-    <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-sm w-full p-6">
+    <div className="fixed inset-0 bg-primary/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-surface rounded-2xl border border-line shadow-2xl max-w-sm w-full p-6">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-base font-extrabold text-slate-900">
+          <h3 className="text-base font-extrabold text-ink">
             {target.type === "CUSTOMER_RECEIVABLE"
               ? "تسجيل تحصيل"
               : "سداد دفعة"}
           </h3>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100"
+            className="p-1.5 rounded-lg text-muted hover:bg-surface-sunken"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
-        <div className="mb-3 text-xs text-slate-500">
+        <div className="mb-3 text-xs text-muted">
           الحساب:{" "}
-          <span className="font-bold text-slate-800">{target.name}</span>
+          <span className="font-bold text-ink">{target.name}</span>
           <br />
           المستحق:{" "}
-          <span className="font-black text-rose-600">
+          <span className="font-black text-danger">
             {fmt(target.amount)}
           </span>
         </div>
@@ -77,7 +77,7 @@ export const PaymentModal: React.FC<Props> = ({
           {target.type === "CUSTOMER_RECEIVABLE" &&
             invoiceOptions.length > 0 && (
               <div className="space-y-2">
-                <label className="font-bold text-slate-700 block">
+                <label className="font-bold text-ink block">
                   توزيع الدفعة على الفواتير المفتوحة
                 </label>
                 {invoiceOptions.map((invoice) => (
@@ -108,7 +108,7 @@ export const PaymentModal: React.FC<Props> = ({
           {(!invoiceOptions.length ||
             target.type !== "CUSTOMER_RECEIVABLE") && (
             <div>
-              <label className="font-bold text-slate-700 block mb-1">
+              <label className="font-bold text-ink block mb-1">
                 المبلغ *
               </label>
               <input
@@ -118,7 +118,7 @@ export const PaymentModal: React.FC<Props> = ({
                 step="0.01"
                 value={amount}
                 onChange={(e) => onAmountChange(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-mono font-bold"
+                className="w-full px-3 py-2 bg-surface-muted rounded-xl border border-line font-mono font-bold"
               />
             </div>
           )}
@@ -166,14 +166,14 @@ export const PaymentModal: React.FC<Props> = ({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 bg-slate-100 text-slate-700 font-bold rounded-xl"
+              className="px-4 py-2 bg-surface-sunken text-ink font-bold rounded-xl"
             >
               إلغاء
             </button>
             <button
               type="submit"
               disabled={saving}
-              className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl flex items-center gap-2"
+              className="px-5 py-2 bg-success hover:bg-success text-white font-bold rounded-xl flex items-center gap-2"
             >
               {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}{" "}
               تأكيد

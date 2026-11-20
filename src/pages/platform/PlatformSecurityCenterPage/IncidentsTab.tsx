@@ -15,7 +15,7 @@ interface IncidentsTabProps {
 export const IncidentsTab: React.FC<IncidentsTabProps> = ({ incidents, canManageSecurity, onOpenIncidentModal, onRespondIncident }) => (
   <div className="space-y-4">
     <div className="flex items-center justify-between">
-      <h3 className="text-xs font-bold text-slate-200">
+      <h3 className="text-xs font-bold text-muted">
         سجل الحوادث الأمنية المركزية ({incidents.length})
       </h3>
       <Button
@@ -28,10 +28,10 @@ export const IncidentsTab: React.FC<IncidentsTabProps> = ({ incidents, canManage
       </Button>
     </div>
 
-    <div className="overflow-hidden rounded-xl border border-slate-800 bg-slate-900/70 shadow-sm">
+    <div className="overflow-hidden rounded-xl border border-line-strong bg-primary/70 shadow-sm">
       {incidents.length === 0 ? (
         <EmptyState
-          icon={<ShieldCheck className="h-6 w-6 text-emerald-400" />}
+          icon={<ShieldCheck className="h-6 w-6 text-success" />}
           title="السجل نظيف تماماً"
           description="لم يتم رصد أي اختراقات أو حوادث أمنية على المنصة."
         />
@@ -46,8 +46,8 @@ export const IncidentsTab: React.FC<IncidentsTabProps> = ({ incidents, canManage
               key: 'incident', header: 'عنوان الحادث',
               render: (inc) => (
                 <div className="text-xs">
-                  <p className="font-bold text-slate-100">{inc.title}</p>
-                  {inc.details && <p className="text-[11px] text-slate-400 mt-0.5">{inc.details}</p>}
+                  <p className="font-bold text-muted">{inc.title}</p>
+                  {inc.details && <p className="text-[11px] text-muted mt-0.5">{inc.details}</p>}
                 </div>
               ),
             },
@@ -57,10 +57,10 @@ export const IncidentsTab: React.FC<IncidentsTabProps> = ({ incidents, canManage
                 <span
                   className={`rounded px-2 py-0.5 text-[10px] font-black ${
                     inc.severity === 'CRITICAL'
-                      ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                      ? 'bg-danger/20 text-danger border border-danger/30'
                       : inc.severity === 'HIGH'
-                      ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                      : 'bg-slate-800 text-slate-300'
+                      ? 'bg-warning/20 text-warning border border-warning/30'
+                      : 'bg-primary text-muted'
                   }`}
                 >
                   {inc.severity}
@@ -73,10 +73,10 @@ export const IncidentsTab: React.FC<IncidentsTabProps> = ({ incidents, canManage
                 <span
                   className={`font-bold text-xs ${
                     inc.status === 'RESOLVED'
-                      ? 'text-emerald-400'
+                      ? 'text-success'
                       : inc.status === 'CONTAINED'
-                      ? 'text-sky-400'
-                      : 'text-rose-400'
+                      ? 'text-primary'
+                      : 'text-danger'
                   }`}
                 >
                   {inc.status === 'RESOLVED'
@@ -87,8 +87,8 @@ export const IncidentsTab: React.FC<IncidentsTabProps> = ({ incidents, canManage
                 </span>
               ),
             },
-            { key: 'action', header: 'إجراء الاحتواء المتخذ', render: (inc) => <span className="text-xs text-slate-300">{inc.containmentAction || 'بانتظار إجراء'}</span> },
-            { key: 'time', header: 'التوقيت', render: (inc) => <span className="text-xs text-slate-400">{formatDateTime(inc.createdAt)}</span> },
+            { key: 'action', header: 'إجراء الاحتواء المتخذ', render: (inc) => <span className="text-xs text-muted">{inc.containmentAction || 'بانتظار إجراء'}</span> },
+            { key: 'time', header: 'التوقيت', render: (inc) => <span className="text-xs text-muted">{formatDateTime(inc.createdAt)}</span> },
             {
               key: 'actions', header: 'إجراءات', align: 'center',
               render: (inc) => inc.status !== 'RESOLVED' ? (

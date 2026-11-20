@@ -160,26 +160,26 @@ export const PlatformEmergencyCenterPage: React.FC = () => {
       <PageHeader
         title="مركز إجراءات الطوارئ والحماية (Emergency Response & Killswitch)"
         description="إجراءات العزل السريع: إيقاف العملاء المنتهكين، سحب المفاتيح المخترقة، إيقاف الإصدارات، وفصل الجلسات المشبوهة."
-        icon={<AlertOctagon className="h-5 w-5 text-rose-500" />}
+        icon={<AlertOctagon className="h-5 w-5 text-danger" />}
       />
 
       {/* Warning Banner */}
-      <div className="p-4 bg-rose-500/10 border border-rose-500/30 rounded-xl flex items-start gap-3">
-        <ShieldAlert className="h-6 w-6 text-rose-400 shrink-0 mt-0.5" />
-        <div className="text-xs text-rose-200 space-y-1">
-          <strong className="font-bold text-sm text-rose-300 block">منطقة العمليات الحرجة والحماية الفورية:</strong>
+      <div className="p-4 bg-danger/10 border border-danger/30 rounded-xl flex items-start gap-3">
+        <ShieldAlert className="h-6 w-6 text-danger shrink-0 mt-0.5" />
+        <div className="text-xs text-danger space-y-1">
+          <strong className="font-bold text-sm text-danger block">منطقة العمليات الحرجة والحماية الفورية:</strong>
           الإجراءات في هذه الصفحة تؤدي إلى إيقاف فوري للخدمات أو التراخيص أو الجلسات. جميع الإجراءات تتطلب إدخال كلمة تأكيد دقيقة وتوثق في سجل التدقيق الأمني بأعلى مستوى خطورة (CRITICAL).
         </div>
       </div>
 
       {/* Global Actions Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="p-4 bg-slate-900/70 border border-slate-800 rounded-xl space-y-3">
-          <div className="flex items-center gap-2 text-rose-400 font-bold text-xs">
+        <div className="p-4 bg-primary/70 border border-line-strong rounded-xl space-y-3">
+          <div className="flex items-center gap-2 text-danger font-bold text-xs">
             <Power className="h-4 w-4" />
             عزل جلسات موظفي المنصة (Staff Sessions)
           </div>
-          <p className="text-[11px] text-slate-400">
+          <p className="text-[11px] text-muted">
             في حال الاشتباه في اختراق بيانات اعتماد أو جهاز لأحد موظفي الدعم أو المشغلين، يمكنك إنهاء جميع الجلسات المفتوحة فوراً.
           </p>
           <Button
@@ -193,12 +193,12 @@ export const PlatformEmergencyCenterPage: React.FC = () => {
           </Button>
         </div>
 
-        <div className="p-4 bg-slate-900/70 border border-slate-800 rounded-xl space-y-3">
-          <div className="flex items-center gap-2 text-amber-400 font-bold text-xs">
+        <div className="p-4 bg-primary/70 border border-line-strong rounded-xl space-y-3">
+          <div className="flex items-center gap-2 text-warning font-bold text-xs">
             <Lock className="h-4 w-4" />
             تفعيل بروتوكول الصيانة الطارئة
           </div>
-          <p className="text-[11px] text-slate-400">
+          <p className="text-[11px] text-muted">
             إدخال المنصة في وضع القراءة فقط وإيقاف العمليات الحساسة لجميع العملاء أثناء التعامل مع تهديد أمني.
           </p>
           <Button
@@ -220,35 +220,35 @@ export const PlatformEmergencyCenterPage: React.FC = () => {
       </div>
 
       {/* Emergency Tenant Isolation */}
-      <div className="p-4 bg-slate-900/70 border border-slate-800 rounded-xl space-y-3">
-        <h3 className="text-xs font-bold text-slate-100 flex items-center gap-2">
-          <Building2 className="h-4 w-4 text-sky-400" />
+      <div className="p-4 bg-primary/70 border border-line-strong rounded-xl space-y-3">
+        <h3 className="text-xs font-bold text-muted flex items-center gap-2">
+          <Building2 className="h-4 w-4 text-primary" />
           إيقاف وعزل عميل فوري (Tenant Killswitch)
         </h3>
-        <p className="text-[11px] text-slate-400">
+        <p className="text-[11px] text-muted">
           اختر عميلاً لقطع وصوله فوراً في حال رصد سلوك ضار أو تلاعب مالي أو انتهاك حقوق التراخيص:
         </p>
 
-        <div className="max-h-56 overflow-y-auto divide-y divide-slate-800 border border-slate-800 rounded-lg bg-slate-950/40">
+        <div className="max-h-56 overflow-y-auto divide-y divide-primary border border-line-strong rounded-lg bg-primary/40">
           {tenants.map((t) => (
             <div key={t.id} className="flex items-center justify-between p-2.5 text-xs">
               <div>
-                <span className="font-bold text-slate-200">{t.name}</span>
-                <span className="font-mono text-[10px] text-slate-500 mr-2">({t.code})</span>
-                <span className="text-[10px] text-slate-400 mr-2">الحالة: {t.status}</span>
+                <span className="font-bold text-muted">{t.name}</span>
+                <span className="font-mono text-[10px] text-muted mr-2">({t.code})</span>
+                <span className="text-[10px] text-muted mr-2">الحالة: {t.status}</span>
               </div>
 
               {t.status !== 'SUSPENDED' ? (
                 canManageEmergency ? (
                   <button
                     onClick={() => handleEmergencySuspendTenant(t)}
-                    className="bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 px-2.5 py-1 rounded font-bold text-[11px]"
+                    className="bg-danger/10 hover:bg-danger/20 text-danger border border-danger/20 px-2.5 py-1 rounded font-bold text-[11px]"
                   >
                     إيقاف وتجميد العميل فوراً
                   </button>
                 ) : null
               ) : (
-                <span className="text-rose-400 font-bold text-[11px]">موقوف حالياً</span>
+                <span className="text-danger font-bold text-[11px]">موقوف حالياً</span>
               )}
             </div>
           ))}
@@ -256,30 +256,30 @@ export const PlatformEmergencyCenterPage: React.FC = () => {
       </div>
 
       {/* Emergency API Keys Revocation */}
-      <div className="p-4 bg-slate-900/70 border border-slate-800 rounded-xl space-y-3">
-        <h3 className="text-xs font-bold text-slate-100 flex items-center gap-2">
-          <KeyRound className="h-4 w-4 text-amber-400" />
+      <div className="p-4 bg-primary/70 border border-line-strong rounded-xl space-y-3">
+        <h3 className="text-xs font-bold text-muted flex items-center gap-2">
+          <KeyRound className="h-4 w-4 text-warning" />
           الإلغاء السريع لمفاتيح API المسربة
         </h3>
 
-        <div className="max-h-48 overflow-y-auto divide-y divide-slate-800 border border-slate-800 rounded-lg bg-slate-950/40">
+        <div className="max-h-48 overflow-y-auto divide-y divide-primary border border-line-strong rounded-lg bg-primary/40">
           {apiKeys.filter((k) => k.isActive).length === 0 ? (
-            <p className="p-4 text-center text-xs text-slate-500">لا توجد مفاتيح API نشطة حالياً.</p>
+            <p className="p-4 text-center text-xs text-muted">لا توجد مفاتيح API نشطة حالياً.</p>
           ) : (
             apiKeys
               .filter((k) => k.isActive)
               .map((k) => (
                 <div key={k.id} className="flex items-center justify-between p-2.5 text-xs">
                   <div>
-                    <span className="font-bold text-slate-200">{k.name}</span>
-                    <span className="font-mono text-[11px] text-slate-400 mr-2">
+                    <span className="font-bold text-muted">{k.name}</span>
+                    <span className="font-mono text-[11px] text-muted mr-2">
                       ({k.keyPrefix}...)
                     </span>
                   </div>
                   {canManageEmergency && (
                     <button
                       onClick={() => handleEmergencyRevokeKey(k)}
-                      className="text-rose-400 hover:text-rose-300 font-bold text-[11px]"
+                      className="text-danger hover:text-danger font-bold text-[11px]"
                     >
                       إلغاء فوري
                     </button>
@@ -297,11 +297,11 @@ export const PlatformEmergencyCenterPage: React.FC = () => {
         title={confirmModal.title}
       >
         <div className="space-y-3.5 text-right">
-          <p className="text-xs text-slate-300 leading-relaxed">{confirmModal.description}</p>
+          <p className="text-xs text-muted leading-relaxed">{confirmModal.description}</p>
 
-          <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-lg text-xs text-rose-300">
+          <div className="p-3 bg-danger/10 border border-danger/20 rounded-lg text-xs text-danger">
             للتأكيد، اكتب الكلمة التالية بدقة في الحقل أدناه:
-            <div className="font-mono font-bold text-center text-sm text-rose-200 mt-1">
+            <div className="font-mono font-bold text-center text-sm text-danger mt-1">
               {confirmModal.confirmationKeyword}
             </div>
           </div>
@@ -316,7 +316,7 @@ export const PlatformEmergencyCenterPage: React.FC = () => {
             />
           </div>
 
-          <div className="flex justify-end gap-2 pt-3 border-t border-slate-800">
+          <div className="flex justify-end gap-2 pt-3 border-t border-line-strong">
             <Button
               variant="secondary"
               size="sm"

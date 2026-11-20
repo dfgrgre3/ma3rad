@@ -88,8 +88,8 @@ export const TrainingPage: React.FC = () => {
   const activeTab: Tab = canTab(tab) ? tab : (visibleTabs[0]?.id ?? tab);
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
-      <div className="bg-white border-b border-slate-200 px-6 pt-4">
+    <div className="h-full flex flex-col bg-surface-muted text-ink overflow-hidden">
+      <div className="bg-surface border-b border-line px-6 pt-4">
         <PageHeader
           icon={<GraduationCap className="h-5 w-5" />}
           title="التدريب والتطوير"
@@ -97,107 +97,107 @@ export const TrainingPage: React.FC = () => {
         />
       </div>
       <div className="flex-1 overflow-auto p-6 space-y-4">
-        {error && <div className="px-4 py-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold">{error}</div>}
+        {error && <div className="px-4 py-2.5 rounded-xl bg-danger-soft border border-danger-border text-danger text-xs font-semibold">{error}</div>}
         <div className="flex flex-wrap gap-2">
           {visibleTabs.map((t) => (
-            <button key={t.id} onClick={() => setTab(t.id)} className={`flex items-center gap-1 rounded-lg px-3 py-2 text-xs font-bold ${activeTab === t.id ? 'bg-amber-600 text-white' : 'border border-slate-200 bg-white text-slate-700'}`}>
+            <button key={t.id} onClick={() => setTab(t.id)} className={`flex items-center gap-1 rounded-lg px-3 py-2 text-xs font-bold ${activeTab === t.id ? 'bg-warning text-white' : 'border border-line bg-surface text-ink'}`}>
               {t.icon} {t.label}
             </button>
           ))}
         </div>
-        {loading ? <div className="py-16 flex justify-center"><GraduationCap className="w-6 h-6 animate-spin text-amber-500" /></div> : (
+        {loading ? <div className="py-16 flex justify-center"><GraduationCap className="w-6 h-6 animate-spin text-warning" /></div> : (
           <>
             {activeTab === 'trainers' && canTab('trainers') && (
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-2">
+                <div className="bg-surface border border-line rounded-xl p-4 space-y-2">
                   <h3 className="text-sm font-black">المدربون</h3>
-                  {trainers.map((t) => <div key={t.id} className="rounded-lg border border-slate-100 px-3 py-2 text-xs font-bold">{t.name} • {t.specialty || '—'}</div>)}
+                  {trainers.map((t) => <div key={t.id} className="rounded-lg border border-line px-3 py-2 text-xs font-bold">{t.name} • {t.specialty || '—'}</div>)}
                 </div>
-                <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-2">
+                <div className="bg-surface border border-line rounded-xl p-4 space-y-2">
                   <h3 className="text-sm font-black">مدرب جديد</h3>
-                  <input value={trainerForm.name} onChange={(e) => setTrainerForm((p) => ({ ...p, name: e.target.value }))} placeholder="الاسم" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
-                  <input value={trainerForm.specialty} onChange={(e) => setTrainerForm((p) => ({ ...p, specialty: e.target.value }))} placeholder="التخصص" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
-                  <input value={trainerForm.contact} onChange={(e) => setTrainerForm((p) => ({ ...p, contact: e.target.value }))} placeholder="التواصل" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
-                  <button onClick={createTrainer} className="w-full rounded-lg bg-amber-600 px-4 py-2.5 text-xs font-bold text-white">إضافة</button>
+                  <input value={trainerForm.name} onChange={(e) => setTrainerForm((p) => ({ ...p, name: e.target.value }))} placeholder="الاسم" className="w-full rounded-lg border border-line px-3 py-2 text-sm" />
+                  <input value={trainerForm.specialty} onChange={(e) => setTrainerForm((p) => ({ ...p, specialty: e.target.value }))} placeholder="التخصص" className="w-full rounded-lg border border-line px-3 py-2 text-sm" />
+                  <input value={trainerForm.contact} onChange={(e) => setTrainerForm((p) => ({ ...p, contact: e.target.value }))} placeholder="التواصل" className="w-full rounded-lg border border-line px-3 py-2 text-sm" />
+                  <button onClick={createTrainer} className="w-full rounded-lg bg-warning px-4 py-2.5 text-xs font-bold text-white">إضافة</button>
                 </div>
               </div>
             )}
             {activeTab === 'courses' && canTab('courses') && (
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-2">
+                <div className="bg-surface border border-line rounded-xl p-4 space-y-2">
                   <h3 className="text-sm font-black">الدورات</h3>
                   {courses.map((c) => (
-                    <div key={c.id} className="rounded-lg border border-slate-100 px-3 py-2 text-xs">
+                    <div key={c.id} className="rounded-lg border border-line px-3 py-2 text-xs">
                       <div className="font-bold">{c.name}</div>
-                      <div className="text-slate-500">{c.startDate || '—'} → {c.endDate || '—'} • {c.status} • {c.cost}</div>
+                      <div className="text-muted">{c.startDate || '—'} → {c.endDate || '—'} • {c.status} • {c.cost}</div>
                     </div>
                   ))}
                 </div>
-                <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-2">
+                <div className="bg-surface border border-line rounded-xl p-4 space-y-2">
                   <h3 className="text-sm font-black">دورة جديدة</h3>
-                  <input value={courseForm.name} onChange={(e) => setCourseForm((p) => ({ ...p, name: e.target.value }))} placeholder="اسم الدورة" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
-                  <textarea value={courseForm.description} onChange={(e) => setCourseForm((p) => ({ ...p, description: e.target.value }))} placeholder="الوصف" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" rows={2} />
-                  <select value={courseForm.trainerId} onChange={(e) => setCourseForm((p) => ({ ...p, trainerId: e.target.value }))} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm">
+                  <input value={courseForm.name} onChange={(e) => setCourseForm((p) => ({ ...p, name: e.target.value }))} placeholder="اسم الدورة" className="w-full rounded-lg border border-line px-3 py-2 text-sm" />
+                  <textarea value={courseForm.description} onChange={(e) => setCourseForm((p) => ({ ...p, description: e.target.value }))} placeholder="الوصف" className="w-full rounded-lg border border-line px-3 py-2 text-sm" rows={2} />
+                  <select value={courseForm.trainerId} onChange={(e) => setCourseForm((p) => ({ ...p, trainerId: e.target.value }))} className="w-full rounded-lg border border-line px-3 py-2 text-sm">
                     <option value="">المدرب (اختياري)</option>
                     {trainers.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
                   </select>
-                  <input type="date" value={courseForm.startDate} onChange={(e) => setCourseForm((p) => ({ ...p, startDate: e.target.value }))} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
-                  <input type="date" value={courseForm.endDate} onChange={(e) => setCourseForm((p) => ({ ...p, endDate: e.target.value }))} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
-                  <input value={courseForm.cost} onChange={(e) => setCourseForm((p) => ({ ...p, cost: e.target.value }))} placeholder="التكلفة" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
-                  <select value={courseForm.status} onChange={(e) => setCourseForm((p) => ({ ...p, status: e.target.value }))} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm">
+                  <input type="date" value={courseForm.startDate} onChange={(e) => setCourseForm((p) => ({ ...p, startDate: e.target.value }))} className="w-full rounded-lg border border-line px-3 py-2 text-sm" />
+                  <input type="date" value={courseForm.endDate} onChange={(e) => setCourseForm((p) => ({ ...p, endDate: e.target.value }))} className="w-full rounded-lg border border-line px-3 py-2 text-sm" />
+                  <input value={courseForm.cost} onChange={(e) => setCourseForm((p) => ({ ...p, cost: e.target.value }))} placeholder="التكلفة" className="w-full rounded-lg border border-line px-3 py-2 text-sm" />
+                  <select value={courseForm.status} onChange={(e) => setCourseForm((p) => ({ ...p, status: e.target.value }))} className="w-full rounded-lg border border-line px-3 py-2 text-sm">
                     {['PLANNED', 'ONGOING', 'COMPLETED', 'CANCELLED'].map((v) => <option key={v} value={v}>{v}</option>)}
                   </select>
-                  <button onClick={createCourse} className="w-full rounded-lg bg-amber-600 px-4 py-2.5 text-xs font-bold text-white">إنشاء</button>
+                  <button onClick={createCourse} className="w-full rounded-lg bg-warning px-4 py-2.5 text-xs font-bold text-white">إنشاء</button>
                 </div>
               </div>
             )}
             {activeTab === 'enrollments' && canTab('enrollments') && (
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-2">
+                <div className="bg-surface border border-line rounded-xl p-4 space-y-2">
                   <h3 className="text-sm font-black">تسجيل موظف</h3>
-                  <select value={enrollmentForm.courseId} onChange={(e) => setEnrollmentForm((p) => ({ ...p, courseId: e.target.value }))} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm">
+                  <select value={enrollmentForm.courseId} onChange={(e) => setEnrollmentForm((p) => ({ ...p, courseId: e.target.value }))} className="w-full rounded-lg border border-line px-3 py-2 text-sm">
                     <option value="">الدورة</option>
                     {courses.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                   </select>
-                  <input value={enrollmentForm.employeeId} onChange={(e) => setEnrollmentForm((p) => ({ ...p, employeeId: e.target.value }))} placeholder="معرف الموظف" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
-                  <textarea value={enrollmentForm.notes} onChange={(e) => setEnrollmentForm((p) => ({ ...p, notes: e.target.value }))} placeholder="ملاحظات" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" rows={2} />
-                  <button onClick={enroll} className="w-full rounded-lg bg-amber-600 px-4 py-2.5 text-xs font-bold text-white">تسجيل</button>
+                  <input value={enrollmentForm.employeeId} onChange={(e) => setEnrollmentForm((p) => ({ ...p, employeeId: e.target.value }))} placeholder="معرف الموظف" className="w-full rounded-lg border border-line px-3 py-2 text-sm" />
+                  <textarea value={enrollmentForm.notes} onChange={(e) => setEnrollmentForm((p) => ({ ...p, notes: e.target.value }))} placeholder="ملاحظات" className="w-full rounded-lg border border-line px-3 py-2 text-sm" rows={2} />
+                  <button onClick={enroll} className="w-full rounded-lg bg-warning px-4 py-2.5 text-xs font-bold text-white">تسجيل</button>
                 </div>
-                <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-2">
+                <div className="bg-surface border border-line rounded-xl p-4 space-y-2">
                   <h3 className="text-sm font-black">الشهادات منتهية (30 يوم)</h3>
                   {expiring.map((e) => (
-                    <div key={e.id} className="rounded-lg border border-slate-100 px-3 py-2 text-xs">
+                    <div key={e.id} className="rounded-lg border border-line px-3 py-2 text-xs">
                       <div className="font-bold">{e.employeeId} • {e.courseId}</div>
-                      <div className="text-slate-500">انتهاء: {e.certificateExpiry}</div>
+                      <div className="text-muted">انتهاء: {e.certificateExpiry}</div>
                     </div>
                   ))}
-                  {!expiring.length && <div className="text-xs text-slate-400">لا توجد شهادات منتهية.</div>}
+                  {!expiring.length && <div className="text-xs text-muted">لا توجد شهادات منتهية.</div>}
                 </div>
               </div>
             )}
             {activeTab === 'skills' && canTab('skills') && (
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-2">
+                <div className="bg-surface border border-line rounded-xl p-4 space-y-2">
                   <h3 className="text-sm font-black">المهارات</h3>
-                  {skills.map((s) => <div key={s.id} className="rounded-lg border border-slate-100 px-3 py-2 text-xs font-bold">{s.name} • {s.category || '—'}</div>)}
-                  <div className="space-y-2 pt-2 border-t border-slate-100">
-                    <input value={skillForm.name} onChange={(e) => setSkillForm((p) => ({ ...p, name: e.target.value }))} placeholder="اسم المهارة" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
-                    <input value={skillForm.category} onChange={(e) => setSkillForm((p) => ({ ...p, category: e.target.value }))} placeholder="الفئة" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
-                    <button onClick={createSkill} className="w-full rounded-lg bg-amber-600 px-4 py-2.5 text-xs font-bold text-white">إضافة مهارة</button>
+                  {skills.map((s) => <div key={s.id} className="rounded-lg border border-line px-3 py-2 text-xs font-bold">{s.name} • {s.category || '—'}</div>)}
+                  <div className="space-y-2 pt-2 border-t border-line">
+                    <input value={skillForm.name} onChange={(e) => setSkillForm((p) => ({ ...p, name: e.target.value }))} placeholder="اسم المهارة" className="w-full rounded-lg border border-line px-3 py-2 text-sm" />
+                    <input value={skillForm.category} onChange={(e) => setSkillForm((p) => ({ ...p, category: e.target.value }))} placeholder="الفئة" className="w-full rounded-lg border border-line px-3 py-2 text-sm" />
+                    <button onClick={createSkill} className="w-full rounded-lg bg-warning px-4 py-2.5 text-xs font-bold text-white">إضافة مهارة</button>
                   </div>
                 </div>
-                <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-2">
+                <div className="bg-surface border border-line rounded-xl p-4 space-y-2">
                   <h3 className="text-sm font-black">ربط مهارة بوظيفة</h3>
-                  <input value={jobSkillForm.jobTitle} onChange={(e) => setJobSkillForm((p) => ({ ...p, jobTitle: e.target.value }))} placeholder="المسمى الوظيفي" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
-                  <select value={jobSkillForm.skillId} onChange={(e) => setJobSkillForm((p) => ({ ...p, skillId: e.target.value }))} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm">
+                  <input value={jobSkillForm.jobTitle} onChange={(e) => setJobSkillForm((p) => ({ ...p, jobTitle: e.target.value }))} placeholder="المسمى الوظيفي" className="w-full rounded-lg border border-line px-3 py-2 text-sm" />
+                  <select value={jobSkillForm.skillId} onChange={(e) => setJobSkillForm((p) => ({ ...p, skillId: e.target.value }))} className="w-full rounded-lg border border-line px-3 py-2 text-sm">
                     <option value="">المهارة</option>
                     {skills.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
                   </select>
-                  <input value={jobSkillForm.requiredLevel} onChange={(e) => setJobSkillForm((p) => ({ ...p, requiredLevel: e.target.value }))} placeholder="المستوى المطلوب" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
-                  <button onClick={addJobSkill} className="w-full rounded-lg bg-amber-600 px-4 py-2.5 text-xs font-bold text-white">ربط</button>
+                  <input value={jobSkillForm.requiredLevel} onChange={(e) => setJobSkillForm((p) => ({ ...p, requiredLevel: e.target.value }))} placeholder="المستوى المطلوب" className="w-full rounded-lg border border-line px-3 py-2 text-sm" />
+                  <button onClick={addJobSkill} className="w-full rounded-lg bg-warning px-4 py-2.5 text-xs font-bold text-white">ربط</button>
                   <div className="space-y-1 pt-2">
                     {jobSkills.map((js) => (
-                      <div key={js.id} className="text-xs text-slate-600">{js.jobTitle} • {js.skillId} • مستوى {js.requiredLevel}</div>
+                      <div key={js.id} className="text-xs text-ink-secondary">{js.jobTitle} • {js.skillId} • مستوى {js.requiredLevel}</div>
                     ))}
                   </div>
                 </div>
@@ -205,75 +205,75 @@ export const TrainingPage: React.FC = () => {
             )}
             {activeTab === 'gaps' && canTab('gaps') && (
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-2">
+                <div className="bg-surface border border-line rounded-xl p-4 space-y-2">
                   <h3 className="text-sm font-black">فجوات التدريب</h3>
                   <div className="flex gap-2">
-                    <input value={gapJobTitle} onChange={(e) => setGapJobTitle(e.target.value)} placeholder="المسمى الوظيفي" className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm" />
-                    <button onClick={loadGaps} className="rounded-lg bg-slate-800 px-3 py-2 text-xs font-bold text-white">تحميل</button>
+                    <input value={gapJobTitle} onChange={(e) => setGapJobTitle(e.target.value)} placeholder="المسمى الوظيفي" className="flex-1 rounded-lg border border-line px-3 py-2 text-sm" />
+                    <button onClick={loadGaps} className="rounded-lg bg-primary px-3 py-2 text-xs font-bold text-white">تحميل</button>
                   </div>
                   {gaps.map((g, idx) => (
-                    <div key={idx} className="rounded-lg border border-slate-100 px-3 py-2 text-xs">
+                    <div key={idx} className="rounded-lg border border-line px-3 py-2 text-xs">
                       <div className="font-bold">{g.employeeId} • {g.skillName}</div>
-                      <div className="text-slate-500">مطلوب {g.requiredLevel} • فعلي {g.actualLevel} • فجوة {g.gap}</div>
+                      <div className="text-muted">مطلوب {g.requiredLevel} • فعلي {g.actualLevel} • فجوة {g.gap}</div>
                     </div>
                   ))}
-                  {!gaps.length && <div className="text-xs text-slate-400">لا توجد فجوات (أو لا توجد بيانات).</div>}
+                  {!gaps.length && <div className="text-xs text-muted">لا توجد فجوات (أو لا توجد بيانات).</div>}
                 </div>
               </div>
             )}
             {activeTab === 'certificates' && canTab('certificates') && (
-              <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-2">
+              <div className="bg-surface border border-line rounded-xl p-4 space-y-2">
                 <h3 className="text-sm font-black">الشهادات منتهية (30 يوم)</h3>
                 {expiring.map((e) => (
-                  <div key={e.id} className="rounded-lg border border-slate-100 px-3 py-2 text-xs">
+                  <div key={e.id} className="rounded-lg border border-line px-3 py-2 text-xs">
                     <div className="font-bold">{e.employeeId} • {e.courseId}</div>
-                    <div className="text-slate-500">انتهاء: {e.certificateExpiry}</div>
+                    <div className="text-muted">انتهاء: {e.certificateExpiry}</div>
                   </div>
                 ))}
-                {!expiring.length && <div className="text-xs text-slate-400">لا توجد شهادات منتهية.</div>}
+                {!expiring.length && <div className="text-xs text-muted">لا توجد شهادات منتهية.</div>}
               </div>
             )}
             {activeTab === 'expenses' && canTab('expenses') && (
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-2">
+                <div className="bg-surface border border-line rounded-xl p-4 space-y-2">
                   <h3 className="text-sm font-black">المصروفات</h3>
                   {expenses.map((e) => (
-                    <div key={e.id} className="rounded-lg border border-slate-100 px-3 py-2 text-xs">
+                    <div key={e.id} className="rounded-lg border border-line px-3 py-2 text-xs">
                       <div className="font-bold">{e.description || e.courseId || '—'} • {e.amount}</div>
-                      <div className="text-slate-500">{e.expenseDate} • {e.paymentMethod}</div>
+                      <div className="text-muted">{e.expenseDate} • {e.paymentMethod}</div>
                     </div>
                   ))}
-                  {!expenses.length && <div className="text-xs text-slate-400">لا توجد مصروفات.</div>}
+                  {!expenses.length && <div className="text-xs text-muted">لا توجد مصروفات.</div>}
                 </div>
-                <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-2">
+                <div className="bg-surface border border-line rounded-xl p-4 space-y-2">
                   <h3 className="text-sm font-black">تسجيل مصروف</h3>
-                  <select value={expenseForm.courseId} onChange={(e) => setExpenseForm((p) => ({ ...p, courseId: e.target.value }))} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm">
+                  <select value={expenseForm.courseId} onChange={(e) => setExpenseForm((p) => ({ ...p, courseId: e.target.value }))} className="w-full rounded-lg border border-line px-3 py-2 text-sm">
                     <option value="">الدورة (اختياري)</option>
                     {courses.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                   </select>
-                  <input value={expenseForm.amount} onChange={(e) => setExpenseForm((p) => ({ ...p, amount: e.target.value }))} placeholder="المبلغ" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
-                  <input type="date" value={expenseForm.expenseDate} onChange={(e) => setExpenseForm((p) => ({ ...p, expenseDate: e.target.value }))} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
-                  <input value={expenseForm.description} onChange={(e) => setExpenseForm((p) => ({ ...p, description: e.target.value }))} placeholder="الوصف" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
-                  <select value={expenseForm.paymentMethod} onChange={(e) => setExpenseForm((p) => ({ ...p, paymentMethod: e.target.value }))} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm">
+                  <input value={expenseForm.amount} onChange={(e) => setExpenseForm((p) => ({ ...p, amount: e.target.value }))} placeholder="المبلغ" className="w-full rounded-lg border border-line px-3 py-2 text-sm" />
+                  <input type="date" value={expenseForm.expenseDate} onChange={(e) => setExpenseForm((p) => ({ ...p, expenseDate: e.target.value }))} className="w-full rounded-lg border border-line px-3 py-2 text-sm" />
+                  <input value={expenseForm.description} onChange={(e) => setExpenseForm((p) => ({ ...p, description: e.target.value }))} placeholder="الوصف" className="w-full rounded-lg border border-line px-3 py-2 text-sm" />
+                  <select value={expenseForm.paymentMethod} onChange={(e) => setExpenseForm((p) => ({ ...p, paymentMethod: e.target.value }))} className="w-full rounded-lg border border-line px-3 py-2 text-sm">
                     {['CASH', 'BANK_TRANSFER', 'WALLET'].map((v) => <option key={v} value={v}>{v}</option>)}
                   </select>
                   {expenseForm.paymentMethod === 'CASH' && (
-                    <select value={expenseForm.registerId} onChange={(e) => setExpenseForm((p) => ({ ...p, registerId: e.target.value }))} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm">
+                    <select value={expenseForm.registerId} onChange={(e) => setExpenseForm((p) => ({ ...p, registerId: e.target.value }))} className="w-full rounded-lg border border-line px-3 py-2 text-sm">
                       <option value="">الخزينة (اختياري)</option>
                       {payoutOptions.registers.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
                     </select>
                   )}
                   {expenseForm.paymentMethod === 'BANK_TRANSFER' && (
-                    <select value={expenseForm.bankAccountId} onChange={(e) => setExpenseForm((p) => ({ ...p, bankAccountId: e.target.value }))} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm">
+                    <select value={expenseForm.bankAccountId} onChange={(e) => setExpenseForm((p) => ({ ...p, bankAccountId: e.target.value }))} className="w-full rounded-lg border border-line px-3 py-2 text-sm">
                       <option value="">الحساب البنكي</option>
                       {payoutOptions.bankAccounts.map((b) => <option key={b.id} value={b.id}>{b.accountName} - {b.bankName}</option>)}
                     </select>
                   )}
-                  <button onClick={recordExpense} className="w-full rounded-lg bg-amber-600 px-4 py-2.5 text-xs font-bold text-white">تسجيل</button>
-                  <div className="pt-2 border-t border-slate-100 space-y-2">
+                  <button onClick={recordExpense} className="w-full rounded-lg bg-warning px-4 py-2.5 text-xs font-bold text-white">تسجيل</button>
+                  <div className="pt-2 border-t border-line space-y-2">
                     <h4 className="text-xs font-black">ترحيل تكلفة دورة</h4>
                     {courses.map((c) => (
-                      <button key={c.id} onClick={() => postCourseCost(c.id)} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700">
+                      <button key={c.id} onClick={() => postCourseCost(c.id)} className="w-full rounded-lg border border-line px-3 py-2 text-xs font-bold text-ink">
                         {c.name} ({c.cost})
                       </button>
                     ))}

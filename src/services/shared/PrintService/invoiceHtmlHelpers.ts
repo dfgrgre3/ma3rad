@@ -1,6 +1,7 @@
 import type { SalesInvoice, SystemSettings } from '../../../types';
 import { CeramicMath } from '../../../utils/products/ceramicMath';
 import { AppConfigService } from '../../domains/config/AppConfigService';
+import { OperationalFieldService } from '../../domains/products/OperationalFieldService';
 import type { InvoiceSectionId, InvoiceTableColumnId } from '../../../types';
 
 export function esc(value: unknown): string {
@@ -199,6 +200,59 @@ export function deliveryDetailsHtml(invoice: SalesInvoice, isA5: boolean): strin
 }
 
 /**
+ * Renders the activity-specific operational fields stored on a business record
+ * (e.g. ceramics invoices carry delivery address, cutting/installation
+ * requirements and total area m²). Returns an empty string when the record has
+ * no filled fields — or when field storage is unavailable (previews, samples).
+ */
+export function operationalFieldsHtml(
+  entityType: string,
+  recordId: string | undefined,
+  isA5: boolean,
+): string {
+  if (!recordId) return '';
+  try {
+    const service = new OperationalFieldService();
+    const definitions = service.getDefinitions(entityType);
+    if (!definitions.length) return '';
+    const values = service.getRecordValues(entityType, recordId);
+    const rows = definitions
+      .map((field) => {
+        const raw = values[field.id];
+        if (raw === undefined || raw === '') return '';
+        let value: string;
+        if (field.dataType === 'BOOLEAN') {
+          value = raw === 'true' ? 'نعم' : 'لا';
+        } else if (field.dataType === 'MULTI_SELECT') {
+          try {
+            const selected: unknown = JSON.parse(raw);
+            value = Array.isArray(selected)
+              ? selected.map((item) => field.values.find((option) => option.value === item)?.label || item).join('، ')
+              : String(selected);
+          } catch {
+            value = raw;
+          }
+        } else {
+          value = field.values.find((option) => option.value === raw)?.label || raw;
+        }
+        return `<div style="display:flex;justify-content:space-between;gap:8px;padding:1px 0;">
+          <span style="color:#475569;">${esc(field.name)}:</span>
+          <span style="font-weight:700;color:#0f172a;text-align:left;">${esc(value)}${field.unit ? ` ${esc(field.unit)}` : ''}</span>
+        </div>`;
+      })
+      .filter(Boolean)
+      .join('');
+    if (!rows) return '';
+    return `<div style="background:#f0fdfa;border:1px solid #99f6e4;border-radius:6px;padding:${isA5 ? '5px 8px' : '7px 10px'};margin-top:${isA5 ? '6px' : '8px'};font-size:${isA5 ? '9px' : '11px'};">
+      <div style="font-weight:800;color:#0f766e;margin-bottom:3px;border-bottom:1px solid #ccfbf1;padding-bottom:2px;">بيانات إضافية خاصة بالنشاط</div>
+      ${rows}
+    </div>`;
+  } catch {
+    return '';
+  }
+}
+
+/**
  * Generates split-payment / multi-payment breakdown HTML.
  */
 export function paymentSplitsHtml(invoice: SalesInvoice, isA5: boolean): string {
@@ -241,6 +295,9 @@ export function orderedInvoiceDetails(
     delivery: settings.invoiceShowShipping
       ? deliveryDetailsHtml(invoice, isA5)
       : '',
+    operationalFields: settings.invoiceShowOperationalFields !== false
+      ? operationalFieldsHtml('sales_invoices', invoice.id, isA5)
+      : '',
     paymentSplits: settings.invoiceShowPaymentSplits
       ? paymentSplitsHtml(invoice, isA5)
       : '',
@@ -248,7 +305,7 @@ export function orderedInvoiceDetails(
       ? `<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:6px;padding:${isA5 ? '5px 8px' : '8px 10px'};margin-top:6px;"><strong style="color:#92400e;">ملاحظات إضافية:</strong><br><span style="color:#78350f;">${esc(invoice.notes)}</span></div>`
       : '',
   };
-  const defaultOrder: InvoiceSectionId[] = ['promotions', 'delivery', 'paymentSplits', 'notes'];
+  const defaultOrder: InvoiceSectionId[] = ['promotions', 'delivery', 'operationalFields', 'paymentSplits', 'notes'];
   const order = Array.isArray(settings.invoiceSectionOrder)
     ? settings.invoiceSectionOrder.filter((section): section is InvoiceSectionId => section in sections)
     : defaultOrder;

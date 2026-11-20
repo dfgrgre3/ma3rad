@@ -327,9 +327,9 @@ export const BackupPage: React.FC = () => {
   };
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-y-auto">
+    <div className="h-full flex flex-col bg-surface-muted text-ink overflow-y-auto">
       {/* Header */}
-      <div className="bg-white border-b border-slate-200 px-6 pt-4 sticky top-0 z-10">
+      <div className="bg-surface border-b border-line px-6 pt-4 sticky top-0 z-10">
         <PageHeader
           icon={<Download className="w-5 h-5" />}
           title="النسخ الاحتياطي واستعادة البيانات (Backup & Recovery)"
@@ -337,7 +337,7 @@ export const BackupPage: React.FC = () => {
           actions={canManage && (
             <button
               onClick={openExportModal}
-              className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-500 hover:to-indigo-500 text-white rounded-xl text-xs font-bold transition shadow-lg shadow-sky-600/20 active:scale-95"
+              className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-primary to-primary hover:from-primary hover:to-primary text-white rounded-xl text-xs font-bold transition shadow-lg shadow-primary/20 active:scale-95"
             >
               <Download className="w-4 h-4" />
               تصدير وتحميل نسخة فورية الآن
@@ -350,32 +350,32 @@ export const BackupPage: React.FC = () => {
         <div
           className={`mx-6 mt-4 p-3.5 rounded-xl text-xs flex items-center justify-between ${
             message.isError
-              ? 'bg-rose-500/10 border border-rose-500/30 text-rose-700'
-              : 'bg-emerald-500/10 border text-emerald-700'
+              ? 'bg-danger/10 border border-danger/30 text-danger'
+              : 'bg-success/10 border text-success'
           }`}
         >
           <div className="flex items-center gap-2">
             {message.isError ? (
-              <AlertTriangle className="w-4 h-4 text-rose-600" />
+              <AlertTriangle className="w-4 h-4 text-danger" />
             ) : (
-              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+              <CheckCircle2 className="w-4 h-4 text-success" />
             )}
             <span>{message.text}</span>
           </div>
-          <button onClick={() => setMessage(null)} className="font-mono text-slate-500 hover:text-slate-900">✕</button>
+          <button onClick={() => setMessage(null)} className="font-mono text-muted hover:text-ink">✕</button>
         </div>
       )}
 
       {/* Cards Grid */}
       <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Export Card */}
-        <div className="bg-white border border-slate-200 rounded-2xl p-6 flex flex-col justify-between">
+        <div className="bg-surface border border-line rounded-2xl p-6 flex flex-col justify-between">
           <div>
-            <div className="w-12 h-12 rounded-2xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-600 mb-4">
+            <div className="w-12 h-12 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary mb-4">
               <HardDrive className="w-6 h-6" />
             </div>
-            <h2 className="text-base font-bold text-slate-900 mb-1.5">تصدير نسخة مشفرة من قاعدة البيانات</h2>
-            <p className="text-xs text-slate-500 leading-relaxed mb-4">
+            <h2 className="text-base font-bold text-ink mb-1.5">تصدير نسخة مشفرة من قاعدة البيانات</h2>
+            <p className="text-xs text-muted leading-relaxed mb-4">
               يصدر النظام نسخة كاملة بصيغة جدول بيانات ‏(.xlsx) محمية بكلمة مرور، ويمكن فتحها ببرامج الجداول أو استعادتها من التطبيق. احتفظ بكلمة المرور.
             </p>
           </div>
@@ -383,29 +383,29 @@ export const BackupPage: React.FC = () => {
           {canManage && (
             <button
               onClick={openExportModal}
-              className="w-full py-3 bg-slate-100 hover:bg-slate-200 text-slate-900 rounded-xl text-xs font-bold border border-slate-300 flex items-center justify-center gap-2 transition"
+              className="w-full py-3 bg-surface-sunken hover:bg-surface-sunken text-ink rounded-xl text-xs font-bold border border-line-strong flex items-center justify-center gap-2 transition"
             >
-              <Download className="w-4 h-4 text-sky-600" />
+              <Download className="w-4 h-4 text-primary" />
               تحميل نسخة مشفرة بصيغة جدول بيانات (.xlsx)
             </button>
           )}
         </div>
 
         {/* Restore Card */}
-        <div className="bg-white border border-slate-200 rounded-2xl p-6 flex flex-col justify-between">
+        <div className="bg-surface border border-line rounded-2xl p-6 flex flex-col justify-between">
           <div>
-            <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-600 mb-4">
+            <div className="w-12 h-12 rounded-2xl bg-warning/10 border border-warning/20 flex items-center justify-center text-warning mb-4">
               <Upload className="w-6 h-6" />
             </div>
-            <h2 className="text-base font-bold text-slate-900 mb-1.5">استرجاع قاعدة البيانات من ملف</h2>
-            <p className="text-xs text-slate-500 leading-relaxed mb-4">
+            <h2 className="text-base font-bold text-ink mb-1.5">استرجاع قاعدة البيانات من ملف</h2>
+            <p className="text-xs text-muted leading-relaxed mb-4">
               استعد بيانات النظام من نسخة مشفرة أو ملف SQLite. يتضمن مجلد نسخ الجهاز نسخًا مشفرة تلقائيًا قبل تثبيت التحديثات.
             </p>
           </div>
 
           {canRestore && (
             <div className="space-y-2">
-              <label className="w-full py-3 bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 border border-amber-500/30 rounded-xl text-xs font-bold flex items-center justify-center gap-2 cursor-pointer transition">
+              <label className="w-full py-3 bg-warning/10 hover:bg-warning/20 text-warning border border-warning/30 rounded-xl text-xs font-bold flex items-center justify-center gap-2 cursor-pointer transition">
                 <Upload className="w-4 h-4" />
                 <span>{isRestoring ? 'جاري الاستيراد...' : 'اختيار ملف النسخة الاحتياطية'}</span>
                 <input
@@ -419,7 +419,7 @@ export const BackupPage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => void handleOpenBackupFolder()}
-                className="w-full rounded-xl border border-slate-300 py-2 text-xs font-bold text-slate-600 transition hover:bg-slate-50"
+                className="w-full rounded-xl border border-line-strong py-2 text-xs font-bold text-ink-secondary transition hover:bg-surface-muted"
               >
                 فتح مجلد نسخ الجهاز
               </button>
@@ -427,13 +427,13 @@ export const BackupPage: React.FC = () => {
           )}
         </div>
 
-        <div className="bg-white border border-emerald-200 rounded-2xl p-6 flex flex-col justify-between">
+        <div className="bg-surface border border-success-border rounded-2xl p-6 flex flex-col justify-between">
           <div>
-            <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-700 mb-4">
+            <div className="w-12 h-12 rounded-2xl bg-success/10 border border-success/20 flex items-center justify-center text-success mb-4">
               <Key className="w-6 h-6" />
             </div>
-            <h2 className="text-base font-bold text-slate-900 mb-1.5">استرداد النسخ على جهاز بديل</h2>
-            <p className="text-xs text-slate-600 leading-relaxed mb-4">
+            <h2 className="text-base font-bold text-ink mb-1.5">استرداد النسخ على جهاز بديل</h2>
+            <p className="text-xs text-ink-secondary leading-relaxed mb-4">
               نزّل ملفًا يحمي مفتاح قاعدة البيانات بكلمة مرور تختارها. احتفظ بالملف وكلمة المرور منفصلين عن الجهاز؛ يلزم كلاهما لفك نسخة الجهاز المشفرة.
             </p>
           </div>
@@ -446,7 +446,7 @@ export const BackupPage: React.FC = () => {
                 setRecoveryExportError(null);
                 setIsRecoveryExportOpen(true);
               }}
-              className="w-full py-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 rounded-xl text-xs font-bold border border-emerald-200 flex items-center justify-center gap-2"
+              className="w-full py-3 bg-success-soft hover:bg-success-soft text-success rounded-xl text-xs font-bold border border-success-border flex items-center justify-center gap-2"
             >
               <Download className="w-4 h-4" />
               تنزيل ملف مفتاح الاسترداد
@@ -456,11 +456,11 @@ export const BackupPage: React.FC = () => {
       </div>
 
       {centralStatus?.configured && centralStatus.activated && (
-        <section className="mx-6 mb-6 rounded-2xl border border-indigo-200 bg-white p-6">
+        <section className="mx-6 mb-6 rounded-2xl border border-accent-border bg-surface p-6">
           <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2 className="text-sm font-bold text-slate-900">نسخ قاعدة بيانات هذا الجهاز على المنصة المركزية</h2>
-              <p className="mt-1 text-xs leading-relaxed text-slate-600">
+              <h2 className="text-sm font-bold text-ink">نسخ قاعدة بيانات هذا الجهاز على المنصة المركزية</h2>
+              <p className="mt-1 text-xs leading-relaxed text-ink-secondary">
                 تُخزَّن النسخة مشفرة على الخادم دون أن تتمكن المنصة من قراءتها. عند طلب الاستعادة من
                 إدارة المنصة، ينزّل هذا الجهاز النسخة ويتحقق منها ويطبقها عبر مسار الاستعادة المعتمد.
               </p>
@@ -470,7 +470,7 @@ export const BackupPage: React.FC = () => {
                 type="button"
                 onClick={() => void handleCentralUpload()}
                 disabled={isCentralBusy}
-                className="mt-3 shrink-0 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white transition hover:bg-indigo-700 disabled:opacity-50 sm:mt-0"
+                className="mt-3 shrink-0 rounded-xl bg-primary px-4 py-2 text-xs font-bold text-white transition hover:bg-primary disabled:opacity-50 sm:mt-0"
               >
                 {isCentralBusy ? 'جاري المعالجة...' : 'إنشاء نسخة ورفعها للمنصة'}
               </button>
@@ -478,10 +478,10 @@ export const BackupPage: React.FC = () => {
           </div>
 
           {centralPending && (
-            <div className="mb-4 flex flex-col gap-3 rounded-xl border border-amber-300 bg-amber-50 p-4 sm:flex-row sm:items-center sm:justify-between">
-              <div className="text-xs text-amber-900">
+            <div className="mb-4 flex flex-col gap-3 rounded-xl border border-warning bg-warning-soft p-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="text-xs text-warning">
                 <span className="font-bold">استعادة مطلوبة من المنصة</span>
-                <span className="mr-2 text-amber-700">
+                <span className="mr-2 text-warning">
                   — {centralPending.name || centralPending.id} ({formatSize(centralPending.sizeBytes ?? 0)}) — الحالة: {centralPending.restoreStatus}
                   {centralPending.restoreError ? ` — ${centralPending.restoreError}` : ''}
                 </span>
@@ -491,7 +491,7 @@ export const BackupPage: React.FC = () => {
                   type="button"
                   onClick={() => void handleCentralApplyRestore()}
                   disabled={isCentralBusy}
-                  className="shrink-0 rounded-xl bg-amber-600 px-4 py-2 text-xs font-bold text-white transition hover:bg-amber-700 disabled:opacity-50"
+                  className="shrink-0 rounded-xl bg-warning px-4 py-2 text-xs font-bold text-white transition hover:bg-warning disabled:opacity-50"
                 >
                   {isCentralBusy ? 'جاري التطبيق...' : 'تنزيل وتطبيق الاستعادة'}
                 </button>
@@ -507,20 +507,20 @@ export const BackupPage: React.FC = () => {
                 rowKey={(backup: any) => String(backup.id)}
                 dense
                 tableClassName="text-xs"
-                rowClassName={() => 'border-b border-slate-100'}
+                rowClassName={() => 'border-b border-line'}
                 columns={[
-                  { key: 'name', header: 'الاسم', render: (backup: any) => <span className="font-medium text-slate-800">{backup.name || backup.id}</span> },
-                  { key: 'device', header: 'الجهاز', render: (backup: any) => <span className="text-slate-600">{backup.deviceName || backup.deviceId || '—'}</span> },
-                  { key: 'size', header: 'الحجم', render: (backup: any) => <span className="text-slate-600">{formatSize(backup.sizeBytes ?? 0)}</span> },
-                  { key: 'date', header: 'تاريخ الرفع', render: (backup: any) => <span className="text-slate-600" dir="ltr">{backup.createdAt ? new Date(backup.createdAt).toLocaleString('ar') : '—'}</span> },
+                  { key: 'name', header: 'الاسم', render: (backup: any) => <span className="font-medium text-ink">{backup.name || backup.id}</span> },
+                  { key: 'device', header: 'الجهاز', render: (backup: any) => <span className="text-ink-secondary">{backup.deviceName || backup.deviceId || '—'}</span> },
+                  { key: 'size', header: 'الحجم', render: (backup: any) => <span className="text-ink-secondary">{formatSize(backup.sizeBytes ?? 0)}</span> },
+                  { key: 'date', header: 'تاريخ الرفع', render: (backup: any) => <span className="text-ink-secondary" dir="ltr">{backup.createdAt ? new Date(backup.createdAt).toLocaleString('ar') : '—'}</span> },
                   {
                     key: 'restore', header: 'حالة الاستعادة',
                     render: (backup: any) => (
                       <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
-                        backup.restoreStatus === 'COMPLETED' ? 'bg-emerald-100 text-emerald-700'
-                        : backup.restoreStatus === 'FAILED' ? 'bg-rose-100 text-rose-700'
-                        : backup.restoreStatus === 'NONE' ? 'bg-slate-100 text-slate-600'
-                        : 'bg-amber-100 text-amber-700'
+                        backup.restoreStatus === 'COMPLETED' ? 'bg-success-soft text-success'
+                        : backup.restoreStatus === 'FAILED' ? 'bg-danger-soft text-danger'
+                        : backup.restoreStatus === 'NONE' ? 'bg-surface-sunken text-ink-secondary'
+                        : 'bg-warning-soft text-warning'
                       }`}>
                         {backup.restoreStatus || 'NONE'}
                       </span>
@@ -534,10 +534,10 @@ export const BackupPage: React.FC = () => {
       )}
 
       {canManage && (
-        <section className="mx-6 mb-6 rounded-2xl border border-sky-200 bg-white p-6">
+        <section className="mx-6 mb-6 rounded-2xl border border-accent-border bg-surface p-6">
           <div className="mb-4">
-            <h2 className="text-sm font-bold text-slate-900">نسخة خارج الموقع على مشاركة شبكة</h2>
-            <p className="mt-1 text-xs leading-relaxed text-slate-600">
+            <h2 className="text-sm font-bold text-ink">نسخة خارج الموقع على مشاركة شبكة</h2>
+            <p className="mt-1 text-xs leading-relaxed text-ink-secondary">
               أدخل مسار مشاركة شبكة مستقلة مكانيًا عن هذا الجهاز (مثل مسار UNC في Windows).
               بعد كل نسخة، ينسخ النظام الملف المشفر إليها ويتحقق من SHA-256 ثم يختبر استعادته وفك تشفيره.
               احفظ ملف مفتاح الاسترداد وكلمة مروره خارج الجهاز وبشكل منفصل؛ من دونهما لا يمكن فك النسخ المشفرة على جهاز بديل.
@@ -551,13 +551,13 @@ export const BackupPage: React.FC = () => {
               placeholder="\\\\server\\share\\CeramiSys-Backups"
               disabled={isSavingOffsiteDir}
               dir="ltr"
-              className="min-w-0 flex-1 rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-900"
+              className="min-w-0 flex-1 rounded-xl border border-line-strong bg-surface-muted px-3 py-2 text-sm text-ink"
             />
             <button
               type="button"
               onClick={() => void handleSaveOffsiteBackupDir()}
               disabled={isSavingOffsiteDir}
-              className="rounded-xl bg-sky-700 px-5 py-2 text-xs font-bold text-white transition hover:bg-sky-800 disabled:opacity-50"
+              className="rounded-xl bg-primary px-5 py-2 text-xs font-bold text-white transition hover:bg-primary disabled:opacity-50"
             >
               {isSavingOffsiteDir ? 'جارٍ الحفظ...' : 'حفظ الوجهة'}
             </button>
@@ -569,22 +569,22 @@ export const BackupPage: React.FC = () => {
 
       {/* Export Password Modal */}
       {canManage && isExportModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-sm p-4">
-          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-150">
-            <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-100">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-primary/60 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md rounded-2xl border border-line bg-surface p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between mb-4 pb-3 border-b border-line">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-sky-50 border border-sky-100 flex items-center justify-center text-sky-600">
+                <div className="w-10 h-10 rounded-xl bg-accent-soft border border-accent-border flex items-center justify-center text-primary">
                   <Lock className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-slate-900">تصدير نسخة مشفرة (.xlsx)</h3>
-                  <p className="text-xs text-slate-500">حدد كلمة مرور قوية لحماية ملف النسخة</p>
+                  <h3 className="text-base font-bold text-ink">تصدير نسخة مشفرة (.xlsx)</h3>
+                  <p className="text-xs text-muted">حدد كلمة مرور قوية لحماية ملف النسخة</p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => !isExporting && setIsExportModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition"
+                className="text-muted hover:text-ink-secondary p-1 rounded-lg hover:bg-surface-sunken transition"
                 disabled={isExporting}
               >
                 <X className="w-5 h-5" />
@@ -592,15 +592,15 @@ export const BackupPage: React.FC = () => {
             </div>
 
             {exportError && (
-              <div className="mb-4 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4 shrink-0 text-rose-600" />
+              <div className="mb-4 p-3 rounded-xl bg-danger-soft border border-danger-border text-danger text-xs flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 shrink-0 text-danger" />
                 <span>{exportError}</span>
               </div>
             )}
 
             <form onSubmit={handleConfirmExport} className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                <label className="block text-xs font-bold text-ink mb-1.5">
                   كلمة مرور النسخة (12 حرفًا على الأقل)
                 </label>
                 <div className="relative">
@@ -614,12 +614,12 @@ export const BackupPage: React.FC = () => {
                     maxLength={255}
                     autoFocus
                     disabled={isExporting}
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-xs text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-500/30 pl-10"
+                    className="w-full rounded-xl border border-line bg-surface-muted px-3.5 py-2.5 text-xs text-ink focus:bg-surface focus:outline-none focus:ring-2 focus:ring-primary/30 pl-10"
                   />
                   <button
                     type="button"
                     onClick={() => setShowExportPassword(!showExportPassword)}
-                    className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-muted hover:text-ink-secondary"
                     tabIndex={-1}
                   >
                     {showExportPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -628,7 +628,7 @@ export const BackupPage: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                <label className="block text-xs font-bold text-ink mb-1.5">
                   تأكيد كلمة المرور
                 </label>
                 <div className="relative">
@@ -641,13 +641,13 @@ export const BackupPage: React.FC = () => {
                     minLength={12}
                     maxLength={255}
                     disabled={isExporting}
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-xs text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-500/30 pl-10"
+                    className="w-full rounded-xl border border-line bg-surface-muted px-3.5 py-2.5 text-xs text-ink focus:bg-surface focus:outline-none focus:ring-2 focus:ring-primary/30 pl-10"
                   />
                 </div>
               </div>
 
-              <div className="p-3 bg-amber-50 rounded-xl border border-amber-200/70 text-[11px] text-amber-800 flex items-start gap-2">
-                <ShieldCheck className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+              <div className="p-3 bg-warning-soft rounded-xl border border-warning-border/70 text-[11px] text-warning flex items-start gap-2">
+                <ShieldCheck className="w-4 h-4 text-warning shrink-0 mt-0.5" />
                 <span>
                   تنبيه: كلمة المرور لا تُحفظ داخل التطبيق. احتفظ بها جيداً لأنه لا يمكن استرجاع بيانات النسخة بدونها.
                 </span>
@@ -657,7 +657,7 @@ export const BackupPage: React.FC = () => {
                 <button
                   type="submit"
                   disabled={isExporting}
-                  className="flex-1 py-2.5 bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-500 hover:to-indigo-500 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-lg shadow-sky-600/20 disabled:opacity-60 transition"
+                  className="flex-1 py-2.5 bg-gradient-to-r from-primary to-primary hover:from-primary hover:to-primary text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-lg shadow-primary/20 disabled:opacity-60 transition"
                 >
                   {isExporting ? (
                     <>
@@ -675,7 +675,7 @@ export const BackupPage: React.FC = () => {
                   type="button"
                   onClick={() => setIsExportModalOpen(false)}
                   disabled={isExporting}
-                  className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition disabled:opacity-50"
+                  className="px-5 py-2.5 bg-surface-sunken hover:bg-surface-sunken text-ink rounded-xl text-xs font-bold transition disabled:opacity-50"
                 >
                   إلغاء
                 </button>
@@ -687,22 +687,22 @@ export const BackupPage: React.FC = () => {
 
       {/* Restore Password Modal */}
       {canManage && isRestoreModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-sm p-4">
-          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-150">
-            <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-100">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-primary/60 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md rounded-2xl border border-line bg-surface p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between mb-4 pb-3 border-b border-line">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-600">
+                <div className="w-10 h-10 rounded-xl bg-warning-soft border border-warning-border flex items-center justify-center text-warning">
                   <Key className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-slate-900">فك تشفير واستعادة النسخة</h3>
-                  <p className="text-xs text-slate-500">الملف محمي بكلمة مرور مشفرة</p>
+                  <h3 className="text-base font-bold text-ink">فك تشفير واستعادة النسخة</h3>
+                  <p className="text-xs text-muted">الملف محمي بكلمة مرور مشفرة</p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => !isRestoring && setIsRestoreModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition"
+                className="text-muted hover:text-ink-secondary p-1 rounded-lg hover:bg-surface-sunken transition"
                 disabled={isRestoring}
               >
                 <X className="w-5 h-5" />
@@ -710,25 +710,25 @@ export const BackupPage: React.FC = () => {
             </div>
 
             {restoreError && (
-              <div className="mb-4 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4 shrink-0 text-rose-600" />
+              <div className="mb-4 p-3 rounded-xl bg-danger-soft border border-danger-border text-danger text-xs flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 shrink-0 text-danger" />
                 <span>{restoreError}</span>
               </div>
             )}
 
             {selectedFile && (
-              <div className="mb-4 p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs flex items-center justify-between">
+              <div className="mb-4 p-3 bg-surface-muted border border-line rounded-xl text-xs flex items-center justify-between">
                 <div className="flex items-center gap-2 truncate">
-                  <FileText className="w-4 h-4 text-slate-500 shrink-0" />
-                  <span className="font-mono truncate font-medium text-slate-700">{selectedFile.name}</span>
+                  <FileText className="w-4 h-4 text-muted shrink-0" />
+                  <span className="font-mono truncate font-medium text-ink">{selectedFile.name}</span>
                 </div>
-                <span className="text-slate-400 text-[11px] shrink-0 font-mono">{formatSize(selectedFile.size)}</span>
+                <span className="text-muted text-[11px] shrink-0 font-mono">{formatSize(selectedFile.size)}</span>
               </div>
             )}
 
             <form onSubmit={handleConfirmRestore} className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                <label className="block text-xs font-bold text-ink mb-1.5">
                   {selectedFile?.name.toLowerCase().endsWith('.sqlite.enc')
                     ? 'نسخة مشفرة بمفتاح الجهاز (لا تحتاج كلمة مرور هنا)'
                     : 'أدخل كلمة مرور ملف النسخة الاحتياطية'}
@@ -742,12 +742,12 @@ export const BackupPage: React.FC = () => {
                     required={!selectedFile?.name.toLowerCase().endsWith('.sqlite.enc')}
                     autoFocus={!selectedFile?.name.toLowerCase().endsWith('.sqlite.enc')}
                     disabled={isRestoring || selectedFile?.name.toLowerCase().endsWith('.sqlite.enc')}
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-xs text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-500/30 pl-10"
+                    className="w-full rounded-xl border border-line bg-surface-muted px-3.5 py-2.5 text-xs text-ink focus:bg-surface focus:outline-none focus:ring-2 focus:ring-warning/30 pl-10"
                   />
                   <button
                     type="button"
                     onClick={() => setShowRestorePassword(!showRestorePassword)}
-                    className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-muted hover:text-ink-secondary"
                     tabIndex={-1}
                   >
                     {showRestorePassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -755,8 +755,8 @@ export const BackupPage: React.FC = () => {
                 </div>
               </div>
 
-              <div className="rounded-xl border border-sky-200 bg-sky-50 p-3 space-y-2">
-                <label className="block text-xs font-bold text-slate-700">
+              <div className="rounded-xl border border-accent-border bg-accent-soft p-3 space-y-2">
+                <label className="block text-xs font-bold text-ink">
                   عند الاستعادة على جهاز بديل: اختر ملف مفتاح الاسترداد وكلمة مروره
                 </label>
                 <input
@@ -764,7 +764,7 @@ export const BackupPage: React.FC = () => {
                   accept=".json,application/json"
                   onChange={(event) => setRecoveryKeyFile(event.target.files?.[0] || null)}
                   disabled={isRestoring}
-                  className="block w-full text-xs text-slate-600"
+                  className="block w-full text-xs text-ink-secondary"
                 />
                 <input
                   type="password"
@@ -772,15 +772,15 @@ export const BackupPage: React.FC = () => {
                   onChange={(event) => setRecoveryKeyPassword(event.target.value)}
                   placeholder="كلمة مرور ملف الاسترداد"
                   disabled={isRestoring || !recoveryKeyFile}
-                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs"
+                  className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-xs"
                 />
-                <p className="text-[10px] leading-relaxed text-slate-600">
+                <p className="text-[10px] leading-relaxed text-ink-secondary">
                   عند اختيار الملف، سيُستخدم مفتاحه لفك النسخة بدل مفتاح الجهاز الحالي. لا يُستبدل مفتاح الجهاز ولا تُحفظ كلمة المرور.
                 </p>
               </div>
 
-              <div className="p-3 bg-rose-50 rounded-xl border border-rose-200 text-[11px] text-rose-800 flex items-start gap-2">
-                <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+              <div className="p-3 bg-danger-soft rounded-xl border border-danger-border text-[11px] text-danger flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 text-danger shrink-0 mt-0.5" />
                 <span>
                   تحذير أمني شديد: استعادة قاعدة البيانات ستستبدل جميع البيانات الحالية بالملف المستورد.
                 </span>
@@ -790,7 +790,7 @@ export const BackupPage: React.FC = () => {
                 <button
                   type="submit"
                   disabled={isRestoring}
-                  className="flex-1 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-lg shadow-amber-600/20 disabled:opacity-60 transition"
+                  className="flex-1 py-2.5 bg-warning hover:bg-warning text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-lg shadow-warning/20 disabled:opacity-60 transition"
                 >
                   {isRestoring ? (
                     <>
@@ -809,7 +809,7 @@ export const BackupPage: React.FC = () => {
                   type="button"
                   onClick={() => setIsRestoreModalOpen(false)}
                   disabled={isRestoring}
-                  className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition disabled:opacity-50"
+                  className="px-5 py-2.5 bg-surface-sunken hover:bg-surface-sunken text-ink rounded-xl text-xs font-bold transition disabled:opacity-50"
                 >
                   إلغاء
                 </button>
@@ -820,14 +820,14 @@ export const BackupPage: React.FC = () => {
       )}
 
       {canManage && isRecoveryExportOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4">
-          <form onSubmit={handleConfirmRecoveryKeyExport} className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 className="text-base font-bold text-slate-900">تصدير ملف مفتاح الاسترداد</h3>
-              <button type="button" onClick={() => setIsRecoveryExportOpen(false)} className="p-1 text-slate-500"><X className="w-5 h-5" /></button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-primary/60 p-4">
+          <form onSubmit={handleConfirmRecoveryKeyExport} className="w-full max-w-md rounded-2xl border border-line bg-surface p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-line pb-3">
+              <h3 className="text-base font-bold text-ink">تصدير ملف مفتاح الاسترداد</h3>
+              <button type="button" onClick={() => setIsRecoveryExportOpen(false)} className="p-1 text-muted"><X className="w-5 h-5" /></button>
             </div>
-            {recoveryExportError && <p className="rounded-lg bg-rose-50 p-3 text-xs text-rose-700">{recoveryExportError}</p>}
-            <p className="text-xs leading-relaxed text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-3">
+            {recoveryExportError && <p className="rounded-lg bg-danger-soft p-3 text-xs text-danger">{recoveryExportError}</p>}
+            <p className="text-xs leading-relaxed text-warning bg-warning-soft border border-warning-border rounded-lg p-3">
               كلمة المرور لا يمكن استعادتها من التطبيق. احفظ ملف المفتاح واحتفظ بكلمة المرور في مكان منفصل وآمن.
             </p>
             <input
@@ -839,7 +839,7 @@ export const BackupPage: React.FC = () => {
               minLength={12}
               maxLength={255}
               disabled={isExportingRecoveryKey}
-              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs"
+              className="w-full rounded-xl border border-line bg-surface-muted px-3 py-2.5 text-xs"
             />
             <input
               type="password"
@@ -850,13 +850,13 @@ export const BackupPage: React.FC = () => {
               minLength={12}
               maxLength={255}
               disabled={isExportingRecoveryKey}
-              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs"
+              className="w-full rounded-xl border border-line bg-surface-muted px-3 py-2.5 text-xs"
             />
             <div className="flex gap-2">
-              <button type="submit" disabled={isExportingRecoveryKey} className="flex-1 rounded-xl bg-emerald-700 py-2.5 text-xs font-bold text-white disabled:opacity-50">
+              <button type="submit" disabled={isExportingRecoveryKey} className="flex-1 rounded-xl bg-success py-2.5 text-xs font-bold text-white disabled:opacity-50">
                 {isExportingRecoveryKey ? 'جارٍ التشفير والتنزيل...' : 'تشفير وتنزيل المفتاح'}
               </button>
-              <button type="button" onClick={() => setIsRecoveryExportOpen(false)} disabled={isExportingRecoveryKey} className="rounded-xl bg-slate-100 px-4 py-2.5 text-xs font-bold text-slate-700">
+              <button type="button" onClick={() => setIsRecoveryExportOpen(false)} disabled={isExportingRecoveryKey} className="rounded-xl bg-surface-sunken px-4 py-2.5 text-xs font-bold text-ink">
                 إلغاء
               </button>
             </div>

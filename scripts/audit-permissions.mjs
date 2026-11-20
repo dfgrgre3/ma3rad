@@ -11,7 +11,7 @@
  * لتصنيفها: تبويبات مفلترة بالصلاحيات (useRouteAccess/WorkspaceHub) مقابل
  * تبويبات داخلية بلا فحص.
  *
- * الناتج: docs/permissions-audit-report.md + .json
+ * الناتج: docs/reports/permissions-audit-report.md + .json
  *
  * التشغيل:  node scripts/audit-permissions.mjs
  */
@@ -23,7 +23,7 @@ import { tmpdir } from 'node:os';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const SRC = join(ROOT, 'src');
-const OUT_DIR = join(ROOT, 'docs');
+const OUT_DIR = join(ROOT, 'docs', 'reports');
 const TMP = join(tmpdir(), `perm-audit-${process.pid}`);
 mkdirSync(TMP, { recursive: true });
 mkdirSync(OUT_DIR, { recursive: true });

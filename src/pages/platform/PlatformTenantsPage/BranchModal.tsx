@@ -55,7 +55,7 @@ export const BranchModal: React.FC<BranchModalProps> = ({
           <Field label="حد الأجهزة">
             <input type="number" min={1} className={inputClass} value={branchForm.devicesLimit} onChange={(e) => setBranchForm({ ...branchForm, devicesLimit: Number(e.target.value) })} />
           </Field>
-          <label className="flex items-center gap-2 text-[12px] font-semibold text-slate-700 sm:col-span-2">
+          <label className="flex items-center gap-2 text-[12px] font-semibold text-ink sm:col-span-2">
             <input type="checkbox" checked={branchForm.isMain} onChange={(e) => setBranchForm({ ...branchForm, isMain: e.target.checked })} />
             الفرع الرئيسي للعميل
           </label>

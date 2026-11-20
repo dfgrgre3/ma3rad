@@ -4,5 +4,11 @@
   },
   "documents.salesInvoices": {
     "ar": "فواتير الخدمات"
+  },
+  "documents.quotations": {
+    "ar": "عروض الخدمة"
+  },
+  "documents.orders": {
+    "ar": "أوامر الخدمة"
   }
 }

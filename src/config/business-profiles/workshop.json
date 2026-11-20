@@ -45,11 +45,11 @@
   "support": {
     "profileDefaults": "implemented",
     "productAttributes": "stored-as-text-attributes",
-    "industrySpecificWorkflows": "not-implemented",
-    "industrySpecificReports": "not-implemented",
-    "industrySpecificDocumentTemplates": "not-implemented",
-    "typedCustomFieldStorage": "not-implemented",
-    "workOrdersAndTechnicianScheduling": "not-implemented"
+    "industrySpecificWorkflows": "partially-implemented",
+    "industrySpecificReports": "implemented",
+    "industrySpecificDocumentTemplates": "partially-implemented",
+    "typedCustomFieldStorage": "implemented-for-profile-declared-fields",
+    "workOrdersAndTechnicianScheduling": "partially-implemented"
   },
   "printTemplates": [
     {

@@ -106,8 +106,8 @@ export const ExpenseModal: React.FC<{ initial?: any; onClose: () => void; onSave
           </div>
         </div>
         <div className="flex justify-end gap-2 pt-2">
-          <button type="button" onClick={onClose} disabled={saving} className="px-4 py-2 text-sm font-semibold text-slate-600 rounded-lg hover:bg-slate-100 disabled:opacity-50">إلغاء</button>
-          <button type="button" onClick={save} disabled={saving || Boolean(listsError) || categories.length === 0 || registers.length === 0} className="flex items-center gap-1.5 px-5 py-2 bg-rose-600 text-white rounded-lg text-sm font-bold hover:bg-rose-700 disabled:opacity-50">
+          <button type="button" onClick={onClose} disabled={saving} className="px-4 py-2 text-sm font-semibold text-ink-secondary rounded-lg hover:bg-surface-sunken disabled:opacity-50">إلغاء</button>
+          <button type="button" onClick={save} disabled={saving || Boolean(listsError) || categories.length === 0 || registers.length === 0} className="flex items-center gap-1.5 px-5 py-2 bg-danger text-white rounded-lg text-sm font-bold hover:bg-danger disabled:opacity-50">
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} حفظ
           </button>
         </div>

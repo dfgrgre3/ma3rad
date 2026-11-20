@@ -89,13 +89,13 @@ export const PartnersPage: React.FC = () => {
         <PartnersListPanel vm={vm} />
 
         <section className="min-w-0 space-y-4">
-          <div className="flex flex-wrap gap-1 rounded-xl border border-slate-200 bg-white p-1 dark:border-slate-700 dark:bg-slate-900">
+          <div className="flex flex-wrap gap-1 rounded-xl border border-line bg-surface p-1 ">
             {([
               { key: 'statement', label: 'كشف الحساب', icon: ClipboardList },
               { key: 'overview', label: 'أرصدة الشركاء', icon: BarChart3 },
               { key: 'distributions', label: 'سجل توزيع الأرباح', icon: History },
             ] as Array<{ key: Tab; label: string; icon: typeof Users }>).map(({ key, label, icon: Icon }) => (
-              <button key={key} type="button" onClick={() => setTab(key)} className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-bold transition ${tab === key ? 'bg-sky-600 text-white' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'}`}>
+              <button key={key} type="button" onClick={() => setTab(key)} className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-bold transition ${tab === key ? 'bg-primary text-white' : 'text-ink-secondary hover:bg-surface-sunken dark:text-muted dark:hover:bg-primary'}`}>
                 <Icon className="h-4 w-4" /> {label}
               </button>
             ))}

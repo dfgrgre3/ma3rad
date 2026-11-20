@@ -31,10 +31,10 @@ const statusLabels: Record<string, string> = {
 };
 
 const statusStyles: Record<string, string> = {
-  ACTIVE: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-  EXPIRING: 'bg-amber-50 text-amber-700 border-amber-200',
-  EXPIRED: 'bg-rose-50 text-rose-700 border-rose-200',
-  ARCHIVED: 'bg-slate-100 text-slate-500 border-slate-200',
+  ACTIVE: 'bg-success-soft text-success border-success-border',
+  EXPIRING: 'bg-warning-soft text-warning border-warning-border',
+  EXPIRED: 'bg-danger-soft text-danger border-danger-border',
+  ARCHIVED: 'bg-surface-sunken text-muted border-line',
 };
 
 const confidentialityLabels = {
@@ -291,7 +291,7 @@ export const EmployeeDocumentsPage: React.FC = () => {
         description="هويات، شهادات، تقارير طبية ومستندات أخرى مع تتبع الانتهاء."
         actions={<>
           <select
-            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+            className="rounded-lg border border-line bg-surface px-3 py-2 text-sm"
             value={employeeFilter}
             onChange={(event) => setEmployeeFilter(event.target.value)}
           >
@@ -301,7 +301,7 @@ export const EmployeeDocumentsPage: React.FC = () => {
             ))}
           </select>
           <select
-            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+            className="rounded-lg border border-line bg-surface px-3 py-2 text-sm"
             value={typeFilter}
             onChange={(event) => setTypeFilter(event.target.value as HrDocumentType | 'ALL')}
           >
@@ -311,7 +311,7 @@ export const EmployeeDocumentsPage: React.FC = () => {
             ))}
           </select>
           <select
-            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+            className="rounded-lg border border-line bg-surface px-3 py-2 text-sm"
             value={statusFilter}
             onChange={(event) => setStatusFilter(event.target.value as 'ALL' | 'ACTIVE' | 'EXPIRED' | 'ARCHIVED')}
           >
@@ -320,12 +320,12 @@ export const EmployeeDocumentsPage: React.FC = () => {
             <option value="EXPIRED">منتهي</option>
             <option value="ARCHIVED">مؤرشف</option>
           </select>
-          <button className="rounded-lg border border-slate-200 bg-white p-2 text-slate-600" onClick={load} title="تحديث">
+          <button className="rounded-lg border border-line bg-surface p-2 text-ink-secondary" onClick={load} title="تحديث">
             <RefreshCw className="h-4 w-4" />
           </button>
           {canManage && (
             <button
-              className="flex items-center gap-1 rounded-lg bg-sky-600 px-3 py-2 text-sm font-medium text-white"
+              className="flex items-center gap-1 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-white"
               onClick={() => {
                 setEditingDocument(null);
                 setForm(emptyForm);
@@ -340,10 +340,10 @@ export const EmployeeDocumentsPage: React.FC = () => {
 
       <div className="grid gap-3 sm:grid-cols-4">
         {[
-          { label: 'نشطة', value: summary.active, tone: 'border-emerald-200 bg-emerald-50 text-emerald-800' },
-          { label: 'قاربت الانتهاء (30 يوم)', value: summary.expiring, tone: 'border-amber-200 bg-amber-50 text-amber-800' },
-          { label: 'منتهية', value: summary.expired, tone: 'border-rose-200 bg-rose-50 text-rose-800' },
-          { label: 'مؤرشفة', value: summary.archived, tone: 'border-slate-200 bg-slate-50 text-slate-800' },
+          { label: 'نشطة', value: summary.active, tone: 'border-success-border bg-success-soft text-success' },
+          { label: 'قاربت الانتهاء (30 يوم)', value: summary.expiring, tone: 'border-warning-border bg-warning-soft text-warning' },
+          { label: 'منتهية', value: summary.expired, tone: 'border-danger-border bg-danger-soft text-danger' },
+          { label: 'مؤرشفة', value: summary.archived, tone: 'border-line bg-surface-muted text-ink' },
         ].map((card) => (
           <div key={card.label} className={`rounded-xl border p-3 ${card.tone}`}>
             <p className="text-xs font-bold opacity-80">{card.label}</p>
@@ -353,24 +353,24 @@ export const EmployeeDocumentsPage: React.FC = () => {
       </div>
 
       {summary.expiring > 0 && (
-        <div role="alert" className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+        <div role="alert" className="rounded-xl border border-warning bg-warning-soft px-4 py-3 text-sm text-warning">
           تنبيه: يوجد {summary.expiring} مستند موظف تنتهي صلاحيته خلال 30 يوماً. راجع تاريخ الانتهاء وجدّد المستندات المطلوبة.
         </div>
       )}
 
       {showForm && canManage && (
-        <form onSubmit={submit} className="rounded-xl border border-slate-200 bg-white p-4">
+        <form onSubmit={submit} className="rounded-xl border border-line bg-surface p-4">
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="font-bold text-slate-800">{editingDocument ? 'تعديل بيانات المستند' : 'تسجيل مستند ورفع ملفه'}</h2>
-            <button type="button" className="rounded p-1 text-slate-500 hover:bg-slate-100"
+            <h2 className="font-bold text-ink">{editingDocument ? 'تعديل بيانات المستند' : 'تسجيل مستند ورفع ملفه'}</h2>
+            <button type="button" className="rounded p-1 text-muted hover:bg-surface-sunken"
               onClick={() => { setShowForm(false); setEditingDocument(null); setForm(emptyForm); }}
               aria-label="إغلاق النموذج"><X className="h-4 w-4" /></button>
           </div>
           <div className="grid gap-3 md:grid-cols-4">
-            <label className="text-xs text-slate-600">
+            <label className="text-xs text-ink-secondary">
               الموظف
               <select
-                className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-2 text-sm"
+                className="mt-1 w-full rounded-lg border border-line px-2 py-2 text-sm"
                 value={form.employeeId}
                 onChange={(event) => setForm({ ...form, employeeId: event.target.value })}
               >
@@ -380,10 +380,10 @@ export const EmployeeDocumentsPage: React.FC = () => {
                 ))}
               </select>
             </label>
-            <label className="text-xs text-slate-600">
+            <label className="text-xs text-ink-secondary">
               نوع المستند
               <select
-                className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-2 text-sm"
+                className="mt-1 w-full rounded-lg border border-line px-2 py-2 text-sm"
                 value={form.documentType}
                 onChange={(event) => setForm({ ...form, documentType: event.target.value as HrDocumentType })}
               >
@@ -392,44 +392,44 @@ export const EmployeeDocumentsPage: React.FC = () => {
                 ))}
               </select>
             </label>
-            <label className="text-xs text-slate-600">
+            <label className="text-xs text-ink-secondary">
               عنوان المستند
               <input
-                className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-2 text-sm"
+                className="mt-1 w-full rounded-lg border border-line px-2 py-2 text-sm"
                 value={form.title}
                 onChange={(event) => setForm({ ...form, title: event.target.value })}
               />
             </label>
-            <label className="text-xs text-slate-600">
+            <label className="text-xs text-ink-secondary">
               رقم المستند
               <input
-                className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-2 text-sm"
+                className="mt-1 w-full rounded-lg border border-line px-2 py-2 text-sm"
                 value={form.documentNumber}
                 onChange={(event) => setForm({ ...form, documentNumber: event.target.value })}
               />
             </label>
-            <label className="text-xs text-slate-600">
+            <label className="text-xs text-ink-secondary">
               تاريخ الإصدار
               <input
                 type="date"
-                className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-2 text-sm"
+                className="mt-1 w-full rounded-lg border border-line px-2 py-2 text-sm"
                 value={form.issuedAt}
                 onChange={(event) => setForm({ ...form, issuedAt: event.target.value })}
               />
             </label>
-            <label className="text-xs text-slate-600">
+            <label className="text-xs text-ink-secondary">
               تاريخ الانتهاء
               <input
                 type="date"
-                className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-2 text-sm"
+                className="mt-1 w-full rounded-lg border border-line px-2 py-2 text-sm"
                 value={form.expiresAt}
                 onChange={(event) => setForm({ ...form, expiresAt: event.target.value })}
               />
             </label>
-            <label className="text-xs text-slate-600">
+            <label className="text-xs text-ink-secondary">
               مستوى السرية
               <select
-                className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-2 text-sm"
+                className="mt-1 w-full rounded-lg border border-line px-2 py-2 text-sm"
                 value={form.confidentiality}
                 onChange={(event) => setForm({ ...form, confidentiality: event.target.value as any })}
               >
@@ -442,30 +442,30 @@ export const EmployeeDocumentsPage: React.FC = () => {
                 ))}
               </select>
             </label>
-            <label className="text-xs text-slate-600">
+            <label className="text-xs text-ink-secondary">
               ملاحظات
               <input
-                className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-2 text-sm"
+                className="mt-1 w-full rounded-lg border border-line px-2 py-2 text-sm"
                 value={form.notes}
                 onChange={(event) => setForm({ ...form, notes: event.target.value })}
               />
             </label>
           </div>
           {!editingDocument && (
-            <p className="mt-3 flex items-center gap-2 rounded-lg bg-sky-50 px-3 py-2 text-xs text-sky-900">
+            <p className="mt-3 flex items-center gap-2 rounded-lg bg-accent-soft px-3 py-2 text-xs text-primary">
               <Upload className="h-4 w-4 shrink-0" />
               سيُطلب اختيار ملف PDF أو صورة عند الحفظ. يُشفّر الملف قبل تخزينه على الجهاز (حد أقصى 25 ميجابايت).
             </p>
           )}
           <div className="mt-3 flex justify-end gap-2">
-            <button type="button" className="rounded-lg border border-slate-200 px-3 py-2 text-sm"
+            <button type="button" className="rounded-lg border border-line px-3 py-2 text-sm"
               onClick={() => { setShowForm(false); setEditingDocument(null); setForm(emptyForm); }}>
               إلغاء
             </button>
             <button
               type="submit"
               disabled={saving}
-              className="flex items-center gap-1 rounded-lg bg-sky-600 px-3 py-2 text-sm text-white disabled:opacity-50"
+              className="flex items-center gap-1 rounded-lg bg-primary px-3 py-2 text-sm text-white disabled:opacity-50"
             >
               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : editingDocument ? <Pencil className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
               {editingDocument ? 'حفظ التعديلات' : 'اختيار الملف وحفظ المستند'}
@@ -474,30 +474,30 @@ export const EmployeeDocumentsPage: React.FC = () => {
         </form>
       )}
 
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+      <div className="overflow-hidden rounded-xl border border-line bg-surface">
         <DataTable
           ariaLabel="مستندات الموظفين"
           rows={rows}
           rowKey={(row: any) => String(row.id)}
           loading={loading}
           tableClassName="text-sm"
-          rowClassName={() => 'border-t border-slate-100'}
+          rowClassName={() => 'border-t border-line'}
           columns={[
-            { key: 'emp', header: 'الموظف', render: (row: any) => <span className="font-medium text-slate-700">{row.employeeName}</span> },
+            { key: 'emp', header: 'الموظف', render: (row: any) => <span className="font-medium text-ink">{row.employeeName}</span> },
             { key: 'type', header: 'النوع', render: (row: any) => <span>{typeLabels[row.documentType as keyof typeof typeLabels]}</span> },
             { key: 'title', header: 'العنوان', render: (row: any) => <span>{row.title}</span> },
-            { key: 'num', header: 'الرقم', render: (row: any) => <span className="font-mono text-xs text-slate-600">{row.documentNumber || '—'}</span> },
-            { key: 'expiry', header: 'الانتهاء', render: (row: any) => <span className="text-slate-600">{row.expiresAt || '—'}</span> },
-            { key: 'conf', header: 'السرية', render: (row: any) => <span className="text-slate-600">{confidentialityLabels[row.confidentiality as keyof typeof confidentialityLabels]}</span> },
+            { key: 'num', header: 'الرقم', render: (row: any) => <span className="font-mono text-xs text-ink-secondary">{row.documentNumber || '—'}</span> },
+            { key: 'expiry', header: 'الانتهاء', render: (row: any) => <span className="text-ink-secondary">{row.expiresAt || '—'}</span> },
+            { key: 'conf', header: 'السرية', render: (row: any) => <span className="text-ink-secondary">{confidentialityLabels[row.confidentiality as keyof typeof confidentialityLabels]}</span> },
             {
               key: 'file', header: 'الملف والنسخ',
               render: (row: any) => row.latestVersionId ? (
                 <span className="block text-xs">
-                  <span className="block max-w-40 truncate font-medium text-slate-700" title={row.latestFileName || ''}>{row.latestFileName} — v{row.latestVersionNumber}</span>
-                  <span className="mt-1 block text-slate-500">{row.versionCount} نسخة · رفعها {row.latestUploaderName || '—'}</span>
-                  <span className="mt-1 block text-slate-500">آخر تعديل: {row.updatedByName || row.createdByName || '—'} · {new Date(row.updatedAt).toLocaleDateString('ar')}</span>
+                  <span className="block max-w-40 truncate font-medium text-ink" title={row.latestFileName || ''}>{row.latestFileName} — v{row.latestVersionNumber}</span>
+                  <span className="mt-1 block text-muted">{row.versionCount} نسخة · رفعها {row.latestUploaderName || '—'}</span>
+                  <span className="mt-1 block text-muted">آخر تعديل: {row.updatedByName || row.createdByName || '—'} · {new Date(row.updatedAt).toLocaleDateString('ar')}</span>
                 </span>
-              ) : <span className="text-xs text-amber-700">لا يوجد ملف مرفق</span>,
+              ) : <span className="text-xs text-warning">لا يوجد ملف مرفق</span>,
             },
             {
               key: 'status', header: 'الحالة',
@@ -511,7 +511,7 @@ export const EmployeeDocumentsPage: React.FC = () => {
                 <span className="flex flex-wrap gap-1">
                   {row.latestVersionId && (
                     <>
-                      <button className="flex items-center gap-1 rounded bg-sky-50 px-2 py-1 text-xs text-sky-700"
+                      <button className="flex items-center gap-1 rounded bg-accent-soft px-2 py-1 text-xs text-primary"
                         onClick={() => {
                           try {
                             const version = service.getVersions(row.id)[0];
@@ -520,7 +520,7 @@ export const EmployeeDocumentsPage: React.FC = () => {
                         }} title="فتح داخل النظام">
                         <Eye className="h-3.5 w-3.5" /> فتح
                       </button>
-                      {canDownload && <button className="flex items-center gap-1 rounded bg-slate-100 px-2 py-1 text-xs text-slate-700"
+                      {canDownload && <button className="flex items-center gap-1 rounded bg-surface-sunken px-2 py-1 text-xs text-ink"
                         onClick={() => {
                           try {
                             const version = service.getVersions(row.id)[0];
@@ -531,21 +531,21 @@ export const EmployeeDocumentsPage: React.FC = () => {
                       </button>}
                     </>
                   )}
-                  <button className="flex items-center gap-1 rounded bg-slate-100 px-2 py-1 text-xs text-slate-600"
+                  <button className="flex items-center gap-1 rounded bg-surface-sunken px-2 py-1 text-xs text-ink-secondary"
                     onClick={() => showVersions(row)} title="سجل النسخ">
                     <History className="h-3.5 w-3.5" /> النسخ
                   </button>
                   {canManage && row.status !== 'ARCHIVED' && (
                     <>
-                      <button className="flex items-center gap-1 rounded bg-slate-100 px-2 py-1 text-xs text-slate-600"
+                      <button className="flex items-center gap-1 rounded bg-surface-sunken px-2 py-1 text-xs text-ink-secondary"
                         onClick={() => edit(row)} title="تعديل بيانات المستند">
                         <Pencil className="h-3.5 w-3.5" /> تعديل
                       </button>
-                      <button className="flex items-center gap-1 rounded bg-sky-50 px-2 py-1 text-xs text-sky-700"
+                      <button className="flex items-center gap-1 rounded bg-accent-soft px-2 py-1 text-xs text-primary"
                         onClick={() => void addVersion(row)} title="إضافة نسخة جديدة">
                         <Upload className="h-3.5 w-3.5" /> رفع نسخة
                       </button>
-                      <button className="flex items-center gap-1 rounded bg-rose-50 px-2 py-1 text-xs text-rose-700"
+                      <button className="flex items-center gap-1 rounded bg-danger-soft px-2 py-1 text-xs text-danger"
                         onClick={() => archive(row)} title="أرشفة">
                         <Archive className="h-3.5 w-3.5" /> أرشفة
                       </button>
@@ -560,15 +560,15 @@ export const EmployeeDocumentsPage: React.FC = () => {
       </div>
 
       {historyDocument && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/50 p-4">
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-primary/50 p-4">
           <section role="dialog" aria-modal="true" aria-labelledby="employee-document-history-title"
-            className="max-h-[85vh] w-full max-w-3xl overflow-hidden rounded-xl bg-white shadow-2xl">
+            className="max-h-[85vh] w-full max-w-3xl overflow-hidden rounded-xl bg-surface shadow-2xl">
             <header className="flex items-center justify-between border-b p-4">
               <div>
-                <h2 id="employee-document-history-title" className="font-bold text-slate-900">سجل نسخ المستند</h2>
-                <p className="mt-1 text-xs text-slate-500">{historyDocument.title}</p>
+                <h2 id="employee-document-history-title" className="font-bold text-ink">سجل نسخ المستند</h2>
+                <p className="mt-1 text-xs text-muted">{historyDocument.title}</p>
               </div>
-              <button onClick={() => setHistoryDocument(null)} className="rounded-lg p-2 hover:bg-slate-100" aria-label="إغلاق">
+              <button onClick={() => setHistoryDocument(null)} className="rounded-lg p-2 hover:bg-surface-sunken" aria-label="إغلاق">
                 <X className="h-4 w-4" />
               </button>
             </header>
@@ -579,41 +579,41 @@ export const EmployeeDocumentsPage: React.FC = () => {
                   {versions.map((version) => (
                     <li key={version.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3">
                       <div className="min-w-0">
-                        <p className="truncate text-sm font-bold text-slate-800">v{version.versionNumber} · {version.fileName}</p>
-                        <p className="mt-1 text-xs text-slate-500">
+                        <p className="truncate text-sm font-bold text-ink">v{version.versionNumber} · {version.fileName}</p>
+                        <p className="mt-1 text-xs text-muted">
                           {version.createdByName || 'مستخدم غير معروف'} · {new Date(version.createdAt).toLocaleString('ar')}
                           · {(version.fileSize / 1024 / 1024).toFixed(2)} ميجابايت
                         </p>
-                        {version.notes && <p className="mt-1 text-xs text-slate-600">{version.notes}</p>}
+                        {version.notes && <p className="mt-1 text-xs text-ink-secondary">{version.notes}</p>}
                       </div>
                       <div className="flex gap-2">
-                        <button className="rounded bg-sky-50 px-3 py-2 text-xs text-sky-700"
+                        <button className="rounded bg-accent-soft px-3 py-2 text-xs text-primary"
                           onClick={() => void openVersion(historyDocument, version)}><Eye className="inline h-3.5 w-3.5" /> فتح</button>
-                        {canDownload && <button className="rounded bg-slate-100 px-3 py-2 text-xs text-slate-700"
+                        {canDownload && <button className="rounded bg-surface-sunken px-3 py-2 text-xs text-ink"
                           onClick={() => void downloadVersion(historyDocument, version)}><Download className="inline h-3.5 w-3.5" /> تنزيل</button>}
                       </div>
                     </li>
                   ))}
                 </ol>
                 </>
-              ) : <p className="py-8 text-center text-sm text-slate-500">لا توجد ملفات مرفقة لهذا المستند.</p>}
+              ) : <p className="py-8 text-center text-sm text-muted">لا توجد ملفات مرفقة لهذا المستند.</p>}
               <section className="mt-6 border-t pt-4">
-                <h3 className="mb-3 text-sm font-bold text-slate-800">سجل التعديلات والعمليات</h3>
+                <h3 className="mb-3 text-sm font-bold text-ink">سجل التعديلات والعمليات</h3>
                 {auditHistory.length ? (
                   <ol className="space-y-2">
                     {auditHistory.map((entry) => (
-                      <li key={entry.id} className="rounded-lg bg-slate-50 p-3 text-xs">
+                      <li key={entry.id} className="rounded-lg bg-surface-muted p-3 text-xs">
                         <div className="flex flex-wrap justify-between gap-2">
-                          <span className="font-bold text-slate-800">{entry.action} — {entry.userName}</span>
-                          <time className="text-slate-500">{new Date(entry.createdAt).toLocaleString('ar')}</time>
+                          <span className="font-bold text-ink">{entry.action} — {entry.userName}</span>
+                          <time className="text-muted">{new Date(entry.createdAt).toLocaleString('ar')}</time>
                         </div>
                         {entry.newValues && (
-                          <pre className="mt-2 whitespace-pre-wrap break-words text-[10px] text-slate-500">{entry.newValues}</pre>
+                          <pre className="mt-2 whitespace-pre-wrap break-words text-[10px] text-muted">{entry.newValues}</pre>
                         )}
                       </li>
                     ))}
                   </ol>
-                ) : <p className="text-xs text-slate-500">لا يوجد سجل تغييرات.</p>}
+                ) : <p className="text-xs text-muted">لا يوجد سجل تغييرات.</p>}
               </section>
             </div>
           </section>
@@ -621,21 +621,21 @@ export const EmployeeDocumentsPage: React.FC = () => {
       )}
 
       {preview && (
-        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/70 p-3 sm:p-6">
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-primary/70 p-3 sm:p-6">
           <section role="dialog" aria-modal="true" aria-labelledby="employee-document-preview-title"
-            className="flex h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-xl bg-white shadow-2xl">
-            <header className="flex items-center justify-between gap-3 border-b bg-slate-50 p-3">
+            className="flex h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-xl bg-surface shadow-2xl">
+            <header className="flex items-center justify-between gap-3 border-b bg-surface-muted p-3">
               <div className="min-w-0">
-                <h2 id="employee-document-preview-title" className="truncate text-sm font-bold text-slate-900">{preview.document.title}</h2>
-                <p className="truncate text-xs text-slate-500">{preview.version.fileName} · v{preview.version.versionNumber}</p>
+                <h2 id="employee-document-preview-title" className="truncate text-sm font-bold text-ink">{preview.document.title}</h2>
+                <p className="truncate text-xs text-muted">{preview.version.fileName} · v{preview.version.versionNumber}</p>
               </div>
-              <button onClick={() => setPreview(null)} className="rounded-lg p-2 hover:bg-slate-200" aria-label="إغلاق المعاينة">
+              <button onClick={() => setPreview(null)} className="rounded-lg p-2 hover:bg-surface-sunken" aria-label="إغلاق المعاينة">
                 <X className="h-4 w-4" />
               </button>
             </header>
-            <div className="flex-1 overflow-auto bg-slate-200 p-3">
+            <div className="flex-1 overflow-auto bg-surface-sunken p-3">
               {preview.version.mimeType === 'application/pdf' ? (
-                <iframe title={preview.version.fileName} src={preview.url} className="h-full min-h-[70vh] w-full rounded bg-white" />
+                <iframe title={preview.version.fileName} src={preview.url} className="h-full min-h-[70vh] w-full rounded bg-surface" />
               ) : (
                 <div className="flex min-h-full items-center justify-center">
                   <img src={preview.url} alt={preview.document.title} className="max-h-full max-w-full object-contain" />

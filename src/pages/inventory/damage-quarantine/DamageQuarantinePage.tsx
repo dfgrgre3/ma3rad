@@ -161,35 +161,35 @@ export const DamageQuarantinePage: React.FC = () => {
   const getCategoryBadge = (cat: string) => {
     switch (cat) {
       case 'BROKEN':
-        return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-black bg-rose-100 text-rose-800 border border-rose-300">كسر بلاط وسيراميك</span>;
+        return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-black bg-danger-soft text-danger border border-danger">كسر بلاط وسيراميك</span>;
       case 'DAMAGED':
-        return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-black bg-amber-100 text-amber-800 border border-amber-300">تلف عام ورطوبة</span>;
+        return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-black bg-warning-soft text-warning border border-warning">تلف عام ورطوبة</span>;
       case 'DISPLAY_SAMPLE':
-        return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-black bg-sky-100 text-sky-800 border border-sky-300">عينات عرض صالة</span>;
+        return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-black bg-accent-soft text-primary border border-accent-border">عينات عرض صالة</span>;
       case 'NON_SELLABLE_RETURN':
-        return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-black bg-purple-100 text-purple-800 border border-purple-300">مرتجع غير صالح للبيع</span>;
+        return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-black bg-accent-soft text-primary border border-accent-border">مرتجع غير صالح للبيع</span>;
       default:
-        return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-black bg-orange-100 text-orange-800 border border-orange-300">تحت الفحص والحجر</span>;
+        return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-black bg-warning-soft text-warning border border-warning">تحت الفحص والحجر</span>;
     }
   };
 
   const getStatusBadge = (st: string, remainingQuantityM2?: number) => {
     switch (st) {
       case 'RECORDED':
-        return <span className="px-2 py-0.5 rounded-lg text-xs font-bold bg-slate-100 text-slate-700">مسجل وبانتظار الفحص</span>;
+        return <span className="px-2 py-0.5 rounded-lg text-xs font-bold bg-surface-sunken text-ink">مسجل وبانتظار الفحص</span>;
       case 'INSPECTED':
-        return <span className="px-2 py-0.5 rounded-lg text-xs font-bold bg-blue-100 text-blue-800">تم الفحص الفني</span>;
+        return <span className="px-2 py-0.5 rounded-lg text-xs font-bold bg-accent-soft text-primary">تم الفحص الفني</span>;
       case 'WRITTEN_OFF':
-        return <span className="px-2 py-0.5 rounded-lg text-xs font-black bg-rose-100 text-rose-700">مُعدم محاسبياً (خسارة)</span>;
+        return <span className="px-2 py-0.5 rounded-lg text-xs font-black bg-danger-soft text-danger">مُعدم محاسبياً (خسارة)</span>;
       case 'RESTORED_TO_STOCK':
-        return <span className="px-2 py-0.5 rounded-lg text-xs font-black bg-emerald-100 text-emerald-700">مُستعاد للصالح للبيع</span>;
+        return <span className="px-2 py-0.5 rounded-lg text-xs font-black bg-success-soft text-success">مُستعاد للصالح للبيع</span>;
       case 'DOWNGRADED_SALE':
         if (Number(remainingQuantityM2) <= 0) {
-          return <span className="px-2 py-0.5 rounded-lg text-xs font-black bg-slate-100 text-slate-600">نفدت كمية البيع المخفض</span>;
+          return <span className="px-2 py-0.5 rounded-lg text-xs font-black bg-surface-sunken text-ink-secondary">نفدت كمية البيع المخفض</span>;
         }
-        return <span className="px-2 py-0.5 rounded-lg text-xs font-black bg-purple-100 text-purple-700">معروض بسعر مخفض</span>;
+        return <span className="px-2 py-0.5 rounded-lg text-xs font-black bg-accent-soft text-primary">معروض بسعر مخفض</span>;
       default:
-        return <span className="px-2 py-0.5 rounded-lg text-xs font-bold bg-slate-100">{st}</span>;
+        return <span className="px-2 py-0.5 rounded-lg text-xs font-bold bg-surface-sunken">{st}</span>;
     }
   };
 
@@ -206,9 +206,9 @@ export const DamageQuarantinePage: React.FC = () => {
   const pendingInspectionCount = items.filter(i => i.status === 'RECORDED').length;
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
+    <div className="h-full flex flex-col bg-surface-muted text-ink overflow-hidden">
       {/* Header */}
-      <div className="bg-white px-6 pt-4">
+      <div className="bg-surface px-6 pt-4">
         <PageHeader
           icon={<ShieldAlert className="w-5 h-5" />}
           title="إدارة الكسر والتالف والحجر الصحي (Damage & Quarantine)"
@@ -217,7 +217,7 @@ export const DamageQuarantinePage: React.FC = () => {
             {canManage && (
               <button
                 onClick={handleOpenCreate}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-black shadow-md shadow-rose-600/20 transition active:scale-95"
+                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-danger hover:bg-danger text-white text-xs font-black shadow-md shadow-danger/20 transition active:scale-95"
               >
                 <Plus className="w-4 h-4" />
                 تسجيل كسر / تالف / حجر
@@ -226,7 +226,7 @@ export const DamageQuarantinePage: React.FC = () => {
 
             <button
               onClick={loadData}
-              className="p-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 transition"
+              className="p-2 rounded-xl border border-line bg-surface hover:bg-surface-muted text-ink-secondary transition"
               title="تحديث"
             >
               <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
@@ -237,61 +237,61 @@ export const DamageQuarantinePage: React.FC = () => {
 
       {/* KPI Cards */}
       <div className="p-6 pb-2 grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-white border border-rose-200 rounded-2xl p-4 shadow-sm flex items-center justify-between">
+        <div className="bg-surface border border-danger-border rounded-2xl p-4 shadow-sm flex items-center justify-between">
           <div>
-            <div className="text-[11px] font-bold text-slate-500">إجمالي قيمة التالف والكسر المحجوز</div>
-            <div className="text-2xl font-black text-rose-600 mt-1">{fmtCur(totalSpecialCost)}</div>
-            <div className="text-[10px] text-slate-400 mt-0.5">معزولة تماماً عن كميات البيع</div>
+            <div className="text-[11px] font-bold text-muted">إجمالي قيمة التالف والكسر المحجوز</div>
+            <div className="text-2xl font-black text-danger mt-1">{fmtCur(totalSpecialCost)}</div>
+            <div className="text-[10px] text-muted mt-0.5">معزولة تماماً عن كميات البيع</div>
           </div>
-          <div className="w-10 h-10 rounded-xl bg-rose-50 border border-rose-200 flex items-center justify-center text-rose-600">
+          <div className="w-10 h-10 rounded-xl bg-danger-soft border border-danger-border flex items-center justify-center text-danger">
             <AlertTriangle className="w-5 h-5" />
           </div>
         </div>
 
-        <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex items-center justify-between">
+        <div className="bg-surface border border-line rounded-2xl p-4 shadow-sm flex items-center justify-between">
           <div>
-            <div className="text-[11px] font-bold text-slate-500">إجمالي الكميات المعزولة</div>
-            <div className="text-base font-black text-slate-900 mt-1">
+            <div className="text-[11px] font-bold text-muted">إجمالي الكميات المعزولة</div>
+            <div className="text-base font-black text-ink mt-1">
               {[...totalSpecialQtyByUnit.values()].map((entry) => formatProductQuantity(entry.quantity, entry.product)).join('، ') || '0'}
             </div>
-            <div className="text-[10px] text-slate-400 mt-0.5">تشمل عينات المعرض والكسر</div>
+            <div className="text-[10px] text-muted mt-0.5">تشمل عينات المعرض والكسر</div>
           </div>
-          <div className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-700">
+          <div className="w-10 h-10 rounded-xl bg-surface-muted border border-line flex items-center justify-center text-ink">
             <Package className="w-5 h-5" />
           </div>
         </div>
 
-        <div className="bg-white border border-amber-200 rounded-2xl p-4 shadow-sm flex items-center justify-between">
+        <div className="bg-surface border border-warning-border rounded-2xl p-4 shadow-sm flex items-center justify-between">
           <div>
-            <div className="text-[11px] font-bold text-slate-500">سجلات بانتظار الفحص والبت</div>
-            <div className="text-2xl font-black text-amber-600 mt-1">{pendingInspectionCount}</div>
-            <div className="text-[10px] text-amber-600 font-semibold mt-0.5">تحت الفحص الفني</div>
+            <div className="text-[11px] font-bold text-muted">سجلات بانتظار الفحص والبت</div>
+            <div className="text-2xl font-black text-warning mt-1">{pendingInspectionCount}</div>
+            <div className="text-[10px] text-warning font-semibold mt-0.5">تحت الفحص الفني</div>
           </div>
-          <div className="w-10 h-10 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-600">
+          <div className="w-10 h-10 rounded-xl bg-warning-soft border border-warning-border flex items-center justify-center text-warning">
             <Eye className="w-5 h-5" />
           </div>
         </div>
       </div>
 
       {/* Filter Toolbar */}
-      <div className="px-6 py-3 flex flex-wrap items-center justify-between gap-3 bg-slate-50">
+      <div className="px-6 py-3 flex flex-wrap items-center justify-between gap-3 bg-surface-muted">
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative">
-            <Search className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2" />
+            <Search className="w-4 h-4 text-muted absolute right-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && loadData()}
               placeholder="بحث بالصنف، الكود، رقم السجل..."
-              className="pr-9 pl-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold w-56 focus:outline-none focus:ring-2 focus:ring-rose-500"
+              className="pr-9 pl-3 py-1.5 bg-surface border border-line rounded-xl text-xs font-bold w-56 focus:outline-none focus:ring-2 focus:ring-danger"
             />
           </div>
 
           <select
             value={selectedWarehouseId}
             onChange={(e) => setSelectedWarehouseId(e.target.value)}
-            className="px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-rose-500"
+            className="px-3 py-1.5 bg-surface border border-line rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-danger"
           >
             <option value="">جميع المخازن</option>
             {warehouses.map(w => (
@@ -302,7 +302,7 @@ export const DamageQuarantinePage: React.FC = () => {
           <select
             value={categoryFilter}
             onChange={(e) => setCategoryFilter(e.target.value)}
-            className="px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-rose-500"
+            className="px-3 py-1.5 bg-surface border border-line rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-danger"
           >
             <option value="ALL">جميع التصنيفات</option>
             <option value="BROKEN">كسر بلاط وسيراميك</option>
@@ -315,7 +315,7 @@ export const DamageQuarantinePage: React.FC = () => {
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-rose-500"
+            className="px-3 py-1.5 bg-surface border border-line rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-danger"
           >
             <option value="ALL">جميع الحالات</option>
             <option value="RECORDED">مسجل بانتظار الفحص</option>
@@ -329,7 +329,7 @@ export const DamageQuarantinePage: React.FC = () => {
 
       {/* Main Table */}
       <div className="flex-1 overflow-auto px-6 pb-6">
-        <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+        <div className="bg-surface border border-line rounded-2xl overflow-hidden shadow-sm">
           <DataTable
             ariaLabel="سجلات التالف والحجر الصحي"
             rows={items}
@@ -341,8 +341,8 @@ export const DamageQuarantinePage: React.FC = () => {
                 key: 'num', header: 'رقم السجل / التاريخ',
                 render: (row: any) => (
                   <span className="block">
-                    <span className="block font-mono font-black text-slate-900">{row.specialNumber}</span>
-                    <span className="block text-[10px] font-bold text-slate-400">{row.createdAt?.slice(0, 10)}</span>
+                    <span className="block font-mono font-black text-ink">{row.specialNumber}</span>
+                    <span className="block text-[10px] font-bold text-muted">{row.createdAt?.slice(0, 10)}</span>
                   </span>
                 ),
               },
@@ -350,29 +350,29 @@ export const DamageQuarantinePage: React.FC = () => {
                 key: 'product', header: 'الصنف / الكود',
                 render: (row: any) => (
                   <span className="block">
-                    <span className="block font-black text-slate-900">{row.productName}</span>
-                    <span className="block font-mono text-[10px] text-slate-400">{row.sku} {row.grade ? `• ${row.grade}` : ''}</span>
+                    <span className="block font-black text-ink">{row.productName}</span>
+                    <span className="block font-mono text-[10px] text-muted">{row.sku} {row.grade ? `• ${row.grade}` : ''}</span>
                   </span>
                 ),
               },
-              { key: 'wh', header: 'المخزن', render: (row: any) => <span className="text-xs font-bold text-slate-600">{row.warehouseName}</span> },
+              { key: 'wh', header: 'المخزن', render: (row: any) => <span className="text-xs font-bold text-ink-secondary">{row.warehouseName}</span> },
               { key: 'cat', header: 'التصنيف', align: 'center', render: (row: any) => getCategoryBadge(row.category) },
               {
                 key: 'qty', header: 'الكمية', align: 'center',
                 render: (row: any) => (
                   <span className="block">
-                    <span className="block font-mono font-black text-rose-700">{formatProductQuantity(Number(row.quantityM2), row)}</span>
-                    {row.productType !== 'GENERAL' && <span className="block text-[10px] font-bold text-slate-400">{row.boxesCount} كرتونة</span>}
+                    <span className="block font-mono font-black text-danger">{formatProductQuantity(Number(row.quantityM2), row)}</span>
+                    {row.productType !== 'GENERAL' && <span className="block text-[10px] font-bold text-muted">{row.boxesCount} كرتونة</span>}
                   </span>
                 ),
               },
               {
                 key: 'cost', header: 'التكلفة الإجمالية', align: 'center',
                 render: (row: any) => (
-                  <span className="block font-mono font-black text-slate-900">
+                  <span className="block font-mono font-black text-ink">
                     <span className="block">{fmtCur(row.totalCost)}</span>
                     {row.status === 'DOWNGRADED_SALE' && (
-                      <span className="block text-[10px] font-bold text-purple-700">
+                      <span className="block text-[10px] font-bold text-primary">
                         {row.discountedUnitPrice == null
                           ? 'بانتظار تحديد سعر البيع'
                           : `سعر مخفض ${fmtCur(row.discountedUnitPrice)} / ${getProductUnitLabel(row)}`}
@@ -387,11 +387,11 @@ export const DamageQuarantinePage: React.FC = () => {
               {
                 key: 'report', header: 'تقرير الفحص / المعالجة',
                 render: (row: any) => row.resolutionNotes ? (
-                  <span className="block text-xs font-bold text-slate-700">{row.resolutionNotes}</span>
+                  <span className="block text-xs font-bold text-ink">{row.resolutionNotes}</span>
                 ) : row.inspectionNotes ? (
-                  <span className="block text-xs font-medium text-blue-700">فحص: {row.inspectionNotes}</span>
+                  <span className="block text-xs font-medium text-primary">فحص: {row.inspectionNotes}</span>
                 ) : (
-                  <span className="block text-xs italic text-slate-300">بانتظار المعاينة الفنية</span>
+                  <span className="block text-xs italic text-muted">بانتظار المعاينة الفنية</span>
                 ),
               },
               {
@@ -404,7 +404,7 @@ export const DamageQuarantinePage: React.FC = () => {
                           setInspectingItem(row);
                           setInspectionNotes(row.inspectionNotes || '');
                         }}
-                        className="rounded-lg bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700 transition hover:bg-blue-100"
+                        className="rounded-lg bg-accent-soft px-2.5 py-1 text-xs font-bold text-primary transition hover:bg-accent-soft"
                         title="توثيق تقرير الفحص"
                       >
                         فحص
@@ -416,7 +416,7 @@ export const DamageQuarantinePage: React.FC = () => {
                           setInspectingItem(row);
                           setInspectionNotes('');
                         }}
-                        className="rounded-lg bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700 transition hover:bg-blue-100"
+                        className="rounded-lg bg-accent-soft px-2.5 py-1 text-xs font-bold text-primary transition hover:bg-accent-soft"
                         title="فحص السجل"
                       >
                         فحص
@@ -430,7 +430,7 @@ export const DamageQuarantinePage: React.FC = () => {
                           setResolutionAction('WRITE_OFF');
                           setDiscountedUnitPrice(0);
                         }}
-                        className="rounded-lg bg-rose-50 px-2.5 py-1 text-xs font-bold text-rose-700 transition hover:bg-rose-100"
+                        className="rounded-lg bg-danger-soft px-2.5 py-1 text-xs font-bold text-danger transition hover:bg-danger-soft"
                         title="اعتماد قرار الفحص"
                       >
                         اعتماد القرار
@@ -443,7 +443,7 @@ export const DamageQuarantinePage: React.FC = () => {
                           setResolutionNotes('');
                           setDiscountedUnitPrice(Math.max(0, Number(allProducts.find((product) => product.id === row.productId)?.sellingPriceM2 || 0) * 0.8));
                         }}
-                        className="rounded-lg bg-purple-50 px-2.5 py-1 text-xs font-bold text-purple-700 transition hover:bg-purple-100"
+                        className="rounded-lg bg-accent-soft px-2.5 py-1 text-xs font-bold text-primary transition hover:bg-accent-soft"
                         title="تحديد سعر البيع لسجل قديم"
                       >
                         تحديد السعر
@@ -460,20 +460,20 @@ export const DamageQuarantinePage: React.FC = () => {
 
       {/* Record Damage / Quarantine Modal */}
       {canManage && showCreateModal && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl border border-slate-100 animate-in fade-in zoom-in duration-150">
-            <h3 className="font-black text-slate-900 text-sm mb-3">تسجيل بضاعة تالفة / كسر / حجر صحي</h3>
-            <p className="text-xs text-slate-500 mb-4">
+        <div className="fixed inset-0 bg-primary/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-surface rounded-3xl p-6 w-full max-w-md shadow-2xl border border-line animate-in fade-in zoom-in duration-150">
+            <h3 className="font-black text-ink text-sm mb-3">تسجيل بضاعة تالفة / كسر / حجر صحي</h3>
+            <p className="text-xs text-muted mb-4">
               سيتم خصم الكمية فوراً من الرصيد الصالح للبيع لحماية طلبيات العملاء، وتسجيل حركة خروج غير قابلة للمحو.
             </p>
 
             <form onSubmit={handleCreateSpecial} className="space-y-3">
               <div>
-                <label className="block text-xs font-bold text-slate-600 mb-1">المستودع المصدر</label>
+                <label className="block text-xs font-bold text-ink-secondary mb-1">المستودع المصدر</label>
                 <select
                   value={createForm.warehouseId}
                   onChange={(e) => setCreateForm({ ...createForm, warehouseId: e.target.value })}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-rose-500"
+                  className="w-full px-3 py-2 bg-surface-muted border border-line rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-danger"
                   required
                 >
                   {warehouses.map(w => (
@@ -483,7 +483,7 @@ export const DamageQuarantinePage: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-600 mb-1">الصنف</label>
+                <label className="block text-xs font-bold text-ink-secondary mb-1">الصنف</label>
                 <ProductPicker
                   value={createForm.productId}
                   selectedLabel={allProducts.find((product) => product.id === createForm.productId)?.name}
@@ -494,11 +494,11 @@ export const DamageQuarantinePage: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-600 mb-1">التصنيف والسبب</label>
+                <label className="block text-xs font-bold text-ink-secondary mb-1">التصنيف والسبب</label>
                 <select
                   value={createForm.category}
                   onChange={(e: any) => setCreateForm({ ...createForm, category: e.target.value })}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-rose-500"
+                  className="w-full px-3 py-2 bg-surface-muted border border-line rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-danger"
                   required
                 >
                   <option value="BROKEN">كسر بلاط وسيراميك (أثناء التعتيق / النقل)</option>
@@ -510,26 +510,26 @@ export const DamageQuarantinePage: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-600 mb-1">الكمية المراد عزلها ({createUnit})</label>
+                <label className="block text-xs font-bold text-ink-secondary mb-1">الكمية المراد عزلها ({createUnit})</label>
                 <input
                   type="number"
                   min="0.1"
                   step={selectedProduct?.productType === 'GENERAL' && ['BOX', 'PIECE', 'SET'].includes(selectedProduct.baseUnit) ? 1 : 0.01}
                   value={createForm.quantityM2}
                   onChange={(e) => setCreateForm({ ...createForm, quantityM2: Number.parseFloat(e.target.value) || 0 })}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono font-bold focus:outline-none focus:ring-2 focus:ring-rose-500"
+                  className="w-full px-3 py-2 bg-surface-muted border border-line rounded-xl text-xs font-mono font-bold focus:outline-none focus:ring-2 focus:ring-danger"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-600 mb-1">ملاحظات وسبب التلف</label>
+                <label className="block text-xs font-bold text-ink-secondary mb-1">ملاحظات وسبب التلف</label>
                 <textarea
                   rows={2}
                   value={createForm.notes}
                   onChange={(e) => setCreateForm({ ...createForm, notes: e.target.value })}
                   placeholder="سقوط طبلية أثناء التحميل بالرافعة..."
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-rose-500"
+                  className="w-full px-3 py-2 bg-surface-muted border border-line rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-danger"
                 />
               </div>
 
@@ -537,13 +537,13 @@ export const DamageQuarantinePage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setShowCreateModal(false)}
-                  className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50"
+                  className="px-4 py-2 rounded-xl border border-line text-xs font-bold text-ink-secondary hover:bg-surface-muted"
                 >
                   إلغاء
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-black shadow-md shadow-rose-600/20"
+                  className="px-5 py-2 rounded-xl bg-danger hover:bg-danger text-white text-xs font-black shadow-md shadow-danger/20"
                 >
                   عزل وتوثيق في الدفتر
                 </button>
@@ -555,20 +555,20 @@ export const DamageQuarantinePage: React.FC = () => {
 
       {/* Inspect Modal */}
       {canManage && inspectingItem && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl border border-slate-100">
-            <h3 className="font-black text-slate-900 text-sm mb-2">فحص ومعاينة البضاعة المعزولة</h3>
-            <p className="text-xs text-slate-500 mb-4">{inspectingItem.productName} ({formatProductQuantity(Number(inspectingItem.quantityM2), inspectingItem)})</p>
+        <div className="fixed inset-0 bg-primary/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-surface rounded-3xl p-6 w-full max-w-md shadow-2xl border border-line">
+            <h3 className="font-black text-ink text-sm mb-2">فحص ومعاينة البضاعة المعزولة</h3>
+            <p className="text-xs text-muted mb-4">{inspectingItem.productName} ({formatProductQuantity(Number(inspectingItem.quantityM2), inspectingItem)})</p>
 
             <form onSubmit={handleInspectSubmit} className="space-y-3">
               <div>
-                <label className="block text-xs font-bold text-slate-600 mb-1">تقرير الفحص الفني والملاحظات</label>
+                <label className="block text-xs font-bold text-ink-secondary mb-1">تقرير الفحص الفني والملاحظات</label>
                 <textarea
                   rows={4}
                   value={inspectionNotes}
                   onChange={(e) => setInspectionNotes(e.target.value)}
                   placeholder="تمت معاينة البلاط: الشروخ في الحواف فقط، غير صالحة للبيع كفرز أول ولكن يمكن بيعها بخصم 40%..."
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 bg-surface-muted border border-line rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-primary"
                   required
                 />
               </div>
@@ -577,13 +577,13 @@ export const DamageQuarantinePage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setInspectingItem(null)}
-                  className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50"
+                  className="px-4 py-2 rounded-xl border border-line text-xs font-bold text-ink-secondary hover:bg-surface-muted"
                 >
                   إلغاء
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-black shadow-md shadow-blue-600/20"
+                  className="px-5 py-2 rounded-xl bg-primary hover:bg-primary text-white text-xs font-black shadow-md shadow-primary/20"
                 >
                   تأكيد الفحص
                 </button>
@@ -595,18 +595,18 @@ export const DamageQuarantinePage: React.FC = () => {
 
       {/* Resolution Modal */}
       {canManage && resolvingItem && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl border border-slate-100">
-            <h3 className="font-black text-slate-900 text-sm mb-2">معالجة واتخاذ قرار بشأن التالف</h3>
-            <p className="text-xs text-slate-500 mb-4">{resolvingItem.productName} ({formatProductQuantity(Number(resolvingItem.quantityM2), resolvingItem)} - بقيمة {fmtCur(resolvingItem.totalCost)})</p>
+        <div className="fixed inset-0 bg-primary/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-surface rounded-3xl p-6 w-full max-w-md shadow-2xl border border-line">
+            <h3 className="font-black text-ink text-sm mb-2">معالجة واتخاذ قرار بشأن التالف</h3>
+            <p className="text-xs text-muted mb-4">{resolvingItem.productName} ({formatProductQuantity(Number(resolvingItem.quantityM2), resolvingItem)} - بقيمة {fmtCur(resolvingItem.totalCost)})</p>
 
             <form onSubmit={handleResolveSubmit} className="space-y-3">
               {resolvingItem.status !== 'DOWNGRADED_SALE' && <div>
-                <label className="block text-xs font-bold text-slate-600 mb-1">القرار المتخذ</label>
+                <label className="block text-xs font-bold text-ink-secondary mb-1">القرار المتخذ</label>
                 <select
                   value={resolutionAction}
                   onChange={(e: any) => setResolutionAction(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-rose-500"
+                  className="w-full px-3 py-2 bg-surface-muted border border-line rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-danger"
                 >
                   {resolvingItem.status !== 'DOWNGRADED_SALE' && (
                     <>
@@ -620,7 +620,7 @@ export const DamageQuarantinePage: React.FC = () => {
 
               {(resolutionAction === 'DOWNGRADE_SALE' || resolvingItem.status === 'DOWNGRADED_SALE') && (
                 <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1">
+                  <label className="block text-xs font-bold text-ink-secondary mb-1">
                     سعر البيع المخفض لكل {getProductUnitLabel(resolvingItem)}
                     {resolvingItem.status !== 'DOWNGRADED_SALE' && (
                       <span className="font-normal"> (السعر الأساسي {fmtCur(Number(resolvingProduct ? resolvingProduct.sellingPriceM2 : 0))})</span>
@@ -633,13 +633,13 @@ export const DamageQuarantinePage: React.FC = () => {
                     value={discountedUnitPrice}
                     onChange={(e) => setDiscountedUnitPrice(Number(e.target.value) || 0)}
                     required
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono font-bold focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    className="w-full px-3 py-2 bg-surface-muted border border-line rounded-xl text-xs font-mono font-bold focus:outline-none focus:ring-2 focus:ring-primary"
                   />
                 </div>
               )}
 
               <div>
-                <label className="block text-xs font-bold text-slate-600 mb-1">
+                <label className="block text-xs font-bold text-ink-secondary mb-1">
                   {resolvingItem.status === 'DOWNGRADED_SALE' ? 'مبررات القرار والملاحظات (اختياري)' : 'مبررات القرار والملاحظات'}
                 </label>
                 <textarea
@@ -647,7 +647,7 @@ export const DamageQuarantinePage: React.FC = () => {
                   value={resolutionNotes}
                   onChange={(e) => setResolutionNotes(e.target.value)}
                   placeholder="اعتماد محضر إعدام رقم..."
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-rose-500"
+                  className="w-full px-3 py-2 bg-surface-muted border border-line rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-danger"
                   required={resolvingItem.status !== 'DOWNGRADED_SALE'}
                 />
               </div>
@@ -656,13 +656,13 @@ export const DamageQuarantinePage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setResolvingItem(null)}
-                  className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50"
+                  className="px-4 py-2 rounded-xl border border-line text-xs font-bold text-ink-secondary hover:bg-surface-muted"
                 >
                   إلغاء
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-black"
+                  className="px-5 py-2 rounded-xl bg-primary hover:bg-primary text-white text-xs font-black"
                 >
                   {resolvingItem.status === 'DOWNGRADED_SALE' ? 'حفظ سعر البيع المخفض' : 'تنفيذ القرار وترحيل القيود'}
                 </button>

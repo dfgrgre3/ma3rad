@@ -55,12 +55,14 @@ export class PermissionSeeder {
   public static seedPermissionCatalog(db: DatabaseManager): void {
     const existing = new Set(db.query<{ code: string }>('SELECT code FROM permissions').map((r) => r.code));
     for (const p of PERMISSIONS) {
-      if (!existing.has(p.code)) {
-        db.run(
-          'INSERT INTO permissions (id, code, name, module, description) VALUES (?, ?, ?, ?, ?)',
-          [`perm_${p.code}`, p.code, p.name, p.module, '']
-        );
-      }
+      if (existing.has(p.code)) continue;
+      db.run(
+        'INSERT INTO permissions (id, code, name, module, description) VALUES (?, ?, ?, ?, ?)',
+        [`perm_${p.code}`, p.code, p.name, p.module, '']
+      );
+      // Keep the set current so duplicate catalog entries cannot crash the
+      // seed midway and leave later permissions unregistered.
+      existing.add(p.code);
     }
   }
 

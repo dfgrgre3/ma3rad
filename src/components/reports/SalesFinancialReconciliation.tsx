@@ -69,7 +69,7 @@ export function SalesFinancialReconciliation({ dateFrom, dateTo }: { dateFrom: s
 
   if (!canView) {
     return (
-      <div className="rounded-xl border border-rose-200 bg-rose-50 p-5 text-sm font-bold text-rose-700">
+      <div className="rounded-xl border border-danger-border bg-danger-soft p-5 text-sm font-bold text-danger">
         لا تملك صلاحية عرض بيانات المصالحة المالية.
       </div>
     );
@@ -80,49 +80,49 @@ export function SalesFinancialReconciliation({ dateFrom, dateTo }: { dateFrom: s
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-surface p-4">
         <div className="flex items-center gap-3">
-          <div className="rounded-lg bg-teal-50 p-2 text-teal-700"><Scale className="h-5 w-5" /></div>
+          <div className="rounded-lg bg-success-soft p-2 text-success"><Scale className="h-5 w-5" /></div>
           <div>
-            <h2 className="font-black text-slate-900">بوابة مراجعة الفروقات المالية</h2>
-            <p className="text-xs text-slate-500">الفترة التشغيلية: {dateFrom} — {dateTo}</p>
+            <h2 className="font-black text-ink">بوابة مراجعة الفروقات المالية</h2>
+            <p className="text-xs text-muted">الفترة التشغيلية: {dateFrom} — {dateTo}</p>
           </div>
         </div>
         <button onClick={load} disabled={loading || saving}
-          className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-50">
+          className="flex items-center gap-2 rounded-lg border border-line px-3 py-2 text-xs font-bold text-ink-secondary hover:bg-surface-muted disabled:opacity-50">
           <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} /> تحديث الفحص
         </button>
       </div>
 
       {error && (
-        <div role="alert" className="flex items-center gap-2 rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">
+        <div role="alert" className="flex items-center gap-2 rounded-lg border border-danger-border bg-danger-soft p-3 text-sm text-danger">
           <AlertCircle className="h-4 w-4 shrink-0" /> {error}
         </div>
       )}
       {scopeWarning && (
-        <div role="status" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+        <div role="status" className="rounded-lg border border-warning-border bg-warning-soft p-3 text-sm text-warning">
           {scopeWarning}
         </div>
       )}
 
       {loading ? (
-        <div className="flex justify-center rounded-xl border border-slate-200 bg-white py-12">
-          <Loader2 className="h-7 w-7 animate-spin text-teal-600" />
+        <div className="flex justify-center rounded-xl border border-line bg-surface py-12">
+          <Loader2 className="h-7 w-7 animate-spin text-success" />
         </div>
       ) : (
         <>
-          <div className={`rounded-xl border p-4 ${differences.length ? 'border-amber-200 bg-amber-50' : 'border-emerald-200 bg-emerald-50'}`}>
+          <div className={`rounded-xl border p-4 ${differences.length ? 'border-warning-border bg-warning-soft' : 'border-success-border bg-success-soft'}`}>
             <p className="flex items-center gap-2 text-sm font-black">
-              {differences.length ? <AlertCircle className="h-4 w-4 text-amber-700" /> : <CheckCircle2 className="h-4 w-4 text-emerald-700" />}
+              {differences.length ? <AlertCircle className="h-4 w-4 text-warning" /> : <CheckCircle2 className="h-4 w-4 text-success" />}
               {differences.length ? `تحتاج ${differences.length} بنود إلى المراجعة` : 'جميع بنود المصالحة متطابقة'}
             </p>
-            <p className="mt-1 text-xs text-slate-600">
+            <p className="mt-1 text-xs text-ink-secondary">
               تظهر فحوصات المبيعات والمرتجعات حسب الفترة، وأرصدة الذمم والمخزون والخزائن والبنوك الحالية.
               الإقفال يوثق المراجعة ولا ينشئ قيود تسوية تلقائية.
             </p>
           </div>
 
-          <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+          <div className="overflow-hidden rounded-xl border border-line bg-surface">
             <div className="overflow-x-auto">
               <DataTable
                 ariaLabel="بنود المصالحة المالية"
@@ -135,8 +135,8 @@ export function SalesFinancialReconciliation({ dateFrom, dateTo }: { dateFrom: s
                     key: 'item', header: 'بند المصالحة',
                     render: (check) => (
                       <span>
-                        <span className="block font-bold text-slate-800">{check.label}</span>
-                        <span className="mt-1 block text-xs text-slate-500">{check.detail}</span>
+                        <span className="block font-bold text-ink">{check.label}</span>
+                        <span className="mt-1 block text-xs text-muted">{check.detail}</span>
                       </span>
                     ),
                   },
@@ -144,14 +144,14 @@ export function SalesFinancialReconciliation({ dateFrom, dateTo }: { dateFrom: s
                   { key: 'source', header: 'المصدر التشغيلي', align: 'end' as const, render: (check) => <span className="font-mono">{fmt(check.source)} ج.م</span> },
                   {
                     key: 'diff', header: 'الفرق', align: 'end' as const,
-                    render: (check) => <span className={`font-mono ${check.status === 'MATCH' ? 'text-emerald-700' : 'text-rose-700'}`}>{fmt(check.difference)} ج.م</span>,
+                    render: (check) => <span className={`font-mono ${check.status === 'MATCH' ? 'text-success' : 'text-danger'}`}>{fmt(check.difference)} ج.م</span>,
                   },
                   {
                     key: 'status', header: 'الحالة / سبب الفرق',
                     render: (check) => {
                       const reasonInputId = `reconcile-reason-${check.key}`;
                       if (check.status === 'MATCH') {
-                        return <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-bold text-emerald-700">متطابق</span>;
+                        return <span className="rounded-full bg-success-soft px-2.5 py-1 text-[11px] font-bold text-success">متطابق</span>;
                       }
                       if (canClose) {
                         return (
@@ -164,12 +164,12 @@ export function SalesFinancialReconciliation({ dateFrom, dateTo }: { dateFrom: s
                               rows={2}
                               maxLength={1000}
                               placeholder="سجل سبب الفرق أو الإجراء المتخذ"
-                              className="w-full rounded-lg border border-slate-200 px-2.5 py-2 text-xs focus:border-teal-500 focus:outline-none"
+                              className="w-full rounded-lg border border-line px-2.5 py-2 text-xs focus:border-success focus:outline-none"
                             />
                           </div>
                         );
                       }
-                      return <span className="rounded-full bg-rose-100 px-2.5 py-1 text-[11px] font-bold text-rose-700">فرق</span>;
+                      return <span className="rounded-full bg-danger-soft px-2.5 py-1 text-[11px] font-bold text-danger">فرق</span>;
                     },
                   },
                 ]}
@@ -178,14 +178,14 @@ export function SalesFinancialReconciliation({ dateFrom, dateTo }: { dateFrom: s
           </div>
 
           {canClose && (
-            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4">
-              <p className="text-xs text-slate-500">
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-surface p-4">
+              <p className="text-xs text-muted">
                 {differences.length
                   ? 'يجب توثيق سبب كل فرق قبل الإقفال. الإقفال يحفظ لقطة مراجعة قابلة للتدقيق.'
                   : 'يمكن إقفال الفترة بعد مراجعة النتائج المتطابقة.'}
               </p>
               <button onClick={closeReview} disabled={saving || loading || !allReasonsProvided}
-                className="flex items-center gap-2 rounded-lg bg-teal-700 px-4 py-2 text-xs font-bold text-white hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-50">
+                className="flex items-center gap-2 rounded-lg bg-success px-4 py-2 text-xs font-bold text-white hover:bg-success disabled:cursor-not-allowed disabled:opacity-50">
                 {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <ClipboardCheck className="h-4 w-4" />}
                 إقفال المراجعة وحفظها
               </button>
@@ -193,13 +193,13 @@ export function SalesFinancialReconciliation({ dateFrom, dateTo }: { dateFrom: s
           )}
 
           {closure && (
-            <div className="rounded-xl border border-teal-200 bg-teal-50 p-4">
-              <p className="font-black text-teal-900">آخر مراجعة مقفلة لهذه الفترة</p>
-              <p className="mt-1 text-xs text-teal-800">
+            <div className="rounded-xl border border-success-border bg-success-soft p-4">
+              <p className="font-black text-success">آخر مراجعة مقفلة لهذه الفترة</p>
+              <p className="mt-1 text-xs text-success">
                 {closure.closedAt} — بواسطة {closure.closedBy}
               </p>
-              <p className="mt-2 whitespace-pre-wrap text-xs text-slate-700">{closure.notes}</p>
-              <p className="mt-2 text-[11px] text-slate-500">هذه لقطة وقت الإقفال؛ حدّث الفحص للتحقق من الأرصدة الحالية.</p>
+              <p className="mt-2 whitespace-pre-wrap text-xs text-ink">{closure.notes}</p>
+              <p className="mt-2 text-[11px] text-muted">هذه لقطة وقت الإقفال؛ حدّث الفحص للتحقق من الأرصدة الحالية.</p>
             </div>
           )}
         </>

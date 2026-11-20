@@ -1,8 +1,8 @@
 export const reservationStatusStyles: Record<string, string> = {
-  ACTIVE: 'bg-sky-50 text-sky-700 border-sky-200',
-  RELEASED: 'bg-slate-100 text-slate-500 border-slate-200',
-  CONSUMED: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-  EXPIRED: 'bg-amber-50 text-amber-700 border-amber-200',
+  ACTIVE: 'bg-accent-soft text-primary border-accent-border',
+  RELEASED: 'bg-surface-sunken text-muted border-line',
+  CONSUMED: 'bg-success-soft text-success border-success-border',
+  EXPIRED: 'bg-warning-soft text-warning border-warning-border',
 };
 
 export const reservationStatusLabels: Record<string, string> = {
@@ -22,10 +22,10 @@ export const orderStatusLabels: Record<string, string> = {
 };
 
 export const orderStatusBadges: Record<string, string> = {
-  PENDING: 'bg-amber-50 text-amber-700 border-amber-200',
-  CONFIRMED: 'bg-blue-50 text-blue-700 border-blue-200',
-  PROCESSING: 'bg-indigo-50 text-indigo-700 border-indigo-200',
-  PARTIAL: 'bg-purple-50 text-purple-700 border-purple-200',
-  COMPLETED: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-  CANCELLED: 'bg-rose-50 text-rose-700 border-rose-200',
+  PENDING: 'bg-warning-soft text-warning border-warning-border',
+  CONFIRMED: 'bg-accent-soft text-primary border-accent-border',
+  PROCESSING: 'bg-accent-soft text-primary border-accent-border',
+  PARTIAL: 'bg-accent-soft text-primary border-accent-border',
+  COMPLETED: 'bg-success-soft text-success border-success-border',
+  CANCELLED: 'bg-danger-soft text-danger border-danger-border',
 };

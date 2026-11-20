@@ -26,14 +26,14 @@ export const KeysTab: React.FC<KeysTabProps> = ({
 }) => (
   <div className="space-y-5">
     {/* Cryptographic Signing Keys */}
-    <section className="rounded-xl border border-slate-800 bg-slate-900/70 p-4 shadow-sm">
-      <header className="mb-3 flex items-center justify-between border-b border-slate-800 pb-2.5">
+    <section className="rounded-xl border border-line-strong bg-primary/70 p-4 shadow-sm">
+      <header className="mb-3 flex items-center justify-between border-b border-line-strong pb-2.5">
         <div>
-          <h3 className="text-xs font-bold text-slate-100 flex items-center gap-2">
-            <KeyRound className="h-4 w-4 text-emerald-400" />
+          <h3 className="text-xs font-bold text-muted flex items-center gap-2">
+            <KeyRound className="h-4 w-4 text-success" />
             مفاتيح التوقيع الرقمي للمنصة (Cryptographic Signing Keys)
           </h3>
-          <p className="text-[11px] text-slate-400">
+          <p className="text-[11px] text-muted">
             تستخدم لتوليد وتوقيع التراخيص وحزم التكوين لضمان عدم تزييفها.
           </p>
         </div>
@@ -43,19 +43,19 @@ export const KeysTab: React.FC<KeysTabProps> = ({
         {signingKeys.map((k) => (
           <div
             key={k.id}
-            className="rounded-lg border border-slate-800 bg-slate-950/60 p-3.5 flex items-center justify-between"
+            className="rounded-lg border border-line-strong bg-primary/60 p-3.5 flex items-center justify-between"
           >
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-xs font-bold text-slate-100">{k.keyAlias}</span>
-                <span className="rounded bg-sky-500/20 text-sky-300 text-[10px] font-bold px-1.5 py-0.5">
+                <span className="text-xs font-bold text-muted">{k.keyAlias}</span>
+                <span className="rounded bg-primary/20 text-primary text-[10px] font-bold px-1.5 py-0.5">
                   v{k.version}
                 </span>
               </div>
-              <p className="text-[11px] text-slate-400 mt-1">
-                الخوارزمية: <span className="font-mono text-slate-300">{k.algorithm}</span>
+              <p className="text-[11px] text-muted mt-1">
+                الخوارزمية: <span className="font-mono text-muted">{k.algorithm}</span>
               </p>
-              <p className="text-[10px] text-slate-500">تم الإنشاء: {formatDateTime(k.createdAt)}</p>
+              <p className="text-[10px] text-muted">تم الإنشاء: {formatDateTime(k.createdAt)}</p>
             </div>
 
             <Button
@@ -73,14 +73,14 @@ export const KeysTab: React.FC<KeysTabProps> = ({
     </section>
 
     {/* Platform API Keys */}
-    <section className="rounded-xl border border-slate-800 bg-slate-900/70 p-4 shadow-sm">
-      <header className="mb-3 flex items-center justify-between border-b border-slate-800 pb-2.5">
+    <section className="rounded-xl border border-line-strong bg-primary/70 p-4 shadow-sm">
+      <header className="mb-3 flex items-center justify-between border-b border-line-strong pb-2.5">
         <div>
-          <h3 className="text-xs font-bold text-slate-100 flex items-center gap-2">
-            <Key className="h-4 w-4 text-sky-400" />
+          <h3 className="text-xs font-bold text-muted flex items-center gap-2">
+            <Key className="h-4 w-4 text-primary" />
             مفاتيح الـ API المركزية
           </h3>
-          <p className="text-[11px] text-slate-400">
+          <p className="text-[11px] text-muted">
             مفاتيح التكامل الخاصة بالمنصة وخدمات الربط الخارجي ونطاقات الصلاحيات.
           </p>
         </div>
@@ -96,7 +96,7 @@ export const KeysTab: React.FC<KeysTabProps> = ({
       </header>
 
       {apiKeys.length === 0 ? (
-        <p className="text-xs text-slate-500 py-4 text-center">لا توجد مفاتيح API مسجلة حالياً.</p>
+        <p className="text-xs text-muted py-4 text-center">لا توجد مفاتيح API مسجلة حالياً.</p>
       ) : (
         <DataTable
           ariaLabel="مفاتيح API"
@@ -104,12 +104,12 @@ export const KeysTab: React.FC<KeysTabProps> = ({
           rowKey={(key) => key.id}
           dense
           columns={[
-            { key: 'name', header: 'اسم المفتاح', render: (key) => <span className="font-bold text-slate-200">{key.name}</span> },
-            { key: 'prefix', header: 'البادئة', render: (key) => <span className="font-mono text-slate-400">{key.keyPrefix}...</span> },
-            { key: 'scopes', header: 'الصلاحيات', render: (key) => <span className="text-slate-400">{key.scopes.join(', ') || 'الكل'}</span> },
-            { key: 'status', header: 'الحالة', render: (key) => <span className={`font-bold ${key.isActive ? 'text-emerald-400' : 'text-rose-400'}`}>{key.isActive ? 'نشط' : 'ملغي'}</span> },
-            { key: 'expires', header: 'تاريخ الانتهاء', render: (key) => <span className="text-slate-400">{key.expiresAt ? formatDateTime(key.expiresAt) : 'دائم'}</span> },
-            { key: 'lastUsed', header: 'آخر استخدام', render: (key) => <span className="text-slate-400">{key.lastUsedAt ? formatDateTime(key.lastUsedAt) : 'لم يستخدم'}</span> },
+            { key: 'name', header: 'اسم المفتاح', render: (key) => <span className="font-bold text-muted">{key.name}</span> },
+            { key: 'prefix', header: 'البادئة', render: (key) => <span className="font-mono text-muted">{key.keyPrefix}...</span> },
+            { key: 'scopes', header: 'الصلاحيات', render: (key) => <span className="text-muted">{key.scopes.join(', ') || 'الكل'}</span> },
+            { key: 'status', header: 'الحالة', render: (key) => <span className={`font-bold ${key.isActive ? 'text-success' : 'text-danger'}`}>{key.isActive ? 'نشط' : 'ملغي'}</span> },
+            { key: 'expires', header: 'تاريخ الانتهاء', render: (key) => <span className="text-muted">{key.expiresAt ? formatDateTime(key.expiresAt) : 'دائم'}</span> },
+            { key: 'lastUsed', header: 'آخر استخدام', render: (key) => <span className="text-muted">{key.lastUsedAt ? formatDateTime(key.lastUsedAt) : 'لم يستخدم'}</span> },
             {
               key: 'actions', header: 'إجراءات', align: 'center',
               render: (key) => key.isActive ? (
@@ -117,17 +117,17 @@ export const KeysTab: React.FC<KeysTabProps> = ({
                   <button
                     disabled={!canManageSecurity}
                     onClick={() => onRotateApiKey(key.id)}
-                    className="text-sky-400 hover:underline text-xs flex items-center gap-1"
+                    className="text-primary hover:underline text-xs flex items-center gap-1"
                     title="تدوير المفتاح"
                   >
                     <RotateCcw className="h-3 w-3" />
                     تدوير
                   </button>
-                  <span className="text-slate-600">|</span>
+                  <span className="text-ink-secondary">|</span>
                   <button
                     disabled={!canManageSecurity}
                     onClick={() => onRevokeApiKey(key.id)}
-                    className="text-rose-400 hover:underline text-xs"
+                    className="text-danger hover:underline text-xs"
                   >
                     إلغاء
                   </button>

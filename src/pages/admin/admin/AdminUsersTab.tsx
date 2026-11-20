@@ -15,7 +15,7 @@ import { useToast } from '../../../components/ui/Toast';
 import type { Role, User, UserRole } from '../../../types';
 
 const inputCls =
-  'w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-sky-500/30';
+  'w-full px-3 py-2 bg-surface-muted rounded-xl border border-line text-ink text-xs focus:outline-none focus:ring-2 focus:ring-primary/30';
 
 interface UserForm {
   username: string;
@@ -300,7 +300,7 @@ export const AdminUsersTab: React.FC = () => {
     <div className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="relative max-w-md flex-1">
-          <Search className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <Search className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -313,17 +313,17 @@ export const AdminUsersTab: React.FC = () => {
             <button
               onClick={regenerateAllPins}
               disabled={busy}
-              className="rounded-xl border border-amber-300 px-3 py-2.5 text-xs font-bold text-amber-700 hover:bg-amber-50 disabled:opacity-50 dark:border-amber-800 dark:text-amber-300 dark:hover:bg-amber-950/30"
+              className="rounded-xl border border-warning px-3 py-2.5 text-xs font-bold text-warning hover:bg-warning-soft disabled:opacity-50 dark:hover:bg-warning/30"
             >
               إعادة إنشاء رموز الحسابات
             </button>
           )}
-          <button onClick={load} className="rounded-xl border border-slate-200 dark:border-slate-700 p-2.5 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800" title="تحديث">
+          <button onClick={load} className="rounded-xl border border-line p-2.5 text-muted hover:bg-surface-sunken dark:hover:bg-primary" title="تحديث">
             <RefreshCw className="h-4 w-4" />
           </button>
           <CentralLimitGuard metric="maxUsers">
             {can('users.create') && (
-              <button onClick={openCreate} className="flex items-center gap-2 rounded-xl bg-sky-600 hover:bg-sky-700 px-4 py-2.5 text-xs font-bold text-white shadow-lg shadow-sky-600/25">
+              <button onClick={openCreate} className="flex items-center gap-2 rounded-xl bg-primary hover:bg-primary px-4 py-2.5 text-xs font-bold text-white shadow-lg shadow-primary/25">
                 <UserPlus className="h-4 w-4" /> مستخدم جديد
               </button>
             )}
@@ -331,22 +331,22 @@ export const AdminUsersTab: React.FC = () => {
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
+      <div className="overflow-hidden rounded-2xl border border-line bg-surface ">
         {pinChangeRequests.length > 0 && (
-          <section className="border-b border-amber-200 bg-amber-50 p-4 dark:border-amber-900/50 dark:bg-amber-950/20" aria-labelledby="pin-change-requests-title">
-            <h3 id="pin-change-requests-title" className="text-xs font-extrabold text-amber-900 dark:text-amber-200">
+          <section className="border-b border-warning-border bg-warning-soft p-4 dark:border-warning/50 dark:bg-warning/20" aria-labelledby="pin-change-requests-title">
+            <h3 id="pin-change-requests-title" className="text-xs font-extrabold text-warning ">
               طلبات تغيير رمز الدخول ({pinChangeRequests.length})
             </h3>
             <div className="mt-2 space-y-2">
               {pinChangeRequests.map((request) => (
-                <article key={request.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-200 bg-white px-3 py-2 dark:border-amber-900/50 dark:bg-slate-900">
+                <article key={request.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-warning-border bg-surface px-3 py-2 dark:border-warning/50 ">
                   <div className="min-w-0">
-                    <p className="truncate text-xs font-bold text-slate-800 dark:text-slate-100">{request.fullName} · @{request.username}</p>
-                    <p className="mt-0.5 text-[10px] text-slate-500">تاريخ الطلب: {request.requestedAt}</p>
+                    <p className="truncate text-xs font-bold text-ink ">{request.fullName} · @{request.username}</p>
+                    <p className="mt-0.5 text-[10px] text-muted">تاريخ الطلب: {request.requestedAt}</p>
                   </div>
                   <div className="flex gap-2">
-                    <button type="button" onClick={() => reviewPinRequest(request.id, true)} disabled={busy} className="rounded-lg bg-emerald-600 px-3 py-1.5 text-[10px] font-bold text-white disabled:opacity-50">اعتماد</button>
-                    <button type="button" onClick={() => reviewPinRequest(request.id, false)} disabled={busy} className="rounded-lg border border-slate-300 px-3 py-1.5 text-[10px] font-bold text-slate-600 disabled:opacity-50 dark:border-slate-700 dark:text-slate-300">رفض</button>
+                    <button type="button" onClick={() => reviewPinRequest(request.id, true)} disabled={busy} className="rounded-lg bg-success px-3 py-1.5 text-[10px] font-bold text-white disabled:opacity-50">اعتماد</button>
+                    <button type="button" onClick={() => reviewPinRequest(request.id, false)} disabled={busy} className="rounded-lg border border-line-strong px-3 py-1.5 text-[10px] font-bold text-ink-secondary disabled:opacity-50 ">رفض</button>
                   </div>
                 </article>
               ))}
@@ -361,12 +361,12 @@ export const AdminUsersTab: React.FC = () => {
             dense
             tableClassName="text-xs"
             columns={[
-              { key: 'username', header: 'المستخدم', render: (user: any) => <span className="font-mono font-bold text-slate-900 dark:text-slate-100">{user.username}</span> },
-              { key: 'fullname', header: 'الاسم الكامل', render: (user: any) => <span className="font-bold text-slate-800 dark:text-slate-200">{user.fullName}</span> },
+              { key: 'username', header: 'المستخدم', render: (user: any) => <span className="font-mono font-bold text-ink ">{user.username}</span> },
+              { key: 'fullname', header: 'الاسم الكامل', render: (user: any) => <span className="font-bold text-ink ">{user.fullName}</span> },
               {
                 key: 'role', header: 'الدور',
                 render: (user: any) => (
-                  <span className="rounded bg-sky-500/10 px-2 py-0.5 text-[10px] font-black text-sky-600 dark:text-sky-400">
+                  <span className="rounded bg-primary/10 px-2 py-0.5 text-[10px] font-black text-primary ">
                     {roles.find((r) => r.code === user.role)?.name || user.role}
                   </span>
                 ),
@@ -376,39 +376,39 @@ export const AdminUsersTab: React.FC = () => {
                 render: (user: any) => (
                   <span className="flex flex-col items-start">
                     {user.role === 'ADMIN'
-                      ? <span className="text-[10px] font-bold text-slate-500">وصول مركزي (مدير)</span>
+                      ? <span className="text-[10px] font-bold text-muted">وصول مركزي (مدير)</span>
                       : can('branches.manage_users') && can('branches.view')
-                      ? <button onClick={() => openBranchScope(user)} className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-bold text-sky-700 hover:bg-sky-50 dark:text-sky-300 dark:hover:bg-slate-800">
+                      ? <button onClick={() => openBranchScope(user)} className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-bold text-primary hover:bg-accent-soft dark:hover:bg-primary">
                           <Building2 className="h-3.5 w-3.5" /> نطاق الفروع
                         </button>
                       : '—'}
                     {user.role !== 'ADMIN' && can('branches.manage_users') && (
-                      <button onClick={() => openDepartmentScope(user)} className="rounded-lg px-2 py-1 text-[10px] font-bold text-violet-700 hover:bg-violet-50 dark:text-violet-300 dark:hover:bg-slate-800">
+                      <button onClick={() => openDepartmentScope(user)} className="rounded-lg px-2 py-1 text-[10px] font-bold text-primary hover:bg-accent-soft dark:hover:bg-primary">
                         نطاق الأقسام
                       </button>
                     )}
                     {user.role !== 'ADMIN' && can('branches.manage_users') && (
-                      <button onClick={() => openWarehouseScope(user)} className="rounded-lg px-2 py-1 text-[10px] font-bold text-amber-700 hover:bg-amber-50 dark:text-amber-300 dark:hover:bg-slate-800">
+                      <button onClick={() => openWarehouseScope(user)} className="rounded-lg px-2 py-1 text-[10px] font-bold text-warning hover:bg-warning-soft dark:hover:bg-primary">
                         نطاق المخازن
                       </button>
                     )}
                   </span>
                 ),
               },
-              { key: 'phone', header: 'الهاتف', render: (user: any) => <span className="font-mono text-slate-500 dark:text-slate-400">{user.phone || '-'}</span> },
+              { key: 'phone', header: 'الهاتف', render: (user: any) => <span className="font-mono text-muted ">{user.phone || '-'}</span> },
               ...(currentUserIsAdmin ? [{
                 key: 'pin', header: 'رمز الدخول',
-                render: (user: any) => <span className="font-mono font-bold tracking-widest text-slate-700 dark:text-slate-200">{loginPins === null ? 'جارٍ التحميل...' : loginPins[user.id] || 'غير متاح'}</span>,
+                render: (user: any) => <span className="font-mono font-bold tracking-widest text-ink ">{loginPins === null ? 'جارٍ التحميل...' : loginPins[user.id] || 'غير متاح'}</span>,
               }] : []),
               {
                 key: 'status', header: 'الحالة',
                 render: (user: any) => user.isActive ? (
-                  <span className="inline-flex items-center gap-1 font-bold text-emerald-600 dark:text-emerald-400">
-                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> نشط
+                  <span className="inline-flex items-center gap-1 font-bold text-success ">
+                    <span className="h-1.5 w-1.5 rounded-full bg-success" /> نشط
                   </span>
                 ) : (
-                  <span className="inline-flex items-center gap-1 font-bold text-slate-400">
-                    <span className="h-1.5 w-1.5 rounded-full bg-slate-400" /> معطّل
+                  <span className="inline-flex items-center gap-1 font-bold text-muted">
+                    <span className="h-1.5 w-1.5 rounded-full bg-line-strong" /> معطّل
                   </span>
                 ),
               },
@@ -417,27 +417,27 @@ export const AdminUsersTab: React.FC = () => {
                 render: (user: any) => (
                   <div className="flex items-center gap-1">
                     {can('users.update') && (
-                      <button onClick={() => openEdit(user)} className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-sky-600 dark:hover:bg-slate-700" title="تعديل">
+                      <button onClick={() => openEdit(user)} className="rounded-lg p-1.5 text-muted hover:bg-surface-sunken hover:text-primary dark:hover:bg-primary" title="تعديل">
                         <Pencil className="h-3.5 w-3.5" />
                       </button>
                     )}
                     {can('users.permissions') && (
-                      <button onClick={() => { setActive(user); setModal('permissions'); }} className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-violet-600 dark:hover:bg-slate-700" title="صلاحيات مخصصة">
+                      <button onClick={() => { setActive(user); setModal('permissions'); }} className="rounded-lg p-1.5 text-muted hover:bg-surface-sunken hover:text-primary dark:hover:bg-primary" title="صلاحيات مخصصة">
                         <UserCog className="h-3.5 w-3.5" />
                       </button>
                     )}
                     {can('users.reset_password') && (
-                      <button onClick={() => openPassword(user)} className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-amber-600 dark:hover:bg-slate-700" title="تغيير كلمة المرور">
+                      <button onClick={() => openPassword(user)} className="rounded-lg p-1.5 text-muted hover:bg-surface-sunken hover:text-warning dark:hover:bg-primary" title="تغيير كلمة المرور">
                         <KeyRound className="h-3.5 w-3.5" />
                       </button>
                     )}
                     {can('users.update') && (
-                      <button onClick={() => toggleActive(user)} className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-emerald-600 dark:hover:bg-slate-700" title={user.isActive ? 'تعطيل' : 'تنشيط'}>
+                      <button onClick={() => toggleActive(user)} className="rounded-lg p-1.5 text-muted hover:bg-surface-sunken hover:text-success dark:hover:bg-primary" title={user.isActive ? 'تعطيل' : 'تنشيط'}>
                         <Power className="h-3.5 w-3.5" />
                       </button>
                     )}
                     {can('users.delete') && (
-                      <button onClick={() => removeUser(user)} className="rounded-lg p-1.5 text-slate-500 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-500/10" title="حذف">
+                      <button onClick={() => removeUser(user)} className="rounded-lg p-1.5 text-muted hover:bg-danger-soft hover:text-danger dark:hover:bg-danger/10" title="حذف">
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>
                     )}
@@ -493,13 +493,13 @@ export const AdminUsersTab: React.FC = () => {
                   </Field>
                 )}
                 {form.pinMode === 'automatic' && (
-                  <p className="rounded-xl bg-sky-50 p-3 text-[11px] leading-5 text-sky-800 dark:bg-sky-950/30 dark:text-sky-200">
+                  <p className="rounded-xl bg-accent-soft p-3 text-[11px] leading-5 text-primary dark:bg-primary/30 ">
                     سيُنشئ البرنامج رمزًا فريدًا من {AuthService.getLoginPinLength()} أرقام، وسيظهر للمدير بعد إنشاء الحساب.
                   </p>
                 )}
               </>
             ) : (
-              <p className="rounded-xl bg-slate-50 p-3 text-[11px] text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+              <p className="rounded-xl bg-surface-muted p-3 text-[11px] text-ink-secondary ">
                 رمز الدخول يحدده مدير النظام.
               </p>
             )}
@@ -532,7 +532,7 @@ export const AdminUsersTab: React.FC = () => {
             <Field label="الهاتف">
               <input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className={`${inputCls} font-mono`} />
             </Field>
-            <div className="rounded-xl border border-slate-200 dark:border-slate-700 p-3 text-xs text-slate-500 dark:text-slate-400">
+            <div className="rounded-xl border border-line p-3 text-xs text-muted ">
               اسم المستخدم: <span className="font-mono font-bold">{active.username}</span> — لا يمكن تغييره من هنا.
             </div>
             <ModalActions busy={busy} onCancel={() => setModal(null)} submitLabel="حفظ التعديلات" />
@@ -560,10 +560,10 @@ export const AdminUsersTab: React.FC = () => {
                 {can('branches.access_all') && <option value="ALL">وصول مركزي إلى كل الفروع</option>}
               </select>
             </Field>
-            <div className="space-y-2 rounded-xl border border-slate-200 dark:border-slate-700 p-3">
-              <p className="text-xs font-bold text-slate-700 dark:text-slate-300">الفروع المسندة</p>
+            <div className="space-y-2 rounded-xl border border-line p-3">
+              <p className="text-xs font-bold text-ink ">الفروع المسندة</p>
               {branchOptions.map((branch) => (
-                <label key={branch.id} className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300">
+                <label key={branch.id} className="flex items-center gap-2 text-xs text-ink ">
                   <input
                     type="checkbox"
                     checked={assignedBranchIds.includes(branch.id)}
@@ -575,7 +575,7 @@ export const AdminUsersTab: React.FC = () => {
                 </label>
               ))}
             </div>
-            <p className="text-[11px] leading-5 text-slate-500">النطاق يفرضه النظام داخل الخدمات والاستعلامات. الحساب المركزي يحتاج صلاحية «الوصول المركزي إلى جميع الفروع» بالإضافة إلى تعيين هذا النطاق.</p>
+            <p className="text-[11px] leading-5 text-muted">النطاق يفرضه النظام داخل الخدمات والاستعلامات. الحساب المركزي يحتاج صلاحية «الوصول المركزي إلى جميع الفروع» بالإضافة إلى تعيين هذا النطاق.</p>
             <ModalActions busy={busy} onCancel={() => setModal(null)} submitLabel="حفظ نطاق الفروع" />
           </form>
         </Modal>
@@ -590,10 +590,10 @@ export const AdminUsersTab: React.FC = () => {
                 <option value="ASSIGNED">الأقسام المسندة فقط</option>
               </select>
             </Field>
-            <div className="max-h-64 space-y-2 overflow-y-auto rounded-xl border border-slate-200 dark:border-slate-700 p-3">
-              <p className="text-xs font-bold text-slate-700 dark:text-slate-300">الأقسام المسندة</p>
+            <div className="max-h-64 space-y-2 overflow-y-auto rounded-xl border border-line p-3">
+              <p className="text-xs font-bold text-ink ">الأقسام المسندة</p>
               {departmentOptions.length ? departmentOptions.map((department) => (
-                <label key={department.id} className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300">
+                <label key={department.id} className="flex items-center gap-2 text-xs text-ink ">
                   <input
                     type="checkbox"
                     checked={assignedDepartmentIds.includes(department.id)}
@@ -605,9 +605,9 @@ export const AdminUsersTab: React.FC = () => {
                   />
                   {department.name}
                 </label>
-              )) : <p className="text-xs text-slate-500">لا توجد أقسام نشطة ضمن فروعك.</p>}
+              )) : <p className="text-xs text-muted">لا توجد أقسام نشطة ضمن فروعك.</p>}
             </div>
-            <p className="text-[11px] leading-5 text-slate-500">تظل صلاحية الفرع مطبقة دائمًا. عند اختيار «الأقسام المسندة فقط» لن يرى المستخدم سجلات الموظفين غير المرتبطة بأحد الأقسام المسندة.</p>
+            <p className="text-[11px] leading-5 text-muted">تظل صلاحية الفرع مطبقة دائمًا. عند اختيار «الأقسام المسندة فقط» لن يرى المستخدم سجلات الموظفين غير المرتبطة بأحد الأقسام المسندة.</p>
             <ModalActions busy={busy} onCancel={() => setModal(null)} submitLabel="حفظ نطاق الأقسام" />
           </form>
         </Modal>
@@ -616,10 +616,10 @@ export const AdminUsersTab: React.FC = () => {
       {modal === 'warehouse-scope' && active && (
         <Modal title={`نطاق المخازن: ${active.fullName}`} onClose={() => setModal(null)}>
           <form onSubmit={submitWarehouseScope} className="space-y-4">
-            <div className="max-h-64 space-y-2 overflow-y-auto rounded-xl border border-slate-200 dark:border-slate-700 p-3">
-              <p className="text-xs font-bold text-slate-700 dark:text-slate-300">المخازن المسموحة</p>
+            <div className="max-h-64 space-y-2 overflow-y-auto rounded-xl border border-line p-3">
+              <p className="text-xs font-bold text-ink ">المخازن المسموحة</p>
               {warehouseOptions.map((warehouse) => (
-                <label key={warehouse.id} className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300">
+                <label key={warehouse.id} className="flex items-center gap-2 text-xs text-ink ">
                   <input
                     type="checkbox"
                     checked={assignedWarehouseIds.includes(warehouse.id)}
@@ -632,9 +632,9 @@ export const AdminUsersTab: React.FC = () => {
                   {warehouse.name}
                 </label>
               ))}
-              {warehouseOptions.length === 0 && <p className="text-xs text-slate-500">لا توجد مخازن معرفة.</p>}
+              {warehouseOptions.length === 0 && <p className="text-xs text-muted">لا توجد مخازن معرفة.</p>}
             </div>
-            <p className="text-[11px] leading-5 text-slate-500">بدون تحديد أي مخزن يكون المستخدم غير مقيّد (كل المخازن). عند التحديد يرى فقط المخازن المختارة — والمخزن التابع لفرع مسموح يُقبل أيضًا.</p>
+            <p className="text-[11px] leading-5 text-muted">بدون تحديد أي مخزن يكون المستخدم غير مقيّد (كل المخازن). عند التحديد يرى فقط المخازن المختارة — والمخزن التابع لفرع مسموح يُقبل أيضًا.</p>
             <ModalActions busy={busy} onCancel={() => setModal(null)} submitLabel="حفظ نطاق المخازن" />
           </form>
         </Modal>
@@ -653,11 +653,11 @@ export const AdminUsersTab: React.FC = () => {
 };
 
 const Modal: React.FC<{ title: string; onClose: () => void; children: React.ReactNode }> = ({ title, onClose, children }) => (
-  <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm">
-    <div className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-3xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-6 shadow-2xl">
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-primary/50 p-4 backdrop-blur-sm">
+    <div className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-3xl border border-line bg-surface p-6 shadow-2xl">
       <div className="mb-4 flex items-center justify-between">
-        <h3 className="text-base font-extrabold text-slate-900 dark:text-slate-100">{title}</h3>
-        <button onClick={onClose} className="rounded-lg px-2 py-1 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800">✕</button>
+        <h3 className="text-base font-extrabold text-ink ">{title}</h3>
+        <button onClick={onClose} className="rounded-lg px-2 py-1 text-muted hover:bg-surface-sunken dark:hover:bg-primary">✕</button>
       </div>
       {children}
     </div>
@@ -676,16 +676,16 @@ const Field: React.FC<{ label: string; children: React.ReactNode }> = ({ label, 
 
   return (
     <div>
-      <label htmlFor={childId} className="mb-1 block text-xs font-bold text-slate-700 dark:text-slate-300">{label}</label>
+      <label htmlFor={childId} className="mb-1 block text-xs font-bold text-ink ">{label}</label>
       {enhancedChild}
     </div>
   );
 };
 
 const ModalActions: React.FC<{ busy: boolean; onCancel: () => void; submitLabel: string }> = ({ busy, onCancel, submitLabel }) => (
-  <div className="flex justify-end gap-2 border-t border-slate-100 dark:border-slate-800 pt-3">
-    <button type="button" onClick={onCancel} className="rounded-xl bg-slate-100 dark:bg-slate-800 px-4 py-2 text-xs font-bold text-slate-700 dark:text-slate-300">إلغاء</button>
-    <button type="submit" disabled={busy} className="rounded-xl bg-sky-600 hover:bg-sky-700 px-5 py-2 text-xs font-bold text-white disabled:opacity-50">
+  <div className="flex justify-end gap-2 border-t border-line pt-3">
+    <button type="button" onClick={onCancel} className="rounded-xl bg-surface-sunken px-4 py-2 text-xs font-bold text-ink ">إلغاء</button>
+    <button type="submit" disabled={busy} className="rounded-xl bg-primary hover:bg-primary px-5 py-2 text-xs font-bold text-white disabled:opacity-50">
       {busy ? 'جارٍ...' : submitLabel}
     </button>
   </div>
@@ -733,18 +733,18 @@ const PermissionOverrides: React.FC<{
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm">
-      <div className="flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-3xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-2xl">
-        <div className="flex items-start justify-between border-b border-slate-200 dark:border-slate-700 p-5">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-primary/50 p-4 backdrop-blur-sm">
+      <div className="flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-3xl border border-line bg-surface shadow-2xl">
+        <div className="flex items-start justify-between border-b border-line p-5">
           <div>
-            <h3 className="flex items-center gap-2 text-base font-extrabold text-slate-900 dark:text-slate-100">
-              <ShieldCheck className="h-5 w-5 text-violet-500" /> صلاحيات: {user.fullName}
+            <h3 className="flex items-center gap-2 text-base font-extrabold text-ink ">
+              <ShieldCheck className="h-5 w-5 text-primary" /> صلاحيات: {user.fullName}
             </h3>
-            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+            <p className="mt-1 text-xs text-muted ">
               الدور الحالي: <b>{currentRole?.name || user.role}</b> — التخصيص هنا يتجاوز صلاحيات الدور.
             </p>
           </div>
-          <button onClick={onClose} className="rounded-lg px-2 py-1 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800">✕</button>
+          <button onClick={onClose} className="rounded-lg px-2 py-1 text-muted hover:bg-surface-sunken dark:hover:bg-primary">✕</button>
         </div>
 
         <div className="flex-1 overflow-y-auto p-5 space-y-2">
@@ -761,26 +761,26 @@ const PermissionOverrides: React.FC<{
             );
             const open = expanded[module] ?? false;
             return (
-              <div key={module} className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+              <div key={module} className="rounded-xl border border-line overflow-hidden">
                 <button
                   onClick={() => setExpanded((prev) => ({ ...prev, [module]: !open }))}
-                  className="flex w-full items-center gap-2 bg-slate-50 dark:bg-slate-800/70 px-4 py-2.5 text-right text-xs font-extrabold text-slate-700 dark:text-slate-200"
+                  className="flex w-full items-center gap-2 bg-surface-muted dark:bg-primary/70 px-4 py-2.5 text-right text-xs font-extrabold text-ink "
                 >
                   {open ? <ChevronDown className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
                   <span className="flex-1">{module}</span>
-                  {counts.grant > 0 && <span className="rounded bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-bold text-emerald-600">+{counts.grant}</span>}
-                  {counts.deny > 0 && <span className="rounded bg-rose-500/10 px-1.5 py-0.5 text-[10px] font-bold text-rose-600">-{counts.deny}</span>}
+                  {counts.grant > 0 && <span className="rounded bg-success/10 px-1.5 py-0.5 text-[10px] font-bold text-success">+{counts.grant}</span>}
+                  {counts.deny > 0 && <span className="rounded bg-danger/10 px-1.5 py-0.5 text-[10px] font-bold text-danger">-{counts.deny}</span>}
                 </button>
                 {open && (
-                  <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                  <div className="divide-y divide-line-strong dark:divide-primary">
                     {perms.map((perm) => {
                       const override = overrides[perm.code];
                       const roleHas = rolePerms.has(perm.code);
                       return (
                         <div key={perm.code} className="flex flex-wrap items-center gap-2 px-4 py-2">
                           <div className="min-w-0 flex-1">
-                            <div className="text-xs font-bold text-slate-800 dark:text-slate-200">{perm.name}</div>
-                            <div className="font-mono text-[10px] text-slate-400">
+                            <div className="text-xs font-bold text-ink ">{perm.name}</div>
+                            <div className="font-mono text-[10px] text-muted">
                               {perm.code} {roleHas ? '• ممنوحة للدور' : '• غير ممنوحة للدور'}
                             </div>
                           </div>
@@ -790,10 +790,10 @@ const PermissionOverrides: React.FC<{
                             onChange={(e) => setEffect(perm.code, e.target.value as 'INHERIT' | 'GRANT' | 'DENY')}
                             className={`rounded-lg border px-2 py-1 text-[11px] font-bold ${
                               override === 'GRANT'
-                                ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
+                                ? 'border-success bg-success-soft text-success'
                                 : override === 'DENY'
-                                  ? 'border-rose-300 bg-rose-50 text-rose-700'
-                                  : 'border-slate-200 bg-slate-50 text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                                  ? 'border-danger bg-danger-soft text-danger'
+                                  : 'border-line bg-surface-muted text-ink-secondary '
                             }`}
                           >
                             <option value="INHERIT">حسب الدور</option>
@@ -810,7 +810,7 @@ const PermissionOverrides: React.FC<{
           })}
         </div>
 
-        <div className="flex items-center justify-between border-t border-slate-200 dark:border-slate-700 p-4">
+        <div className="flex items-center justify-between border-t border-line p-4">
           <button
             onClick={() => {
               if (!window.confirm('مسح كل التخصيصات وإرجاع المستخدم لصلاحيات دوره؟')) return;
@@ -823,11 +823,11 @@ const PermissionOverrides: React.FC<{
                 toast.error('تعذر المسح', error?.message);
               }
             }}
-            className="rounded-xl border border-rose-200 px-4 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50 dark:border-rose-500/30 dark:hover:bg-rose-500/10"
+            className="rounded-xl border border-danger-border px-4 py-2 text-xs font-bold text-danger hover:bg-danger-soft dark:border-danger/30 dark:hover:bg-danger/10"
           >
             مسح التخصيصات
           </button>
-          <button onClick={onClose} className="rounded-xl bg-slate-100 dark:bg-slate-800 px-5 py-2 text-xs font-bold text-slate-700 dark:text-slate-300">إغلاق</button>
+          <button onClick={onClose} className="rounded-xl bg-surface-sunken px-5 py-2 text-xs font-bold text-ink ">إغلاق</button>
         </div>
       </div>
     </div>

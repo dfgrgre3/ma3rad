@@ -98,7 +98,7 @@ export const PlatformAnalyticsPage: React.FC = () => {
     return (
       <span
         className={`inline-flex items-center gap-0.5 text-[11px] font-bold ${
-          isPositive ? 'text-emerald-400' : 'text-rose-400'
+          isPositive ? 'text-success' : 'text-danger'
         }`}
         dir="ltr"
       >
@@ -152,11 +152,11 @@ export const PlatformAnalyticsPage: React.FC = () => {
       />
 
       {/* Filter Header */}
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-800 bg-slate-900/60 p-3 shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line-strong bg-primary/60 p-3 shadow-sm">
         <div className="flex items-center gap-2">
-          <Filter className="h-4 w-4 text-slate-400" />
-          <span className="text-xs font-bold text-slate-200">الفترة الزمنية:</span>
-          <div className="flex rounded-lg bg-slate-950 p-1 border border-slate-800 text-xs">
+          <Filter className="h-4 w-4 text-muted" />
+          <span className="text-xs font-bold text-muted">الفترة الزمنية:</span>
+          <div className="flex rounded-lg bg-primary p-1 border border-line-strong text-xs">
             {(
               [
                 { id: '7d', label: '7 أيام' },
@@ -170,8 +170,8 @@ export const PlatformAnalyticsPage: React.FC = () => {
                 onClick={() => setPeriod(p.id)}
                 className={`px-3 py-1 rounded font-bold transition-colors ${
                   period === p.id
-                    ? 'bg-sky-500 text-white shadow'
-                    : 'text-slate-400 hover:text-slate-200'
+                    ? 'bg-primary text-white shadow'
+                    : 'text-muted hover:text-muted'
                 }`}
               >
                 {p.label}
@@ -181,7 +181,7 @@ export const PlatformAnalyticsPage: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2">
-          <span className="text-xs font-semibold text-slate-300">فلترة حسب الباقة:</span>
+          <span className="text-xs font-semibold text-muted">فلترة حسب الباقة:</span>
           <select
             value={planId}
             onChange={(e) => setPlanId(e.target.value)}
@@ -198,65 +198,65 @@ export const PlatformAnalyticsPage: React.FC = () => {
       </div>
 
       {error && (
-        <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-lg text-xs font-bold text-rose-300">
+        <div className="p-3 bg-danger/10 border border-danger/20 rounded-lg text-xs font-bold text-danger">
           {error}
         </div>
       )}
 
       {loading ? (
-        <div className="py-20 text-center text-sm font-semibold text-slate-500">جارٍ تجميع بيانات التحليلات...</div>
+        <div className="py-20 text-center text-sm font-semibold text-muted">جارٍ تجميع بيانات التحليلات...</div>
       ) : (
         <>
           {/* Revenue & Financial KPIs */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-            <div className="p-4 bg-slate-900/80 border border-slate-800 rounded-xl">
+            <div className="p-4 bg-primary/80 border border-line-strong rounded-xl">
               <div className="flex justify-between items-start">
-                <p className="text-xs font-semibold text-slate-400">الإيراد المحصل بالفترة</p>
+                <p className="text-xs font-semibold text-muted">الإيراد المحصل بالفترة</p>
                 {renderDelta(businessPerf?.revenue.total.changePercent)}
               </div>
-              <p className="text-2xl font-black text-slate-100 mt-2">
+              <p className="text-2xl font-black text-muted mt-2">
                 {formatMoney(businessPerf?.revenue.total.current || 0)}
               </p>
-              <p className="text-[10px] text-slate-500 mt-1">
+              <p className="text-[10px] text-muted mt-1">
                 الفترة السابقة: {formatMoney(businessPerf?.revenue.total.previous || 0)}
               </p>
             </div>
 
-            <div className="p-4 bg-emerald-950/20 border border-emerald-500/20 rounded-xl">
+            <div className="p-4 bg-success/20 border border-success/20 rounded-xl">
               <div className="flex justify-between items-start">
-                <p className="text-xs font-semibold text-emerald-400">MRR (الإيراد المتكرر شهرياً)</p>
+                <p className="text-xs font-semibold text-success">MRR (الإيراد المتكرر شهرياً)</p>
                 {renderDelta(businessPerf?.revenue.mrr.changePercent)}
               </div>
-              <p className="text-2xl font-black text-emerald-300 mt-2">
+              <p className="text-2xl font-black text-success mt-2">
                 {formatMoney(businessPerf?.revenue.mrr.current || 0)}
               </p>
-              <p className="text-[10px] text-emerald-500/70 mt-1">
+              <p className="text-[10px] text-success/70 mt-1">
                 الفترة السابقة: {formatMoney(businessPerf?.revenue.mrr.previous || 0)}
               </p>
             </div>
 
-            <div className="p-4 bg-sky-950/20 border border-sky-500/20 rounded-xl">
+            <div className="p-4 bg-primary/20 border border-primary/20 rounded-xl">
               <div className="flex justify-between items-start">
-                <p className="text-xs font-semibold text-sky-400">ARR (الإيراد السنوي المتوقع)</p>
+                <p className="text-xs font-semibold text-primary">ARR (الإيراد السنوي المتوقع)</p>
                 {renderDelta(businessPerf?.revenue.arr.changePercent)}
               </div>
-              <p className="text-2xl font-black text-sky-300 mt-2">
+              <p className="text-2xl font-black text-primary mt-2">
                 {formatMoney(businessPerf?.revenue.arr.current || 0)}
               </p>
-              <p className="text-[10px] text-sky-500/70 mt-1">
+              <p className="text-[10px] text-primary/70 mt-1">
                 الفترة السابقة: {formatMoney(businessPerf?.revenue.arr.previous || 0)}
               </p>
             </div>
 
-            <div className="p-4 bg-purple-950/20 border border-purple-500/20 rounded-xl">
+            <div className="p-4 bg-primary/20 border border-primary/20 rounded-xl">
               <div className="flex justify-between items-start">
-                <p className="text-xs font-semibold text-purple-400">متوسط قيمة العميل (ARPU)</p>
+                <p className="text-xs font-semibold text-primary">متوسط قيمة العميل (ARPU)</p>
                 {renderDelta(customerMetrics?.averageRevenuePerCustomer.changePercent)}
               </div>
-              <p className="text-2xl font-black text-purple-300 mt-2">
+              <p className="text-2xl font-black text-primary mt-2">
                 {formatMoney(customerMetrics?.averageRevenuePerCustomer.current || 0)}
               </p>
-              <p className="text-[10px] text-purple-500/70 mt-1">
+              <p className="text-[10px] text-primary/70 mt-1">
                 الفترة السابقة: {formatMoney(customerMetrics?.averageRevenuePerCustomer.previous || 0)}
               </p>
             </div>
@@ -264,32 +264,32 @@ export const PlatformAnalyticsPage: React.FC = () => {
 
           {/* Customer & Subscription Insights */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="p-4 bg-slate-900/70 border border-slate-800 rounded-xl space-y-3">
-              <h3 className="text-xs font-bold text-slate-200 flex items-center gap-2">
-                <Users className="h-4 w-4 text-sky-400" />
+            <div className="p-4 bg-primary/70 border border-line-strong rounded-xl space-y-3">
+              <h3 className="text-xs font-bold text-muted flex items-center gap-2">
+                <Users className="h-4 w-4 text-primary" />
                 ديناميكية العملاء ومعدلات التسرب
               </h3>
 
               <div className="grid grid-cols-3 gap-2 text-center">
-                <div className="p-2.5 bg-slate-950/60 rounded-lg border border-slate-800">
-                  <p className="text-[11px] text-slate-400">العملاء النشطون</p>
-                  <p className="text-lg font-black text-slate-100 mt-0.5">
+                <div className="p-2.5 bg-primary/60 rounded-lg border border-line-strong">
+                  <p className="text-[11px] text-muted">العملاء النشطون</p>
+                  <p className="text-lg font-black text-muted mt-0.5">
                     {formatNumber(customerMetrics?.activeCustomers.current || 0)}
                   </p>
                   {renderDelta(customerMetrics?.activeCustomers.changePercent)}
                 </div>
 
-                <div className="p-2.5 bg-slate-950/60 rounded-lg border border-slate-800">
-                  <p className="text-[11px] text-slate-400">عملاء جدد</p>
-                  <p className="text-lg font-black text-emerald-400 mt-0.5">
+                <div className="p-2.5 bg-primary/60 rounded-lg border border-line-strong">
+                  <p className="text-[11px] text-muted">عملاء جدد</p>
+                  <p className="text-lg font-black text-success mt-0.5">
                     +{formatNumber(customerMetrics?.newCustomers.current || 0)}
                   </p>
                   {renderDelta(customerMetrics?.newCustomers.changePercent)}
                 </div>
 
-                <div className="p-2.5 bg-slate-950/60 rounded-lg border border-slate-800">
-                  <p className="text-[11px] text-slate-400">معدل الفقد (Churn)</p>
-                  <p className="text-lg font-black text-rose-400 mt-0.5">
+                <div className="p-2.5 bg-primary/60 rounded-lg border border-line-strong">
+                  <p className="text-[11px] text-muted">معدل الفقد (Churn)</p>
+                  <p className="text-lg font-black text-danger mt-0.5">
                     {customerMetrics?.churnRate.current || 0}%
                   </p>
                   {renderDelta(customerMetrics?.churnRate.changePercent)}
@@ -297,32 +297,32 @@ export const PlatformAnalyticsPage: React.FC = () => {
               </div>
             </div>
 
-            <div className="p-4 bg-slate-900/70 border border-slate-800 rounded-xl space-y-3">
-              <h3 className="text-xs font-bold text-slate-200 flex items-center gap-2">
-                <CalendarClock className="h-4 w-4 text-emerald-400" />
+            <div className="p-4 bg-primary/70 border border-line-strong rounded-xl space-y-3">
+              <h3 className="text-xs font-bold text-muted flex items-center gap-2">
+                <CalendarClock className="h-4 w-4 text-success" />
                 حركة الاشتراكات والتجديدات
               </h3>
 
               <div className="grid grid-cols-3 gap-2 text-center">
-                <div className="p-2.5 bg-slate-950/60 rounded-lg border border-slate-800">
-                  <p className="text-[11px] text-slate-400">تجديدات قادمة</p>
-                  <p className="text-lg font-black text-slate-100 mt-0.5">
+                <div className="p-2.5 bg-primary/60 rounded-lg border border-line-strong">
+                  <p className="text-[11px] text-muted">تجديدات قادمة</p>
+                  <p className="text-lg font-black text-muted mt-0.5">
                     {formatNumber(subMetrics?.upcomingRenewals.current || 0)}
                   </p>
                   {renderDelta(subMetrics?.upcomingRenewals.changePercent)}
                 </div>
 
-                <div className="p-2.5 bg-slate-950/60 rounded-lg border border-slate-800">
-                  <p className="text-[11px] text-slate-400">فترات تجريبية منتهية</p>
-                  <p className="text-lg font-black text-amber-400 mt-0.5">
+                <div className="p-2.5 bg-primary/60 rounded-lg border border-line-strong">
+                  <p className="text-[11px] text-muted">فترات تجريبية منتهية</p>
+                  <p className="text-lg font-black text-warning mt-0.5">
                     {formatNumber(subMetrics?.expiredTrials.current || 0)}
                   </p>
                   {renderDelta(subMetrics?.expiredTrials.changePercent)}
                 </div>
 
-                <div className="p-2.5 bg-slate-950/60 rounded-lg border border-slate-800">
-                  <p className="text-[11px] text-slate-400">نسبة التحويل التجريبي</p>
-                  <p className="text-lg font-black text-sky-400 mt-0.5">
+                <div className="p-2.5 bg-primary/60 rounded-lg border border-line-strong">
+                  <p className="text-[11px] text-muted">نسبة التحويل التجريبي</p>
+                  <p className="text-lg font-black text-primary mt-0.5">
                     {subMetrics?.trialConversionRate.current || 0}%
                   </p>
                   {renderDelta(subMetrics?.trialConversionRate.changePercent)}
@@ -332,40 +332,40 @@ export const PlatformAnalyticsPage: React.FC = () => {
           </div>
 
           {/* Operational Health & Sync Overview */}
-          <div className="p-4 bg-slate-900/70 border border-slate-800 rounded-xl space-y-3">
-            <h3 className="text-xs font-bold text-slate-200 flex items-center gap-2">
-              <ShieldCheck className="h-4 w-4 text-purple-400" />
+          <div className="p-4 bg-primary/70 border border-line-strong rounded-xl space-y-3">
+            <h3 className="text-xs font-bold text-muted flex items-center gap-2">
+              <ShieldCheck className="h-4 w-4 text-primary" />
               مؤشرات الأداء التشغيلي والمزامنة
             </h3>
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-center">
-              <div className="p-3 bg-slate-950/60 rounded-lg border border-slate-800">
-                <p className="text-[11px] text-slate-400">الأجهزة المنشطة</p>
-                <p className="text-lg font-black text-slate-100 mt-1">
+              <div className="p-3 bg-primary/60 rounded-lg border border-line-strong">
+                <p className="text-[11px] text-muted">الأجهزة المنشطة</p>
+                <p className="text-lg font-black text-muted mt-1">
                   {formatNumber(licenseMetrics?.activatedDevices.current || 0)}
                 </p>
                 {renderDelta(licenseMetrics?.activatedDevices.changePercent)}
               </div>
 
-              <div className="p-3 bg-slate-950/60 rounded-lg border border-slate-800">
-                <p className="text-[11px] text-slate-400">نسبة استخدام التراخيص</p>
-                <p className="text-lg font-black text-sky-400 mt-1">
+              <div className="p-3 bg-primary/60 rounded-lg border border-line-strong">
+                <p className="text-[11px] text-muted">نسبة استخدام التراخيص</p>
+                <p className="text-lg font-black text-primary mt-1">
                   {licenseMetrics?.utilizationRate.current || 0}%
                 </p>
                 {renderDelta(licenseMetrics?.utilizationRate.changePercent)}
               </div>
 
-              <div className="p-3 bg-slate-950/60 rounded-lg border border-slate-800">
-                <p className="text-[11px] text-slate-400">أخطاء المزامنة المسجلة</p>
-                <p className="text-lg font-black text-amber-400 mt-1">
+              <div className="p-3 bg-primary/60 rounded-lg border border-line-strong">
+                <p className="text-[11px] text-muted">أخطاء المزامنة المسجلة</p>
+                <p className="text-lg font-black text-warning mt-1">
                   {formatNumber(opsMetrics?.syncErrors.current || 0)}
                 </p>
                 {renderDelta(opsMetrics?.syncErrors.changePercent)}
               </div>
 
-              <div className="p-3 bg-slate-950/60 rounded-lg border border-slate-800">
-                <p className="text-[11px] text-slate-400">صحة واجهات API</p>
-                <p className="text-lg font-black text-emerald-400 mt-1">
+              <div className="p-3 bg-primary/60 rounded-lg border border-line-strong">
+                <p className="text-[11px] text-muted">صحة واجهات API</p>
+                <p className="text-lg font-black text-success mt-1">
                   {opsMetrics?.apiHealth.current || 0}%
                 </p>
                 {renderDelta(opsMetrics?.apiHealth.changePercent)}

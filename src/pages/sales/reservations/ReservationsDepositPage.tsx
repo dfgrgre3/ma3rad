@@ -270,7 +270,7 @@ export const ReservationsDepositPage: React.FC<ReservationsDepositPageProps> = (
   );
 
   if (!canViewPage) {
-    return <div className="p-8 text-center text-slate-500">ليس لديك صلاحية عرض هذه الصفحة.</div>;
+    return <div className="p-8 text-center text-muted">ليس لديك صلاحية عرض هذه الصفحة.</div>;
   }
 
   return (
@@ -291,15 +291,15 @@ export const ReservationsDepositPage: React.FC<ReservationsDepositPageProps> = (
                 toast.success(`تم تحديث ${result.released} من أصل ${result.candidates} حجز منتهي.`);
               }
             }}
-            className="px-3.5 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 rounded-xl transition flex items-center gap-1.5"
+            className="px-3.5 py-2 text-xs font-semibold text-ink bg-surface-sunken hover:bg-surface-sunken dark:hover:bg-primary rounded-xl transition flex items-center gap-1.5"
             title="فحص الحجوزات المنتهية"
           >
-            <Clock className="w-4 h-4 text-amber-500" />
+            <Clock className="w-4 h-4 text-warning" />
             تحديث الصلاحيات
           </button>}
           {mode === 'inventory' && canAdjustInventory && <button
             onClick={() => setShowNewResModal(true)}
-            className="px-4 py-2 text-sm font-bold text-white bg-sky-600 hover:bg-sky-500 rounded-xl shadow-sm hover:shadow transition flex items-center gap-2"
+            className="px-4 py-2 text-sm font-bold text-white bg-primary hover:bg-primary rounded-xl shadow-sm hover:shadow transition flex items-center gap-2"
           >
             <Plus className="w-4 h-4" />
             حجز كمية بضاعة يدوياً
@@ -332,9 +332,9 @@ export const ReservationsDepositPage: React.FC<ReservationsDepositPageProps> = (
 
       {/* Main Content Area */}
       {loading ? (
-        <div className="flex flex-col items-center justify-center p-16 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200/80 dark:border-slate-700">
-          <Loader2 className="w-8 h-8 text-sky-600 animate-spin mb-3" />
-          <p className="text-sm text-slate-500">جاري تحميل البيانات...</p>
+        <div className="flex flex-col items-center justify-center p-16 bg-surface rounded-2xl border border-line/80 dark:border-line-strong">
+          <Loader2 className="w-8 h-8 text-primary animate-spin mb-3" />
+          <p className="text-sm text-muted">جاري تحميل البيانات...</p>
         </div>
       ) : mode === 'sales' ? (
         /* Orders & Deposits Table */

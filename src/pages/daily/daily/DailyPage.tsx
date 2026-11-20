@@ -27,7 +27,7 @@ import { getActivityNavLabel } from '../../../config/activityNavLabels';
 
 
 const StatCard: React.FC<{ label: string; value: React.ReactNode; hint?: React.ReactNode; tone?: string }> = ({ label, value, hint, tone }) => (
-  <UiStatCard label={label} value={<span className={tone || 'text-slate-900'}>{value}</span>} hint={hint} />
+  <UiStatCard label={label} value={<span className={tone || 'text-ink'}>{value}</span>} hint={hint} />
 );
 type DailyKind = 'sales' | 'purchases' | 'expenses' | 'debts';
 
@@ -36,28 +36,28 @@ const META: Record<DailyKind, { title: string; subtitle: string; icon: React.Ele
     title: 'مبيعات اليوم',
     subtitle: 'فواتير البيع المسجلة اليوم مع المدفوعات والهامش',
     icon: Receipt,
-    color: 'text-emerald-600 bg-emerald-50 border-emerald-200',
+    color: 'text-success bg-success-soft border-success-border',
     perm: 'sales.view',
   },
   purchases: {
     title: 'مشتريات اليوم',
     subtitle: 'فواتير التوريد الواردة اليوم وحالة سدادها',
     icon: ShoppingBag,
-    color: 'text-orange-600 bg-orange-50 border-orange-200',
+    color: 'text-warning bg-warning-soft border-warning-border',
     perm: 'purchases.view',
   },
   expenses: {
     title: 'منصرف اليوم',
     subtitle: 'المصروفات النقدية والبنكية المسجلة اليوم',
     icon: TrendingDown,
-    color: 'text-rose-600 bg-rose-50 border-rose-200',
+    color: 'text-danger bg-danger-soft border-danger-border',
     perm: 'cashier.expense',
   },
   debts: {
     title: 'ديون اليوم',
     subtitle: 'الديون الجديدة والتحصيلات والأقساط المستحقة',
     icon: Banknote,
-    color: 'text-amber-600 bg-amber-50 border-amber-200',
+    color: 'text-warning bg-warning-soft border-warning-border',
     perm: 'finance.debts.view',
   },
 };
@@ -75,9 +75,9 @@ const PAY_LABEL: Record<string, string> = {
 };
 
 const PAY_STYLE: Record<string, string> = {
-  PAID: 'bg-emerald-50 text-emerald-600',
-  PARTIAL: 'bg-amber-50 text-amber-600',
-  UNPAID: 'bg-rose-50 text-rose-600',
+  PAID: 'bg-success-soft text-success',
+  PARTIAL: 'bg-warning-soft text-warning',
+  UNPAID: 'bg-danger-soft text-danger',
 };
 
 
@@ -89,11 +89,11 @@ const SalesMetric: React.FC<{
   featured?: boolean;
 }> = ({ label, value, hint, tone, featured }) => (
   <div className={`min-w-0 rounded-xl border p-4 ${featured
-    ? 'border-slate-800 bg-slate-900 text-white dark:border-slate-700 dark:bg-slate-900'
-    : 'border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900'}`}>
-    <p className={`text-[11px] font-bold ${featured ? 'text-slate-300' : 'text-slate-500 dark:text-slate-400'}`}>{label}</p>
-    <p className={`mt-2 whitespace-normal break-words text-sm font-black leading-snug tabular-nums [overflow-wrap:anywhere] min-[400px]:text-base sm:text-lg xl:text-xl ${featured ? 'text-emerald-300' : tone || 'text-slate-900 dark:text-slate-100'}`}>{value}</p>
-    <p className={`mt-1 whitespace-normal break-words text-[11px] [overflow-wrap:anywhere] ${featured ? 'text-slate-400' : 'text-slate-500 dark:text-slate-400'}`}>{hint}</p>
+    ? 'border-line-strong bg-primary text-white '
+    : 'border-line bg-surface '}`}>
+    <p className={`text-[11px] font-bold ${featured ? 'text-muted' : 'text-muted dark:text-muted'}`}>{label}</p>
+    <p className={`mt-2 whitespace-normal break-words text-sm font-black leading-snug tabular-nums [overflow-wrap:anywhere] min-[400px]:text-base sm:text-lg xl:text-xl ${featured ? 'text-success' : tone || 'text-ink dark:text-muted'}`}>{value}</p>
+    <p className={`mt-1 whitespace-normal break-words text-[11px] [overflow-wrap:anywhere] ${featured ? 'text-muted' : 'text-muted dark:text-muted'}`}>{hint}</p>
   </div>
 );
 
@@ -115,15 +115,15 @@ const SalesPulse: React.FC<{ rows: any[]; format: (value: number) => string }> =
     : 'لا توجد فواتير مسجلة في هذا اليوم.';
 
   return (
-    <section className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900 sm:p-5" aria-labelledby="sales-pulse-title">
+    <section className="rounded-xl border border-line bg-surface p-4 sm:p-5" aria-labelledby="sales-pulse-title">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 id="sales-pulse-title" className="text-sm font-black text-slate-900 dark:text-slate-100">نبض المبيعات</h2>
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">توزيع قيمة الفواتير المسجلة على ساعات اليوم</p>
+          <h2 id="sales-pulse-title" className="text-sm font-black text-ink ">نبض المبيعات</h2>
+          <p className="mt-1 text-xs text-muted ">توزيع قيمة الفواتير المسجلة على ساعات اليوم</p>
         </div>
         <div className="text-left">
-          <p className="text-xs font-bold tabular-nums text-slate-800 dark:text-slate-200">{totalInvoices} فاتورة</p>
-          <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">{peak > 0 ? `أعلى ساعة · ${format(peak)}` : 'لا توجد حركة مسجلة'}</p>
+          <p className="text-xs font-bold tabular-nums text-ink ">{totalInvoices} فاتورة</p>
+          <p className="mt-1 text-[11px] text-muted ">{peak > 0 ? `أعلى ساعة · ${format(peak)}` : 'لا توجد حركة مسجلة'}</p>
         </div>
       </div>
       <p id="sales-pulse-description" className="sr-only">{hourlyDescription}</p>
@@ -134,22 +134,22 @@ const SalesPulse: React.FC<{ rows: any[]; format: (value: number) => string }> =
       </ul>
       {totalInvoices > 0 ? (
         <div className="mt-5" role="img" aria-labelledby="sales-pulse-title" aria-describedby="sales-pulse-description">
-          <div className="flex h-24 items-end gap-1 border-b border-slate-200 dark:border-slate-700 sm:gap-1.5" dir="ltr">
+          <div className="flex h-24 items-end gap-1 border-b border-line sm:gap-1.5" dir="ltr">
             {hourly.map((hour, index) => (
               <div
                 key={index}
                 title={`${String(index).padStart(2, '0')}:00 · ${hour.count} فاتورة · ${format(hour.total)}`}
-                className={`min-w-0 flex-1 rounded-t-sm transition-colors ${hour.total > 0 ? 'bg-emerald-500 hover:bg-emerald-600' : 'bg-slate-100 dark:bg-slate-800'}`}
+                className={`min-w-0 flex-1 rounded-t-sm transition-colors ${hour.total > 0 ? 'bg-success hover:bg-success' : 'bg-surface-sunken dark:bg-primary'}`}
                 style={{ height: hour.total > 0 ? `${Math.max((hour.total / peak) * 100, 8)}%` : '3px' }}
               />
             ))}
           </div>
-          <div className="mt-2 flex justify-between text-[10px] tabular-nums text-slate-400" dir="ltr">
+          <div className="mt-2 flex justify-between text-[10px] tabular-nums text-muted" dir="ltr">
             {[0, 4, 8, 12, 16, 20, 23].map((hour) => <span key={hour}>{String(hour).padStart(2, '0')}:00</span>)}
           </div>
         </div>
       ) : (
-        <div className="mt-5 flex h-24 items-center justify-center rounded-lg border border-dashed border-slate-200 text-xs text-slate-500 dark:border-slate-700 dark:text-slate-400">
+        <div className="mt-5 flex h-24 items-center justify-center rounded-lg border border-dashed border-line text-xs text-muted ">
           {hourlyDescription} سيظهر النشاط هنا بعد تسجيل أول فاتورة.
         </div>
       )}
@@ -160,11 +160,11 @@ const SalesPulse: React.FC<{ rows: any[]; format: (value: number) => string }> =
 const Table: React.FC<{ title?: string; headers: string[]; rows: React.ReactNode[][]; empty: string }> = ({ title, headers, rows, empty }) => {
   const body = rows.map((cells, i) => ({ __cells: cells, __i: i }));
   return (
-    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+    <div className="bg-surface rounded-xl border border-line overflow-hidden">
       {title && (
-        <div className="px-4 py-3 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
-          <h3 className="text-xs font-bold text-slate-700">{title}</h3>
-          <span className="text-[11px] text-slate-500">{rows.length} سجل</span>
+        <div className="px-4 py-3 border-b border-line bg-surface-muted flex items-center justify-between">
+          <h3 className="text-xs font-bold text-ink">{title}</h3>
+          <span className="text-[11px] text-muted">{rows.length} سجل</span>
         </div>
       )}
       <UiDataTable
@@ -195,9 +195,9 @@ const formatDate = (value: string) => new Date(`${value}T12:00:00`).toLocaleDate
   weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
 });
 const PAY_DARK_STYLE: Record<string, string> = {
-  PAID: 'dark:bg-emerald-950 dark:text-emerald-300',
-  PARTIAL: 'dark:bg-amber-950 dark:text-amber-300',
-  UNPAID: 'dark:bg-rose-950 dark:text-rose-300',
+  PAID: 'dark:bg-success dark:text-success',
+  PARTIAL: 'dark:bg-warning dark:text-warning',
+  UNPAID: 'dark:bg-danger dark:text-danger',
 };
 
 const getDailyData = (service: DailyOperationsService, kind: DailyKind, date: string) => {
@@ -289,7 +289,7 @@ const getDailyExportOptions = (kind: DailyKind, date: string, data: any) => {
 const payBadge = (status?: string | null, darkTheme = false) => {
   const key = status || '';
   return (
-    <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${PAY_STYLE[key] || 'bg-slate-100 text-slate-600'} ${darkTheme ? PAY_DARK_STYLE[key] || 'dark:bg-slate-700 dark:text-slate-200' : ''}`}>
+    <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${PAY_STYLE[key] || 'bg-surface-sunken text-ink-secondary'} ${darkTheme ? PAY_DARK_STYLE[key] || 'dark:bg-primary dark:text-muted' : ''}`}>
       {PAY_LABEL[key] || key || '—'}
     </span>
   );
@@ -397,15 +397,15 @@ const DailyPage: React.FC<{ kind: DailyKind }> = ({ kind }) => {
   const saleActions = (row: any) => (
     <div className="flex items-center gap-1">
       {canCustomerPay && row.remaining > 0 && (
-        <button type="button" aria-label={`تسجيل دفعة للفاتورة ${row.invoiceNumber}`} title="تسجيل دفعة" onClick={() => setPaymentTarget({ kind: 'sale', id: row.id, branchId: row.branchId, name: `${row.invoiceNumber} — ${row.customerName || ''}`, remaining: row.remaining })} className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-emerald-700 transition hover:bg-emerald-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 dark:text-emerald-300 dark:hover:bg-emerald-950">
+        <button type="button" aria-label={`تسجيل دفعة للفاتورة ${row.invoiceNumber}`} title="تسجيل دفعة" onClick={() => setPaymentTarget({ kind: 'sale', id: row.id, branchId: row.branchId, name: `${row.invoiceNumber} — ${row.customerName || ''}`, remaining: row.remaining })} className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-success transition hover:bg-success-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-success dark:hover:bg-success">
           <HandCoins className="h-4 w-4" />
         </button>
       )}
-      <button type="button" aria-label={`تفاصيل الفاتورة ${row.invoiceNumber}`} title="التفاصيل" onClick={() => setDetailsTarget({ kind: 'sale', id: row.id })} className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-sky-700 transition hover:bg-sky-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:text-sky-300 dark:hover:bg-sky-950">
+      <button type="button" aria-label={`تفاصيل الفاتورة ${row.invoiceNumber}`} title="التفاصيل" onClick={() => setDetailsTarget({ kind: 'sale', id: row.id })} className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-primary transition hover:bg-accent-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary dark:hover:bg-primary">
         <Eye className="h-4 w-4" />
       </button>
       {canVoidSale && (
-        <button type="button" aria-label={`إلغاء الفاتورة ${row.invoiceNumber}`} title="إلغاء الفاتورة" onClick={() => setVoidTarget({ kind: 'sale', id: row.id, name: row.invoiceNumber })} className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-rose-600 transition hover:bg-rose-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 dark:text-rose-300 dark:hover:bg-rose-950">
+        <button type="button" aria-label={`إلغاء الفاتورة ${row.invoiceNumber}`} title="إلغاء الفاتورة" onClick={() => setVoidTarget({ kind: 'sale', id: row.id, name: row.invoiceNumber })} className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-danger transition hover:bg-danger-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger dark:hover:bg-danger">
           <Ban className="h-4 w-4" />
         </button>
       )}
@@ -423,16 +423,16 @@ const DailyPage: React.FC<{ kind: DailyKind }> = ({ kind }) => {
   };
 
   return (
-    <div className={`h-full flex flex-col overflow-hidden ${kind === 'sales' ? 'bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100' : 'bg-slate-50 text-slate-900'}`}>
+    <div className={`h-full flex flex-col overflow-hidden ${kind === 'sales' ? 'bg-surface-muted text-ink dark:bg-primary dark:text-muted' : 'bg-surface-muted text-ink'}`}>
       {kind === 'sales' ? (
-        <div className="shrink-0 border-b border-slate-200 bg-white px-4 py-4 dark:border-slate-800 dark:bg-slate-900 sm:px-6">
+        <div className="shrink-0 border-b border-line bg-surface px-4 py-4 sm:px-6">
           <div className="mx-auto max-w-screen-2xl">
             <PageHeader
               icon={<Receipt className="h-5 w-5" />}
               title={
                 <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
                   {meta.title}
-                  <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                  <span className="rounded-md bg-surface-sunken px-2 py-0.5 text-[10px] font-bold text-ink-secondary ">
                     {date === todayDate ? 'اليوم' : formatDate(date)}
                   </span>
                 </span>
@@ -444,31 +444,31 @@ const DailyPage: React.FC<{ kind: DailyKind }> = ({ kind }) => {
                     <button
                       type="button"
                       onClick={() => setQuickSaleOpen(true)}
-                      className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-emerald-700 px-4 text-xs font-bold text-white shadow-sm transition hover:bg-emerald-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900"
+                      className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-success px-4 text-xs font-bold text-white shadow-sm transition hover:bg-success focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-success focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900"
                     >
                       <Plus className="h-4 w-4" /> بيع سريع
                     </button>
                   )}
                 </CentralLimitGuard>
-                <div className="flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 p-1 dark:border-slate-700 dark:bg-slate-800">
-                  <button type="button" onClick={() => setDate(todayDate)} aria-pressed={date === todayDate} className={`min-h-8 rounded-md px-3 text-xs font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 ${date === todayDate ? 'bg-white text-emerald-700 shadow-sm dark:bg-slate-700 dark:text-emerald-300' : 'text-slate-600 hover:bg-white dark:text-slate-300 dark:hover:bg-slate-700'}`}>اليوم</button>
-                  <button type="button" onClick={() => setDate(moveDate(todayDate, -1))} aria-pressed={date === moveDate(todayDate, -1)} className={`min-h-8 rounded-md px-3 text-xs font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 ${date === moveDate(todayDate, -1) ? 'bg-white text-emerald-700 shadow-sm dark:bg-slate-700 dark:text-emerald-300' : 'text-slate-600 hover:bg-white dark:text-slate-300 dark:hover:bg-slate-700'}`}>أمس</button>
-                  <label className="relative flex min-h-8 items-center gap-1.5 border-r border-slate-200 px-2 dark:border-slate-700">
-                    <CalendarDays className="h-4 w-4 text-slate-500" aria-hidden="true" />
+                <div className="flex items-center gap-1 rounded-lg border border-line bg-surface-muted p-1 ">
+                  <button type="button" onClick={() => setDate(todayDate)} aria-pressed={date === todayDate} className={`min-h-8 rounded-md px-3 text-xs font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-success ${date === todayDate ? 'bg-surface text-success shadow-sm dark:bg-primary dark:text-success' : 'text-ink-secondary hover:bg-surface dark:hover:bg-primary'}`}>اليوم</button>
+                  <button type="button" onClick={() => setDate(moveDate(todayDate, -1))} aria-pressed={date === moveDate(todayDate, -1)} className={`min-h-8 rounded-md px-3 text-xs font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-success ${date === moveDate(todayDate, -1) ? 'bg-surface text-success shadow-sm dark:bg-primary dark:text-success' : 'text-ink-secondary hover:bg-surface dark:hover:bg-primary'}`}>أمس</button>
+                  <label className="relative flex min-h-8 items-center gap-1.5 border-r border-line px-2 ">
+                    <CalendarDays className="h-4 w-4 text-muted" aria-hidden="true" />
                     <span className="sr-only">اختيار تاريخ المبيعات</span>
                     <input
                       type="date"
                       value={date}
                       onChange={(event) => setDate(event.target.value || todayDate)}
                       aria-label="اختيار تاريخ المبيعات"
-                      className="w-[130px] bg-transparent text-xs font-semibold text-slate-700 outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 dark:text-slate-200"
+                      className="w-[130px] bg-transparent text-xs font-semibold text-ink outline-none focus-visible:ring-2 focus-visible:ring-success "
                     />
                   </label>
                 </div>
-                <button type="button" onClick={load} aria-label="تحديث بيانات المبيعات" title="تحديث" className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800">
+                <button type="button" onClick={load} aria-label="تحديث بيانات المبيعات" title="تحديث" className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-line bg-surface text-ink-secondary transition hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-success dark:hover:bg-primary">
                   <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
                 </button>
-                <button type="button" onClick={handleExport} disabled={!data} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800">
+                <button type="button" onClick={handleExport} disabled={!data} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-line bg-surface px-3 text-xs font-bold text-ink transition hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-primary">
                   <Download className="h-4 w-4" /> تصدير جدول بيانات
                 </button>
               </>}
@@ -476,38 +476,38 @@ const DailyPage: React.FC<{ kind: DailyKind }> = ({ kind }) => {
           </div>
         </div>
       ) : (
-      <div className="bg-white border-b border-slate-200 px-6 pt-4">
+      <div className="bg-surface border-b border-line px-6 pt-4">
         <PageHeader
           icon={<Icon className="w-5 h-5" />}
           title={meta.title}
           description={meta.subtitle}
           actions={<>
             {kind === 'purchases' && canCreatePurchase && (
-              <button onClick={() => setQuickPurchaseOpen(true)} className="flex items-center gap-1.5 px-3.5 py-2.5 bg-orange-600 text-white rounded-xl text-xs font-bold hover:bg-orange-700">
+              <button onClick={() => setQuickPurchaseOpen(true)} className="flex items-center gap-1.5 px-3.5 py-2.5 bg-warning text-white rounded-xl text-xs font-bold hover:bg-warning">
                 <Plus className="w-4 h-4" /> فاتورة توريد
               </button>
             )}
             {kind === 'expenses' && canExpense && (
-              <button onClick={() => setExpenseModal({})} className="flex items-center gap-1.5 px-3.5 py-2.5 bg-rose-600 text-white rounded-xl text-xs font-bold hover:bg-rose-700">
+              <button onClick={() => setExpenseModal({})} className="flex items-center gap-1.5 px-3.5 py-2.5 bg-danger text-white rounded-xl text-xs font-bold hover:bg-danger">
                 <Plus className="w-4 h-4" /> إضافة مصروف
               </button>
             )}
-            <div className="flex items-center gap-2 bg-slate-100 border border-slate-200 rounded-xl px-3 py-2">
-              <CalendarDays className="w-4 h-4 text-slate-500" />
+            <div className="flex items-center gap-2 bg-surface-sunken border border-line rounded-xl px-3 py-2">
+              <CalendarDays className="w-4 h-4 text-muted" />
               <input
                 type="date"
                 value={date}
                 onChange={(e) => setDate(e.target.value || service.today())}
-                className="bg-transparent text-xs font-semibold text-slate-700 outline-none"
+                className="bg-transparent text-xs font-semibold text-ink outline-none"
               />
             </div>
-            <button onClick={load} className="p-2.5 rounded-xl bg-slate-100 text-slate-600 hover:bg-slate-200" title="تحديث">
+            <button onClick={load} className="p-2.5 rounded-xl bg-surface-sunken text-ink-secondary hover:bg-surface-sunken" title="تحديث">
               <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             </button>
             <button
               onClick={handleExport}
               disabled={!data}
-              className="flex items-center gap-1.5 px-3.5 py-2.5 bg-sky-600 text-white rounded-xl text-xs font-bold hover:bg-sky-700 disabled:opacity-50"
+              className="flex items-center gap-1.5 px-3.5 py-2.5 bg-primary text-white rounded-xl text-xs font-bold hover:bg-primary disabled:opacity-50"
             >
               <Download className="w-4 h-4" /> تصدير
             </button>
@@ -518,27 +518,27 @@ const DailyPage: React.FC<{ kind: DailyKind }> = ({ kind }) => {
 
       <div className={`flex-1 overflow-y-auto ${kind === 'sales' ? 'space-y-4 p-4 sm:space-y-5 sm:p-6' : 'space-y-5 p-6'}`}>
         {error && (
-          <div role="alert" className={`flex items-center gap-2 rounded-xl border px-4 py-3 text-xs font-semibold ${kind === 'sales' ? 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900 dark:bg-rose-950/50 dark:text-rose-300' : 'bg-rose-50 border-rose-200 text-rose-700'}`}>
+          <div role="alert" className={`flex items-center gap-2 rounded-xl border px-4 py-3 text-xs font-semibold ${kind === 'sales' ? 'border-danger-border bg-danger-soft text-danger dark:bg-danger/50 dark:text-danger' : 'bg-danger-soft border-danger-border text-danger'}`}>
             <AlertTriangle className="h-4 w-4 shrink-0" /> <span className="flex-1">{error}</span>
-            {kind === 'sales' && <button type="button" onClick={load} className="rounded-md px-2 py-1 font-bold underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500">إعادة المحاولة</button>}
+            {kind === 'sales' && <button type="button" onClick={load} className="rounded-md px-2 py-1 font-bold underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger">إعادة المحاولة</button>}
           </div>
         )}
 
         {kind === 'sales' ? (
-        <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900 sm:flex-row sm:items-center">
+        <div className="flex flex-col gap-3 rounded-xl border border-line bg-surface p-3 sm:flex-row sm:items-center">
           <div className="relative min-w-0 flex-1 sm:max-w-sm">
-            <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden="true" />
+            <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" aria-hidden="true" />
             <input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               placeholder="ابحث برقم الفاتورة أو العميل أو الهاتف..."
               aria-label="البحث في فواتير المبيعات"
-              className="w-full rounded-lg border border-slate-200 bg-slate-50 py-2.5 pl-3 pr-9 text-xs text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+              className="w-full rounded-lg border border-line bg-surface-muted py-2.5 pl-3 pr-9 text-xs text-ink outline-none transition placeholder:text-muted focus:border-success focus:ring-2 focus:ring-success/20 "
             />
           </div>
           <label className="flex items-center gap-2">
-            <span className="shrink-0 text-[11px] font-bold text-slate-500 dark:text-slate-400">حالة السداد</span>
-            <select value={status} onChange={(event) => setStatus(event.target.value)} aria-label="تصفية حسب حالة السداد" className="min-h-10 flex-1 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 sm:flex-none">
+            <span className="shrink-0 text-[11px] font-bold text-muted ">حالة السداد</span>
+            <select value={status} onChange={(event) => setStatus(event.target.value)} aria-label="تصفية حسب حالة السداد" className="min-h-10 flex-1 rounded-lg border border-line bg-surface px-3 text-xs font-semibold text-ink outline-none focus:border-success focus:ring-2 focus:ring-success/20 sm:flex-none">
               <option value="ALL">كل الحالات</option>
               <option value="PAID">مدفوعة</option>
               <option value="PARTIAL">مدفوعة جزئيًا</option>
@@ -546,25 +546,25 @@ const DailyPage: React.FC<{ kind: DailyKind }> = ({ kind }) => {
             </select>
           </label>
           {(search || status !== 'ALL') && (
-            <button type="button" onClick={() => { setSearch(''); setStatus('ALL'); }} className="min-h-9 rounded-lg px-2 text-xs font-bold text-slate-600 underline underline-offset-2 hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 dark:text-slate-300 dark:hover:text-emerald-300">مسح الفلاتر</button>
+            <button type="button" onClick={() => { setSearch(''); setStatus('ALL'); }} className="min-h-9 rounded-lg px-2 text-xs font-bold text-ink-secondary underline underline-offset-2 hover:text-success focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-success dark:hover:text-success">مسح الفلاتر</button>
           )}
-          <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 sm:mr-auto" aria-live="polite">
+          <span className="text-[11px] font-semibold text-muted sm:mr-auto" aria-live="polite">
             {loading ? 'جارٍ التحديث…' : `${plain(filteredRows.length)} من ${plain(data?.rows?.length || 0)} فاتورة`}
           </span>
         </div>
         ) : (
         <div className="flex flex-col sm:flex-row sm:items-center gap-2">
           <div className="relative flex-1 sm:max-w-xs">
-            <Search className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2" />
+            <Search className="w-4 h-4 text-muted absolute right-3 top-1/2 -translate-y-1/2" />
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder={kind === 'expenses' ? 'بحث بالبند أو البيان...' : 'بحث بالرقم أو الاسم...'}
-              className="w-full pr-9 pl-3 py-2.5 bg-white border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-sky-500"
+              className="w-full pr-9 pl-3 py-2.5 bg-surface border border-line rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary"
             />
           </div>
           {kind === 'purchases' && (
-            <select value={status} onChange={(e) => setStatus(e.target.value)} className="px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-600 focus:outline-none">
+            <select value={status} onChange={(e) => setStatus(e.target.value)} className="px-3 py-2.5 bg-surface border border-line rounded-xl text-xs font-semibold text-ink-secondary focus:outline-none">
               <option value="ALL">كل الحالات</option>
               <option value="PAID">مدفوعة</option>
               <option value="PARTIAL">مدفوعة جزئيًا</option>
@@ -572,9 +572,9 @@ const DailyPage: React.FC<{ kind: DailyKind }> = ({ kind }) => {
             </select>
           )}
           {(search || status !== 'ALL') && (
-            <button onClick={() => { setSearch(''); setStatus('ALL'); }} className="px-3 py-2.5 text-xs font-semibold text-slate-500 hover:text-slate-700">مسح الفلاتر</button>
+            <button onClick={() => { setSearch(''); setStatus('ALL'); }} className="px-3 py-2.5 text-xs font-semibold text-muted hover:text-ink">مسح الفلاتر</button>
           )}
-          <span className="text-[11px] text-slate-400 sm:mr-auto">
+          <span className="text-[11px] text-muted sm:mr-auto">
             {kind === 'debts' ? `${filteredRows.length} فاتورة · ${filteredPayments.length} سند` : `${filteredRows.length} صف`}
           </span>
         </div>
@@ -582,72 +582,72 @@ const DailyPage: React.FC<{ kind: DailyKind }> = ({ kind }) => {
 
         {loading ? (
           <div className="flex min-h-56 flex-col items-center justify-center gap-3 text-center" role="status" aria-live="polite">
-            <Loader2 className="h-7 w-7 animate-spin text-sky-600" />
-            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">جارٍ تحميل بيانات اليوم…</span>
+            <Loader2 className="h-7 w-7 animate-spin text-primary" />
+            <span className="text-xs font-semibold text-muted ">جارٍ تحميل بيانات اليوم…</span>
           </div>
         ) : !data ? (
           <div className="flex min-h-48 flex-col items-center justify-center text-center">
-            <AlertTriangle className="h-6 w-6 text-rose-500" aria-hidden="true" />
-            <p className="mt-3 text-sm font-bold text-slate-800 dark:text-slate-200">تعذر تحميل {meta.title}</p>
-            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">تحقق من الاتصال بقاعدة البيانات ثم أعد المحاولة.</p>
-            <button type="button" onClick={load} className="mt-4 rounded-lg bg-slate-900 px-4 py-2 text-xs font-bold text-white hover:bg-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 dark:bg-slate-100 dark:text-slate-900">إعادة المحاولة</button>
+            <AlertTriangle className="h-6 w-6 text-danger" aria-hidden="true" />
+            <p className="mt-3 text-sm font-bold text-ink ">تعذر تحميل {meta.title}</p>
+            <p className="mt-1 text-xs text-muted ">تحقق من الاتصال بقاعدة البيانات ثم أعد المحاولة.</p>
+            <button type="button" onClick={load} className="mt-4 rounded-lg bg-primary px-4 py-2 text-xs font-bold text-white hover:bg-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-success dark:text-ink">إعادة المحاولة</button>
           </div>
         ) : kind === 'sales' ? (
           <section className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 xl:grid-cols-6">
               <SalesMetric featured label="إجمالي المبيعات" value={fmt(data.summary.total)} hint={`${plain(data.summary.count)} فاتورة في ${date === todayDate ? 'اليوم' : formatDate(date)}`} />
               <SalesMetric label="عدد الفواتير" value={plain(data.summary.count)} hint="الفواتير غير الملغاة" />
-              <SalesMetric label="المحصّل" value={fmt(data.summary.paid)} hint="إجمالي المدفوع" tone="text-emerald-700 dark:text-emerald-300" />
-              <SalesMetric label="المتبقي" value={fmt(data.summary.remaining)} hint="رصيد مستحق على العملاء" tone={data.summary.remaining > 0 ? 'text-rose-700 dark:text-rose-300' : 'text-slate-900 dark:text-slate-100'} />
-              <SalesMetric label="هامش الربح" value={fmt(data.summary.profit)} hint="المبيعات بعد تكلفة الأصناف" tone={data.summary.profit >= 0 ? 'text-emerald-700 dark:text-emerald-300' : 'text-rose-700 dark:text-rose-300'} />
+              <SalesMetric label="المحصّل" value={fmt(data.summary.paid)} hint="إجمالي المدفوع" tone="text-success " />
+              <SalesMetric label="المتبقي" value={fmt(data.summary.remaining)} hint="رصيد مستحق على العملاء" tone={data.summary.remaining > 0 ? 'text-danger ' : 'text-ink '} />
+              <SalesMetric label="هامش الربح" value={fmt(data.summary.profit)} hint="المبيعات بعد تكلفة الأصناف" tone={data.summary.profit >= 0 ? 'text-success ' : 'text-danger '} />
               <SalesMetric label="الضريبة والخصم" value={fmt(data.summary.tax)} hint={`خصومات الفواتير · ${fmt(data.summary.discount)}`} />
             </div>
 
             <SalesPulse rows={data.rows} format={fmt} />
 
-            <section className="overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900" aria-labelledby="sales-invoices-title">
-              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 px-4 py-3 dark:border-slate-700 sm:px-5">
+            <section className="overflow-hidden rounded-xl border border-line bg-surface " aria-labelledby="sales-invoices-title">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-4 py-3 sm:px-5">
                 <div>
-                  <h2 id="sales-invoices-title" className="text-sm font-black text-slate-900 dark:text-slate-100">فواتير المبيعات</h2>
-                  <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">تفاصيل الفواتير والمدفوعات المسجلة</p>
+                  <h2 id="sales-invoices-title" className="text-sm font-black text-ink ">فواتير المبيعات</h2>
+                  <p className="mt-0.5 text-[11px] text-muted ">تفاصيل الفواتير والمدفوعات المسجلة</p>
                 </div>
-                <span className="rounded-md bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300">{plain(filteredRows.length)} فاتورة</span>
+                <span className="rounded-md bg-surface-sunken px-2.5 py-1 text-[11px] font-bold text-ink-secondary ">{plain(filteredRows.length)} فاتورة</span>
               </div>
               {filteredRows.length === 0 ? (
                 <div className="flex flex-col items-center px-4 py-12 text-center">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-300">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-surface-sunken text-muted ">
                     <Receipt className="h-5 w-5" />
                   </div>
-                  <p className="mt-3 text-sm font-bold text-slate-800 dark:text-slate-200">{data.rows.length === 0 ? 'لا توجد مبيعات مسجلة في هذا اليوم' : 'لا توجد فواتير تطابق البحث'}</p>
-                  <p className="mt-1 max-w-sm text-xs text-slate-500 dark:text-slate-400">{data.rows.length === 0 ? 'ستظهر الفواتير هنا فور تسجيلها.' : 'غيّر كلمات البحث أو حالة السداد لعرض نتائج أخرى.'}</p>
+                  <p className="mt-3 text-sm font-bold text-ink ">{data.rows.length === 0 ? 'لا توجد مبيعات مسجلة في هذا اليوم' : 'لا توجد فواتير تطابق البحث'}</p>
+                  <p className="mt-1 max-w-sm text-xs text-muted ">{data.rows.length === 0 ? 'ستظهر الفواتير هنا فور تسجيلها.' : 'غيّر كلمات البحث أو حالة السداد لعرض نتائج أخرى.'}</p>
                   {search || status !== 'ALL' ? (
-                    <button type="button" onClick={() => { setSearch(''); setStatus('ALL'); }} className="mt-4 rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800">مسح الفلاتر</button>
+                    <button type="button" onClick={() => { setSearch(''); setStatus('ALL'); }} className="mt-4 rounded-lg border border-line px-3 py-2 text-xs font-bold text-ink hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-success dark:hover:bg-primary">مسح الفلاتر</button>
                   ) : canCreateSale ? (
                     <CentralLimitGuard metric="maxInvoices">
-                      <button type="button" onClick={() => setQuickSaleOpen(true)} className="mt-4 inline-flex items-center gap-2 rounded-lg bg-emerald-700 px-4 py-2.5 text-xs font-bold text-white hover:bg-emerald-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900"><Plus className="h-4 w-4" /> تسجيل أول عملية بيع</button>
+                      <button type="button" onClick={() => setQuickSaleOpen(true)} className="mt-4 inline-flex items-center gap-2 rounded-lg bg-success px-4 py-2.5 text-xs font-bold text-white hover:bg-success focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-success focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900"><Plus className="h-4 w-4" /> تسجيل أول عملية بيع</button>
                     </CentralLimitGuard>
                   ) : null}
                 </div>
               ) : (
                 <>
-                  <div className="divide-y divide-slate-100 dark:divide-slate-800 xl:hidden">
+                  <div className="divide-y divide-line-strong dark:divide-primary xl:hidden">
                     {filteredRows.map((row: any) => (
                       <article key={row.id} className="p-4">
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
-                            <p className="font-mono text-sm font-bold text-sky-700 dark:text-sky-300">{row.invoiceNumber}</p>
-                            <p className="mt-1 truncate text-xs font-semibold text-slate-800 dark:text-slate-200">{row.customerName || 'عميل نقدي'}</p>
-                            <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">{time(row.createdAt)} · {plain(row.itemsCount)} أصناف</p>
+                            <p className="font-mono text-sm font-bold text-primary ">{row.invoiceNumber}</p>
+                            <p className="mt-1 truncate text-xs font-semibold text-ink ">{row.customerName || 'عميل نقدي'}</p>
+                            <p className="mt-1 text-[11px] text-muted ">{time(row.createdAt)} · {plain(row.itemsCount)} أصناف</p>
                           </div>
                           {payBadge(row.paymentStatus, true)}
                         </div>
-                        <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-2 border-t border-slate-100 pt-3 text-xs dark:border-slate-800">
-                          <div><p className="text-[10px] text-slate-500 dark:text-slate-400">الإجمالي</p><p className="mt-0.5 font-black tabular-nums text-slate-900 dark:text-slate-100">{fmt(row.total)}</p></div>
-                          <div><p className="text-[10px] text-slate-500 dark:text-slate-400">المدفوع</p><p className="mt-0.5 font-bold tabular-nums text-emerald-700 dark:text-emerald-300">{fmt(row.paid)}</p></div>
-                          <div><p className="text-[10px] text-slate-500 dark:text-slate-400">المتبقي</p><p className={`mt-0.5 font-bold tabular-nums ${row.remaining > 0 ? 'text-rose-700 dark:text-rose-300' : 'text-slate-500 dark:text-slate-400'}`}>{fmt(row.remaining)}</p></div>
-                          <div><p className="text-[10px] text-slate-500 dark:text-slate-400">الربح · الضريبة · الخصم</p><p className="mt-0.5 font-semibold tabular-nums text-slate-700 dark:text-slate-300">{fmt(row.profit)} · {fmt(row.tax)} · {fmt(row.discount)}</p></div>
+                        <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-2 border-t border-line pt-3 text-xs ">
+                          <div><p className="text-[10px] text-muted ">الإجمالي</p><p className="mt-0.5 font-black tabular-nums text-ink ">{fmt(row.total)}</p></div>
+                          <div><p className="text-[10px] text-muted ">المدفوع</p><p className="mt-0.5 font-bold tabular-nums text-success ">{fmt(row.paid)}</p></div>
+                          <div><p className="text-[10px] text-muted ">المتبقي</p><p className={`mt-0.5 font-bold tabular-nums ${row.remaining > 0 ? 'text-danger dark:text-danger' : 'text-muted dark:text-muted'}`}>{fmt(row.remaining)}</p></div>
+                          <div><p className="text-[10px] text-muted ">الربح · الضريبة · الخصم</p><p className="mt-0.5 font-semibold tabular-nums text-ink ">{fmt(row.profit)} · {fmt(row.tax)} · {fmt(row.discount)}</p></div>
                         </div>
-                        <div className="mt-2 flex items-center justify-end border-t border-slate-100 pt-2 dark:border-slate-800">{saleActions(row)}</div>
+                        <div className="mt-2 flex items-center justify-end border-t border-line pt-2 ">{saleActions(row)}</div>
                       </article>
                     ))}
                   </div>
@@ -659,26 +659,26 @@ const DailyPage: React.FC<{ kind: DailyKind }> = ({ kind }) => {
                     minWidth={1120}
                     dense
                     tableClassName="text-xs"
-                    rowClassName={() => 'transition-colors hover:bg-slate-50/80 dark:hover:bg-slate-800/50'}
+                    rowClassName={() => 'transition-colors hover:bg-surface-muted/80 dark:hover:bg-primary/50'}
                     columns={[
-                      { key: 'invoice', header: 'الفاتورة', render: (row: any) => <span className="font-mono font-bold text-sky-700 dark:text-sky-300">{row.invoiceNumber}</span> },
-                      { key: 'time', header: 'الوقت', render: (row: any) => <span className="whitespace-nowrap text-slate-500 dark:text-slate-400">{time(row.createdAt)}</span> },
+                      { key: 'invoice', header: 'الفاتورة', render: (row: any) => <span className="font-mono font-bold text-primary ">{row.invoiceNumber}</span> },
+                      { key: 'time', header: 'الوقت', render: (row: any) => <span className="whitespace-nowrap text-muted ">{time(row.createdAt)}</span> },
                       {
                         key: 'customer', header: 'العميل',
                         render: (row: any) => (
                           <span>
-                            <span className="block font-semibold text-slate-900 dark:text-slate-100">{row.customerName || 'عميل نقدي'}</span>
-                            {row.customerPhone && <span className="mt-0.5 block text-[10px] text-slate-500 dark:text-slate-400" dir="ltr">{row.customerPhone}</span>}
+                            <span className="block font-semibold text-ink ">{row.customerName || 'عميل نقدي'}</span>
+                            {row.customerPhone && <span className="mt-0.5 block text-[10px] text-muted " dir="ltr">{row.customerPhone}</span>}
                           </span>
                         ),
                       },
-                      { key: 'items', header: 'الأصناف', render: (row: any) => <span className="tabular-nums text-slate-600 dark:text-slate-300">{plain(row.itemsCount)}</span> },
-                      { key: 'total', header: 'الإجمالي', render: (row: any) => <span className="whitespace-nowrap font-black tabular-nums text-slate-900 dark:text-slate-100">{fmt(row.total)}</span> },
-                      { key: 'paid', header: 'المدفوع', render: (row: any) => <span className="whitespace-nowrap font-semibold tabular-nums text-emerald-700 dark:text-emerald-300">{fmt(row.paid)}</span> },
-                      { key: 'remaining', header: 'المتبقي', render: (row: any) => <span className={`whitespace-nowrap font-semibold tabular-nums ${row.remaining > 0 ? 'text-rose-700 dark:text-rose-300' : 'text-slate-500 dark:text-slate-400'}`}>{fmt(row.remaining)}</span> },
+                      { key: 'items', header: 'الأصناف', render: (row: any) => <span className="tabular-nums text-ink-secondary ">{plain(row.itemsCount)}</span> },
+                      { key: 'total', header: 'الإجمالي', render: (row: any) => <span className="whitespace-nowrap font-black tabular-nums text-ink ">{fmt(row.total)}</span> },
+                      { key: 'paid', header: 'المدفوع', render: (row: any) => <span className="whitespace-nowrap font-semibold tabular-nums text-success ">{fmt(row.paid)}</span> },
+                      { key: 'remaining', header: 'المتبقي', render: (row: any) => <span className={`whitespace-nowrap font-semibold tabular-nums ${row.remaining > 0 ? 'text-danger dark:text-danger' : 'text-muted dark:text-muted'}`}>{fmt(row.remaining)}</span> },
                       { key: 'status', header: 'الحالة', render: (row: any) => payBadge(row.paymentStatus, true) },
-                      { key: 'profit', header: 'الربح', render: (row: any) => <span className={`whitespace-nowrap font-semibold tabular-nums ${row.profit >= 0 ? 'text-emerald-700 dark:text-emerald-300' : 'text-rose-700 dark:text-rose-300'}`}>{fmt(row.profit)}</span> },
-                      { key: 'tax', header: 'الضريبة / الخصم', render: (row: any) => <span className="whitespace-nowrap text-slate-600 dark:text-slate-300"><span className="font-semibold">{fmt(row.tax)}</span><span className="mx-1 text-slate-400">/</span><span>{fmt(row.discount)}</span></span> },
+                      { key: 'profit', header: 'الربح', render: (row: any) => <span className={`whitespace-nowrap font-semibold tabular-nums ${row.profit >= 0 ? 'text-success dark:text-success' : 'text-danger dark:text-danger'}`}>{fmt(row.profit)}</span> },
+                      { key: 'tax', header: 'الضريبة / الخصم', render: (row: any) => <span className="whitespace-nowrap text-ink-secondary "><span className="font-semibold">{fmt(row.tax)}</span><span className="mx-1 text-muted">/</span><span>{fmt(row.discount)}</span></span> },
                       { key: 'actions', header: 'إجراءات', render: (row: any) => saleActions(row) },
                     ]}
                   />
@@ -690,30 +690,30 @@ const DailyPage: React.FC<{ kind: DailyKind }> = ({ kind }) => {
         ) : kind === 'purchases' ? (
           <>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-              <StatCard label="إجمالي المشتريات" value={fmt(data.summary.total)} hint={`${data.summary.count} فاتورة`} tone="text-orange-600" />
+              <StatCard label="إجمالي المشتريات" value={fmt(data.summary.total)} hint={`${data.summary.count} فاتورة`} tone="text-warning" />
               <StatCard label="المدفوع" value={fmt(data.summary.paid)} />
-              <StatCard label="المتبقي للموردين" value={fmt(data.summary.remaining)} tone={data.summary.remaining > 0 ? 'text-rose-600' : 'text-slate-900'} />
+              <StatCard label="المتبقي للموردين" value={fmt(data.summary.remaining)} tone={data.summary.remaining > 0 ? 'text-danger' : 'text-ink'} />
               <StatCard label="الضريبة" value={fmt(data.summary.tax)} hint={`خصم ${fmt(data.summary.discount)}`} />
             </div>
             <Table
               headers={['الفاتورة', 'الوقت', 'المورد', 'الأصناف', 'الإجمالي', 'المدفوع', 'المتبقي', 'الحالة', 'إجراءات']}
               empty="لا توجد مشتريات مسجلة في هذا اليوم"
               rows={filteredRows.map((row: any) => [
-                <span className="font-mono text-orange-600">{row.invoiceNumber}</span>,
-                <span className="text-slate-500">{time(row.createdAt)}</span>,
-                <div><div className="font-semibold text-slate-900">{row.supplierName || '—'}</div><div className="text-[11px] text-slate-400">{row.supplierPhone || ''}</div></div>,
+                <span className="font-mono text-warning">{row.invoiceNumber}</span>,
+                <span className="text-muted">{time(row.createdAt)}</span>,
+                <div><div className="font-semibold text-ink">{row.supplierName || '—'}</div><div className="text-[11px] text-muted">{row.supplierPhone || ''}</div></div>,
                 plain(row.itemsCount),
                 <b>{fmt(row.total)}</b>,
-                <span className="text-emerald-600">{fmt(row.paid)}</span>,
-                <span className={row.remaining > 0 ? 'text-rose-600 font-semibold' : 'text-slate-400'}>{fmt(row.remaining)}</span>,
+                <span className="text-success">{fmt(row.paid)}</span>,
+                <span className={row.remaining > 0 ? 'text-danger font-semibold' : 'text-muted'}>{fmt(row.remaining)}</span>,
                 payBadge(row.paymentStatus),
                 <div className="flex items-center gap-1">
                   {canSupplierPay && row.remaining > 0 && (
-                    <button title="سداد للمورد" onClick={() => setPaymentTarget({ kind: 'purchase', id: row.id, branchId: row.branchId, name: `${row.invoiceNumber} — ${row.supplierName || ''}`, remaining: row.remaining })} className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg"><HandCoins className="w-3.5 h-3.5" /></button>
+                    <button title="سداد للمورد" onClick={() => setPaymentTarget({ kind: 'purchase', id: row.id, branchId: row.branchId, name: `${row.invoiceNumber} — ${row.supplierName || ''}`, remaining: row.remaining })} className="p-1.5 text-success hover:bg-success-soft rounded-lg"><HandCoins className="w-3.5 h-3.5" /></button>
                   )}
-                  <button title="التفاصيل" onClick={() => setDetailsTarget({ kind: 'purchase', id: row.id })} className="p-1.5 text-sky-600 hover:bg-sky-50 rounded-lg"><Eye className="w-3.5 h-3.5" /></button>
+                  <button title="التفاصيل" onClick={() => setDetailsTarget({ kind: 'purchase', id: row.id })} className="p-1.5 text-primary hover:bg-accent-soft rounded-lg"><Eye className="w-3.5 h-3.5" /></button>
                   {canDeletePurchase && (
-                    <button title="حذف فاتورة التوريد" onClick={() => setVoidTarget({ kind: 'purchase', id: row.id, name: row.invoiceNumber })} className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg"><Trash2 className="w-3.5 h-3.5" /></button>
+                    <button title="حذف فاتورة التوريد" onClick={() => setVoidTarget({ kind: 'purchase', id: row.id, name: row.invoiceNumber })} className="p-1.5 text-danger hover:bg-danger-soft rounded-lg"><Trash2 className="w-3.5 h-3.5" /></button>
                   )}
                 </div>,
               ])}
@@ -722,7 +722,7 @@ const DailyPage: React.FC<{ kind: DailyKind }> = ({ kind }) => {
         ) : kind === 'expenses' ? (
           <>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-              <StatCard label="إجمالي المنصرف" value={fmt(data.summary.total)} hint={`${data.summary.count} حركة`} tone="text-rose-600" />
+              <StatCard label="إجمالي المنصرف" value={fmt(data.summary.total)} hint={`${data.summary.count} حركة`} tone="text-danger" />
               <StatCard label="المنصرف النقدي" value={fmt(data.summary.cash)} />
               <StatCard label="أعلى بند" value={data.summary.topCategory || '—'} hint={data.summary.topCategory ? fmt(data.summary.topCategoryAmount) : ''} />
               <StatCard label="متوسط الحركة" value={data.summary.count ? fmt(data.summary.total / data.summary.count) : fmt(0)} />
@@ -731,19 +731,19 @@ const DailyPage: React.FC<{ kind: DailyKind }> = ({ kind }) => {
               headers={['البند', 'البيان', 'المستفيد', 'الخزينة', 'طريقة الدفع', 'المبلغ', 'الوقت', 'إجراءات']}
               empty="لا توجد مصروفات مسجلة في هذا اليوم"
               rows={filteredRows.map((row: any) => [
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-rose-50 text-rose-600 font-bold">{row.category}</span>,
-                <span className="font-semibold text-slate-900">{row.description}</span>,
-                <span className="text-slate-500">{row.recipient || '—'}</span>,
-                <span className="text-slate-500">{row.registerName || '—'}</span>,
-                <span className="text-xs text-slate-600">{PAY_LABEL[row.paymentType] || row.paymentType || '—'}</span>,
-                <b className="text-rose-600">{fmt(row.amount)}</b>,
-                <span className="text-slate-500">{time(row.createdAt)}</span>,
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-danger-soft text-danger font-bold">{row.category}</span>,
+                <span className="font-semibold text-ink">{row.description}</span>,
+                <span className="text-muted">{row.recipient || '—'}</span>,
+                <span className="text-muted">{row.registerName || '—'}</span>,
+                <span className="text-xs text-ink-secondary">{PAY_LABEL[row.paymentType] || row.paymentType || '—'}</span>,
+                <b className="text-danger">{fmt(row.amount)}</b>,
+                <span className="text-muted">{time(row.createdAt)}</span>,
                 <div className="flex items-center gap-1">
                   {can('cashier.expense.update') && (
-                    <button title="تعديل" onClick={() => setExpenseModal({ initial: row })} className="p-1.5 text-sky-600 hover:bg-sky-50 rounded-lg"><Pencil className="w-3.5 h-3.5" /></button>
+                    <button title="تعديل" onClick={() => setExpenseModal({ initial: row })} className="p-1.5 text-primary hover:bg-accent-soft rounded-lg"><Pencil className="w-3.5 h-3.5" /></button>
                   )}
                   {canDeleteExpense && (
-                    <button title="حذف" onClick={() => deleteExpense(row)} className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg"><Trash2 className="w-3.5 h-3.5" /></button>
+                    <button title="حذف" onClick={() => deleteExpense(row)} className="p-1.5 text-danger hover:bg-danger-soft rounded-lg"><Trash2 className="w-3.5 h-3.5" /></button>
                   )}
                 </div>,
               ])}
@@ -752,9 +752,9 @@ const DailyPage: React.FC<{ kind: DailyKind }> = ({ kind }) => {
         ) : (
           <>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-              <StatCard label="ديون جديدة اليوم" value={fmt(data.summary.newDebt)} hint={`${data.rows.length} فاتورة آجلة`} tone="text-rose-600" />
-              <StatCard label="تحصيلات اليوم" value={fmt(data.summary.collectedToday)} hint={`${data.payments.length} إيصال`} tone="text-emerald-600" />
-              <StatCard label="صافي التغير" value={fmt(data.summary.netChange)} tone={data.summary.netChange > 0 ? 'text-rose-600' : 'text-emerald-600'} />
+              <StatCard label="ديون جديدة اليوم" value={fmt(data.summary.newDebt)} hint={`${data.rows.length} فاتورة آجلة`} tone="text-danger" />
+              <StatCard label="تحصيلات اليوم" value={fmt(data.summary.collectedToday)} hint={`${data.payments.length} إيصال`} tone="text-success" />
+              <StatCard label="صافي التغير" value={fmt(data.summary.netChange)} tone={data.summary.netChange > 0 ? 'text-danger' : 'text-success'} />
               <StatCard label="أقساط مستحقة" value={fmt(data.summary.dueInstallments)} hint={`${data.dueInstallments.length} قسط`} />
               <StatCard label="إجمالي مديونية العملاء" value={fmt(data.summary.totalOutstanding)} />
             </div>
@@ -763,19 +763,19 @@ const DailyPage: React.FC<{ kind: DailyKind }> = ({ kind }) => {
               headers={['الفاتورة', 'العميل', 'الإجمالي', 'المدفوع', 'المتبقي', 'الحالة', 'إجراءات']}
               empty="لا توجد ديون جديدة اليوم"
               rows={filteredRows.map((row: any) => [
-                <span className="font-mono text-amber-600">{row.invoiceNumber}</span>,
-                <div><div className="font-semibold text-slate-900">{row.customerName || '—'}</div><div className="text-[11px] text-slate-400">{row.customerPhone || ''}</div></div>,
+                <span className="font-mono text-warning">{row.invoiceNumber}</span>,
+                <div><div className="font-semibold text-ink">{row.customerName || '—'}</div><div className="text-[11px] text-muted">{row.customerPhone || ''}</div></div>,
                 fmt(row.total),
-                <span className="text-emerald-600">{fmt(row.paid)}</span>,
-                <b className="text-rose-600">{fmt(row.remaining)}</b>,
+                <span className="text-success">{fmt(row.paid)}</span>,
+                <b className="text-danger">{fmt(row.remaining)}</b>,
                 payBadge(row.paymentStatus),
                 <div className="flex items-center gap-1">
                   {canCustomerPay && row.remaining > 0 && (
-                    <button title="تحصيل دفعة" onClick={() => setPaymentTarget({ kind: 'sale', id: row.id, branchId: row.branchId, name: `${row.invoiceNumber} — ${row.customerName || ''}`, remaining: row.remaining })} className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg"><HandCoins className="w-3.5 h-3.5" /></button>
+                    <button title="تحصيل دفعة" onClick={() => setPaymentTarget({ kind: 'sale', id: row.id, branchId: row.branchId, name: `${row.invoiceNumber} — ${row.customerName || ''}`, remaining: row.remaining })} className="p-1.5 text-success hover:bg-success-soft rounded-lg"><HandCoins className="w-3.5 h-3.5" /></button>
                   )}
-                  <button title="التفاصيل" onClick={() => setDetailsTarget({ kind: 'sale', id: row.id })} className="p-1.5 text-sky-600 hover:bg-sky-50 rounded-lg"><Eye className="w-3.5 h-3.5" /></button>
+                  <button title="التفاصيل" onClick={() => setDetailsTarget({ kind: 'sale', id: row.id })} className="p-1.5 text-primary hover:bg-accent-soft rounded-lg"><Eye className="w-3.5 h-3.5" /></button>
                   {canVoidSale && (
-                    <button title="إلغاء الفاتورة" onClick={() => setVoidTarget({ kind: 'sale', id: row.id, name: row.invoiceNumber })} className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg"><Ban className="w-3.5 h-3.5" /></button>
+                    <button title="إلغاء الفاتورة" onClick={() => setVoidTarget({ kind: 'sale', id: row.id, name: row.invoiceNumber })} className="p-1.5 text-danger hover:bg-danger-soft rounded-lg"><Ban className="w-3.5 h-3.5" /></button>
                   )}
                 </div>,
               ])}
@@ -785,15 +785,15 @@ const DailyPage: React.FC<{ kind: DailyKind }> = ({ kind }) => {
               headers={['الإيصال', 'العميل', 'المبلغ', 'طريقة الدفع', 'بواسطة', 'ملاحظات', 'إجراءات']}
               empty="لا توجد تحصيلات اليوم"
               rows={filteredPayments.map((row: any) => [
-                <span className={`font-mono ${row.movementType === 'ORDER_DEPOSIT_REFUND' ? 'text-rose-600' : 'text-emerald-600'}`}>{row.receiptNumber}</span>,
-                <span className="font-semibold text-slate-900">{row.customerName || '—'}</span>,
-                <b className={row.amount < 0 ? 'text-rose-600' : 'text-emerald-600'}>{fmt(row.amount)}</b>,
-                <span className="text-slate-600">{PAY_LABEL[row.paymentType] || row.paymentType}</span>,
-                <span className="text-slate-500">{row.performedByName || '—'}</span>,
-                <span className="text-slate-500">{row.movementType === 'ORDER_DEPOSIT_REFUND' ? `رد عربون · ${row.notes || ''}` : row.isOrderDepositRefunded ? `تم رد العربون · ${row.notes || ''}` : row.notes || '—'}</span>,
+                <span className={`font-mono ${row.movementType === 'ORDER_DEPOSIT_REFUND' ? 'text-danger' : 'text-success'}`}>{row.receiptNumber}</span>,
+                <span className="font-semibold text-ink">{row.customerName || '—'}</span>,
+                <b className={row.amount < 0 ? 'text-danger' : 'text-success'}>{fmt(row.amount)}</b>,
+                <span className="text-ink-secondary">{PAY_LABEL[row.paymentType] || row.paymentType}</span>,
+                <span className="text-muted">{row.performedByName || '—'}</span>,
+                <span className="text-muted">{row.movementType === 'ORDER_DEPOSIT_REFUND' ? `رد عربون · ${row.notes || ''}` : row.isOrderDepositRefunded ? `تم رد العربون · ${row.notes || ''}` : row.notes || '—'}</span>,
                 canCustomerPay && !row.isOrderDeposit ? (
-                  <button title="حذف السند" onClick={() => deleteCustomerPayment(row)} className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg"><Trash2 className="w-3.5 h-3.5" /></button>
-                ) : <span className="text-slate-300">—</span>,
+                  <button title="حذف السند" onClick={() => deleteCustomerPayment(row)} className="p-1.5 text-danger hover:bg-danger-soft rounded-lg"><Trash2 className="w-3.5 h-3.5" /></button>
+                ) : <span className="text-muted">—</span>,
               ])}
             />
             {data.dueInstallments.length > 0 && (
@@ -802,20 +802,20 @@ const DailyPage: React.FC<{ kind: DailyKind }> = ({ kind }) => {
                 headers={['الخطة', 'العميل', 'القسط', 'تاريخ الاستحقاق', 'المتبقي', 'الحالة', 'إجراءات']}
                 empty="لا توجد أقساط مستحقة"
                 rows={data.dueInstallments.map((row: any) => [
-                  <span className="font-mono text-amber-600">{row.planNumber}</span>,
-                  <span className="font-semibold text-slate-900">{row.customerName || '—'}</span>,
+                  <span className="font-mono text-warning">{row.planNumber}</span>,
+                  <span className="font-semibold text-ink">{row.customerName || '—'}</span>,
                   `#${row.sequenceNumber}`,
-                  <span className="text-slate-600">{row.dueDate}</span>,
-                  <b className="text-rose-600">{fmt(row.remaining)}</b>,
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 font-bold">{row.status}</span>,
-                  <button title="فتح صفحة الأقساط" onClick={() => navigate('/finance/installments')} className="p-1.5 text-sky-600 hover:bg-sky-50 rounded-lg inline-flex"><ExternalLink className="w-3.5 h-3.5" /></button>,
+                  <span className="text-ink-secondary">{row.dueDate}</span>,
+                  <b className="text-danger">{fmt(row.remaining)}</b>,
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-warning-soft text-warning font-bold">{row.status}</span>,
+                  <button title="فتح صفحة الأقساط" onClick={() => navigate('/finance/installments')} className="p-1.5 text-primary hover:bg-accent-soft rounded-lg inline-flex"><ExternalLink className="w-3.5 h-3.5" /></button>,
                 ])}
               />
             )}
           </>
         )}
 
-        <div className="flex items-center gap-2 text-[11px] text-slate-400 justify-end">
+        <div className="flex items-center gap-2 text-[11px] text-muted justify-end">
           <Clock className="w-3.5 h-3.5" /> البيانات محدّثة لحظيًا من قاعدة البيانات المحلية
           <Users className="w-3.5 h-3.5 mr-2" /> {date}
         </div>

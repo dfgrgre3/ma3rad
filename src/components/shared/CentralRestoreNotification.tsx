@@ -27,22 +27,22 @@ export function CentralRestoreNotification() {
       <section
         role="alert"
         aria-live="assertive"
-        className="overflow-hidden rounded-2xl border border-amber-300 bg-white text-slate-900 shadow-2xl dark:border-amber-700 dark:bg-slate-900 dark:text-white"
+        className="overflow-hidden rounded-2xl border border-warning bg-surface text-ink shadow-2xl dark:text-white"
       >
-        <div className="bg-amber-600 px-4 py-3 text-white">
+        <div className="bg-warning px-4 py-3 text-white">
           <div className="text-sm font-black">استعادة بيانات مطلوبة من منصة الإدارة</div>
-          <div className="mt-1 text-xs text-amber-100">
+          <div className="mt-1 text-xs text-warning">
             {pending.name || pending.id} — بانتظار تطبيقها على هذا الجهاز
           </div>
         </div>
         <div className="space-y-3 p-4">
-          <p className="text-xs leading-5 text-slate-600 dark:text-slate-300">
+          <p className="text-xs leading-5 text-ink-secondary ">
             طلبت الإدارة المركزية استعادة نسخة احتياطية لقاعدة بيانات هذا الجهاز.
             سيُتحقق من النسخة المشفرة وسلامتها قبل تطبيقها، ويمكنك مراجعة الطلب
             وبدء التطبيق من صفحة النسخ الاحتياطي.
           </p>
           {pending.restoreError && (
-            <p className="rounded-lg bg-rose-50 p-2 text-[11px] text-rose-700 dark:bg-rose-950/40 dark:text-rose-300">
+            <p className="rounded-lg bg-danger-soft p-2 text-[11px] text-danger dark:bg-danger/40 ">
               آخر خطأ مسجل: {pending.restoreError}
             </p>
           )}
@@ -50,7 +50,7 @@ export function CentralRestoreNotification() {
             <button
               type="button"
               onClick={() => { window.location.hash = '/backup'; }}
-              className="rounded-lg bg-amber-600 px-3 py-2 text-xs font-bold text-white hover:bg-amber-700"
+              className="rounded-lg bg-warning px-3 py-2 text-xs font-bold text-white hover:bg-warning"
             >
               فتح صفحة النسخ الاحتياطي
             </button>
@@ -58,7 +58,7 @@ export function CentralRestoreNotification() {
               type="button"
               onClick={() => setDismissedId(pending.id)}
               aria-label="إخفاء الإشعار"
-              className="rounded px-2 text-lg leading-5 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+              className="rounded px-2 text-lg leading-5 text-muted hover:bg-surface-sunken dark:hover:bg-primary"
             >
               ×
             </button>

@@ -5,6 +5,10 @@ import { ManufacturingService } from '../../../services/domains/manufacturing/Ma
 import { ProductService } from '../../../services/domains/products/ProductService';
 import { BranchService } from '../../../services/domains/organization/BranchService';
 import { InventoryService } from '../../../services/domains/inventory/InventoryService';
+import { EmployeeService } from '../../../services/domains/hr/EmployeeService';
+import { SupplierService } from '../../../services/domains/suppliers/SupplierService';
+import { ProcurementService } from '../../../services/domains/procurement/ProcurementService';
+import { PurchaseService } from '../../../services/domains/purchases/PurchaseService';
 import { usePermission } from '../../../hooks/domains/auth/usePermission';
 import { useToast } from '../../../components/ui/Toast';
 import { getEffectiveBusinessType } from '../../../services/domains/config/BusinessTypeService';
@@ -15,9 +19,12 @@ import { BomsTab } from './tabs/BomsTab';
 import { OrdersTab } from './tabs/OrdersTab';
 import { FloorTab } from './tabs/FloorTab';
 import { SalesCandidatesTab } from './tabs/SalesCandidatesTab';
+import { MrpTab } from './tabs/MrpTab';
 import { QualityTab } from './tabs/QualityTab';
 import { MaintenanceTab } from './tabs/MaintenanceTab';
 import { CostingTab } from './tabs/CostingTab';
+import { HseTab } from './tabs/HseTab';
+import { TraceabilityTab } from './tabs/TraceabilityTab';
 
 export interface ManufacturingData {
   workCenters: any[];
@@ -29,7 +36,7 @@ export interface ManufacturingData {
   qualityChecks: any[];
   maintenance: any[];
   wip: { orders: any[]; totalMaterialCost: number; totalQuantity: number };
-  costReport: { orders: any[]; totalMaterialCost: number; totalLaborCost: number; totalCost: number; totalQuantity: number };
+  costReport: { orders: any[]; totalMaterialCost: number; totalLaborCost: number; totalCost: number; totalQuantity: number; maintenanceCost?: number; maintenanceByWorkCenter?: any[] };
   capacityPlan: any[];
   salesCandidates: any[];
   analytics: { workCenterEfficiency: any[]; orderVariance: any[]; monthlyOutput: any[] };
@@ -38,6 +45,25 @@ export interface ManufacturingData {
   purchaseSuggestions: any[];
   productionFloor: any[];
   bomStockAlerts: any[];
+  productionSchedule: any[];
+  mrp: { plannedProduction: any[]; materialNeeds: any[] };
+  mpsEntries: any[];
+  timePhasedMrp: { weeks: number; buckets: any[]; mpsEntries: any[] };
+  downtime: any[];
+  employees: any[];
+  defectCodes: any[];
+  oee: { centers: any[]; periodNote: string };
+  operatorLabor: any[];
+  operatorLaborDaily: any[];
+  suppliers: any[];
+  goodsReceipts: any[];
+  purchases: any[];
+  hseIncidents: any[];
+  hsePermits: any[];
+  hseInspections: any[];
+  hseTrainings: any[];
+  hsePermitAlerts: { expiring: any[]; expired: any[] };
+  productionLines: any[];
 }
 
 const EMPTY_DATA: ManufacturingData = {
@@ -52,6 +78,25 @@ const EMPTY_DATA: ManufacturingData = {
   purchaseSuggestions: [],
   productionFloor: [],
   bomStockAlerts: [],
+  productionSchedule: [],
+  mrp: { plannedProduction: [], materialNeeds: [] },
+  mpsEntries: [],
+  timePhasedMrp: { weeks: 8, buckets: [], mpsEntries: [] },
+  downtime: [],
+  employees: [],
+  defectCodes: [],
+  oee: { centers: [], periodNote: '' },
+  operatorLabor: [],
+  operatorLaborDaily: [],
+  suppliers: [],
+  goodsReceipts: [],
+  purchases: [],
+  hseIncidents: [],
+  hsePermits: [],
+  hseInspections: [],
+  hseTrainings: [],
+  hsePermitAlerts: { expiring: [], expired: [] },
+  productionLines: [],
 };
 
 const TABS = [
@@ -59,10 +104,13 @@ const TABS = [
   { key: 'orders', label: 'أوامر الإنتاج' },
   { key: 'floor', label: 'أرضية الإنتاج' },
   { key: 'sales', label: 'من أوامر البيع' },
+  { key: 'mrp', label: 'تخطيط المواد' },
   { key: 'workCenters', label: 'مراكز العمل' },
   { key: 'boms', label: 'قوائم المواد' },
+  { key: 'traceability', label: 'سلسلة التتبع' },
   { key: 'quality', label: 'الجودة' },
   { key: 'maintenance', label: 'الصيانة' },
+  { key: 'hse', label: 'السلامة' },
   { key: 'costing', label: 'التكاليف والسعة' },
 ] as const;
 
@@ -100,6 +148,25 @@ export const ManufacturingPage: React.FC = () => {
         purchaseSuggestions: service.getPurchaseSuggestions(),
         productionFloor: service.getProductionFloor(),
         bomStockAlerts: service.getBomStockAlerts(),
+        productionSchedule: service.getProductionSchedule(),
+        mrp: service.getMrpPlan(),
+        mpsEntries: service.getMpsEntries(),
+        timePhasedMrp: service.getTimePhasedMrp(8),
+        downtime: service.getDowntimeRecords(),
+        employees: (() => { try { return EmployeeService.getAll(); } catch { return []; } })(),
+        defectCodes: service.getDefectCodes(true),
+        oee: service.getOeeAnalytics(),
+        operatorLabor: service.getOperatorLaborSummary(),
+        operatorLaborDaily: service.getOperatorLaborDaily(),
+        suppliers: (() => { try { return new SupplierService().getAllSuppliers(); } catch { return []; } })(),
+        goodsReceipts: (() => { try { return new ProcurementService().getAllGoodsReceipts(); } catch { return []; } })(),
+        purchases: (() => { try { return new PurchaseService().getAllPurchases(); } catch { return []; } })(),
+        hseIncidents: service.getHseIncidents(),
+        hsePermits: service.getHsePermits(),
+        hseInspections: service.getHseInspections(),
+        hseTrainings: service.getHseTrainings(),
+        hsePermitAlerts: service.getHsePermitAlerts(7),
+        productionLines: service.getProductionLines(),
       });
     } catch (error: any) {
       toast.error(error?.message || 'تعذر تحميل بيانات التصنيع.');
@@ -119,38 +186,38 @@ export const ManufacturingPage: React.FC = () => {
         title="التصنيع"
         description="إدارة متكاملة: أوامر إنتاج، قوائم مواد، جودة، صيانة، تكاليف وقدرة إنتاجية."
         actions={
-          <button className="rounded-lg border border-slate-200 bg-white p-2 text-slate-600" onClick={load} title="تحديث">
+          <button className="rounded-lg border border-line bg-surface p-2 text-ink-secondary" onClick={load} title="تحديث">
             <RefreshCw className="h-4 w-4" />
           </button>
         }
       />
       {getProfileWorkflows(getEffectiveBusinessType()).length > 0 && (
-        <div className="rounded-xl border border-slate-200 bg-white p-3 text-xs dark:border-slate-700 dark:bg-slate-900">
-          <span className="font-bold text-slate-500">سير عمل النشاط: </span>
+        <div className="rounded-xl border border-line bg-surface p-3 text-xs ">
+          <span className="font-bold text-muted">سير عمل النشاط: </span>
           {getProfileWorkflows(getEffectiveBusinessType()).map((w) => (
-            <span key={w.id} className="ml-2 inline-block rounded-full bg-slate-100 px-2 py-0.5 dark:bg-slate-800" title={w.steps.join(' → ')}>{w.label.ar}</span>
+            <span key={w.id} className="ml-2 inline-block rounded-full bg-surface-sunken px-2 py-0.5 " title={w.steps.join(' → ')}>{w.label.ar}</span>
           ))}
         </div>
       )}
 
-      <div className="flex flex-wrap gap-1 border-b border-slate-200">
+      <div className="flex flex-wrap gap-1 border-b border-line">
         {TABS.map((item) => (
           <button
             key={item.key}
             onClick={() => setTab(item.key)}
-            className={`px-4 py-2 text-xs font-bold rounded-t-lg transition ${tab === item.key ? 'bg-white border border-slate-200 border-b-white text-sky-600 -mb-px' : 'text-slate-500 hover:text-slate-700'}`}
+            className={`px-4 py-2 text-xs font-bold rounded-t-lg transition ${tab === item.key ? 'bg-surface border border-line border-b-white text-primary -mb-px' : 'text-muted hover:text-ink'}`}
           >
             {item.label}
             {item.key === 'sales' && data.salesCandidates.length > 0 && (
-              <span className="mr-1 rounded-full bg-sky-100 px-1.5 text-[10px] text-sky-700">{data.salesCandidates.length}</span>
+              <span className="mr-1 rounded-full bg-accent-soft px-1.5 text-[10px] text-primary">{data.salesCandidates.length}</span>
             )}
           </button>
         ))}
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center rounded-xl border border-slate-200 bg-white p-10">
-          <Loader2 className="h-6 w-6 animate-spin text-sky-500" />
+        <div className="flex items-center justify-center rounded-xl border border-line bg-surface p-10">
+          <Loader2 className="h-6 w-6 animate-spin text-primary" />
         </div>
       ) : (
         <>
@@ -158,10 +225,13 @@ export const ManufacturingPage: React.FC = () => {
           {tab === 'orders' && <OrdersTab {...shared} />}
           {tab === 'floor' && <FloorTab {...shared} />}
           {tab === 'sales' && <SalesCandidatesTab {...shared} />}
+          {tab === 'mrp' && <MrpTab {...shared} />}
           {tab === 'workCenters' && <WorkCentersTab {...shared} />}
           {tab === 'boms' && <BomsTab {...shared} />}
+          {tab === 'traceability' && <TraceabilityTab {...shared} />}
           {tab === 'quality' && <QualityTab {...shared} />}
           {tab === 'maintenance' && <MaintenanceTab {...shared} />}
+          {tab === 'hse' && <HseTab {...shared} />}
           {tab === 'costing' && <CostingTab {...shared} />}
         </>
       )}

@@ -189,27 +189,27 @@ export const PayslipsPage: React.FC = () => {
 
   if (!canViewPayroll) {
     return (
-      <div className="h-full flex items-center justify-center text-slate-500">
+      <div className="h-full flex items-center justify-center text-muted">
         ليس لديك صلاحية عرض كشوف المرتبات.
       </div>
     );
   }
 
   return (
-    <div className="h-full overflow-y-auto p-6 space-y-6 bg-slate-50 text-slate-900">
-      <div className="bg-white border-b border-slate-200 px-6 pt-4 pb-1 flex-shrink-0">
+    <div className="h-full overflow-y-auto p-6 space-y-6 bg-surface-muted text-ink">
+      <div className="bg-surface border-b border-line px-6 pt-4 pb-1 flex-shrink-0">
         <PageHeader
           icon={<Wallet className="h-5 w-5" />}
           title="كشوف المرتبات الشهرية"
           description="عرض وطباعة وتصدير كشوف رواتب الموظفين لكل فترة"
-          actions={run && <button onClick={exportPeriodCsv} className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700">
+          actions={run && <button onClick={exportPeriodCsv} className="flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-2 text-xs font-bold text-ink">
             <FileDown className="w-3.5 h-3.5" /> تصدير الفترة CSV
           </button>}
         />
       </div>
 
       {error && (
-        <div className="mx-6 px-4 py-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs font-semibold flex items-center gap-2">
+        <div className="mx-6 px-4 py-3 bg-danger-soft border border-danger-border rounded-xl text-danger text-xs font-semibold flex items-center gap-2">
           <AlertTriangle className="w-4 h-4 shrink-0" /> {error}
         </div>
       )}
@@ -217,42 +217,42 @@ export const PayslipsPage: React.FC = () => {
       <div className="mx-6">
         {loading ? (
           <div className="flex items-center justify-center py-20">
-            <Loader2 className="w-8 h-8 animate-spin text-teal-500" />
+            <Loader2 className="w-8 h-8 animate-spin text-success" />
           </div>
         ) : periods.length === 0 ? (
-          <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center">
-            <Clock className="w-12 h-12 text-slate-400 mx-auto mb-3" />
-            <h3 className="text-sm font-black text-slate-900">لا توجد فترات رواتب</h3>
-            <p className="text-xs text-slate-500 mt-1">لم يتم احتساب أي دورة رواتب بعد. انتقل إلى صفحة الرواتب لحساب فترة أولى.</p>
+          <div className="bg-surface rounded-2xl border border-line p-12 text-center">
+            <Clock className="w-12 h-12 text-muted mx-auto mb-3" />
+            <h3 className="text-sm font-black text-ink">لا توجد فترات رواتب</h3>
+            <p className="text-xs text-muted mt-1">لم يتم احتساب أي دورة رواتب بعد. انتقل إلى صفحة الرواتب لحساب فترة أولى.</p>
           </div>
         ) : (
           <>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="bg-white border border-slate-200 rounded-xl p-4">
-                <p className="text-[10px] font-bold text-slate-500 uppercase">الفترة المختارة</p>
-                <p className="text-xl font-black text-slate-900 mt-1">{selectedPeriod || '—'}</p>
+              <div className="bg-surface border border-line rounded-xl p-4">
+                <p className="text-[10px] font-bold text-muted uppercase">الفترة المختارة</p>
+                <p className="text-xl font-black text-ink mt-1">{selectedPeriod || '—'}</p>
               </div>
-              <div className="bg-white border border-slate-200 rounded-xl p-4">
-                <p className="text-[10px] font-bold text-slate-500 uppercase">عدد الكشوف</p>
-                <p className="text-xl font-black text-slate-900 mt-1">{run?.items.length ?? 0}</p>
+              <div className="bg-surface border border-line rounded-xl p-4">
+                <p className="text-[10px] font-bold text-muted uppercase">عدد الكشوف</p>
+                <p className="text-xl font-black text-ink mt-1">{run?.items.length ?? 0}</p>
               </div>
-              <div className="bg-white border border-slate-200 rounded-xl p-4">
-                <p className="text-[10px] font-bold text-slate-500 uppercase">إجمالي الاستحقاقات</p>
-                <p className="text-xl font-black text-slate-900 mt-1">{fmt(totals.gross)}</p>
+              <div className="bg-surface border border-line rounded-xl p-4">
+                <p className="text-[10px] font-bold text-muted uppercase">إجمالي الاستحقاقات</p>
+                <p className="text-xl font-black text-ink mt-1">{fmt(totals.gross)}</p>
               </div>
-              <div className="bg-white border border-slate-200 rounded-xl p-4">
-                <p className="text-[10px] font-bold text-slate-500 uppercase">صافي المستحق</p>
-                <p className="text-xl font-black text-slate-900 mt-1">{fmt(totals.net)}</p>
+              <div className="bg-surface border border-line rounded-xl p-4">
+                <p className="text-[10px] font-bold text-muted uppercase">صافي المستحق</p>
+                <p className="text-xl font-black text-ink mt-1">{fmt(totals.net)}</p>
               </div>
             </div>
 
-            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-              <div className="px-4 py-3 border-b border-slate-200 bg-slate-50 flex flex-wrap items-center justify-between gap-3">
+            <div className="bg-surface border border-line rounded-xl overflow-hidden">
+              <div className="px-4 py-3 border-b border-line bg-surface-muted flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <h3 className="text-sm font-black flex items-center gap-2">
-                    <Calendar className="w-4 h-4 text-slate-400" /> فترات الرواتب المتاحة
+                    <Calendar className="w-4 h-4 text-muted" /> فترات الرواتب المتاحة
                   </h3>
-                  <p className="text-[10px] text-slate-500 mt-1">اختر فترة لعرض كشوف رواتب جميع الموظفين فيها</p>
+                  <p className="text-[10px] text-muted mt-1">اختر فترة لعرض كشوف رواتب جميع الموظفين فيها</p>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {periods.map((p) => {
@@ -264,8 +264,8 @@ export const PayslipsPage: React.FC = () => {
                         onClick={() => loadPeriod(p)}
                         className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
                           isSelected
-                            ? 'bg-sky-600 text-white'
-                            : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+                            ? 'bg-primary text-white'
+                            : 'bg-surface border border-line text-ink-secondary hover:bg-surface-muted'
                         }`}
                       >
                         {p}
@@ -288,9 +288,9 @@ export const PayslipsPage: React.FC = () => {
                     {
                       key: 'employee', header: 'الموظف',
                       render: (item) => (
-                        <span className="font-bold text-slate-800">
+                        <span className="font-bold text-ink">
                           {item.employeeName}
-                          <span className="mt-1 block text-[10px] font-normal text-slate-400">{item.paymentMethod === 'CASH' ? 'نقدي' : item.paymentMethod === 'BANK_TRANSFER' ? 'تحويل بنكي' : 'محفظة'}</span>
+                          <span className="mt-1 block text-[10px] font-normal text-muted">{item.paymentMethod === 'CASH' ? 'نقدي' : item.paymentMethod === 'BANK_TRANSFER' ? 'تحويل بنكي' : 'محفظة'}</span>
                         </span>
                       ),
                     },
@@ -303,11 +303,11 @@ export const PayslipsPage: React.FC = () => {
                     { key: 'insurance', header: 'تأمينات', render: (item) => <span className="font-mono">{money(item.socialInsuranceEmployeeShare)}</span> },
                     { key: 'advances', header: 'السلف والقروض', render: (item) => <span className="font-mono">{money(item.advanceAmount + item.loanDeductionAmount)}</span> },
                     { key: 'gross', header: 'الإجمالي', render: (item) => <span className="font-mono font-bold">{money(item.grossAmount)}</span> },
-                    { key: 'net', header: 'الصافي', render: (item) => <span className={`font-mono font-black ${item.netAmount < 0 ? 'text-rose-700' : 'text-sky-700'}`}>{money(item.netAmount)}</span> },
+                    { key: 'net', header: 'الصافي', render: (item) => <span className={`font-mono font-black ${item.netAmount < 0 ? 'text-danger' : 'text-primary'}`}>{money(item.netAmount)}</span> },
                     {
                       key: 'payout', header: 'حالة الصرف',
                       render: (item) => (
-                        <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold ${item.payoutStatus === 'PAID' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                        <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold ${item.payoutStatus === 'PAID' ? 'bg-success-soft text-success' : 'bg-warning-soft text-warning'}`}>
                           {item.payoutStatus === 'PAID' ? 'مصروف' : 'معلق'}
                         </span>
                       ),
@@ -318,7 +318,7 @@ export const PayslipsPage: React.FC = () => {
                         <button
                           onClick={() => printPayslip(item)}
                           disabled={printing === item.id}
-                          className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 font-bold text-slate-600 disabled:opacity-50"
+                          className="flex items-center gap-1 rounded-lg border border-line bg-surface px-2 py-1 font-bold text-ink-secondary disabled:opacity-50"
                         >
                           {printing === item.id ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : <Printer className="w-2.5 h-2.5" />}
                           قسيمة
@@ -330,7 +330,7 @@ export const PayslipsPage: React.FC = () => {
                 />
                 </div>
               ) : (
-                <div className="p-10 text-center text-slate-500">اختر فترة من القائمة أعلاه لعرض كشوف الرواتب.</div>
+                <div className="p-10 text-center text-muted">اختر فترة من القائمة أعلاه لعرض كشوف الرواتب.</div>
               )}
             </div>
           </>

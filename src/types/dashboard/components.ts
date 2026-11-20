@@ -1,9 +1,9 @@
 import type { ElementType } from 'react';
 import {
-  Award, Banknote, Layers, LayoutDashboard, ShoppingBag, ShoppingCart, Target, TrendingUp, Truck,
+  Award, Banknote, Layers, LayoutDashboard, LayoutGrid, ShoppingBag, ShoppingCart, Target, TrendingUp, Truck,
 } from 'lucide-react';
 
-export type SectionId = 'all' | 'pulse' | 'executive' | 'sales' | 'purchases' | 'debts' | 'crm' | 'fleet' | 'hr';
+export type SectionId = 'all' | 'pulse' | 'activity' | 'executive' | 'sales' | 'purchases' | 'debts' | 'crm' | 'fleet' | 'hr';
 
 export interface DashboardSectionConfig {
   id: SectionId;
@@ -15,6 +15,7 @@ export interface DashboardSectionConfig {
 export const SECTIONS_CONFIG: DashboardSectionConfig[] = [
   { id: 'all', label: 'نظرة شاملة', icon: Layers },
   { id: 'pulse', label: 'ملخص اليوم', icon: LayoutDashboard },
+  { id: 'activity', label: 'نشاطي', icon: LayoutGrid },
   { id: 'executive', label: 'مركز القيادة', icon: TrendingUp },
   { id: 'sales', label: 'المبيعات', icon: ShoppingCart },
   { id: 'purchases', label: 'المشتريات والمخزون', icon: ShoppingBag },

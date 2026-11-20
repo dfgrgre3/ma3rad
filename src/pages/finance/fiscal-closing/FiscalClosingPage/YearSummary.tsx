@@ -34,45 +34,45 @@ export const YearSummary: FC<YearSummaryProps> = ({
 }) => (
   <>
     <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-        <p className="text-xs font-medium text-slate-500">السنة المالية</p>
-        <p className="mt-1 text-lg font-black text-slate-800">{selectedYear.name}</p>
-        <p className="mt-1 text-xs text-slate-500">{formatDate(selectedYear.startDate)} — {formatDate(selectedYear.endDate)}</p>
+      <div className="rounded-2xl border border-line bg-surface p-4 shadow-sm">
+        <p className="text-xs font-medium text-muted">السنة المالية</p>
+        <p className="mt-1 text-lg font-black text-ink">{selectedYear.name}</p>
+        <p className="mt-1 text-xs text-muted">{formatDate(selectedYear.startDate)} — {formatDate(selectedYear.endDate)}</p>
       </div>
-      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-        <p className="text-xs font-medium text-slate-500">حالة السنة</p>
-        <p className={`mt-1 text-lg font-black ${selectedYear.status === 'OPEN' ? 'text-emerald-700' : 'text-slate-700'}`}>
+      <div className="rounded-2xl border border-line bg-surface p-4 shadow-sm">
+        <p className="text-xs font-medium text-muted">حالة السنة</p>
+        <p className={`mt-1 text-lg font-black ${selectedYear.status === 'OPEN' ? 'text-success' : 'text-ink'}`}>
           {selectedYear.status === 'OPEN' ? 'مفتوحة' : selectedYear.workflowState === 'LOCKED' ? 'مؤمّنة' : 'مقفلة'}
         </p>
-        <p className="mt-1 text-xs text-slate-500">{selectedYear.companyName || selectedYear.companyId} · {selectedYear.currency || 'EGP'}</p>
+        <p className="mt-1 text-xs text-muted">{selectedYear.companyName || selectedYear.companyId} · {selectedYear.currency || 'EGP'}</p>
       </div>
-      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-        <p className="text-xs font-medium text-slate-500">الفترات المقفلة</p>
-        <p className="mt-1 text-2xl font-black text-emerald-700">{closedPeriods} <span className="text-sm font-semibold text-slate-400">/ {periodsCount}</span></p>
-        <p className="mt-1 text-xs text-slate-500">{openPeriods} فترة مفتوحة</p>
+      <div className="rounded-2xl border border-line bg-surface p-4 shadow-sm">
+        <p className="text-xs font-medium text-muted">الفترات المقفلة</p>
+        <p className="mt-1 text-2xl font-black text-success">{closedPeriods} <span className="text-sm font-semibold text-muted">/ {periodsCount}</span></p>
+        <p className="mt-1 text-xs text-muted">{openPeriods} فترة مفتوحة</p>
       </div>
-      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-        <p className="text-xs font-medium text-slate-500">المهام</p>
-        <p className="mt-1 text-2xl font-black text-cyan-700">{completedTasks} <span className="text-sm font-semibold text-slate-400">/ {tasksCount}</span></p>
-        <p className="mt-1 text-xs text-slate-500">مكتملة / إجمالي مهام الفترة المحددة</p>
+      <div className="rounded-2xl border border-line bg-surface p-4 shadow-sm">
+        <p className="text-xs font-medium text-muted">المهام</p>
+        <p className="mt-1 text-2xl font-black text-primary">{completedTasks} <span className="text-sm font-semibold text-muted">/ {tasksCount}</span></p>
+        <p className="mt-1 text-xs text-muted">مكتملة / إجمالي مهام الفترة المحددة</p>
       </div>
-      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-        <p className="text-xs font-medium text-slate-500">فحوص الإقفال السنوي</p>
-        <p className={`mt-1 text-2xl font-black ${readiness.some((check) => check.status === 'FAIL') ? 'text-rose-700' : 'text-emerald-700'}`}>
+      <div className="rounded-2xl border border-line bg-surface p-4 shadow-sm">
+        <p className="text-xs font-medium text-muted">فحوص الإقفال السنوي</p>
+        <p className={`mt-1 text-2xl font-black ${readiness.some((check) => check.status === 'FAIL') ? 'text-danger' : 'text-success'}`}>
           {readiness.filter((check) => check.status === 'FAIL').length}
         </p>
-        <p className="mt-1 text-xs text-slate-500">فحص حاجب · {readiness.filter((check) => check.status === 'WARNING').length} تحذير</p>
+        <p className="mt-1 text-xs text-muted">فحص حاجب · {readiness.filter((check) => check.status === 'WARNING').length} تحذير</p>
       </div>
     </section>
 
-    <section className="flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+    <section className="flex flex-wrap items-center gap-2 rounded-2xl border border-line bg-surface p-3 shadow-sm">
       {canClose && selectedYear.status === 'OPEN' && (
         <button
           type="button"
           onClick={onCloseYear}
           disabled={openPeriods > 0}
           title={openPeriods > 0 ? 'يجب إقفال جميع الأشهر قبل إقفال السنة' : 'إقفال السنة المالية'}
-          className="inline-flex items-center gap-2 rounded-xl bg-rose-700 px-3.5 py-2 text-sm font-bold text-white hover:bg-rose-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+          className="inline-flex items-center gap-2 rounded-xl bg-danger px-3.5 py-2 text-sm font-bold text-white hover:bg-danger disabled:cursor-not-allowed disabled:bg-surface-sunken"
         >
           <Lock className="h-4 w-4" />
           إقفال السنة المالية
@@ -82,13 +82,13 @@ export const YearSummary: FC<YearSummaryProps> = ({
         <button
           type="button"
           onClick={onGenerateOpenings}
-          className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-sm font-bold text-slate-700 hover:bg-slate-100"
+          className="inline-flex items-center gap-2 rounded-xl border border-line-strong bg-surface px-3.5 py-2 text-sm font-bold text-ink hover:bg-surface-sunken"
         >
           <ScrollText className="h-4 w-4" />
           إنشاء الأرصدة الافتتاحية
         </button>
       )}
-      <span className="mr-auto text-xs text-slate-500">
+      <span className="mr-auto text-xs text-muted">
         الأرصدة الافتتاحية تُنشأ من أرصدة إقفال السنة السابقة ولا تُصفّر الأصول والالتزامات.
       </span>
     </section>

@@ -7,6 +7,8 @@ import { AuthService } from '../../../services/domains/auth/AuthService';
 import { PermissionService } from '../../../services/domains/auth/PermissionService';
 import { STATUS_LABEL, STATUS_STYLE } from './deliveryStatus';
 import { DeliveryCreateModal } from './DeliveryCreateModal';
+import { DeliveryDetailModal } from './DeliveryDetailModal';
+import { ProductService } from '../../../services/domains/products/ProductService';
 import { useToast } from '../../../components/ui/Toast';
 type Customer = { id: string; name: string; phone?: string | null; address?: string | null; city?: string | null };
 export const DeliveriesPage: React.FC = () => {
@@ -27,6 +29,8 @@ export const DeliveriesPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
+  const [detailDelivery, setDetailDelivery] = useState<Delivery | null>(null);
+  const [products, setProducts] = useState<Array<{ id: string; name: string }>>([]);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
     customerId: '', address: '', city: '', driverId: '', vehicleId: '',
@@ -49,6 +53,7 @@ export const DeliveriesPage: React.FC = () => {
       setDrivers(service.getDrivers().filter((d) => d.isActive));
       setVehicles(service.getVehicles().filter((v) => v.isActive && v.status !== 'OUT_OF_SERVICE'));
       setCustomers(service.getCustomersForSelect());
+      try { setProducts(new ProductService().getAllProducts().map((p: any) => ({ id: p.id, name: p.name }))); } catch { setProducts([]); }
     } catch (e: any) { setError(e?.message || 'تعذر تحميل البيانات المرجعية.'); }
   }, [service]);
 
@@ -90,35 +95,35 @@ export const DeliveriesPage: React.FC = () => {
   };
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
-      <div className="bg-white px-6 pt-4">
+    <div className="h-full flex flex-col bg-surface-muted text-ink overflow-hidden">
+      <div className="bg-surface px-6 pt-4">
         <PageHeader
           icon={<Truck className="h-5 w-5" />}
           title="أوامر التسليم"
           description="جدولة الشحنات ومتابعة حالة التوصيل"
           actions={canCreate && (
-            <button onClick={() => setModalOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-sm font-semibold transition shrink-0">
+            <button onClick={() => setModalOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary text-white rounded-xl text-sm font-semibold transition shrink-0">
               <Plus className="w-4 h-4" /> أمر تسليم جديد
             </button>
           )}
         />
       </div>
 
-      <div className="p-4 bg-white border-b border-slate-200 flex flex-col sm:flex-row gap-3">
+      <div className="p-4 bg-surface border-b border-line flex flex-col sm:flex-row gap-3">
         <form onSubmit={(e) => { e.preventDefault(); load(); }} className="relative flex-1">
-          <Search className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="بحث برقم الأمر أو العميل أو العنوان ثم اضغط إدخال..." className="w-full pl-4 pr-10 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-sky-400" />
+          <Search className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="بحث برقم الأمر أو العميل أو العنوان ثم اضغط إدخال..." className="w-full pl-4 pr-10 py-2.5 bg-surface border border-line rounded-xl text-sm focus:outline-none focus:border-primary" />
         </form>
-        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as any)} className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold">
+        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as any)} className="px-3 py-2 bg-surface-muted border border-line rounded-xl text-xs font-bold">
           <option value="ALL">كل الحالات</option>
           {Object.entries(STATUS_LABEL).map(([k, label]) => <option key={k} value={k}>{label}</option>)}
         </select>
       </div>
 
       <div className="flex-1 overflow-y-auto p-4">
-        {error && <div className="mb-3 px-4 py-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold">{error}</div>}
-        {loading ? <div className="py-16 flex justify-center"><Loader2 className="w-6 h-6 animate-spin text-sky-500" /></div> : (
-          <div className="bg-white border border-slate-200 rounded-xl overflow-x-auto">
+        {error && <div className="mb-3 px-4 py-2.5 rounded-xl bg-danger-soft border border-danger-border text-danger text-xs font-semibold">{error}</div>}
+        {loading ? <div className="py-16 flex justify-center"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div> : (
+          <div className="bg-surface border border-line rounded-xl overflow-x-auto">
             <DataTable
               ariaLabel="أوامر التسليم"
               rows={deliveries}
@@ -126,20 +131,20 @@ export const DeliveriesPage: React.FC = () => {
               minWidth={800}
               tableClassName="text-xs"
               columns={[
-                { key: 'num', header: 'رقم الأمر', render: (d: any) => <span className="font-mono font-bold text-slate-900">{d.deliveryNumber}</span> },
+                { key: 'num', header: 'رقم الأمر', render: (d: any) => <span className="font-mono font-bold text-ink">{d.deliveryNumber}</span> },
                 {
                   key: 'customer', header: 'العميل',
                   render: (d: any) => (
                     <span className="block">
-                      <span className="flex items-center gap-1 font-bold text-slate-800"><User className="h-3 w-3" />{d.customerName}</span>
-                      <span className="flex items-center gap-1 font-mono text-[10px] text-slate-400"><Phone className="h-3 w-3" />{d.customerPhone || '—'}</span>
+                      <span className="flex items-center gap-1 font-bold text-ink"><User className="h-3 w-3" />{d.customerName}</span>
+                      <span className="flex items-center gap-1 font-mono text-[10px] text-muted"><Phone className="h-3 w-3" />{d.customerPhone || '—'}</span>
                     </span>
                   ),
                 },
                 {
                   key: 'address', header: 'العنوان',
                   render: (d: any) => (
-                    <span className="flex items-start gap-1 text-slate-600">
+                    <span className="flex items-start gap-1 text-ink-secondary">
                       <MapPin className="mt-0.5 h-3 w-3 shrink-0" />
                       <span className="line-clamp-2">{d.address}{d.city ? `, ${d.city}` : ''}</span>
                     </span>
@@ -148,36 +153,37 @@ export const DeliveriesPage: React.FC = () => {
                 {
                   key: 'driver', header: 'السائق / المركبة',
                   render: (d: any) => (
-                    <span className="block text-slate-600">
+                    <span className="block text-ink-secondary">
                       <span className="block">{d.driverName || 'غير مسند'}</span>
-                      <span className="block font-mono text-[10px] text-slate-400">{d.plateNumber || '—'}</span>
+                      <span className="block font-mono text-[10px] text-muted">{d.plateNumber || '—'}</span>
                     </span>
                   ),
                 },
                 {
                   key: 'date', header: 'التاريخ',
                   render: (d: any) => (
-                    <span className="flex items-center gap-1 text-slate-600">
+                    <span className="flex items-center gap-1 text-ink-secondary">
                       <Calendar className="h-3 w-3" />{d.date ? new Date(d.date).toLocaleDateString('ar-EG') : '—'}
                     </span>
                   ),
                 },
                 { key: 'status', header: 'الحالة', render: (d: any) => <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${STATUS_STYLE[d.status as keyof typeof STATUS_STYLE]}`}>{STATUS_LABEL[d.status as keyof typeof STATUS_LABEL]}</span> },
-                ...(canStart || canComplete || canCancel ? [{
+                ...(canStart || canComplete || canCancel || _canManage ? [{
                   key: 'actions', header: '',
                   render: (d: any) => (
                     <span className="block whitespace-nowrap text-left">
+                      <button onClick={() => setDetailDelivery(d)} className="ml-1 rounded-lg border border-accent-border bg-accent-soft px-2.5 py-1 text-[10px] font-bold text-primary hover:bg-accent-soft">تعبئة/فحص</button>
                       {(d.status === 'PENDING' || d.status === 'SCHEDULED' || d.status === 'IN_TRANSIT')
                         && (d.status === 'IN_TRANSIT' ? canComplete : canStart) && (
                         <button
                           onClick={() => advance(d)}
-                          className="ml-1 rounded-lg border border-sky-200 bg-sky-50 px-2.5 py-1 text-[10px] font-bold text-sky-600 hover:bg-sky-100"
+                          className="ml-1 rounded-lg border border-accent-border bg-accent-soft px-2.5 py-1 text-[10px] font-bold text-primary hover:bg-accent-soft"
                         >
                           {d.status === 'IN_TRANSIT' ? 'تأكيد التسليم' : 'بدء التوصيل'}
                         </button>
                       )}
                       {canCancel && d.status !== 'DELIVERED' && d.status !== 'CANCELLED' && (
-                        <button onClick={() => cancel(d)} className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-bold text-slate-500 hover:bg-slate-100">إلغاء</button>
+                        <button onClick={() => cancel(d)} className="rounded-lg border border-line bg-surface-muted px-2.5 py-1 text-[10px] font-bold text-muted hover:bg-surface-sunken">إلغاء</button>
                       )}
                     </span>
                   ),
@@ -190,6 +196,7 @@ export const DeliveriesPage: React.FC = () => {
       </div>
 
       {modalOpen && <DeliveryCreateModal form={form} setForm={setForm} customers={customers} drivers={drivers} vehicles={vehicles} saving={saving} onClose={() => setModalOpen(false)} onSubmit={handleCreate} onPickCustomer={pickCustomer} />}
+      {detailDelivery && <DeliveryDetailModal service={service} delivery={detailDelivery} products={products} onClose={() => setDetailDelivery(null)} onChanged={load} />}
     </div>
   );
 };

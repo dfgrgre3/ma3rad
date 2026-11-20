@@ -62,46 +62,46 @@ function parseRemoteRow(raw: string | null): Record<string, unknown> | null {
 }
 
 function resolvedStatusLabel(status: string): { label: string; cls: string } {
-  if (status === 'RESOLVED_LOCAL') return { label: 'أُبقي المحلي', cls: 'bg-slate-100 text-slate-700' };
-  if (status === 'RESOLVED_REMOTE') return { label: 'اعتُمد الوارد', cls: 'bg-sky-100 text-sky-700' };
-  if (status === 'RESOLVED_AUTO') return { label: 'دمج ذكي تلقائي', cls: 'bg-emerald-100 text-emerald-700' };
-  return { label: status, cls: 'bg-amber-100 text-amber-700' };
+  if (status === 'RESOLVED_LOCAL') return { label: 'أُبقي المحلي', cls: 'bg-surface-sunken text-ink' };
+  if (status === 'RESOLVED_REMOTE') return { label: 'اعتُمد الوارد', cls: 'bg-accent-soft text-primary' };
+  if (status === 'RESOLVED_AUTO') return { label: 'دمج ذكي تلقائي', cls: 'bg-success-soft text-success' };
+  return { label: status, cls: 'bg-warning-soft text-warning' };
 }
 
 // ─── Field diff helpers ──────────────────────────────────────────────────────
 
 const diffBadge = (diff: FieldDiff) =>
   diff.status === 'CONFLICT'
-    ? <span className="rounded-md bg-amber-200/80 px-2 py-0.5 text-[10px] font-bold text-amber-900">مختلف</span>
+    ? <span className="rounded-md bg-warning/80 px-2 py-0.5 text-[10px] font-bold text-warning">مختلف</span>
     : diff.status === 'LOCAL_ONLY'
-      ? <span className="rounded-md bg-sky-100 px-2 py-0.5 text-[10px] font-bold text-sky-800">محلي فقط</span>
+      ? <span className="rounded-md bg-accent-soft px-2 py-0.5 text-[10px] font-bold text-primary">محلي فقط</span>
       : diff.status === 'REMOTE_ONLY'
-        ? <span className="rounded-md bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800">وارد فقط</span>
-        : <span className="text-[10px] text-slate-400">متطابق</span>;
+        ? <span className="rounded-md bg-success-soft px-2 py-0.5 text-[10px] font-bold text-success">وارد فقط</span>
+        : <span className="text-[10px] text-muted">متطابق</span>;
 
 const diffRowClass = (diff: FieldDiff) =>
   diff.status === 'CONFLICT'
-    ? 'bg-amber-50/70'
+    ? 'bg-warning-soft/70'
     : diff.status === 'LOCAL_ONLY'
-      ? 'bg-sky-50/50'
+      ? 'bg-accent-soft/50'
       : diff.status === 'REMOTE_ONLY'
-        ? 'bg-emerald-50/50'
+        ? 'bg-success-soft/50'
         : '';
 
-const fmtDiffValue = (v: unknown) => (v === null || v === undefined || v === '' ? <span className="text-slate-300 italic">فارغ</span> : String(v));
+const fmtDiffValue = (v: unknown) => (v === null || v === undefined || v === '' ? <span className="text-muted italic">فارغ</span> : String(v));
 
 const diffColumns = (localHeader: string, remoteHeader: string) => [
   {
     key: 'field', header: 'اسم الحقل',
     render: (diff: FieldDiff) => (
-      <span className="flex items-center gap-2 font-semibold text-slate-700">
+      <span className="flex items-center gap-2 font-semibold text-ink">
         <span>{diff.label}</span>
         {diffBadge(diff)}
       </span>
     ),
   },
-  { key: 'local', header: localHeader, render: (diff: FieldDiff) => <span className="font-mono text-slate-900">{fmtDiffValue(diff.localValue)}</span> },
-  { key: 'remote', header: remoteHeader, render: (diff: FieldDiff) => <span className="font-mono text-slate-900">{fmtDiffValue(diff.remoteValue)}</span> },
+  { key: 'local', header: localHeader, render: (diff: FieldDiff) => <span className="font-mono text-ink">{fmtDiffValue(diff.localValue)}</span> },
+  { key: 'remote', header: remoteHeader, render: (diff: FieldDiff) => <span className="font-mono text-ink">{fmtDiffValue(diff.remoteValue)}</span> },
 ];
 
 // ─── MergePreviewModal ────────────────────────────────────────────────────────
@@ -115,24 +115,24 @@ interface MergePreviewModalProps {
 }
 
 const MergePreviewModal: React.FC<MergePreviewModalProps> = ({ conflict, diffs, onConfirm, onClose }) => (
-  <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
-    <div className="w-full max-w-2xl rounded-2xl bg-white shadow-2xl border border-slate-200 overflow-hidden">
-      <div className="flex items-center justify-between border-b border-slate-100 p-4 bg-slate-50">
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-primary/40 backdrop-blur-sm p-4">
+    <div className="w-full max-w-2xl rounded-2xl bg-surface shadow-2xl border border-line overflow-hidden">
+      <div className="flex items-center justify-between border-b border-line p-4 bg-surface-muted">
         <div className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-success-soft text-success">
             <GitMerge className="h-4 w-4" />
           </div>
           <div>
-            <h2 className="font-bold text-sm text-slate-900">معاينة الحسم والدمج التلقائي</h2>
-            <p className="text-[11px] text-slate-500">سيتم دمج الحقول المتطابقة والآمنة تلقائياً واعتماد النتيجة لباقي الفروع.</p>
+            <h2 className="font-bold text-sm text-ink">معاينة الحسم والدمج التلقائي</h2>
+            <p className="text-[11px] text-muted">سيتم دمج الحقول المتطابقة والآمنة تلقائياً واعتماد النتيجة لباقي الفروع.</p>
           </div>
         </div>
-        <button type="button" onClick={onClose} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-200 hover:text-slate-700 transition">
+        <button type="button" onClick={onClose} className="rounded-lg p-1.5 text-muted hover:bg-surface-sunken hover:text-ink transition">
           <X className="h-4 w-4" />
         </button>
       </div>
       <div className="p-4 max-h-[60vh] overflow-auto">
-        <div className="rounded-xl border border-slate-200 overflow-hidden">
+        <div className="rounded-xl border border-line overflow-hidden">
           <DataTable
               ariaLabel="معاينة الدمج"
               rows={diffs.filter(d => d.status === 'CONFLICT')}
@@ -143,27 +143,27 @@ const MergePreviewModal: React.FC<MergePreviewModalProps> = ({ conflict, diffs, 
                 {
                   key: 'field', header: 'الحقل',
                   render: (diff) => (
-                    <span className="flex items-center gap-2 font-semibold text-slate-700">
+                    <span className="flex items-center gap-2 font-semibold text-ink">
                       <span>{diff.label}</span>
                       {diffBadge(diff)}
                     </span>
                   ),
                 },
-                { key: 'local', header: 'البيانات المحلية', render: (diff) => <span className="font-mono text-slate-900">{fmtDiffValue(diff.localValue)}</span> },
-                { key: 'remote', header: 'بيانات الفرع الواردة', render: (diff) => <span className="font-mono text-slate-900">{fmtDiffValue(diff.remoteValue)}</span> },
+                { key: 'local', header: 'البيانات المحلية', render: (diff) => <span className="font-mono text-ink">{fmtDiffValue(diff.localValue)}</span> },
+                { key: 'remote', header: 'بيانات الفرع الواردة', render: (diff) => <span className="font-mono text-ink">{fmtDiffValue(diff.remoteValue)}</span> },
               ]}
             />
         </div>
-        <div className="mt-3 flex items-center justify-between text-xs text-slate-500 bg-slate-50 p-2.5 rounded-lg border border-slate-200">
+        <div className="mt-3 flex items-center justify-between text-xs text-muted bg-surface-muted p-2.5 rounded-lg border border-line">
           <span>النوع: <strong>{entityLabels[conflict.entityType] ?? conflict.entityType}</strong></span>
-          <span>معرّف السجل: <code className="font-mono text-slate-700">{conflict.entityId}</code></span>
+          <span>معرّف السجل: <code className="font-mono text-ink">{conflict.entityId}</code></span>
         </div>
       </div>
-      <div className="flex items-center justify-end gap-2 border-t border-slate-100 p-4 bg-slate-50">
-        <button type="button" onClick={onClose} className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-100 transition">
+      <div className="flex items-center justify-end gap-2 border-t border-line p-4 bg-surface-muted">
+        <button type="button" onClick={onClose} className="rounded-xl border border-line-strong bg-surface px-4 py-2 text-xs font-bold text-ink hover:bg-surface-sunken transition">
           إلغاء
         </button>
-        <button type="button" onClick={onConfirm} className="flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-700 shadow-sm transition">
+        <button type="button" onClick={onConfirm} className="flex items-center gap-2 rounded-xl bg-success px-4 py-2 text-xs font-bold text-white hover:bg-success shadow-sm transition">
           <Sparkles className="h-4 w-4" />
           تأكيد وحفظ الدمج
         </button>
@@ -329,7 +329,7 @@ export const SyncConflictsPage: React.FC = () => {
   // ─── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="h-full overflow-auto bg-slate-50 p-4 text-slate-900 sm:p-6">
+    <div className="h-full overflow-auto bg-surface-muted p-4 text-ink sm:p-6">
       {/* ── Page Header ── */}
       <PageHeader
         className="mb-5"
@@ -341,7 +341,7 @@ export const SyncConflictsPage: React.FC = () => {
             type="button"
             onClick={() => setShowSettings(!showSettings)}
             className={`flex items-center gap-2 rounded-xl border px-3.5 py-2 text-xs font-bold transition shadow-sm ${
-              showSettings ? 'border-sky-300 bg-sky-50 text-sky-700' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+              showSettings ? 'border-accent-border bg-accent-soft text-primary' : 'border-line bg-surface text-ink hover:bg-surface-muted'
             }`}
           >
             <SlidersHorizontal className="h-4 w-4" />
@@ -350,7 +350,7 @@ export const SyncConflictsPage: React.FC = () => {
           <button
             type="button"
             onClick={runInstantSync}
-            className="flex items-center gap-2 rounded-xl bg-emerald-600 px-3.5 py-2 text-xs font-bold text-white hover:bg-emerald-700 shadow-sm transition"
+            className="flex items-center gap-2 rounded-xl bg-success px-3.5 py-2 text-xs font-bold text-white hover:bg-success shadow-sm transition"
           >
             <RefreshCw className="h-4 w-4" />
             مزامنة فورية
@@ -359,7 +359,7 @@ export const SyncConflictsPage: React.FC = () => {
             type="button"
             onClick={load}
             disabled={loading}
-            className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50 transition shadow-sm"
+            className="flex items-center gap-2 rounded-xl border border-line bg-surface px-3 py-2 text-xs font-bold text-ink hover:bg-surface-muted disabled:opacity-50 transition shadow-sm"
           >
             <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
             تحديث
@@ -368,40 +368,40 @@ export const SyncConflictsPage: React.FC = () => {
       />
 
       {/* ── Status Bar ── */}
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm">
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-line bg-surface p-3.5 shadow-sm">
         <div className="flex flex-wrap items-center gap-4">
           <div className="flex items-center gap-2">
             <span className="relative flex h-3 w-3">
-              <span className={`absolute inline-flex h-full w-full rounded-full opacity-75 ${health.connected ? 'animate-ping bg-emerald-400' : 'bg-slate-300'}`}></span>
-              <span className={`relative inline-flex h-3 w-3 rounded-full ${health.connected ? 'bg-emerald-500' : 'bg-slate-400'}`}></span>
+              <span className={`absolute inline-flex h-full w-full rounded-full opacity-75 ${health.connected ? 'animate-ping bg-success' : 'bg-surface-sunken'}`}></span>
+              <span className={`relative inline-flex h-3 w-3 rounded-full ${health.connected ? 'bg-success' : 'bg-line-strong'}`}></span>
             </span>
-            <span className={`text-xs font-bold ${health.connected ? 'text-emerald-700' : 'text-slate-600'}`}>
+            <span className={`text-xs font-bold ${health.connected ? 'text-success' : 'text-ink-secondary'}`}>
               {health.connected ? 'متصل بالشبكة وجاهز' : 'غير متصل بالفرع'}
             </span>
           </div>
 
-          <div className="h-4 w-px bg-slate-200 hidden sm:block"></div>
+          <div className="h-4 w-px bg-surface-sunken hidden sm:block"></div>
 
-          <div className="flex items-center gap-1.5 text-xs text-slate-500">
-            <Clock className="h-3.5 w-3.5 text-slate-400" />
+          <div className="flex items-center gap-1.5 text-xs text-muted">
+            <Clock className="h-3.5 w-3.5 text-muted" />
             <span>آخر مزامنة: <strong>{formatTimestamp(health.lastSyncAt)}</strong></span>
           </div>
 
           {health.pendingCount > 0 && (
-            <span className="rounded-full bg-amber-50 border border-amber-200 px-2.5 py-0.5 text-[11px] font-bold text-amber-700">
+            <span className="rounded-full bg-warning-soft border border-warning-border px-2.5 py-0.5 text-[11px] font-bold text-warning">
               {health.pendingCount} سجل في الانتظار
             </span>
           )}
 
           {health.failedCount > 0 && (
-            <span className="rounded-full bg-red-50 border border-red-200 px-2.5 py-0.5 text-[11px] font-bold text-red-700">
+            <span className="rounded-full bg-danger-soft border border-danger-border px-2.5 py-0.5 text-[11px] font-bold text-danger">
               {health.failedCount} فشل إرسال
             </span>
           )}
         </div>
 
         {health.lastError && (
-          <div className="flex items-center gap-1.5 text-xs text-red-600 bg-red-50 px-2.5 py-1 rounded-lg border border-red-100">
+          <div className="flex items-center gap-1.5 text-xs text-danger bg-danger-soft px-2.5 py-1 rounded-lg border border-danger-border">
             <AlertCircle className="h-3.5 w-3.5 shrink-0" />
             <span className="truncate max-w-sm">{health.lastError}</span>
           </div>
@@ -416,21 +416,21 @@ export const SyncConflictsPage: React.FC = () => {
       )}
 
       {/* ── Navigation Tabs ── */}
-      <div className="mb-4 flex items-center justify-between border-b border-slate-200 pb-2">
+      <div className="mb-4 flex items-center justify-between border-b border-line pb-2">
         <div className="flex gap-2">
           <button
             type="button"
             onClick={() => setActiveTab('conflicts')}
             className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition ${
               activeTab === 'conflicts'
-                ? 'bg-slate-900 text-white shadow-sm'
-                : 'text-slate-600 hover:bg-slate-200/60'
+                ? 'bg-primary text-white shadow-sm'
+                : 'text-ink-secondary hover:bg-surface-sunken/60'
             }`}
           >
             <span>التعارضات المفتوحة</span>
             {conflicts.length > 0 && (
               <span className={`rounded-full px-2 py-0.5 text-[10px] font-black ${
-                activeTab === 'conflicts' ? 'bg-amber-400 text-slate-950' : 'bg-amber-100 text-amber-800'
+                activeTab === 'conflicts' ? 'bg-warning text-ink' : 'bg-warning-soft text-warning'
               }`}>
                 {conflicts.length}
               </span>
@@ -442,14 +442,14 @@ export const SyncConflictsPage: React.FC = () => {
             onClick={() => setActiveTab('resolved')}
             className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition ${
               activeTab === 'resolved'
-                ? 'bg-slate-900 text-white shadow-sm'
-                : 'text-slate-600 hover:bg-slate-200/60'
+                ? 'bg-primary text-white shadow-sm'
+                : 'text-ink-secondary hover:bg-surface-sunken/60'
             }`}
           >
             <History className="h-3.5 w-3.5" />
             <span>سجل الحسم السابق</span>
             {resolvedConflicts.length > 0 && (
-              <span className="rounded-full bg-slate-200/80 px-2 py-0.5 text-[10px] font-bold text-slate-700">
+              <span className="rounded-full bg-surface-sunken/80 px-2 py-0.5 text-[10px] font-bold text-ink">
                 {resolvedConflicts.length}
               </span>
             )}
@@ -461,17 +461,17 @@ export const SyncConflictsPage: React.FC = () => {
       {activeTab === 'conflicts' && (
         <div className="space-y-3">
           {loading ? (
-            <div className="rounded-2xl border border-slate-200 bg-white p-12 text-center text-xs text-slate-400">
-              <RefreshCw className="mx-auto mb-2 h-6 w-6 animate-spin text-slate-300" />
+            <div className="rounded-2xl border border-line bg-surface p-12 text-center text-xs text-muted">
+              <RefreshCw className="mx-auto mb-2 h-6 w-6 animate-spin text-muted" />
               جارٍ فحص التعارضات...
             </div>
           ) : conflicts.length === 0 ? (
-            <div className="rounded-2xl border border-emerald-200 bg-emerald-50/40 p-12 text-center">
-              <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-600">
+            <div className="rounded-2xl border border-success-border bg-success-soft/40 p-12 text-center">
+              <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-success-soft text-success">
                 <CheckCircle2 className="h-6 w-6" />
               </div>
-              <h3 className="font-bold text-slate-900 text-sm">كافة البيانات متزامنة ولا توجد تعارضات</h3>
-              <p className="mt-1 text-xs text-slate-500 max-w-sm mx-auto">
+              <h3 className="font-bold text-ink text-sm">كافة البيانات متزامنة ولا توجد تعارضات</h3>
+              <p className="mt-1 text-xs text-muted max-w-sm mx-auto">
                 جميع المنتجات والعملاء والمستندات متطابقة تماماً بين هذا الجهاز والفروع الأخرى.
               </p>
             </div>
@@ -489,54 +489,54 @@ export const SyncConflictsPage: React.FC = () => {
               const conflictDiffs = diffs.filter(d => d.status === 'CONFLICT');
 
               return (
-                <div key={conflict.id} className="overflow-hidden rounded-2xl border border-amber-200/90 bg-white shadow-sm transition">
+                <div key={conflict.id} className="overflow-hidden rounded-2xl border border-warning-border/90 bg-surface shadow-sm transition">
                   {/* Summary Bar */}
                   <div
                     onClick={() => setExpandedId(expanded ? null : conflict.id)}
-                    className="flex cursor-pointer flex-wrap items-center justify-between gap-3 p-4 hover:bg-amber-50/30 transition"
+                    className="flex cursor-pointer flex-wrap items-center justify-between gap-3 p-4 hover:bg-warning-soft/30 transition"
                   >
                     <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-800 font-black text-xs">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-warning-soft text-warning font-black text-xs">
                         {entityLabels[conflict.entityType] ?? conflict.entityType}
                       </div>
                       <div>
                         <div className="flex items-center gap-2">
-                          <span className="font-bold text-sm text-slate-900">
+                          <span className="font-bold text-sm text-ink">
                             {entityLabels[conflict.entityType] ?? conflict.entityType}
                           </span>
-                          <span className="rounded bg-slate-100 px-2 py-0.5 font-mono text-[11px] text-slate-600">
+                          <span className="rounded bg-surface-sunken px-2 py-0.5 font-mono text-[11px] text-ink-secondary">
                             #{conflict.entityId}
                           </span>
                         </div>
-                        <p className="text-xs text-slate-500 mt-0.5">
-                          تعديل وارد من الفرع: <span className="font-semibold text-slate-700">{conflict.sourceBranchId}</span>
+                        <p className="text-xs text-muted mt-0.5">
+                          تعديل وارد من الفرع: <span className="font-semibold text-ink">{conflict.sourceBranchId}</span>
                         </p>
                       </div>
                     </div>
 
                     <div className="flex items-center gap-3">
-                      <span className="rounded-lg bg-amber-50 border border-amber-200 px-2.5 py-1 text-[11px] font-bold text-amber-800">
+                      <span className="rounded-lg bg-warning-soft border border-warning-border px-2.5 py-1 text-[11px] font-bold text-warning">
                         يحتاج قرارك
                       </span>
-                      {expanded ? <ChevronUp className="h-5 w-5 text-slate-400" /> : <ChevronDown className="h-5 w-5 text-slate-400" />}
+                      {expanded ? <ChevronUp className="h-5 w-5 text-muted" /> : <ChevronDown className="h-5 w-5 text-muted" />}
                     </div>
                   </div>
 
                   {/* Expanded Body */}
                   {expanded && (
-                    <div className="border-t border-slate-100 p-4 bg-slate-50/50">
+                    <div className="border-t border-line p-4 bg-surface-muted/50">
                       {/* Auto resolution recommendation banner */}
                       {autoResolution && (
-                        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3">
-                          <div className="flex items-center gap-2 text-xs text-emerald-900">
-                            <Sparkles className="h-4 w-4 text-emerald-600 shrink-0" />
+                        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-success-border bg-success-soft p-3">
+                          <div className="flex items-center gap-2 text-xs text-success">
+                            <Sparkles className="h-4 w-4 text-success shrink-0" />
                             <span><strong>اقتراح حسم ذكي:</strong> {autoResolution.reason}</span>
                           </div>
                           <button
                             type="button"
                             disabled={autoResolvingId === conflict.id}
                             onClick={() => tryAutoResolve(conflict)}
-                            className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-700 transition disabled:opacity-50"
+                            className="flex items-center gap-1.5 rounded-lg bg-success px-3 py-1.5 text-xs font-bold text-white hover:bg-success transition disabled:opacity-50"
                           >
                             <Sparkles className="h-3.5 w-3.5" />
                             {autoResolvingId === conflict.id ? 'جارٍ الحسم...' : 'تطبيق الدمج الذكي'}
@@ -545,7 +545,7 @@ export const SyncConflictsPage: React.FC = () => {
                       )}
 
                       {/* Visual Diff Table */}
-                      <div className="mb-4 overflow-hidden rounded-xl border border-slate-200 bg-white">
+                      <div className="mb-4 overflow-hidden rounded-xl border border-line bg-surface">
                         <DataTable
                           ariaLabel="فروقات الحقول"
                           rows={diffs}
@@ -556,9 +556,9 @@ export const SyncConflictsPage: React.FC = () => {
                         />
 
                         {conflictDiffs.length > 0 && (
-                          <div className="border-t border-slate-100 bg-amber-50/50 px-3 py-2 text-[11px] text-amber-800 flex items-center justify-between">
+                          <div className="border-t border-line bg-warning-soft/50 px-3 py-2 text-[11px] text-warning flex items-center justify-between">
                             <span>يوجد {conflictDiffs.length} حقول مختلفة بين النسختين.</span>
-                            <span className="text-slate-500">{diffs.filter(d => d.status === 'SAME').length} حقول متطابقة تماماً</span>
+                            <span className="text-muted">{diffs.filter(d => d.status === 'SAME').length} حقول متطابقة تماماً</span>
                           </div>
                         )}
                       </div>
@@ -569,20 +569,20 @@ export const SyncConflictsPage: React.FC = () => {
                           <button
                             type="button"
                             onClick={() => resolve(conflict, 'KEEP_LOCAL')}
-                            className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-100 hover:text-slate-900 transition shadow-sm"
+                            className="rounded-xl border border-line-strong bg-surface px-4 py-2 text-xs font-bold text-ink hover:bg-surface-sunken hover:text-ink transition shadow-sm"
                           >
                             الإبقاء على نسخة هذا الجهاز وإلغاء الوارد
                           </button>
                           <button
                             type="button"
                             onClick={() => resolve(conflict, 'ACCEPT_REMOTE')}
-                            className="rounded-xl bg-sky-700 px-4 py-2 text-xs font-bold text-white hover:bg-sky-800 transition shadow-sm"
+                            className="rounded-xl bg-primary px-4 py-2 text-xs font-bold text-white hover:bg-primary transition shadow-sm"
                           >
                             اعتماد واستبدال بالبيانات الواردة
                           </button>
                         </div>
 
-                        <span className="text-[11px] text-slate-400">
+                        <span className="text-[11px] text-muted">
                           الإصدار المحلي: {conflict.localVersion ?? 0} | الوارد: {conflict.remoteVersion}
                         </span>
                       </div>
@@ -597,17 +597,17 @@ export const SyncConflictsPage: React.FC = () => {
 
       {/* ═══ TAB 2: Resolved History ════════════════════════════════════════════ */}
       {activeTab === 'resolved' && (
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="rounded-2xl border border-line bg-surface p-4 shadow-sm">
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="font-bold text-sm text-slate-800 flex items-center gap-2">
-              <History className="h-4 w-4 text-slate-500" />
+            <h2 className="font-bold text-sm text-ink flex items-center gap-2">
+              <History className="h-4 w-4 text-muted" />
               سجل القرارات والتعارضات المحسومة سابقاً
             </h2>
-            <span className="text-xs text-slate-400">آخر 50 عملية حسم</span>
+            <span className="text-xs text-muted">آخر 50 عملية حسم</span>
           </div>
 
           {resolvedConflicts.length === 0 ? (
-            <div className="p-8 text-center text-xs text-slate-400 bg-slate-50 rounded-xl border border-slate-100">
+            <div className="p-8 text-center text-xs text-muted bg-surface-muted rounded-xl border border-line">
               لا توجد عمليات حسم سابقة مسجلة.
             </div>
           ) : (
@@ -619,12 +619,12 @@ export const SyncConflictsPage: React.FC = () => {
                 dense
                 tableClassName="text-xs"
                 columns={[
-                  { key: 'type', header: 'نوع البيانات', render: (rc) => <span className="font-bold text-slate-700">{entityLabels[rc.entityType] ?? rc.entityType}</span> },
-                  { key: 'id', header: 'معرّف السجل', render: (rc) => <span className="font-mono text-[11px] text-slate-600">{rc.entityId}</span> },
-                  { key: 'branch', header: 'الفرع المصدر', render: (rc) => <span className="text-slate-600">{rc.sourceBranchId}</span> },
+                  { key: 'type', header: 'نوع البيانات', render: (rc) => <span className="font-bold text-ink">{entityLabels[rc.entityType] ?? rc.entityType}</span> },
+                  { key: 'id', header: 'معرّف السجل', render: (rc) => <span className="font-mono text-[11px] text-ink-secondary">{rc.entityId}</span> },
+                  { key: 'branch', header: 'الفرع المصدر', render: (rc) => <span className="text-ink-secondary">{rc.sourceBranchId}</span> },
                   { key: 'decision', header: 'القرار المتخذ', render: (rc) => { const st = resolvedStatusLabel(rc.status); return <span className={`rounded-md px-2 py-0.5 text-[10px] font-bold ${st.cls}`}>{st.label}</span>; } },
-                  { key: 'reason', header: 'السبب', render: (rc) => <span className="block max-w-[240px] truncate text-slate-500">{rc.reason}</span> },
-                  { key: 'date', header: 'تاريخ الحسم', render: (rc) => <span className="text-slate-400">{formatTimestamp(rc.resolvedAt)}</span> },
+                  { key: 'reason', header: 'السبب', render: (rc) => <span className="block max-w-[240px] truncate text-muted">{rc.reason}</span> },
+                  { key: 'date', header: 'تاريخ الحسم', render: (rc) => <span className="text-muted">{formatTimestamp(rc.resolvedAt)}</span> },
                 ]}
                 emptyTitle="لا توجد عمليات حسم سابقة مسجلة."
               />

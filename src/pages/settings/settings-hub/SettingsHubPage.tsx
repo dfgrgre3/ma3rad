@@ -177,7 +177,7 @@ export const SettingsHubPage: React.FC = () => {
   const tabRoute = requested ? TAB_ROUTES[requested] : undefined;
   if (tabRoute) {
     if (!canAccess(tabRoute)) {
-      return <div className="flex h-full items-center justify-center p-6 text-sm font-bold text-slate-500">لا تملك صلاحية الوصول إلى هذا القسم من الإعدادات.</div>;
+      return <div className="flex h-full items-center justify-center p-6 text-sm font-bold text-muted">لا تملك صلاحية الوصول إلى هذا القسم من الإعدادات.</div>;
     }
     if (requested === 'appConfig') {
       return <AppConfigurationPage />;
@@ -205,7 +205,7 @@ export const SettingsHubPage: React.FC = () => {
 
       <UpdateSettings />
 
-      <Link to="/settings/approvals" className="erp-card block border border-amber-200 bg-amber-50/60 hover:bg-amber-50">
+      <Link to="/settings/approvals" className="erp-card block border border-warning-border bg-warning-soft/60 hover:bg-warning-soft">
         <span className="font-bold">إعدادات الاعتمادات والموافقات</span>
         <span className="mt-1 block text-sm text-[var(--cerami-muted)]">إدارة سياسة إضافة المخزون والأدوار المعتمدة.</span>
       </Link>

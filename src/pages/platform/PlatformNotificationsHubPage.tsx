@@ -150,30 +150,30 @@ export const PlatformNotificationsHubPage: React.FC = () => {
       />
 
       {error ? (
-        <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+        <div role="alert" className="rounded-xl border border-danger-border bg-danger-soft p-3 text-sm text-danger">
           {error}
         </div>
       ) : null}
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        <div className="p-3 bg-slate-900/60 border border-slate-800 rounded-xl">
-          <p className="text-[11px] font-semibold text-slate-400">إجمالي الإشعارات المرسلة</p>
-          <p className="text-xl font-black text-slate-100 mt-1">{logs.length}</p>
+        <div className="p-3 bg-primary/60 border border-line-strong rounded-xl">
+          <p className="text-[11px] font-semibold text-muted">إجمالي الإشعارات المرسلة</p>
+          <p className="text-xl font-black text-muted mt-1">{logs.length}</p>
         </div>
-        <div className="p-3 bg-emerald-950/20 border border-emerald-500/20 rounded-xl">
-          <p className="text-[11px] font-semibold text-emerald-400">نسبة التسليم الناجح</p>
-          <p className="text-xl font-black text-emerald-300 mt-1">{logs.length ? deliveryRate : 0}%</p>
+        <div className="p-3 bg-success/20 border border-success/20 rounded-xl">
+          <p className="text-[11px] font-semibold text-success">نسبة التسليم الناجح</p>
+          <p className="text-xl font-black text-success mt-1">{logs.length ? deliveryRate : 0}%</p>
         </div>
-        <div className="p-3 bg-sky-950/20 border border-sky-500/20 rounded-xl">
-          <p className="text-[11px] font-semibold text-sky-400">القنوات المستخدمة</p>
-          <p className="text-xl font-black text-sky-300 mt-1">{['EMAIL', 'SMS', 'IN_APP'].filter((c) => logs.some((l) => l.channel === c)).join(' + ') || 'لا إشعارات بعد'}</p>
+        <div className="p-3 bg-primary/20 border border-primary/20 rounded-xl">
+          <p className="text-[11px] font-semibold text-primary">القنوات المستخدمة</p>
+          <p className="text-xl font-black text-primary mt-1">{['EMAIL', 'SMS', 'IN_APP'].filter((c) => logs.some((l) => l.channel === c)).join(' + ') || 'لا إشعارات بعد'}</p>
         </div>
       </div>
 
       {/* Filter Bar */}
-      <div className="flex items-center gap-2 rounded-xl border border-slate-800 bg-slate-900/60 p-3 shadow-sm">
-        <Filter className="h-4 w-4 text-slate-400" />
+      <div className="flex items-center gap-2 rounded-xl border border-line-strong bg-primary/60 p-3 shadow-sm">
+        <Filter className="h-4 w-4 text-muted" />
         <select value={channelFilter} onChange={(e) => setChannelFilter(e.target.value)} className={`${inputClass} max-w-[200px]`}>
           <option value="">جميع القنوات</option>
           <option value="EMAIL">بريد إلكتروني (Email)</option>
@@ -183,7 +183,7 @@ export const PlatformNotificationsHubPage: React.FC = () => {
       </div>
 
       {/* Logs Table */}
-      <div className="overflow-hidden rounded-xl border border-slate-800 bg-slate-900/70 shadow-sm">
+      <div className="overflow-hidden rounded-xl border border-line-strong bg-primary/70 shadow-sm">
         <div className="overflow-x-auto">
           <DataTable
               ariaLabel="سجل الإشعارات"
@@ -192,14 +192,14 @@ export const PlatformNotificationsHubPage: React.FC = () => {
               minWidth={850}
               dense
               tableClassName="text-xs"
-              rowClassName={() => 'transition-colors hover:bg-slate-800/30'}
+              rowClassName={() => 'transition-colors hover:bg-primary/30'}
               columns={[
                 {
                   key: 'channel', header: 'القناة / المستلم',
                   render: (log: any) => (
                     <span className="block">
-                      <span className="block font-bold text-slate-100">{STATUS_LABELS[log.status as keyof typeof STATUS_LABELS] || log.status}</span>
-                      <span className="block font-mono text-[11px] text-slate-400">{log.channel}</span>
+                      <span className="block font-bold text-muted">{STATUS_LABELS[log.status as keyof typeof STATUS_LABELS] || log.status}</span>
+                      <span className="block font-mono text-[11px] text-muted">{log.channel}</span>
                     </span>
                   ),
                 },
@@ -207,26 +207,26 @@ export const PlatformNotificationsHubPage: React.FC = () => {
                   key: 'template', header: 'القالب والموضوع',
                   render: (log: any) => (
                     <span className="block">
-                      <span className="block font-semibold text-slate-200">{log.subject}</span>
-                      <span className="block font-mono text-[10px] text-slate-500">{log.template}</span>
+                      <span className="block font-semibold text-muted">{log.subject}</span>
+                      <span className="block font-mono text-[10px] text-muted">{log.template}</span>
                     </span>
                   ),
                 },
                 {
                   key: 'status', header: 'الحالة',
                   render: (log: any) => log.status === 'SENT' || log.status === 'DELIVERED' ? (
-                    <span className="flex items-center gap-1 font-bold text-emerald-400"><CheckCircle2 className="h-3.5 w-3.5" /> تم التسليم</span>
+                    <span className="flex items-center gap-1 font-bold text-success"><CheckCircle2 className="h-3.5 w-3.5" /> تم التسليم</span>
                   ) : log.status === 'FAILED' ? (
-                    <span className="flex items-center gap-1 font-bold text-red-400"><XCircle className="h-3.5 w-3.5" /> فشل التسليم</span>
+                    <span className="flex items-center gap-1 font-bold text-danger"><XCircle className="h-3.5 w-3.5" /> فشل التسليم</span>
                   ) : (
-                    <span className="flex items-center gap-1 font-bold text-amber-300"><Clock className="h-3.5 w-3.5" /> {STATUS_LABELS[log.status as keyof typeof STATUS_LABELS] || log.status}</span>
+                    <span className="flex items-center gap-1 font-bold text-warning"><Clock className="h-3.5 w-3.5" /> {STATUS_LABELS[log.status as keyof typeof STATUS_LABELS] || log.status}</span>
                   ),
                 },
-                { key: 'sent', header: 'وقت التسليم', render: (log: any) => <span className="text-slate-400">{formatDateTime(log.sentAt)}</span> },
+                { key: 'sent', header: 'وقت التسليم', render: (log: any) => <span className="text-muted">{formatDateTime(log.sentAt)}</span> },
               ]}
             />
           {!loading && filteredLogs.length === 0 ? (
-            <div className="p-6 text-center text-xs text-slate-400">لا توجد إشعارات مسجلة بعد.</div>
+            <div className="p-6 text-center text-xs text-muted">لا توجد إشعارات مسجلة بعد.</div>
           ) : null}
         </div>
       </div>
@@ -236,7 +236,7 @@ export const PlatformNotificationsHubPage: React.FC = () => {
         <div className="space-y-3.5 text-right">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">القناة</label>
+              <label className="block text-xs font-semibold text-muted mb-1">القناة</label>
               <select
                 value={broadcastForm.channel}
                 onChange={(e) => setBroadcastForm({ ...broadcastForm, channel: e.target.value as 'EMAIL' | 'SMS' | 'IN_APP' })}
@@ -248,7 +248,7 @@ export const PlatformNotificationsHubPage: React.FC = () => {
               </select>
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">المستهدفون</label>
+              <label className="block text-xs font-semibold text-muted mb-1">المستهدفون</label>
               <select
                 value={broadcastForm.audience}
                 onChange={(e) => setBroadcastForm({ ...broadcastForm, audience: e.target.value })}
@@ -261,15 +261,15 @@ export const PlatformNotificationsHubPage: React.FC = () => {
             </div>
           </div>
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">عنوان الإشعار / الموضوع *</label>
+            <label className="block text-xs font-semibold text-muted mb-1">عنوان الإشعار / الموضوع *</label>
             <input type="text" value={broadcastForm.subject} onChange={(e) => setBroadcastForm({ ...broadcastForm, subject: e.target.value })} className={inputClass} />
           </div>
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">نص الرسالة *</label>
+            <label className="block text-xs font-semibold text-muted mb-1">نص الرسالة *</label>
             <textarea rows={4} value={broadcastForm.message} onChange={(e) => setBroadcastForm({ ...broadcastForm, message: e.target.value })} className={inputClass} />
           </div>
-          {sendError ? <div className="rounded border border-red-200 bg-red-50 p-2 text-xs text-red-700">{sendError}</div> : null}
-          <div className="flex justify-end gap-2 pt-3 border-t border-slate-800">
+          {sendError ? <div className="rounded border border-danger-border bg-danger-soft p-2 text-xs text-danger">{sendError}</div> : null}
+          <div className="flex justify-end gap-2 pt-3 border-t border-line-strong">
             <Button variant="secondary" size="sm" onClick={() => setIsSendOpen(false)}>
               إلغاء
             </Button>

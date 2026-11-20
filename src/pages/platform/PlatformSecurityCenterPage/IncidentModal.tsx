@@ -21,7 +21,7 @@ export const IncidentModal: React.FC<IncidentModalProps> = ({ open, onClose, for
   >
     <div className="space-y-3.5 text-right">
       <div>
-        <label className="block text-xs font-semibold text-slate-300 mb-1">عنوان البلاغ الأمني *</label>
+        <label className="block text-xs font-semibold text-muted mb-1">عنوان البلاغ الأمني *</label>
         <input
           type="text"
           value={form.title}
@@ -33,7 +33,7 @@ export const IncidentModal: React.FC<IncidentModalProps> = ({ open, onClose, for
 
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="block text-xs font-semibold text-slate-300 mb-1">مستوى الخطورة</label>
+          <label className="block text-xs font-semibold text-muted mb-1">مستوى الخطورة</label>
           <select
             value={form.severity}
             onChange={(e) => setForm({ ...form, severity: e.target.value as any })}
@@ -46,7 +46,7 @@ export const IncidentModal: React.FC<IncidentModalProps> = ({ open, onClose, for
           </select>
         </div>
         <div>
-          <label className="block text-xs font-semibold text-slate-300 mb-1">مصدر IP المشتبه به</label>
+          <label className="block text-xs font-semibold text-muted mb-1">مصدر IP المشتبه به</label>
           <input
             type="text"
             value={form.sourceIp}
@@ -58,7 +58,7 @@ export const IncidentModal: React.FC<IncidentModalProps> = ({ open, onClose, for
       </div>
 
       <div>
-        <label className="block text-xs font-semibold text-slate-300 mb-1">تفاصيل وملاحظات الحادث</label>
+        <label className="block text-xs font-semibold text-muted mb-1">تفاصيل وملاحظات الحادث</label>
         <textarea
           rows={3}
           value={form.details}
@@ -67,7 +67,7 @@ export const IncidentModal: React.FC<IncidentModalProps> = ({ open, onClose, for
         />
       </div>
 
-      <div className="flex justify-end gap-2 pt-3 border-t border-slate-800">
+      <div className="flex justify-end gap-2 pt-3 border-t border-line-strong">
         <Button variant="secondary" size="sm" onClick={onClose}>
           إلغاء
         </Button>

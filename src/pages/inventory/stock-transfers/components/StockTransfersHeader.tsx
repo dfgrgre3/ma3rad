@@ -9,7 +9,7 @@ export const StockTransfersHeader: React.FC<StockTransfersHeaderProps> = ({
   onCreateTransfer,
   onRefresh,
 }) => (
-  <div className="bg-white border-b border-slate-200 px-6 pt-4">
+  <div className="bg-surface border-b border-line px-6 pt-4">
     <PageHeader
       icon={<ArrowLeftRight className="w-5 h-5" />}
       title="التحويلات المخزنية ودورة الحياة الكاملة"
@@ -18,7 +18,7 @@ export const StockTransfersHeader: React.FC<StockTransfersHeaderProps> = ({
         {canCreateTransfer && (
           <button
             onClick={onCreateTransfer}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-black shadow-md shadow-sky-600/20 transition active:scale-95"
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-primary hover:bg-primary text-white text-xs font-black shadow-md shadow-primary/20 transition active:scale-95"
           >
             <Plus className="w-4 h-4" />
             طلب تحويل مخزني جديد
@@ -27,7 +27,7 @@ export const StockTransfersHeader: React.FC<StockTransfersHeaderProps> = ({
 
         <button
           onClick={onRefresh}
-          className="p-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 transition"
+          className="p-2 rounded-xl border border-line bg-surface hover:bg-surface-muted text-ink-secondary transition"
           title="تحديث"
         >
           <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />

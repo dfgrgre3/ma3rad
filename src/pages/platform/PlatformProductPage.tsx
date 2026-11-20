@@ -380,7 +380,7 @@ export const PlatformProductPage: React.FC = () => {
         }
       />
 
-      <div className="inline-flex rounded-lg bg-slate-100 p-1">
+      <div className="inline-flex rounded-lg bg-surface-sunken p-1">
         {TABS.map((item) => {
           const Icon = item.icon;
           return (
@@ -389,7 +389,7 @@ export const PlatformProductPage: React.FC = () => {
               type="button"
               onClick={() => setTab(item.id)}
               className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[12px] font-bold transition ${
-                tab === item.id ? 'bg-white text-slate-900 shadow' : 'text-slate-500'
+                tab === item.id ? 'bg-surface text-ink shadow' : 'text-muted'
               }`}
             >
               <Icon className="h-3.5 w-3.5" />
@@ -400,13 +400,13 @@ export const PlatformProductPage: React.FC = () => {
       </div>
 
       {error && (
-        <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-2.5 text-xs font-semibold text-rose-700">
+        <div role="alert" className="rounded-lg border border-danger-border bg-danger-soft px-4 py-2.5 text-xs font-semibold text-danger">
           {error}
         </div>
       )}
 
       {loading ? (
-        <div className="rounded-xl border border-slate-200 bg-white py-16 text-center text-sm font-semibold text-slate-500 shadow-sm">
+        <div className="rounded-xl border border-line bg-surface py-16 text-center text-sm font-semibold text-muted shadow-sm">
           جارٍ تحميل بيانات المنتج...
         </div>
       ) : tab === 'matrix' ? (

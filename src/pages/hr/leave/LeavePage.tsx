@@ -23,10 +23,10 @@ const statusLabels: Record<LeaveStatus, string> = {
 };
 
 const statusStyles: Record<LeaveStatus, string> = {
-  PENDING: 'bg-amber-50 text-amber-700 border-amber-200',
-  APPROVED: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-  REJECTED: 'bg-rose-50 text-rose-700 border-rose-200',
-  CANCELLED: 'bg-slate-100 text-slate-500 border-slate-200',
+  PENDING: 'bg-warning-soft text-warning border-warning-border',
+  APPROVED: 'bg-success-soft text-success border-success-border',
+  REJECTED: 'bg-danger-soft text-danger border-danger-border',
+  CANCELLED: 'bg-surface-sunken text-muted border-line',
 };
 
 const typeLabels: Record<LeaveType, string> = {
@@ -287,7 +287,7 @@ export const LeavePage: React.FC = () => {
         description="طلبات الإجازة واعتمادها ومتابعة الأرصدة المستخدمة."
         actions={<>
           <select
-            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+            className="rounded-lg border border-line bg-surface px-3 py-2 text-sm"
             value={status}
             onChange={(event) => setStatus(event.target.value as LeaveStatus | 'ALL')}
           >
@@ -296,12 +296,12 @@ export const LeavePage: React.FC = () => {
               <option key={value} value={value}>{label}</option>
             ))}
           </select>
-          <button className="rounded-lg border border-slate-200 bg-white p-2 text-slate-600" onClick={load} title="تحديث">
+          <button className="rounded-lg border border-line bg-surface p-2 text-ink-secondary" onClick={load} title="تحديث">
             <RefreshCw className="h-4 w-4" />
           </button>
           {canRequest && (
             <button
-              className="flex items-center gap-1 rounded-lg bg-sky-600 px-3 py-2 text-sm font-medium text-white"
+              className="flex items-center gap-1 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-white"
               onClick={() => setShowForm((value) => !value)}
             >
               <Plus className="h-4 w-4" /> طلب إجازة
@@ -311,25 +311,25 @@ export const LeavePage: React.FC = () => {
       />
 
       <div className="grid gap-3 sm:grid-cols-2">
-        <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">
-          <p className="text-xs text-amber-700">طلبات قيد الانتظار</p>
-          <p className="text-2xl font-bold text-amber-800">{summary.pending}</p>
+        <div className="rounded-xl border border-warning-border bg-warning-soft p-3">
+          <p className="text-xs text-warning">طلبات قيد الانتظار</p>
+          <p className="text-2xl font-bold text-warning">{summary.pending}</p>
         </div>
-        <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3">
-          <p className="text-xs text-emerald-700">أيام الإجازات المعتمدة هذا العام</p>
-          <p className="text-2xl font-bold text-emerald-800">{summary.approvedDays}</p>
+        <div className="rounded-xl border border-success-border bg-success-soft p-3">
+          <p className="text-xs text-success">أيام الإجازات المعتمدة هذا العام</p>
+          <p className="text-2xl font-bold text-success">{summary.approvedDays}</p>
         </div>
       </div>
 
-      <section className="rounded-xl border border-slate-200 bg-white p-4">
+      <section className="rounded-xl border border-line bg-surface p-4">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <div>
-            <h2 className="font-bold text-slate-800">تقويم الإجازات والموظفون الغائبون</h2>
-            <p className="text-xs text-slate-500">يعرض الإجازات المعتمدة والطلبات المعلقة في الفرع المحدد.</p>
+            <h2 className="font-bold text-ink">تقويم الإجازات والموظفون الغائبون</h2>
+            <p className="text-xs text-muted">يعرض الإجازات المعتمدة والطلبات المعلقة في الفرع المحدد.</p>
           </div>
           <input
             type="month"
-            className="rounded-lg border border-slate-200 px-3 py-2 text-sm"
+            className="rounded-lg border border-line px-3 py-2 text-sm"
             value={calendarPeriod}
             onChange={(event) => setCalendarPeriod(event.target.value)}
           />
@@ -348,9 +348,9 @@ export const LeavePage: React.FC = () => {
                               <div className="flex flex-wrap gap-1">
                                 {entry[1].map((e) => (
                                   <span key={`${e.employeeId}-${e.status}`} className={`rounded-full px-2 py-1 text-xs ${
-                                    e.status === 'APPROVED' ? 'bg-emerald-50 text-emerald-700'
-                                      : e.status === 'ABSENT' ? 'bg-rose-50 text-rose-700'
-                                        : 'bg-amber-50 text-amber-700'
+                                    e.status === 'APPROVED' ? 'bg-success-soft text-success'
+                                      : e.status === 'ABSENT' ? 'bg-danger-soft text-danger'
+                                        : 'bg-warning-soft text-warning'
                                   }`}>
                                     {e.employeeName} · {e.leaveType ? typeLabels[e.leaveType] : 'غياب'}
                                     {' · '}{e.status === 'APPROVED' ? 'في إجازة' : e.status === 'ABSENT' ? 'غائب' : 'طلب معلق'}
@@ -362,16 +362,16 @@ export const LeavePage: React.FC = () => {
                         ]}
                       />
 
-        ) : <p className="rounded-lg bg-slate-50 p-5 text-center text-sm text-slate-500">لا توجد إجازات أو طلبات معلقة في هذا الشهر.</p>}
+        ) : <p className="rounded-lg bg-surface-muted p-5 text-center text-sm text-muted">لا توجد إجازات أو طلبات معلقة في هذا الشهر.</p>}
       </section>
 
       {showForm && canRequest && (
-        <div className="rounded-xl border border-slate-200 bg-white p-4">
+        <div className="rounded-xl border border-line bg-surface p-4">
           <div className="grid gap-3 md:grid-cols-5">
-            <label className="text-xs text-slate-600">
+            <label className="text-xs text-ink-secondary">
               الموظف
               <select
-                className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-2 text-sm"
+                className="mt-1 w-full rounded-lg border border-line px-2 py-2 text-sm"
                 value={form.employeeId}
                 onChange={(event) => setForm({ ...form, employeeId: event.target.value })}
               >
@@ -381,10 +381,10 @@ export const LeavePage: React.FC = () => {
                 ))}
               </select>
             </label>
-            <label className="text-xs text-slate-600">
+            <label className="text-xs text-ink-secondary">
               النوع
               <select
-                className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-2 text-sm"
+                className="mt-1 w-full rounded-lg border border-line px-2 py-2 text-sm"
                 value={form.leaveType}
                 onChange={(event) => setForm({ ...form, leaveType: event.target.value as LeaveType })}
               >
@@ -393,51 +393,51 @@ export const LeavePage: React.FC = () => {
                 ))}
               </select>
             </label>
-            <label className="text-xs text-slate-600">
+            <label className="text-xs text-ink-secondary">
               من
               <input
                 type="date"
-                className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-2 text-sm"
+                className="mt-1 w-full rounded-lg border border-line px-2 py-2 text-sm"
                 value={form.startDate}
                 onChange={(event) => setForm({ ...form, startDate: event.target.value })}
               />
             </label>
-            <label className="text-xs text-slate-600">
+            <label className="text-xs text-ink-secondary">
               إلى
               <input
                 type="date"
-                className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-2 text-sm"
+                className="mt-1 w-full rounded-lg border border-line px-2 py-2 text-sm"
                 value={form.endDate}
                 onChange={(event) => setForm({ ...form, endDate: event.target.value })}
               />
             </label>
-            <label className="text-xs text-slate-600">
+            <label className="text-xs text-ink-secondary">
               السبب
               <input
-                className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-2 text-sm"
+                className="mt-1 w-full rounded-lg border border-line px-2 py-2 text-sm"
                 value={form.reason}
                 onChange={(event) => setForm({ ...form, reason: event.target.value })}
               />
             </label>
           </div>
           {form.leaveType === 'ANNUAL' && form.employeeId && requestBalance && (
-            <div className="mt-3 rounded-lg bg-sky-50 p-3 text-sm text-sky-900">
+            <div className="mt-3 rounded-lg bg-accent-soft p-3 text-sm text-primary">
               رصيد سنة {requestBalance.year}: {requestBalance.availableDays} يوم متاح
-              <span className="mr-2 text-xs text-sky-700">
+              <span className="mr-2 text-xs text-primary">
                 (مخصص {requestBalance.grantedDays} · معتمد {requestBalance.approvedDays} · معلق {requestBalance.pendingDays})
               </span>
-              <p className="mt-1 text-xs text-sky-700">الرصيد لا يشمل الاستحقاق الشهري الذي لم يحل تاريخ إضافته بعد.</p>
+              <p className="mt-1 text-xs text-primary">الرصيد لا يشمل الاستحقاق الشهري الذي لم يحل تاريخ إضافته بعد.</p>
             </div>
           )}
-          <p className="mt-2 text-xs text-amber-700">
+          <p className="mt-2 text-xs text-warning">
             تُستثنى العطلات المسجلة وأيام الراحة وفق وردية الموظف. عند عدم تعيين وردية تُحسب أيام التقويم بعد استثناء العطلات المسجلة، لعدم توفر جدول أسبوعي للموظف.
           </p>
           <div className="mt-3 flex justify-end gap-2">
-            <button className="rounded-lg border border-slate-200 px-3 py-2 text-sm" onClick={() => setShowForm(false)}>
+            <button className="rounded-lg border border-line px-3 py-2 text-sm" onClick={() => setShowForm(false)}>
               إلغاء
             </button>
             <button
-              className="flex items-center gap-1 rounded-lg bg-sky-600 px-3 py-2 text-sm text-white disabled:opacity-50"
+              className="flex items-center gap-1 rounded-lg bg-primary px-3 py-2 text-sm text-white disabled:opacity-50"
               disabled={saving}
               onClick={submit}
             >
@@ -448,18 +448,18 @@ export const LeavePage: React.FC = () => {
       )}
 
       {canApprove && (
-        <section className="space-y-4 rounded-xl border border-sky-200 bg-white p-4">
+        <section className="space-y-4 rounded-xl border border-accent-border bg-surface p-4">
           <div>
-            <h2 className="font-bold text-slate-800">سياسة الاستحقاق والترحيل التلقائي</h2>
-            <p className="text-xs text-slate-500">
+            <h2 className="font-bold text-ink">سياسة الاستحقاق والترحيل التلقائي</h2>
+            <p className="text-xs text-muted">
               تُضاف أيام الاستحقاق شهريًا في نهاية الشهر، ويُرحل الرصيد المتبقي تلقائيًا وفق الحد المحدد.
               أيام الراحة والعطلات تُحسب حسب وردية الموظف.
             </p>
           </div>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-            <label className="text-xs text-slate-600">نطاق السياسة
+            <label className="text-xs text-ink-secondary">نطاق السياسة
               <select
-                className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-2 text-sm"
+                className="mt-1 w-full rounded-lg border border-line px-2 py-2 text-sm"
                 value={annualPolicyDraft.employeeId}
                 onChange={(event) => selectAnnualPolicyTarget(event.target.value)}
               >
@@ -469,33 +469,33 @@ export const LeavePage: React.FC = () => {
                 ))}
               </select>
             </label>
-            <label className="text-xs text-slate-600">الاستحقاق السنوي (أيام)
+            <label className="text-xs text-ink-secondary">الاستحقاق السنوي (أيام)
               <input
                 type="number" min="0" max="366" step="0.5"
                 disabled={annualPolicyDraft.inheritBranchPolicy}
-                className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-2 text-sm disabled:bg-slate-100"
+                className="mt-1 w-full rounded-lg border border-line px-2 py-2 text-sm disabled:bg-surface-sunken"
                 value={annualPolicyDraft.annualEntitlementDays}
                 onChange={(event) => setAnnualPolicyDraft({ ...annualPolicyDraft, annualEntitlementDays: event.target.value })}
               />
             </label>
-            <label className="text-xs text-slate-600">حد الترحيل (أيام)
+            <label className="text-xs text-ink-secondary">حد الترحيل (أيام)
               <input
                 type="number" min="0" max="366" step="0.5"
                 disabled={annualPolicyDraft.inheritBranchPolicy}
-                className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-2 text-sm disabled:bg-slate-100"
+                className="mt-1 w-full rounded-lg border border-line px-2 py-2 text-sm disabled:bg-surface-sunken"
                 value={annualPolicyDraft.carryoverLimitDays}
                 onChange={(event) => setAnnualPolicyDraft({ ...annualPolicyDraft, carryoverLimitDays: event.target.value })}
               />
             </label>
-            <label className="text-xs text-slate-600">سريان من شهر
+            <label className="text-xs text-ink-secondary">سريان من شهر
               <input
                 type="month"
-                className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-2 text-sm"
+                className="mt-1 w-full rounded-lg border border-line px-2 py-2 text-sm"
                 value={annualPolicyDraft.effectiveFrom}
                 onChange={(event) => setAnnualPolicyDraft({ ...annualPolicyDraft, effectiveFrom: event.target.value })}
               />
             </label>
-            <label className="flex items-center gap-2 self-end rounded-lg border border-slate-200 p-2 text-xs text-slate-700">
+            <label className="flex items-center gap-2 self-end rounded-lg border border-line p-2 text-xs text-ink">
               <input
                 type="checkbox"
                 disabled={annualPolicyDraft.inheritBranchPolicy}
@@ -506,7 +506,7 @@ export const LeavePage: React.FC = () => {
             </label>
           </div>
           {annualPolicyDraft.employeeId && (
-            <label className="flex items-center gap-2 text-sm text-slate-700">
+            <label className="flex items-center gap-2 text-sm text-ink">
               <input
                 type="checkbox"
                 checked={annualPolicyDraft.inheritBranchPolicy}
@@ -516,7 +516,7 @@ export const LeavePage: React.FC = () => {
             </label>
           )}
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-muted">
               السياسة الحالية: {annualPolicyState.effectivePolicy
                 ? `${annualPolicyState.effectivePolicy.annualEntitlementDays} يوم سنويًا · ترحيل حتى ${annualPolicyState.effectivePolicy.carryoverLimitDays} يوم`
                 : 'لا يوجد استحقاق تلقائي؛ يمكن إضافة الرصيد يدويًا'}
@@ -524,7 +524,7 @@ export const LeavePage: React.FC = () => {
             <button
               disabled={!annualPolicyDraft.effectiveFrom || (!annualPolicyDraft.inheritBranchPolicy
                 && (!annualPolicyDraft.annualEntitlementDays || !annualPolicyDraft.carryoverLimitDays))}
-              className="rounded-lg bg-sky-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+              className="rounded-lg bg-primary px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
               onClick={saveAnnualPolicy}
             >
               حفظ السياسة
@@ -534,46 +534,46 @@ export const LeavePage: React.FC = () => {
       )}
 
       {canApprove && (
-        <section className="space-y-4 rounded-xl border border-slate-200 bg-white p-4">
+        <section className="space-y-4 rounded-xl border border-line bg-surface p-4">
               <div>
-                <h2 className="font-bold text-slate-800">إدارة رصيد الإجازة السنوية</h2>
-                <p className="text-xs text-slate-500">يمكن تسجيل التسويات اليدوية، مع حفظ سجل جميع الحركات التلقائية واليدوية.</p>
+                <h2 className="font-bold text-ink">إدارة رصيد الإجازة السنوية</h2>
+                <p className="text-xs text-muted">يمكن تسجيل التسويات اليدوية، مع حفظ سجل جميع الحركات التلقائية واليدوية.</p>
               </div>
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
-                <label className="text-xs text-slate-600">الموظف
-                  <select className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-2 text-sm"
+                <label className="text-xs text-ink-secondary">الموظف
+                  <select className="mt-1 w-full rounded-lg border border-line px-2 py-2 text-sm"
                     value={balanceForm.employeeId} onChange={(event) => setBalanceForm({ ...balanceForm, employeeId: event.target.value })}>
                     <option value="">اختر الموظف</option>
                     {employees.map((employee) => <option key={employee.id} value={employee.id}>{employee.name}</option>)}
                   </select>
                 </label>
-                <label className="text-xs text-slate-600">السنة
-                  <input type="number" min="2000" max="2100" className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-2 text-sm"
+                <label className="text-xs text-ink-secondary">السنة
+                  <input type="number" min="2000" max="2100" className="mt-1 w-full rounded-lg border border-line px-2 py-2 text-sm"
                     value={balanceForm.year} onChange={(event) => setBalanceForm({ ...balanceForm, year: event.target.value })} />
                 </label>
-                <label className="text-xs text-slate-600">نوع الحركة
-                  <select className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-2 text-sm"
+                <label className="text-xs text-ink-secondary">نوع الحركة
+                  <select className="mt-1 w-full rounded-lg border border-line px-2 py-2 text-sm"
                     value={balanceForm.transactionType} onChange={(event) => setBalanceForm({ ...balanceForm, transactionType: event.target.value as typeof balanceForm.transactionType })}>
                     <option value="ALLOCATION">استحقاق يدوي</option>
                     <option value="CARRYOVER">ترحيل رصيد</option>
                     <option value="ADJUSTMENT">تسوية</option>
                   </select>
                 </label>
-                <label className="text-xs text-slate-600">الأيام (+ / −)
-                  <input type="number" step="0.5" className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-2 text-sm"
+                <label className="text-xs text-ink-secondary">الأيام (+ / −)
+                  <input type="number" step="0.5" className="mt-1 w-full rounded-lg border border-line px-2 py-2 text-sm"
                     value={balanceForm.daysDelta} onChange={(event) => setBalanceForm({ ...balanceForm, daysDelta: event.target.value })} />
                 </label>
-                <label className="text-xs text-slate-600">تاريخ الاستحقاق
-                  <input type="date" className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-2 text-sm"
+                <label className="text-xs text-ink-secondary">تاريخ الاستحقاق
+                  <input type="date" className="mt-1 w-full rounded-lg border border-line px-2 py-2 text-sm"
                     value={balanceForm.effectiveDate} onChange={(event) => setBalanceForm({ ...balanceForm, effectiveDate: event.target.value })} />
                 </label>
-                <label className="text-xs text-slate-600">السبب
-                  <input className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-2 text-sm"
+                <label className="text-xs text-ink-secondary">السبب
+                  <input className="mt-1 w-full rounded-lg border border-line px-2 py-2 text-sm"
                     value={balanceForm.reason} onChange={(event) => setBalanceForm({ ...balanceForm, reason: event.target.value })} />
                 </label>
               </div>
               <button disabled={!balanceForm.employeeId || !balanceForm.daysDelta || !balanceForm.reason.trim()}
-                className="rounded-lg bg-sky-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-50" onClick={adjustBalance}>
+                className="rounded-lg bg-primary px-3 py-2 text-sm font-medium text-white disabled:opacity-50" onClick={adjustBalance}>
                 حفظ حركة الرصيد
               </button>
               {balanceForm.employeeId && (
@@ -585,7 +585,7 @@ export const LeavePage: React.FC = () => {
                                     columns={[
                                       { key: 'date', header: 'التاريخ', render: (transaction) => transaction.effectiveDate },
                                       { key: 'type', header: 'الحركة', render: (transaction) => transaction.transactionType === 'CARRYOVER' ? 'ترحيل' : transaction.transactionType === 'ALLOCATION' ? 'استحقاق' : 'تسوية' },
-                                      { key: 'days', header: 'الأيام', render: (transaction) => <span className={transaction.daysDelta < 0 ? 'text-rose-700' : 'text-emerald-700'}>{transaction.daysDelta > 0 ? '+' : ''}{transaction.daysDelta}</span> },
+                                      { key: 'days', header: 'الأيام', render: (transaction) => <span className={transaction.daysDelta < 0 ? 'text-danger' : 'text-success'}>{transaction.daysDelta > 0 ? '+' : ''}{transaction.daysDelta}</span> },
                                       { key: 'reason', header: 'السبب', render: (transaction) => transaction.reason },
                                       { key: 'by', header: 'بواسطة', render: (transaction) => transaction.createdByName },
                                     ]}
@@ -596,18 +596,18 @@ export const LeavePage: React.FC = () => {
       )}
 
       {canApprove && (
-        <section className="rounded-xl border border-slate-200 bg-white p-4">
-              <h2 className="mb-3 font-bold text-slate-800">الحد الأقصى السنوي لأنواع الإجازات</h2>
+        <section className="rounded-xl border border-line bg-surface p-4">
+              <h2 className="mb-3 font-bold text-ink">الحد الأقصى السنوي لأنواع الإجازات</h2>
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 {policies.map((policy) => (
                   <div key={policy.leaveType} className="flex items-end gap-2">
-                    <label className="flex-1 text-xs text-slate-600">{typeLabels[policy.leaveType]} (اتركه فارغًا لغير محدود)
-                      <input type="number" min="0" step="0.5" className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-2 text-sm"
+                    <label className="flex-1 text-xs text-ink-secondary">{typeLabels[policy.leaveType]} (اتركه فارغًا لغير محدود)
+                      <input type="number" min="0" step="0.5" className="mt-1 w-full rounded-lg border border-line px-2 py-2 text-sm"
                         value={policyDraft[policy.leaveType]} onChange={(event) => setPolicyDraft({
                           ...policyDraft, [policy.leaveType]: event.target.value,
                         })} />
                     </label>
-                    <button className="rounded-lg border border-slate-200 px-3 py-2 text-xs" onClick={() => savePolicy(policy.leaveType)}>حفظ</button>
+                    <button className="rounded-lg border border-line px-3 py-2 text-xs" onClick={() => savePolicy(policy.leaveType)}>حفظ</button>
                   </div>
                 ))}
               </div>
@@ -621,9 +621,9 @@ export const LeavePage: React.FC = () => {
                 loading={loading}
                 emptyTitle="لا توجد طلبات إجازة."
                 columns={[
-                  { key: 'employee', header: 'الموظف', render: (row) => <span className="font-medium text-slate-700">{row.employeeName}</span> },
+                  { key: 'employee', header: 'الموظف', render: (row) => <span className="font-medium text-ink">{row.employeeName}</span> },
                   { key: 'type', header: 'النوع', render: (row) => typeLabels[row.leaveType] },
-                  { key: 'period', header: 'الفترة', render: (row) => <span className="text-slate-600">{row.startDate} → {row.endDate}</span> },
+                  { key: 'period', header: 'الفترة', render: (row) => <span className="text-ink-secondary">{row.startDate} → {row.endDate}</span> },
                   { key: 'days', header: 'الأيام', render: (row) => row.days },
                   { key: 'status', header: 'الحالة', render: (row) => <span className={`rounded-full border px-2 py-1 text-xs ${statusStyles[row.status]}`}>{statusLabels[row.status]}</span> },
                   {
@@ -632,16 +632,16 @@ export const LeavePage: React.FC = () => {
                       <div className="flex gap-1">
                         {canApprove && row.status === 'PENDING' && (
                           <>
-                            <button className="rounded bg-emerald-50 p-1 text-emerald-700" title="اعتماد" onClick={() => decide(row, 'APPROVED')}>
+                            <button className="rounded bg-success-soft p-1 text-success" title="اعتماد" onClick={() => decide(row, 'APPROVED')}>
                               <Check className="h-4 w-4" />
                             </button>
-                            <button className="rounded bg-rose-50 p-1 text-rose-700" title="رفض" onClick={() => decide(row, 'REJECTED')}>
+                            <button className="rounded bg-danger-soft p-1 text-danger" title="رفض" onClick={() => decide(row, 'REJECTED')}>
                               <X className="h-4 w-4" />
                             </button>
                           </>
                         )}
                         {(row.status === 'PENDING' || row.status === 'APPROVED') && (canApprove || canRequest) && (
-                          <button className="rounded bg-slate-100 px-2 py-1 text-xs text-slate-600" onClick={() => cancel(row)}>
+                          <button className="rounded bg-surface-sunken px-2 py-1 text-xs text-ink-secondary" onClick={() => cancel(row)}>
                             إلغاء
                           </button>
                         )}

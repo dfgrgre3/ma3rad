@@ -28,10 +28,10 @@ const _REFUND_LABELS: Record<string, string> = {
 };
 
 const _REFUND_BADGES: Record<string, string> = {
-  CASH: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-  CARD: 'bg-indigo-50 text-indigo-700 border-indigo-200',
-  BANK_TRANSFER: 'bg-sky-50 text-sky-700 border-sky-200',
-  BALANCE: 'bg-purple-50 text-purple-700 border-purple-200',
+  CASH: 'bg-success-soft text-success border-success-border',
+  CARD: 'bg-accent-soft text-primary border-accent-border',
+  BANK_TRANSFER: 'bg-accent-soft text-primary border-accent-border',
+  BALANCE: 'bg-accent-soft text-primary border-accent-border',
 };
 
 const _COMMON_REASONS = [
@@ -47,7 +47,7 @@ const getTabButtonClass = (isActive: boolean, activeClass: string) =>
   `flex-1 md:flex-initial px-5 py-2 rounded-lg text-sm font-bold transition flex items-center justify-center gap-2 ${
     isActive
       ? activeClass
-      : 'text-slate-600 dark:text-slate-300 hover:text-slate-900'
+      : 'text-ink-secondary hover:text-ink'
   }`;
 
 export const AfterSalesPage: React.FC = () => {
@@ -134,7 +134,7 @@ export const AfterSalesPage: React.FC = () => {
         actions={
           <button
             onClick={loadData}
-            className="px-3.5 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 rounded-xl transition flex items-center gap-1.5"
+            className="px-3.5 py-2 text-xs font-semibold text-ink bg-surface-sunken hover:bg-surface-sunken dark:hover:bg-primary rounded-xl transition flex items-center gap-1.5"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             تحديث
@@ -144,57 +144,57 @@ export const AfterSalesPage: React.FC = () => {
 
       {/* KPI Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-200/80 dark:border-slate-700 shadow-sm flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-rose-50 dark:bg-rose-950/50 flex items-center justify-center text-rose-600 dark:text-rose-400">
+        <div className="bg-surface p-5 rounded-2xl border border-line/80 dark:border-line-strong shadow-sm flex items-center gap-4">
+          <div className="w-12 h-12 rounded-xl bg-danger-soft dark:bg-danger/50 flex items-center justify-center text-danger ">
             <RotateCcw className="w-6 h-6" />
           </div>
           <div>
-            <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">إجمالي المرتجعات</div>
-            <div className="text-2xl font-black text-slate-900 dark:text-white mt-0.5">{stats?.count ?? 0} عملية</div>
-            <div className="text-[11px] text-rose-600 dark:text-rose-400 font-semibold mt-0.5">
+            <div className="text-xs text-muted font-medium">إجمالي المرتجعات</div>
+            <div className="text-2xl font-black text-ink dark:text-white mt-0.5">{stats?.count ?? 0} عملية</div>
+            <div className="text-[11px] text-danger font-semibold mt-0.5">
               بقيمة {fmtCurrency(stats?.totalAmount || 0)}
             </div>
           </div>
         </div>
 
-        <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-200/80 dark:border-slate-700 shadow-sm flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-purple-50 dark:bg-purple-950/50 flex items-center justify-center text-purple-600 dark:text-purple-400">
+        <div className="bg-surface p-5 rounded-2xl border border-line/80 dark:border-line-strong shadow-sm flex items-center gap-4">
+          <div className="w-12 h-12 rounded-xl bg-accent-soft dark:bg-primary/50 flex items-center justify-center text-primary ">
             <ArrowRightLeft className="w-6 h-6" />
           </div>
           <div>
-            <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">إشعارات دائنة (أرصدة عملاء)</div>
-            <div className="text-2xl font-black text-slate-900 dark:text-white mt-0.5">
+            <div className="text-xs text-muted font-medium">إشعارات دائنة (أرصدة عملاء)</div>
+            <div className="text-2xl font-black text-ink dark:text-white mt-0.5">
               {fmtCurrency(stats?.creditedToBalance || 0)}
             </div>
-            <div className="text-[11px] text-purple-600 dark:text-purple-400 font-semibold mt-0.5">
+            <div className="text-[11px] text-primary font-semibold mt-0.5">
               رصيد متاح لمشتريات قادمة
             </div>
           </div>
         </div>
 
-        <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-200/80 dark:border-slate-700 shadow-sm flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
+        <div className="bg-surface p-5 rounded-2xl border border-line/80 dark:border-line-strong shadow-sm flex items-center gap-4">
+          <div className="w-12 h-12 rounded-xl bg-success-soft dark:bg-success/50 flex items-center justify-center text-success ">
             <DollarSign className="w-6 h-6" />
           </div>
           <div>
-            <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">مستردات نقدية / بنكية</div>
-            <div className="text-2xl font-black text-slate-900 dark:text-white mt-0.5">
+            <div className="text-xs text-muted font-medium">مستردات نقدية / بنكية</div>
+            <div className="text-2xl font-black text-ink dark:text-white mt-0.5">
               {fmtCurrency(stats?.cashRefunded || 0)}
             </div>
-            <div className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold mt-0.5">
+            <div className="text-[11px] text-success font-semibold mt-0.5">
               منصرف من الخزينة أو البنك
             </div>
           </div>
         </div>
 
-        <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-200/80 dark:border-slate-700 shadow-sm flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-sky-50 dark:bg-sky-950/50 flex items-center justify-center text-sky-600 dark:text-sky-400">
+        <div className="bg-surface p-5 rounded-2xl border border-line/80 dark:border-line-strong shadow-sm flex items-center gap-4">
+          <div className="w-12 h-12 rounded-xl bg-accent-soft dark:bg-primary/50 flex items-center justify-center text-primary ">
             <ShieldCheck className="w-6 h-6" />
           </div>
           <div>
-            <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">مرتجعات اليوم</div>
-            <div className="text-2xl font-black text-slate-900 dark:text-white mt-0.5">{stats?.todayCount ?? 0} عملية</div>
-            <div className="text-[11px] text-sky-600 dark:text-sky-400 font-semibold mt-0.5">
+            <div className="text-xs text-muted font-medium">مرتجعات اليوم</div>
+            <div className="text-2xl font-black text-ink dark:text-white mt-0.5">{stats?.todayCount ?? 0} عملية</div>
+            <div className="text-[11px] text-primary font-semibold mt-0.5">
               بقيمة {fmtCurrency(stats?.todayAmount || 0)}
             </div>
           </div>
@@ -202,14 +202,14 @@ export const AfterSalesPage: React.FC = () => {
       </div>
 
       {/* Tabs and Filters Navigation */}
-      <div className="bg-white dark:bg-slate-800 p-4 rounded-2xl border border-slate-200/80 dark:border-slate-700 shadow-sm flex flex-col md:flex-row justify-between items-center gap-4">
+      <div className="bg-surface p-4 rounded-2xl border border-line/80 dark:border-line-strong shadow-sm flex flex-col md:flex-row justify-between items-center gap-4">
         {/* Navigation Tabs */}
-        <div className="flex bg-slate-100 dark:bg-slate-700/60 p-1 rounded-xl w-full md:w-auto">
+        <div className="flex bg-surface-sunken dark:bg-primary/60 p-1 rounded-xl w-full md:w-auto">
           <button
             onClick={() => setActiveTab('returns')}
             className={getTabButtonClass(
               viewTab === 'returns',
-              'bg-white dark:bg-slate-800 text-rose-600 dark:text-rose-400 shadow-sm'
+              'bg-surface text-danger shadow-sm'
             )}
           >
             <RotateCcw className="w-4 h-4" />
@@ -219,7 +219,7 @@ export const AfterSalesPage: React.FC = () => {
             onClick={() => setActiveTab('warranty')}
             className={getTabButtonClass(
               viewTab === 'warranty',
-              'bg-white dark:bg-slate-800 text-sky-600 dark:text-sky-400 shadow-sm'
+              'bg-surface text-primary shadow-sm'
             )}
           >
             <ShieldCheck className="w-4 h-4" />
@@ -230,7 +230,7 @@ export const AfterSalesPage: React.FC = () => {
             onClick={() => setActiveTab('analytics')}
             className={getTabButtonClass(
               viewTab === 'analytics',
-              'bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-sm'
+              'bg-surface text-primary shadow-sm'
             )}
           >
             <PieIcon className="w-4 h-4" />
@@ -242,13 +242,13 @@ export const AfterSalesPage: React.FC = () => {
         {/* Search */}
         <div className="flex items-center gap-3 w-full md:w-auto">
           <div className="relative flex-1 md:w-72">
-            <Search className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2" />
+            <Search className="w-4 h-4 text-muted absolute right-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
               placeholder="بحث بالرقم أو العميل أو الفاتورة..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-3 pr-9 py-2 text-sm bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500"
+              className="w-full pl-3 pr-9 py-2 text-sm bg-surface-muted dark:bg-primary/50 border border-line rounded-xl focus:outline-none focus:ring-2 focus:ring-danger"
             />
           </div>
         </div>
@@ -256,13 +256,13 @@ export const AfterSalesPage: React.FC = () => {
 
       {/* Main Tab Content */}
       {loading ? (
-        <div className="flex flex-col items-center justify-center p-16 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200/80 dark:border-slate-700">
-          <Loader2 className="w-8 h-8 text-rose-600 animate-spin mb-3" />
-          <p className="text-sm text-slate-500">جاري تحميل البيانات...</p>
+        <div className="flex flex-col items-center justify-center p-16 bg-surface rounded-2xl border border-line/80 dark:border-line-strong">
+          <Loader2 className="w-8 h-8 text-danger animate-spin mb-3" />
+          <p className="text-sm text-muted">جاري تحميل البيانات...</p>
         </div>
       ) : viewTab === 'returns' ? (
         /* Returns Table */
-        <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200/80 dark:border-slate-700 shadow-sm overflow-hidden">
+        <div className="bg-surface rounded-2xl border border-line/80 dark:border-line-strong shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
             <DataTable
               ariaLabel="عمليات الإرجاع"
@@ -272,29 +272,29 @@ export const AfterSalesPage: React.FC = () => {
               columns={[
                 {
                   key: 'num', header: 'رقم الإشعار',
-                  render: (ret) => <span className="font-bold font-mono text-rose-600 dark:text-rose-400 flex items-center gap-1.5"><RotateCcw className="w-3.5 h-3.5" />{ret.returnNumber}</span>,
+                  render: (ret) => <span className="font-bold font-mono text-danger flex items-center gap-1.5"><RotateCcw className="w-3.5 h-3.5" />{ret.returnNumber}</span>,
                 },
-                { key: 'invoice', header: 'الفاتورة الأصلية', render: (ret) => <span className="font-mono text-xs font-semibold text-slate-700 dark:text-slate-300">{ret.invoiceNumber || '—'}</span> },
-                { key: 'customer', header: 'العميل', render: (ret) => <span className="font-semibold text-slate-900 dark:text-white">{ret.customerName || 'عميل نقدي'}</span> },
-                { key: 'date', header: 'التاريخ', render: (ret) => <span className="text-xs text-slate-500 font-mono">{ret.date ? ret.date.substring(0, 10) : '—'}</span> },
-                { key: 'reason', header: 'سبب الإرجاع', render: (ret) => <span className="text-slate-700 dark:text-slate-300 max-w-xs truncate block">{ret.reason || 'إرجاع بضاعة'}</span> },
-                { key: 'total', header: 'إجمالي المرتجع', render: (ret) => <span className="font-bold text-slate-900 dark:text-white">{fmtCurrency(ret.totalAmount)}</span> },
-                { key: 'cash', header: 'المسترد نقداً', render: (ret) => <span className="font-semibold text-emerald-600 dark:text-emerald-400">{fmtCurrency(ret.refundedAmount || 0)}</span> },
-                { key: 'balance', header: 'المضاف للرصيد', render: (ret) => <span className="font-semibold text-purple-600 dark:text-purple-400">{fmtCurrency(ret.remainingToBalance || 0)}</span> },
+                { key: 'invoice', header: 'الفاتورة الأصلية', render: (ret) => <span className="font-mono text-xs font-semibold text-ink ">{ret.invoiceNumber || '—'}</span> },
+                { key: 'customer', header: 'العميل', render: (ret) => <span className="font-semibold text-ink dark:text-white">{ret.customerName || 'عميل نقدي'}</span> },
+                { key: 'date', header: 'التاريخ', render: (ret) => <span className="text-xs text-muted font-mono">{ret.date ? ret.date.substring(0, 10) : '—'}</span> },
+                { key: 'reason', header: 'سبب الإرجاع', render: (ret) => <span className="text-ink max-w-xs truncate block">{ret.reason || 'إرجاع بضاعة'}</span> },
+                { key: 'total', header: 'إجمالي المرتجع', render: (ret) => <span className="font-bold text-ink dark:text-white">{fmtCurrency(ret.totalAmount)}</span> },
+                { key: 'cash', header: 'المسترد نقداً', render: (ret) => <span className="font-semibold text-success ">{fmtCurrency(ret.refundedAmount || 0)}</span> },
+                { key: 'balance', header: 'المضاف للرصيد', render: (ret) => <span className="font-semibold text-primary ">{fmtCurrency(ret.remainingToBalance || 0)}</span> },
                 {
                   key: 'actions', header: 'إجراءات', align: 'center',
                   render: (ret) => (
                     <span className="flex items-center justify-center gap-1.5">
                       <button
                         onClick={() => handleViewReturn(ret)}
-                        className="p-1.5 text-slate-500 hover:text-sky-600 dark:hover:text-sky-400 bg-slate-100 dark:bg-slate-700 rounded-lg transition"
+                        className="p-1.5 text-muted hover:text-primary dark:hover:text-primary bg-surface-sunken rounded-lg transition"
                         title="عرض تفاصيل المرتجع"
                       >
                         <Eye className="w-4 h-4" />
                       </button>
                       <button
                         onClick={() => handlePrintReturn(ret)}
-                        className="p-1.5 text-slate-500 hover:text-rose-600 dark:hover:text-rose-400 bg-slate-100 dark:bg-slate-700 rounded-lg transition"
+                        className="p-1.5 text-muted hover:text-danger dark:hover:text-danger bg-surface-sunken rounded-lg transition"
                         title="طباعة إشعار دائن"
                       >
                         <Printer className="w-4 h-4" />
@@ -312,14 +312,14 @@ export const AfterSalesPage: React.FC = () => {
       ) : (
         /* Analytics of Return Reasons */
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200/80 dark:border-slate-700 shadow-sm">
-            <h3 className="font-black text-slate-900 dark:text-white text-base mb-4 flex items-center gap-2">
-              <PieIcon className="w-5 h-5 text-indigo-600" />
+          <div className="bg-surface p-6 rounded-2xl border border-line/80 dark:border-line-strong shadow-sm">
+            <h3 className="font-black text-ink dark:text-white text-base mb-4 flex items-center gap-2">
+              <PieIcon className="w-5 h-5 text-primary" />
               أكثر أسباب المرتجعات تكراراً
             </h3>
             <div className="space-y-4">
               {topReasons.length === 0 ? (
-                <p className="text-slate-400 text-sm text-center py-8">لا توجد بيانات مرتجعات مسجلة حتى الآن.</p>
+                <p className="text-muted text-sm text-center py-8">لا توجد بيانات مرتجعات مسجلة حتى الآن.</p>
               ) : (
                 topReasons.map((r, i) => {
                   const totalCount = stats?.count || 1;
@@ -327,14 +327,14 @@ export const AfterSalesPage: React.FC = () => {
                   return (
                     <div key={i} className="space-y-1.5">
                       <div className="flex justify-between items-center text-xs font-bold">
-                        <span className="text-slate-800 dark:text-slate-200">{r.reason}</span>
-                        <span className="text-slate-500">
+                        <span className="text-ink ">{r.reason}</span>
+                        <span className="text-muted">
                           {r.count} عملية ({fmtCurrency(r.amount)})
                         </span>
                       </div>
-                      <div className="w-full bg-slate-100 dark:bg-slate-700 h-2.5 rounded-full overflow-hidden">
+                      <div className="w-full bg-surface-sunken h-2.5 rounded-full overflow-hidden">
                         <div
-                          className="bg-indigo-600 h-full rounded-full transition-all duration-500"
+                          className="bg-primary h-full rounded-full transition-all duration-500"
                           style={{ width: `${percent}%` }}
                         />
                       </div>
@@ -345,15 +345,15 @@ export const AfterSalesPage: React.FC = () => {
             </div>
           </div>
 
-          <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200/80 dark:border-slate-700 shadow-sm flex flex-col justify-between">
+          <div className="bg-surface p-6 rounded-2xl border border-line/80 dark:border-line-strong shadow-sm flex flex-col justify-between">
             <div>
-              <h3 className="font-black text-slate-900 dark:text-white text-base mb-4 flex items-center gap-2">
-                <Award className="w-5 h-5 text-amber-500" />
+              <h3 className="font-black text-ink dark:text-white text-base mb-4 flex items-center gap-2">
+                <Award className="w-5 h-5 text-warning" />
                 توصيات تحسين تجربة العميل وجودة التوريد
               </h3>
-              <ul className="space-y-3 text-xs text-slate-600 dark:text-slate-300">
+              <ul className="space-y-3 text-xs text-ink-secondary ">
                 <li className="flex items-start gap-2">
-                  <span className="w-5 h-5 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 flex items-center justify-center font-bold text-[10px] shrink-0 mt-0.5">
+                  <span className="w-5 h-5 rounded-full bg-success-soft dark:bg-success/60 text-success flex items-center justify-center font-bold text-[10px] shrink-0 mt-0.5">
                     1
                   </span>
                   <span>
@@ -361,7 +361,7 @@ export const AfterSalesPage: React.FC = () => {
                   </span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="w-5 h-5 rounded-full bg-sky-100 dark:bg-sky-950/60 text-sky-600 flex items-center justify-center font-bold text-[10px] shrink-0 mt-0.5">
+                  <span className="w-5 h-5 rounded-full bg-accent-soft dark:bg-primary/60 text-primary flex items-center justify-center font-bold text-[10px] shrink-0 mt-0.5">
                     2
                   </span>
                   <span>
@@ -369,7 +369,7 @@ export const AfterSalesPage: React.FC = () => {
                   </span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="w-5 h-5 rounded-full bg-purple-100 dark:bg-purple-950/60 text-purple-600 flex items-center justify-center font-bold text-[10px] shrink-0 mt-0.5">
+                  <span className="w-5 h-5 rounded-full bg-accent-soft dark:bg-primary/60 text-primary flex items-center justify-center font-bold text-[10px] shrink-0 mt-0.5">
                     3
                   </span>
                   <span>
@@ -379,9 +379,9 @@ export const AfterSalesPage: React.FC = () => {
               </ul>
             </div>
 
-            <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-700 text-xs text-slate-500 flex items-center justify-between">
+            <div className="mt-6 pt-4 border-t border-line text-xs text-muted flex items-center justify-between">
               <span>نظام ضبط الجودة CeramiSys QA</span>
-              <span className="text-emerald-600 font-bold">معدل سلامة التوريد: 98.4%</span>
+              <span className="text-success font-bold">معدل سلامة التوريد: 98.4%</span>
             </div>
           </div>
         </div>
@@ -390,57 +390,57 @@ export const AfterSalesPage: React.FC = () => {
       {/* Return Detail Modal */}
       {selectedReturn && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 w-full max-w-2xl p-6 shadow-2xl animate-in fade-in zoom-in-95">
-            <div className="flex justify-between items-center pb-4 border-b border-slate-100 dark:border-slate-700">
-              <h3 className="text-lg font-black text-slate-900 dark:text-white flex items-center gap-2">
-                <RotateCcw className="w-5 h-5 text-rose-600" />
+          <div className="bg-surface rounded-2xl border border-line w-full max-w-2xl p-6 shadow-2xl animate-in fade-in zoom-in-95">
+            <div className="flex justify-between items-center pb-4 border-b border-line ">
+              <h3 className="text-lg font-black text-ink dark:text-white flex items-center gap-2">
+                <RotateCcw className="w-5 h-5 text-danger" />
                 تفاصيل إشعار المرتجع: {selectedReturn.returnNumber}
               </h3>
               <button
                 onClick={() => setSelectedReturn(null)}
-                className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg"
+                className="p-1 text-muted hover:text-ink-secondary dark:hover:text-muted rounded-lg"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             <div className="space-y-4 mt-4 text-xs">
-              <div className="grid grid-cols-1  sm:grid-cols-4 gap-3 p-3 bg-slate-50 dark:bg-slate-700/50 rounded-xl">
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 p-3 bg-surface-muted dark:bg-primary/50 rounded-xl">
                 <div>
-                  <span className="text-slate-400 block">العميل:</span>
-                  <span className="font-bold text-slate-900 dark:text-white">{selectedReturn.customerName || 'نقدي'}</span>
+                  <span className="text-muted block">العميل:</span>
+                  <span className="font-bold text-ink dark:text-white">{selectedReturn.customerName || 'نقدي'}</span>
                 </div>
                 <div>
-                  <span className="text-slate-400 block">الفاتورة الأصلية:</span>
-                  <span className="font-mono font-bold text-slate-900 dark:text-white">{selectedReturn.invoiceNumber || '—'}</span>
+                  <span className="text-muted block">الفاتورة الأصلية:</span>
+                  <span className="font-mono font-bold text-ink dark:text-white">{selectedReturn.invoiceNumber || '—'}</span>
                 </div>
                 <div>
-                  <span className="text-slate-400 block">إجمالي القيمة:</span>
-                  <span className="font-bold text-rose-600">{fmtCurrency(selectedReturn.totalAmount)}</span>
+                  <span className="text-muted block">إجمالي القيمة:</span>
+                  <span className="font-bold text-danger">{fmtCurrency(selectedReturn.totalAmount)}</span>
                 </div>
                 <div>
-                  <span className="text-slate-400 block">التاريخ:</span>
-                  <span className="font-mono text-slate-700 dark:text-slate-300">{selectedReturn.date}</span>
+                  <span className="text-muted block">التاريخ:</span>
+                  <span className="font-mono text-ink ">{selectedReturn.date}</span>
                 </div>
               </div>
 
               <div>
-                <h4 className="font-bold text-slate-900 dark:text-white mb-2">الأصناف المرتجعة إلى المخزن:</h4>
+                <h4 className="font-bold text-ink dark:text-white mb-2">الأصناف المرتجعة إلى المخزن:</h4>
                 {loadingReturnDetails ? (
-                  <div className="p-8 text-center"><Loader2 className="w-5 h-5 animate-spin mx-auto text-slate-400" /></div>
+                  <div className="p-8 text-center"><Loader2 className="w-5 h-5 animate-spin mx-auto text-muted" /></div>
                 ) : (
-                  <div className="border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden">
+                  <div className="border border-line rounded-xl overflow-hidden">
                     <DataTable
                       ariaLabel="الأصناف المرتجعة"
                       rows={returnItems.map((item, idx) => ({ ...item, __idx: idx }))}
                       rowKey={(item) => `${item.productName}-${item.__idx}`}
                       dense
                       columns={[
-                        { key: 'product', header: 'الصنف', render: (item) => <span className="font-bold text-slate-900 dark:text-white">{item.productName}</span> },
-                        { key: 'qty', header: 'الكمية المرتجعة', render: (item) => <span className="font-semibold text-rose-600">{formatProductQuantity(item.quantityM2, item)}</span> },
+                        { key: 'product', header: 'الصنف', render: (item) => <span className="font-bold text-ink dark:text-white">{item.productName}</span> },
+                        { key: 'qty', header: 'الكمية المرتجعة', render: (item) => <span className="font-semibold text-danger">{formatProductQuantity(item.quantityM2, item)}</span> },
                         { key: 'price', header: 'سعر الوحدة', render: (item) => <span className="font-mono">{fmtCurrency(item.unitPrice)}</span> },
                         { key: 'total', header: 'الإجمالي', render: (item) => <span className="font-bold font-mono">{fmtCurrency(item.totalRefund)}</span> },
-                        { key: 'reason', header: 'السبب', render: () => <span className="text-slate-500">{selectedReturn.reason || 'إرجاع'}</span> },
+                        { key: 'reason', header: 'السبب', render: () => <span className="text-muted">{selectedReturn.reason || 'إرجاع'}</span> },
                       ]}
                     />
                   </div>
@@ -451,7 +451,7 @@ export const AfterSalesPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => handlePrintReturn(selectedReturn)}
-                  className="px-4 py-2 text-xs font-bold text-white bg-slate-800 hover:bg-slate-700 dark:bg-slate-700 dark:hover:bg-slate-600 rounded-xl transition flex items-center gap-1.5"
+                  className="px-4 py-2 text-xs font-bold text-white bg-primary hover:bg-primary dark:hover:bg-primary rounded-xl transition flex items-center gap-1.5"
                 >
                   <Printer className="w-4 h-4" />
                   طباعة إشعار الإرجاع
@@ -459,7 +459,7 @@ export const AfterSalesPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setSelectedReturn(null)}
-                  className="px-4 py-2 text-xs font-bold text-slate-600 dark:text-slate-300 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 rounded-xl transition"
+                  className="px-4 py-2 text-xs font-bold text-ink-secondary bg-surface-sunken hover:bg-surface-sunken rounded-xl transition"
                 >
                   إغلاق
                 </button>

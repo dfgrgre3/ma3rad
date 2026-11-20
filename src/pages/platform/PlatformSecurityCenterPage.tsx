@@ -29,6 +29,7 @@ import { IncidentsTab } from './PlatformSecurityCenterPage/IncidentsTab';
 import { IncidentModal } from './PlatformSecurityCenterPage/IncidentModal';
 import { ApiKeyModal } from './PlatformSecurityCenterPage/ApiKeyModal';
 import { ApiKeyResultModal } from './PlatformSecurityCenterPage/ApiKeyResultModal';
+import { IpBansTab, type PlatformIpBan } from './PlatformSecurityCenterPage/IpBansTab';
 
 import { useToast } from '../../components/ui/Toast';
 
@@ -41,6 +42,8 @@ export const PlatformSecurityCenterPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [ownerAccounts, setOwnerAccounts] = useState<PlatformOwnerAuditEntry[]>([]);
+  const [isCentral, setIsCentral] = useState(false);
+  const [ipBans, setIpBans] = useState<PlatformIpBan[]>([]);
 
   // Filters
   const [loginFilterFailed, setLoginFilterFailed] = useState(false);
@@ -73,16 +76,20 @@ export const PlatformSecurityCenterPage: React.FC = () => {
     setLoading(true);
     try {
       const centralState = getCentralDataSourceState();
+      setIsCentral(centralState.active);
       if (centralState.active) {
-        const [overview, keys, tenantList] = await Promise.all([
+        const [overview, keys, tenantList, bans] = await Promise.all([
           centralPlatformClient.getSecurityOverview(),
           centralPlatformClient.listApiKeys(),
           centralPlatformClient.listTenants(),
+          centralPlatformClient.listIpBans(),
         ]);
         setData(overview as any);
         setApiKeys(keys as any);
         setTenants(tenantList as any);
+        setIpBans(bans as PlatformIpBan[]);
       } else {
+        setIpBans([]);
         setData(platformAdminService.getPlatformSecurityOverview());
         setApiKeys(platformAdminService.listApiKeys());
         setTenants(platformAdminService.listTenants());
@@ -231,6 +238,32 @@ export const PlatformSecurityCenterPage: React.FC = () => {
     }
   };
 
+  // Ban / lift IP
+  const handleBanIp = async (input: { ipAddress: string; reason?: string; expiresAt?: string }) => {
+    if (!confirm(`حظر عنوان IP "${input.ipAddress}"؟ سيتم قطع الجهاز بالكامل عن المنصة فوراً.`)) return;
+    try {
+      await centralPlatformClient.banIp(input);
+      toast.success('تم حظر عنوان IP.');
+      loadSecurity();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'تعذر حظر عنوان IP.');
+      throw err;
+    }
+  };
+
+  const handleLiftIpBan = (id: string) => {
+    if (!confirm('هل أنت متأكد من فك حظر عنوان IP هذا؟')) return;
+    void (async () => {
+      try {
+        await centralPlatformClient.liftIpBan(id);
+        toast.success('تم فك الحظر.');
+        loadSecurity();
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'تعذر فك الحظر.');
+      }
+    })();
+  };
+
   // 2FA policy card toggle (overview tab)
   const handleToggleMfaPolicy = () => {
     if (!canManageSecurity || !data) return;
@@ -260,9 +293,9 @@ export const PlatformSecurityCenterPage: React.FC = () => {
 
   if (error) {
     return (
-      <div role="alert" className="rounded-xl border border-rose-800 bg-rose-950/40 p-5 text-rose-200">
+      <div role="alert" className="rounded-xl border border-danger bg-danger/40 p-5 text-danger">
         <div className="flex items-center gap-2">
-          <AlertTriangle className="h-6 w-6 text-rose-400" />
+          <AlertTriangle className="h-6 w-6 text-danger" />
           <span className="font-bold">{error}</span>
         </div>
       </div>
@@ -272,8 +305,8 @@ export const PlatformSecurityCenterPage: React.FC = () => {
   if (loading || !data) {
     return (
       <div className="flex min-h-[400px] items-center justify-center">
-        <div className="flex items-center gap-3 text-slate-400">
-          <RefreshCw className="h-5 w-5 animate-spin text-emerald-400" />
+        <div className="flex items-center gap-3 text-muted">
+          <RefreshCw className="h-5 w-5 animate-spin text-success" />
           <span>جارٍ فحص وتحليل الحالة الأمنية المركزية للمنصة...</span>
         </div>
       </div>
@@ -286,7 +319,7 @@ export const PlatformSecurityCenterPage: React.FC = () => {
       <PageHeader
         title="مركز الأمان المركزي (Central Security Center)"
         description="المراقبة الأمنية لمسؤولي المنصة، رصد محاولات الاختراق، إدارة الجلسات ومفاتيح التوقيع الرقمي، والاستجابة للطوارئ."
-        icon={<ShieldCheck className="h-6 w-6 text-emerald-400" />}
+        icon={<ShieldCheck className="h-6 w-6 text-success" />}
         actions={
           <div className="flex items-center gap-2">
             <Button
@@ -378,6 +411,17 @@ export const PlatformSecurityCenterPage: React.FC = () => {
           canManageSecurity={canManageSecurity}
           onOpenIncidentModal={() => setIsIncidentModalOpen(true)}
           onRespondIncident={handleRespondIncident}
+        />
+      )}
+
+      {/* TAB 6: IP BANS */}
+      {tab === 'IP_BANS' && (
+        <IpBansTab
+          bans={ipBans}
+          canManageSecurity={canManageSecurity}
+          isCentral={isCentral}
+          onBan={handleBanIp}
+          onLift={handleLiftIpBan}
         />
       )}
 

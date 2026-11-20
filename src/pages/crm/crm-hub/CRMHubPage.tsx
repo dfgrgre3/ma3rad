@@ -44,11 +44,11 @@ export const CRMHubPage: React.FC = () => {
   const ActivePage = activeTab ? PAGE_BY_TAB[activeTab as keyof typeof PAGE_BY_TAB] : null;
 
   if (matchedTab && !matchedAllowed) {
-    return <div className="flex h-full items-center justify-center p-6 text-sm font-bold text-slate-500">لا تملك صلاحية الوصول إلى هذا القسم من مركز CRM.</div>;
+    return <div className="flex h-full items-center justify-center p-6 text-sm font-bold text-muted">لا تملك صلاحية الوصول إلى هذا القسم من مركز CRM.</div>;
   }
 
   if (!activeTab || !ActivePage) {
-    return <div className="flex h-full items-center justify-center p-6 text-sm font-bold text-slate-500">لا تملك صلاحية الوصول إلى مركز CRM.</div>;
+    return <div className="flex h-full items-center justify-center p-6 text-sm font-bold text-muted">لا تملك صلاحية الوصول إلى مركز CRM.</div>;
   }
 
   return (

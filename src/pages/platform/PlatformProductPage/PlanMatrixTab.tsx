@@ -16,14 +16,14 @@ interface PlanMatrixTabProps {
 
 const SectionHeader: React.FC<{ icon: React.ReactNode; title: string; hint: string; count: number }> = ({ icon, title, hint, count }) => (
   <tr>
-    <td colSpan={999} className="border-b border-slate-200 bg-slate-50 px-4 py-2">
+    <td colSpan={999} className="border-b border-line bg-surface-muted px-4 py-2">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="flex items-center gap-2 text-[11.5px] font-black text-slate-700">
-          <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-white text-slate-500 ring-1 ring-slate-200">{icon}</span>
+        <p className="flex items-center gap-2 text-[11.5px] font-black text-ink">
+          <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-surface text-muted ring-1 ring-line-strong">{icon}</span>
           {title}
-          <span className="rounded-full bg-white px-2 py-0.5 text-[9.5px] font-bold text-slate-500 ring-1 ring-slate-200">{count}</span>
+          <span className="rounded-full bg-surface px-2 py-0.5 text-[9.5px] font-bold text-muted ring-1 ring-line-strong">{count}</span>
         </p>
-        <p className="text-[10px] font-semibold text-slate-400">{hint}</p>
+        <p className="text-[10px] font-semibold text-muted">{hint}</p>
       </div>
     </td>
   </tr>
@@ -49,13 +49,13 @@ export const PlanMatrixTab: React.FC<PlanMatrixTabProps> = ({
     section === 'modules' ? (plan.includedModules ?? []).length : (plan.features ?? []).length;
 
   const renderRow = (section: 'modules' | 'features', item: { id: string; code: string; name: string; description?: string | null; category?: string | null }) => (
-    <tr key={`${section}:${item.id || item.code}`} className="border-b border-slate-100 last:border-0 hover:bg-slate-50/60">
-      <td className="sticky right-0 min-w-[220px] bg-white px-4 py-2.5">
-        <p className="flex flex-wrap items-center gap-1.5 text-[12px] font-bold text-slate-800">
+    <tr key={`${section}:${item.id || item.code}`} className="border-b border-line last:border-0 hover:bg-surface-muted/60">
+      <td className="sticky right-0 min-w-[220px] bg-surface px-4 py-2.5">
+        <p className="flex flex-wrap items-center gap-1.5 text-[12px] font-bold text-ink">
           {item.name}
-          <span className="font-mono text-[9.5px] font-normal text-slate-400" dir="ltr">{item.code}</span>
+          <span className="font-mono text-[9.5px] font-normal text-muted" dir="ltr">{item.code}</span>
         </p>
-        {item.description && <p className="mt-0.5 line-clamp-1 text-[10px] text-slate-400">{item.description}</p>}
+        {item.description && <p className="mt-0.5 line-clamp-1 text-[10px] text-muted">{item.description}</p>}
       </td>
       {plans.map((plan) => {
         const checked = isChecked(plan, section, item.code);
@@ -66,7 +66,7 @@ export const PlanMatrixTab: React.FC<PlanMatrixTabProps> = ({
               checked={checked}
               disabled={!canManageProduct || saving || centralActive}
               onChange={(event) => onToggle(plan, section, item.code, event.target.checked)}
-              className="h-4 w-4 cursor-pointer accent-emerald-600 disabled:cursor-not-allowed disabled:opacity-40"
+              className="h-4 w-4 cursor-pointer accent-success disabled:cursor-not-allowed disabled:opacity-40"
               aria-label={`${item.name} — ${plan.name}`}
             />
           </td>
@@ -78,20 +78,20 @@ export const PlanMatrixTab: React.FC<PlanMatrixTabProps> = ({
   return (
     <div className="space-y-3">
       {centralActive && <CentralUnsupportedNotice feature="تعديل مصفوفة الخطط" />}
-      <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+      <div className="overflow-x-auto rounded-xl border border-line bg-surface shadow-sm">
         <table className="w-full min-w-[720px] border-collapse text-right">
           <thead>
-            <tr className="border-b border-slate-200 bg-slate-50">
-              <th className="sticky right-0 min-w-[220px] bg-slate-50 px-4 py-3 text-[11px] font-black text-slate-600">
+            <tr className="border-b border-line bg-surface-muted">
+              <th className="sticky right-0 min-w-[220px] bg-surface-muted px-4 py-3 text-[11px] font-black text-ink-secondary">
                 الصفحة / الميزة
               </th>
               {plans.map((plan) => (
                 <th key={plan.id} className="min-w-[110px] px-3 py-3 text-center">
-                  <p className="text-[11.5px] font-black text-slate-800">{plan.name}</p>
-                  <p className="mt-0.5 text-[9.5px] font-semibold text-slate-400" dir="ltr">
+                  <p className="text-[11.5px] font-black text-ink">{plan.name}</p>
+                  <p className="mt-0.5 text-[9.5px] font-semibold text-muted" dir="ltr">
                     {formatMoney(plan.price, plan.currency)}
                   </p>
-                  <p className="text-[9px] font-bold text-emerald-600">
+                  <p className="text-[9px] font-bold text-success">
                     {includedCount(plan, 'modules')} وحدة · {includedCount(plan, 'features')} ميزة
                   </p>
                 </th>
@@ -117,7 +117,7 @@ export const PlanMatrixTab: React.FC<PlanMatrixTabProps> = ({
         </table>
       </div>
       {!canManageProduct && (
-        <p className="text-[11px] font-semibold text-slate-400">تحتاج صلاحية إدارة المنتج لتعديل المصفوفة.</p>
+        <p className="text-[11px] font-semibold text-muted">تحتاج صلاحية إدارة المنتج لتعديل المصفوفة.</p>
       )}
     </div>
   );

@@ -21,23 +21,23 @@ export const TicketDetailHeader: React.FC<TicketDetailHeaderProps> = ({
   onAssignChange,
   onOpenRateModal,
 }) => (
-  <div className="border-b border-slate-800 p-4 bg-slate-950/60">
+  <div className="border-b border-line-strong p-4 bg-primary/60">
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div>
         <div className="flex items-center gap-2">
-          <span className="rounded bg-emerald-500/20 text-emerald-300 px-2 py-0.5 text-xs font-bold">
+          <span className="rounded bg-success/20 text-success px-2 py-0.5 text-xs font-bold">
             {details.ticket.tenantName || details.ticket.tenantId}
           </span>
-          <span className="text-xs text-slate-400">#{details.ticket.id}</span>
+          <span className="text-xs text-muted">#{details.ticket.id}</span>
           {details.ticket.rating && (
-            <span className="flex items-center gap-1 rounded bg-amber-500/20 text-amber-300 px-2 py-0.5 text-xs font-bold">
-              <Star className="h-3 w-3 fill-amber-300" /> {details.ticket.rating} نجوم
+            <span className="flex items-center gap-1 rounded bg-warning/20 text-warning px-2 py-0.5 text-xs font-bold">
+              <Star className="h-3 w-3 fill-warning" /> {details.ticket.rating} نجوم
             </span>
           )}
         </div>
-        <h2 className="mt-1 text-base font-black text-slate-100">{details.ticket.subject}</h2>
+        <h2 className="mt-1 text-base font-black text-muted">{details.ticket.subject}</h2>
         {details.ticket.description && (
-          <p className="mt-1 text-xs text-slate-300 leading-relaxed bg-slate-900/80 p-2.5 rounded-lg border border-slate-800">
+          <p className="mt-1 text-xs text-muted leading-relaxed bg-primary/80 p-2.5 rounded-lg border border-line-strong">
             {details.ticket.description}
           </p>
         )}
@@ -76,7 +76,7 @@ export const TicketDetailHeader: React.FC<TicketDetailHeaderProps> = ({
             variant="secondary"
             disabled={!canManageSupport}
             onClick={onOpenRateModal}
-            leadingIcon={<Star className="h-3.5 w-3.5 text-amber-400" />}
+            leadingIcon={<Star className="h-3.5 w-3.5 text-warning" />}
           >
             تقييم
           </Button>
@@ -85,10 +85,10 @@ export const TicketDetailHeader: React.FC<TicketDetailHeaderProps> = ({
     </div>
 
     {/* Sub-bar: SLA & Assignee */}
-    <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-400 pt-3 border-t border-slate-800/80">
+    <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-xs text-muted pt-3 border-t border-line-strong/80">
       <div className="flex items-center gap-3">
         <span className="flex items-center gap-1">
-          <UserCheck className="h-3.5 w-3.5 text-slate-400" />
+          <UserCheck className="h-3.5 w-3.5 text-muted" />
           مسؤول:
         </span>
         <input
@@ -97,19 +97,19 @@ export const TicketDetailHeader: React.FC<TicketDetailHeaderProps> = ({
           disabled={!canManageSupport}
           onBlur={(e) => onAssignChange(e.target.value)}
           placeholder="اسم الموظف (منصة الدعم)"
-          className="rounded border border-transparent hover:border-slate-700 bg-transparent px-2 py-0.5 text-xs text-slate-200 focus:border-emerald-500 focus:bg-slate-900"
+          className="rounded border border-transparent hover:border-line-strong bg-transparent px-2 py-0.5 text-xs text-muted focus:border-success focus:bg-primary"
         />
       </div>
 
       {details.ticket.slaDueAt && (
         <div className="flex items-center gap-1.5">
-          <Clock className="h-3.5 w-3.5 text-slate-400" />
+          <Clock className="h-3.5 w-3.5 text-muted" />
           <span>موعد SLA:</span>
           <span
             className={`font-bold ${
               new Date(details.ticket.slaDueAt).getTime() < Date.now()
-                ? 'text-rose-400'
-                : 'text-emerald-400'
+                ? 'text-danger'
+                : 'text-success'
             }`}
           >
             {formatDateTime(details.ticket.slaDueAt)}

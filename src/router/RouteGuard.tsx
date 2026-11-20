@@ -16,8 +16,8 @@ import type { User } from '../types';
 export const PageLoader: React.FC = () => (
   <div className="flex-1 flex items-center justify-center h-full">
     <div className="flex flex-col items-center gap-3">
-      <div className="w-7 h-7 border-2 border-slate-200 border-t-sky-600 rounded-full animate-spin" />
-      <p className="text-xs text-slate-500 font-medium">
+      <div className="w-7 h-7 border-2 border-line border-primary rounded-full animate-spin" />
+      <p className="text-xs text-muted font-medium">
         <ConfigText k="shell.loading" fallback="جاري التحميل..." />
       </p>
     </div>
@@ -46,7 +46,7 @@ export const ModuleGuard: React.FC<ModuleGuardProps> = ({ currentUser, children 
 
   if (!PermissionService.canAccessPage(currentUser, pathname)) {
     return (
-      <div role="alert" className="flex h-full items-center justify-center p-6 text-sm font-semibold text-slate-600">
+      <div role="alert" className="flex h-full items-center justify-center p-6 text-sm font-semibold text-ink-secondary">
         ليس لديك صلاحية للوصول إلى هذه الصفحة.
       </div>
     );

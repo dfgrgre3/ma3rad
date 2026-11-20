@@ -32,7 +32,7 @@ export const OpenShiftModal: React.FC<{
       <button
         onClick={onConfirm}
         disabled={!registerId || registers.length === 0}
-        className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-sm flex items-center justify-center gap-2"
+        className="w-full py-2.5 bg-success hover:bg-success text-white font-bold rounded-xl text-sm flex items-center justify-center gap-2"
       >
         <Unlock className="w-4 h-4" /> فتح الوردية
       </button>

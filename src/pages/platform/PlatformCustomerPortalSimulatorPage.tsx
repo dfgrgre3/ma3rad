@@ -56,10 +56,10 @@ export const PlatformCustomerPortalSimulatorPage: React.FC = () => {
       <PageHeader
         title="بوابة العملاء المركزية (Customer Portal)"
         description="واجهة العميل النهائي للاطلاع على اشتراكه وفواتيره وتراخيصه وأجهزته وإدارة مستخدميه — وفق صلاحياته فقط."
-        icon={<Building2 className="h-5 w-5 text-sky-400" />}
+        icon={<Building2 className="h-5 w-5 text-primary" />}
       />
 
-      <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-900">
+      <div className="flex items-start gap-3 rounded-xl border border-warning-border bg-warning-soft p-4 text-warning">
         <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
         <div className="space-y-1 text-sm leading-relaxed">
           <p className="font-bold">بوابة العملاء غير مفعّلة للإنتاج بعد</p>
@@ -70,33 +70,33 @@ export const PlatformCustomerPortalSimulatorPage: React.FC = () => {
         </div>
       </div>
 
-      <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-4">
-        <h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-slate-100">
-          <ShieldAlert className="h-4 w-4 text-rose-400" />
+      <div className="rounded-xl border border-line-strong bg-primary/70 p-4">
+        <h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-muted">
+          <ShieldAlert className="h-4 w-4 text-danger" />
           متطلبات الجاهزية (حالة حقيقية)
         </h3>
         <ul className="space-y-3">
           {checks.map((item) => (
-            <li key={item.label} className="flex items-start gap-3 rounded-lg border border-slate-800 bg-slate-950/40 p-3">
+            <li key={item.label} className="flex items-start gap-3 rounded-lg border border-line-strong bg-primary/40 p-3">
               <span
                 className={`mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${
-                  item.ok ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'
+                  item.ok ? 'bg-success/20 text-success' : 'bg-danger/20 text-danger'
                 }`}
                 aria-label={item.ok ? 'متوفر' : 'غير متوفر'}
               >
                 {item.ok ? '✓' : '×'}
               </span>
               <div className="min-w-0">
-                <p className="text-xs font-bold text-slate-100">{item.label}</p>
-                <p className="mt-0.5 text-[11px] leading-relaxed text-slate-400">{item.detail}</p>
+                <p className="text-xs font-bold text-muted">{item.label}</p>
+                <p className="mt-0.5 text-[11px] leading-relaxed text-muted">{item.detail}</p>
               </div>
             </li>
           ))}
         </ul>
       </div>
 
-      <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4 text-xs text-slate-400 leading-relaxed">
-        <p className="flex items-center gap-2 font-semibold text-slate-300">
+      <div className="rounded-xl border border-line-strong bg-primary/60 p-4 text-xs text-muted leading-relaxed">
+        <p className="flex items-center gap-2 font-semibold text-muted">
           <ExternalLink className="h-3.5 w-3.5" />
           ملاحظة تشغيلية
         </p>

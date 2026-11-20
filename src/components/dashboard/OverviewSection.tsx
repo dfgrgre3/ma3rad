@@ -62,24 +62,24 @@ export const OverviewSection: React.FC<OverviewSectionProps> = ({ onDataLoaded }
 
   if (!metrics && loading) {
     return (
-      <div className="flex flex-col items-center justify-center py-12 text-center text-slate-500">
-        <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-lg bg-sky-100 dark:bg-sky-950">
-          <Activity className="h-4 w-4 text-sky-600 dark:text-sky-400" />
+      <div className="flex flex-col items-center justify-center py-12 text-center text-muted">
+        <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-lg bg-accent-soft ">
+          <Activity className="h-4 w-4 text-primary " />
         </div>
-        <p className="text-xs font-bold text-slate-600 dark:text-slate-400">جاري استرجاع بيانات لوحة المؤشرات...</p>
+        <p className="text-xs font-bold text-ink-secondary ">جاري استرجاع بيانات لوحة المؤشرات...</p>
       </div>
     );
   }
 
   if (!metrics) {
     return (
-      <div className="rounded-xl border border-rose-200 bg-rose-50 p-6 text-center dark:border-rose-900 dark:bg-rose-950/30" role="alert">
-        <AlertTriangle className="mx-auto mb-2 h-6 w-6 text-rose-500" />
-        <p className="text-xs font-bold text-rose-800 dark:text-rose-200">{dashboardError || 'تعذر تحميل مؤشرات النظام'}</p>
+      <div className="rounded-xl border border-danger-border bg-danger-soft p-6 text-center dark:bg-danger/30" role="alert">
+        <AlertTriangle className="mx-auto mb-2 h-6 w-6 text-danger" />
+        <p className="text-xs font-bold text-danger ">{dashboardError || 'تعذر تحميل مؤشرات النظام'}</p>
         <button
           type="button"
           onClick={loadData}
-          className="mt-3 rounded-lg bg-rose-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-rose-700"
+          className="mt-3 rounded-lg bg-danger px-3 py-1.5 text-xs font-bold text-white hover:bg-danger"
         >
           إعادة المحاولة
         </button>
@@ -94,9 +94,9 @@ export const OverviewSection: React.FC<OverviewSectionProps> = ({ onDataLoaded }
   return (
     <div className="min-w-0 space-y-3 sm:space-y-4">
       {dashboardError && (
-        <div role="alert" className="flex min-w-0 items-center justify-between gap-3 rounded-lg border border-rose-200 bg-rose-50 p-2.5 text-xs font-semibold text-rose-700 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-300">
+        <div role="alert" className="flex min-w-0 items-center justify-between gap-3 rounded-lg border border-danger-border bg-danger-soft p-2.5 text-xs font-semibold text-danger dark:bg-danger/40 ">
           <span className="flex min-w-0 items-center gap-1.5">
-            <AlertTriangle className="h-4 w-4 shrink-0 text-rose-500" />
+            <AlertTriangle className="h-4 w-4 shrink-0 text-danger" />
             {dashboardError}
           </span>
           <button type="button" onClick={loadData} className="shrink-0 font-bold underline">إعادة المحاولة</button>
@@ -108,7 +108,7 @@ export const OverviewSection: React.FC<OverviewSectionProps> = ({ onDataLoaded }
           type="button"
           onClick={loadData}
           disabled={refreshing}
-          className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 sm:w-auto sm:py-1.5"
+          className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-2 text-xs font-bold text-ink shadow-sm transition hover:bg-surface-muted disabled:opacity-50 dark:hover:bg-primary sm:w-auto sm:py-1.5"
         >
           <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`} />
           {refreshing ? 'جاري التحديث...' : 'تحديث البيانات'}

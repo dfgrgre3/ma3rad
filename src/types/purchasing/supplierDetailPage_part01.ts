@@ -15,18 +15,18 @@ export const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
 ];
 
 export const PAY_STATUS_BADGES: Record<string, { label: string; className: string }> = {
-  PAID: { label: 'مدفوع بالكامل', className: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-  PARTIAL: { label: 'مدفوع جزئياً', className: 'bg-amber-50 text-amber-700 border-amber-200' },
-  UNPAID: { label: 'غير مسدد (آجل)', className: 'bg-rose-50 text-rose-700 border-rose-200' },
+  PAID: { label: 'مدفوع بالكامل', className: 'bg-success-soft text-success border-success-border' },
+  PARTIAL: { label: 'مدفوع جزئياً', className: 'bg-warning-soft text-warning border-warning-border' },
+  UNPAID: { label: 'غير مسدد (آجل)', className: 'bg-danger-soft text-danger border-danger-border' },
 };
 
 export const ORDER_STATUS_BADGES: Record<string, { label: string; className: string }> = {
-  DRAFT: { label: 'مسودة', className: 'bg-slate-100 text-slate-700 border-slate-200' },
-  PENDING: { label: 'معلق', className: 'bg-amber-50 text-amber-700 border-amber-200' },
-  SENT: { label: 'مرسل للمورد', className: 'bg-sky-50 text-sky-700 border-sky-200' },
-  PARTIALLY_RECEIVED: { label: 'مستلم جزئياً', className: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
-  RECEIVED: { label: 'مستلم بالكامل', className: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-  CANCELLED: { label: 'ملغي', className: 'bg-rose-50 text-rose-700 border-rose-200' },
+  DRAFT: { label: 'مسودة', className: 'bg-surface-sunken text-ink border-line' },
+  PENDING: { label: 'معلق', className: 'bg-warning-soft text-warning border-warning-border' },
+  SENT: { label: 'مرسل للمورد', className: 'bg-accent-soft text-primary border-accent-border' },
+  PARTIALLY_RECEIVED: { label: 'مستلم جزئياً', className: 'bg-accent-soft text-primary border-accent-border' },
+  RECEIVED: { label: 'مستلم بالكامل', className: 'bg-success-soft text-success border-success-border' },
+  CANCELLED: { label: 'ملغي', className: 'bg-danger-soft text-danger border-danger-border' },
 };
 
 export interface SupplierInvoiceRow {

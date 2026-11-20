@@ -50,7 +50,7 @@ export const DataScopeModal: React.FC<DataScopeModalProps> = ({
               key={option}
               onClick={() => setScope(option)}
               className={`flex-1 rounded-xl border px-4 py-3 text-xs font-bold transition-all ${
-                scope === option ? 'border-orange-500 bg-orange-500/10 text-orange-300' : 'border-slate-800 text-slate-400 hover:border-slate-700'
+                scope === option ? 'border-warning bg-warning/10 text-warning' : 'border-line-strong text-muted hover:border-line-strong'
               }`}
             >
               {option === 'ALL' ? 'كل العملاء (الافتراضي)' : 'عملاء محددون'}
@@ -60,29 +60,29 @@ export const DataScopeModal: React.FC<DataScopeModalProps> = ({
         {scope === 'LIMITED' && (
           <>
             <input value={tenantSearch} onChange={(e) => setTenantSearch(e.target.value)} placeholder="ابحث باسم العميل أو الكود..." className={inputClass} />
-            <div className="max-h-64 overflow-y-auto rounded-xl border border-slate-800 divide-y divide-slate-800/80">
+            <div className="max-h-64 overflow-y-auto rounded-xl border border-line-strong divide-y divide-primary/80">
               {filteredTenants.length === 0 ? (
-                <p className="px-4 py-6 text-center text-[11px] text-slate-500">لا توجد نتائج مطابقة.</p>
+                <p className="px-4 py-6 text-center text-[11px] text-muted">لا توجد نتائج مطابقة.</p>
               ) : filteredTenants.map((tenant) => {
                 const checked = scopeTenantIds.includes(tenant.id);
                 return (
-                  <label key={tenant.id} className="flex cursor-pointer items-center gap-3 px-4 py-2 hover:bg-slate-800/30">
+                  <label key={tenant.id} className="flex cursor-pointer items-center gap-3 px-4 py-2 hover:bg-primary/30">
                     <input
                       type="checkbox"
                       checked={checked}
                       onChange={() => setScopeTenantIds((prev) => prev.includes(tenant.id) ? prev.filter((id) => id !== tenant.id) : [...prev, tenant.id])}
-                      className="rounded border-slate-700 text-orange-500 focus:ring-orange-500"
+                      className="rounded border-line-strong text-warning focus:ring-warning"
                     />
-                    <span className="text-xs font-bold text-slate-200">{tenant.name}</span>
-                    <span className="text-[10px] font-mono text-slate-500" dir="ltr">{tenant.code}</span>
+                    <span className="text-xs font-bold text-muted">{tenant.name}</span>
+                    <span className="text-[10px] font-mono text-muted" dir="ltr">{tenant.code}</span>
                   </label>
                 );
               })}
             </div>
-            <p className="text-[10px] text-slate-500">{scopeTenantIds.length} عميل محدد — لن يرى الموظف أي عميل خارج هذه القائمة (لا في القوائم ولا بالبحث المباشر).</p>
+            <p className="text-[10px] text-muted">{scopeTenantIds.length} عميل محدد — لن يرى الموظف أي عميل خارج هذه القائمة (لا في القوائم ولا بالبحث المباشر).</p>
           </>
         )}
-        <div className="flex justify-end gap-2 pt-3 border-t border-slate-800">
+        <div className="flex justify-end gap-2 pt-3 border-t border-line-strong">
           <Button variant="secondary" size="sm" onClick={onClose}>إلغاء</Button>
           <Button size="sm" onClick={onSave}>حفظ النطاق</Button>
         </div>

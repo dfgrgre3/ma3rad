@@ -52,10 +52,10 @@ const DELIVERABLE_STATUS_LABELS: Record<ProjectDeliverableStatus, string> = {
 };
 
 const statusBadge: Record<string, string> = {
-  PENDING: 'bg-amber-50 text-amber-700 border-amber-200',
-  APPROVED: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-  REJECTED: 'bg-rose-50 text-rose-700 border-rose-200',
-  CANCELLED: 'bg-slate-100 text-slate-500 border-slate-200',
+  PENDING: 'bg-warning-soft text-warning border-warning-border',
+  APPROVED: 'bg-success-soft text-success border-success-border',
+  REJECTED: 'bg-danger-soft text-danger border-danger-border',
+  CANCELLED: 'bg-surface-sunken text-muted border-line',
 };
 
 type Tab = 'tasks' | 'budget' | 'time' | 'risks' | 'changes' | 'deliverables';
@@ -75,7 +75,7 @@ interface Props {
   canApprove: boolean;
 }
 
-const inputClass = 'w-full rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 text-xs';
+const inputClass = 'w-full rounded-lg border border-line bg-surface-muted px-2 py-1.5 text-xs';
 
 export const ProjectControlsPanel: React.FC<Props> = ({ projectId, canUpdate, canApprove }) => {
   const service = useMemo(() => new ProjectService(), []);
@@ -307,36 +307,36 @@ export const ProjectControlsPanel: React.FC<Props> = ({ projectId, canUpdate, ca
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center rounded-xl border border-slate-200 bg-white p-10">
-        <Loader2 className="h-6 w-6 animate-spin text-sky-500" />
+      <div className="flex items-center justify-center rounded-xl border border-line bg-surface p-10">
+        <Loader2 className="h-6 w-6 animate-spin text-primary" />
       </div>
     );
   }
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white p-2">
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line bg-surface p-2">
         <div className="flex flex-wrap gap-1">
           {TABS.map((item) => (
             <button
               key={item.key}
               onClick={() => setTab(item.key)}
               className={`rounded-lg px-3 py-1.5 text-xs font-bold transition ${
-                tab === item.key ? 'bg-sky-600 text-white' : 'text-slate-600 hover:bg-slate-100'
+                tab === item.key ? 'bg-primary text-white' : 'text-ink-secondary hover:bg-surface-sunken'
               }`}
             >
               {item.label}
             </button>
           ))}
         </div>
-        <button onClick={load} className="rounded-lg border border-slate-200 p-2 text-slate-500" title="تحديث">
+        <button onClick={load} className="rounded-lg border border-line p-2 text-muted" title="تحديث">
           <RefreshCw className="h-4 w-4" />
         </button>
       </div>
 
       {tab === 'tasks' && (
         <div className="grid gap-3 lg:grid-cols-3">
-          <div className="overflow-hidden rounded-xl border border-slate-200 bg-white lg:col-span-2">
+          <div className="overflow-hidden rounded-xl border border-line bg-surface lg:col-span-2">
             <DataTable
                         ariaLabel="مهام المشروع"
                         rows={tasks}
@@ -347,14 +347,14 @@ export const ProjectControlsPanel: React.FC<Props> = ({ projectId, canUpdate, ca
                             key: 'task', header: 'المهمة',
                             render: (task) => (
                               <div>
-                                <p className="font-bold text-slate-800">{task.title}</p>
-                                {task.description && <p className="text-[10px] text-slate-400">{task.description}</p>}
+                                <p className="font-bold text-ink">{task.title}</p>
+                                {task.description && <p className="text-[10px] text-muted">{task.description}</p>}
                               </div>
                             ),
                           },
-                          { key: 'assignee', header: 'المسؤول', render: (task) => <span className="text-slate-600">{task.assigneeName || '—'}</span> },
-                          { key: 'priority', header: 'الأولوية', render: (task) => <span className="text-slate-600">{TASK_PRIORITY_LABELS[task.priority]}</span> },
-                          { key: 'due', header: 'الاستحقاق', render: (task) => <span className="font-mono text-slate-600">{task.dueDate || '—'}</span> },
+                          { key: 'assignee', header: 'المسؤول', render: (task) => <span className="text-ink-secondary">{task.assigneeName || '—'}</span> },
+                          { key: 'priority', header: 'الأولوية', render: (task) => <span className="text-ink-secondary">{TASK_PRIORITY_LABELS[task.priority]}</span> },
+                          { key: 'due', header: 'الاستحقاق', render: (task) => <span className="font-mono text-ink-secondary">{task.dueDate || '—'}</span> },
                           {
                             key: 'deps', header: 'التبعيات',
                             render: (task) => (
@@ -363,18 +363,18 @@ export const ProjectControlsPanel: React.FC<Props> = ({ projectId, canUpdate, ca
                                   const dependency = tasks.find((item) => item.id === dependencyId);
                                   if (!dependency) return null;
                                   return (
-                                    <span key={dependencyId} className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] text-slate-600">
+                                    <span key={dependencyId} className="inline-flex items-center gap-1 rounded-full border border-line bg-surface-muted px-2 py-0.5 text-[10px] text-ink-secondary">
                                       <GitBranch className="h-3 w-3" />
                                       {dependency.title}
                                       {canUpdate && (
-                                        <button onClick={() => removeDependency(task.id, dependencyId)} className="text-slate-400 hover:text-rose-600" title="حذف التبعية">
+                                        <button onClick={() => removeDependency(task.id, dependencyId)} className="text-muted hover:text-danger" title="حذف التبعية">
                                           <X className="h-3 w-3" />
                                         </button>
                                       )}
                                     </span>
                                   );
                                 })}
-                                {(task.dependencyIds || []).length === 0 && <span className="text-slate-400">—</span>}
+                                {(task.dependencyIds || []).length === 0 && <span className="text-muted">—</span>}
                               </div>
                             ),
                           },
@@ -386,7 +386,7 @@ export const ProjectControlsPanel: React.FC<Props> = ({ projectId, canUpdate, ca
                                   <select
                                     value={task.status}
                                     onChange={(event) => setTaskStatus(task, event.target.value as ProjectTaskStatus)}
-                                    className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[10px] font-bold"
+                                    className="rounded-lg border border-line bg-surface px-2 py-1 text-[10px] font-bold"
                                   >
                                     {Object.entries(TASK_STATUS_LABELS).map(([value, label]) => (
                                       <option key={value} value={value}>{label}</option>
@@ -395,14 +395,14 @@ export const ProjectControlsPanel: React.FC<Props> = ({ projectId, canUpdate, ca
                                 ) : (
                                   <span className="text-[10px] font-bold">{TASK_STATUS_LABELS[task.status]}</span>
                                 )}
-                                <span className="mr-1 text-[10px] text-slate-400">{task.progress}%</span>
+                                <span className="mr-1 text-[10px] text-muted">{task.progress}%</span>
                               </div>
                             ),
                           },
                           {
                             key: 'actions', header: '',
                             render: (task) => canUpdate ? (
-                              <button onClick={() => removeTask(task)} className="rounded p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600" title="حذف">
+                              <button onClick={() => removeTask(task)} className="rounded p-1 text-muted hover:bg-danger-soft hover:text-danger" title="حذف">
                                 <Trash2 className="h-3.5 w-3.5" />
                               </button>
                             ) : null,
@@ -414,9 +414,9 @@ export const ProjectControlsPanel: React.FC<Props> = ({ projectId, canUpdate, ca
 
           {canUpdate && (
             <div className="space-y-3">
-              <form onSubmit={submitTask} className="space-y-2 rounded-xl border border-slate-200 bg-white p-3 text-xs">
-                <h3 className="flex items-center gap-1.5 font-black text-slate-900">
-                  <ClipboardList className="h-4 w-4 text-sky-600" /> إضافة مهمة
+              <form onSubmit={submitTask} className="space-y-2 rounded-xl border border-line bg-surface p-3 text-xs">
+                <h3 className="flex items-center gap-1.5 font-black text-ink">
+                  <ClipboardList className="h-4 w-4 text-primary" /> إضافة مهمة
                 </h3>
                 <input required placeholder="عنوان المهمة" value={taskForm.title}
                   onChange={(event) => setTaskForm({ ...taskForm, title: event.target.value })} className={inputClass} />
@@ -436,14 +436,14 @@ export const ProjectControlsPanel: React.FC<Props> = ({ projectId, canUpdate, ca
                     onChange={(event) => setTaskForm({ ...taskForm, dueDate: event.target.value })} className={inputClass} />
                 </div>
                 <button type="submit" disabled={saving}
-                  className="flex w-full items-center justify-center gap-1 rounded-lg bg-sky-600 py-1.5 font-bold text-white disabled:opacity-60">
+                  className="flex w-full items-center justify-center gap-1 rounded-lg bg-primary py-1.5 font-bold text-white disabled:opacity-60">
                   {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />} إضافة
                 </button>
               </form>
 
-              <form onSubmit={addDependency} className="space-y-2 rounded-xl border border-slate-200 bg-white p-3 text-xs">
-                <h3 className="flex items-center gap-1.5 font-black text-slate-900">
-                  <GitBranch className="h-4 w-4 text-violet-600" /> ربط تبعية
+              <form onSubmit={addDependency} className="space-y-2 rounded-xl border border-line bg-surface p-3 text-xs">
+                <h3 className="flex items-center gap-1.5 font-black text-ink">
+                  <GitBranch className="h-4 w-4 text-primary" /> ربط تبعية
                 </h3>
                 <select value={dependencyForm.taskId}
                   onChange={(event) => setDependencyForm({ ...dependencyForm, taskId: event.target.value })} className={inputClass}>
@@ -455,7 +455,7 @@ export const ProjectControlsPanel: React.FC<Props> = ({ projectId, canUpdate, ca
                   <option value="">تعتمد على</option>
                   {tasks.map((task) => <option key={task.id} value={task.id}>{task.title}</option>)}
                 </select>
-                <button type="submit" className="w-full rounded-lg border border-violet-200 bg-violet-50 py-1.5 font-bold text-violet-700">
+                <button type="submit" className="w-full rounded-lg border border-accent-border bg-accent-soft py-1.5 font-bold text-primary">
                   إضافة التبعية
                 </button>
               </form>
@@ -474,23 +474,23 @@ export const ProjectControlsPanel: React.FC<Props> = ({ projectId, canUpdate, ca
                 { label: 'الفرق', value: money(budgetSummary.variance) },
                 { label: 'المتبقي من العقد', value: money(budgetSummary.remainingContract) },
               ].map((card) => (
-                <div key={card.label} className="rounded-xl border border-slate-200 bg-white p-3">
-                  <p className="text-[10px] font-bold text-slate-500">{card.label}</p>
-                  <p className="text-sm font-black text-slate-900">{card.value}</p>
+                <div key={card.label} className="rounded-xl border border-line bg-surface p-3">
+                  <p className="text-[10px] font-bold text-muted">{card.label}</p>
+                  <p className="text-sm font-black text-ink">{card.value}</p>
                 </div>
               ))}
             </div>
           )}
           <div className="grid gap-3 lg:grid-cols-3">
-            <div className="overflow-hidden rounded-xl border border-slate-200 bg-white lg:col-span-2">
+            <div className="overflow-hidden rounded-xl border border-line bg-surface lg:col-span-2">
               <DataTable
                             ariaLabel="بنود ميزانية المشروع"
                             rows={budgetLines}
                             rowKey={(line) => line.id}
                             dense
                             columns={[
-                              { key: 'category', header: 'البند', render: (line) => <span className="font-bold text-slate-800">{line.category}</span> },
-                              { key: 'desc', header: 'الوصف', render: (line) => <span className="text-slate-500">{line.description || '—'}</span> },
+                              { key: 'category', header: 'البند', render: (line) => <span className="font-bold text-ink">{line.category}</span> },
+                              { key: 'desc', header: 'الوصف', render: (line) => <span className="text-muted">{line.description || '—'}</span> },
                               { key: 'planned', header: 'المخطط', render: (line) => <span className="font-mono">{money(line.plannedAmount)}</span> },
                               {
                                 key: 'actual', header: 'الفعلي',
@@ -503,7 +503,7 @@ export const ProjectControlsPanel: React.FC<Props> = ({ projectId, canUpdate, ca
                                         catch (error: any) { fail(error, 'تعذر تحديث المبلغ الفعلي.'); }
                                       }
                                     }}
-                                    className="w-24 rounded-lg border border-slate-200 px-2 py-1 font-mono" />
+                                    className="w-24 rounded-lg border border-line px-2 py-1 font-mono" />
                                 ) : money(line.actualAmount),
                               },
                               {
@@ -512,7 +512,7 @@ export const ProjectControlsPanel: React.FC<Props> = ({ projectId, canUpdate, ca
                                   <button onClick={() => {
                                     if (!window.confirm(`حذف بند الميزانية "${line.category}"؟`)) return;
                                     try { service.deleteBudgetLine(line.id); load(); } catch (error: any) { fail(error, 'تعذر حذف البند.'); }
-                                  }} className="rounded p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600" title="حذف">
+                                  }} className="rounded p-1 text-muted hover:bg-danger-soft hover:text-danger" title="حذف">
                                     <Trash2 className="h-3.5 w-3.5" />
                                   </button>
                                 ) : null,
@@ -522,9 +522,9 @@ export const ProjectControlsPanel: React.FC<Props> = ({ projectId, canUpdate, ca
 
             </div>
             {canUpdate && (
-              <form onSubmit={submitBudget} className="space-y-2 rounded-xl border border-slate-200 bg-white p-3 text-xs">
-                <h3 className="flex items-center gap-1.5 font-black text-slate-900">
-                  <Coins className="h-4 w-4 text-emerald-600" /> إضافة بند
+              <form onSubmit={submitBudget} className="space-y-2 rounded-xl border border-line bg-surface p-3 text-xs">
+                <h3 className="flex items-center gap-1.5 font-black text-ink">
+                  <Coins className="h-4 w-4 text-success" /> إضافة بند
                 </h3>
                 <input required placeholder="البند (مواد، عمالة...)" value={budgetForm.category}
                   onChange={(event) => setBudgetForm({ ...budgetForm, category: event.target.value })} className={inputClass} />
@@ -536,7 +536,7 @@ export const ProjectControlsPanel: React.FC<Props> = ({ projectId, canUpdate, ca
                   <input type="number" min="0" step="0.01" placeholder="الفعلي" value={budgetForm.actualAmount}
                     onChange={(event) => setBudgetForm({ ...budgetForm, actualAmount: event.target.value })} className={inputClass} />
                 </div>
-                <button type="submit" className="flex w-full items-center justify-center gap-1 rounded-lg bg-emerald-600 py-1.5 font-bold text-white">
+                <button type="submit" className="flex w-full items-center justify-center gap-1 rounded-lg bg-success py-1.5 font-bold text-white">
                   <Plus className="h-3.5 w-3.5" /> إضافة
                 </button>
               </form>
@@ -554,24 +554,24 @@ export const ProjectControlsPanel: React.FC<Props> = ({ projectId, canUpdate, ca
                 { label: 'ساعات قابلة للفوترة', value: timeSummary.billableHours },
                 { label: 'ساعات غير قابلة للفوترة', value: timeSummary.nonBillableHours },
               ].map((card) => (
-                <div key={card.label} className="rounded-xl border border-slate-200 bg-white p-3">
-                  <p className="text-[10px] font-bold text-slate-500">{card.label}</p>
-                  <p className="text-sm font-black text-slate-900">{card.value}</p>
+                <div key={card.label} className="rounded-xl border border-line bg-surface p-3">
+                  <p className="text-[10px] font-bold text-muted">{card.label}</p>
+                  <p className="text-sm font-black text-ink">{card.value}</p>
                 </div>
               ))}
             </div>
           )}
           <div className="grid gap-3 lg:grid-cols-3">
-            <div className="overflow-hidden rounded-xl border border-slate-200 bg-white lg:col-span-2">
+            <div className="overflow-hidden rounded-xl border border-line bg-surface lg:col-span-2">
               <DataTable
                             ariaLabel="سجلات وقت المشروع"
                             rows={timeEntries}
                             rowKey={(entry) => entry.id}
                             dense
                             columns={[
-                              { key: 'date', header: 'التاريخ', render: (entry) => <span className="font-mono text-slate-600">{entry.entryDate}</span> },
-                              { key: 'task', header: 'المهمة', render: (entry) => <span className="text-slate-600">{entry.taskTitle || '—'}</span> },
-                              { key: 'employee', header: 'الموظف', render: (entry) => <span className="text-slate-600">{entry.employeeName || '—'}</span> },
+                              { key: 'date', header: 'التاريخ', render: (entry) => <span className="font-mono text-ink-secondary">{entry.entryDate}</span> },
+                              { key: 'task', header: 'المهمة', render: (entry) => <span className="text-ink-secondary">{entry.taskTitle || '—'}</span> },
+                              { key: 'employee', header: 'الموظف', render: (entry) => <span className="text-ink-secondary">{entry.employeeName || '—'}</span> },
                               { key: 'hours', header: 'الساعات', render: (entry) => <span className="font-bold">{entry.hours}</span> },
                               { key: 'billable', header: 'الفوترة', render: (entry) => <span>{Number(entry.billable) === 1 ? 'نعم' : 'لا'}</span> },
                               {
@@ -579,7 +579,7 @@ export const ProjectControlsPanel: React.FC<Props> = ({ projectId, canUpdate, ca
                                 render: (entry) => canUpdate ? (
                                   <button onClick={() => {
                                     try { service.deleteTimeEntry(entry.id); load(); } catch (error: any) { fail(error, 'تعذر حذف سجل الوقت.'); }
-                                  }} className="rounded p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600" title="حذف">
+                                  }} className="rounded p-1 text-muted hover:bg-danger-soft hover:text-danger" title="حذف">
                                     <Trash2 className="h-3.5 w-3.5" />
                                   </button>
                                 ) : null,
@@ -589,9 +589,9 @@ export const ProjectControlsPanel: React.FC<Props> = ({ projectId, canUpdate, ca
 
             </div>
             {canUpdate && (
-              <form onSubmit={submitTime} className="space-y-2 rounded-xl border border-slate-200 bg-white p-3 text-xs">
-                <h3 className="flex items-center gap-1.5 font-black text-slate-900">
-                  <Clock3 className="h-4 w-4 text-sky-600" /> تسجيل وقت
+              <form onSubmit={submitTime} className="space-y-2 rounded-xl border border-line bg-surface p-3 text-xs">
+                <h3 className="flex items-center gap-1.5 font-black text-ink">
+                  <Clock3 className="h-4 w-4 text-primary" /> تسجيل وقت
                 </h3>
                 <select value={timeForm.taskId} onChange={(event) => setTimeForm({ ...timeForm, taskId: event.target.value })} className={inputClass}>
                   <option value="">بدون مهمة</option>
@@ -607,12 +607,12 @@ export const ProjectControlsPanel: React.FC<Props> = ({ projectId, canUpdate, ca
                 </div>
                 <input placeholder="الوصف" value={timeForm.description}
                   onChange={(event) => setTimeForm({ ...timeForm, description: event.target.value })} className={inputClass} />
-                <label className="flex items-center gap-2 text-slate-600">
+                <label className="flex items-center gap-2 text-ink-secondary">
                   <input type="checkbox" checked={timeForm.billable}
                     onChange={(event) => setTimeForm({ ...timeForm, billable: event.target.checked })} />
                   قابلة للفوترة
                 </label>
-                <button type="submit" className="flex w-full items-center justify-center gap-1 rounded-lg bg-sky-600 py-1.5 font-bold text-white">
+                <button type="submit" className="flex w-full items-center justify-center gap-1 rounded-lg bg-primary py-1.5 font-bold text-white">
                   <Plus className="h-3.5 w-3.5" /> تسجيل
                 </button>
               </form>
@@ -623,7 +623,7 @@ export const ProjectControlsPanel: React.FC<Props> = ({ projectId, canUpdate, ca
 
       {tab === 'risks' && (
         <div className="grid gap-3 lg:grid-cols-3">
-          <div className="overflow-hidden rounded-xl border border-slate-200 bg-white lg:col-span-2">
+          <div className="overflow-hidden rounded-xl border border-line bg-surface lg:col-span-2">
             <DataTable
                         ariaLabel="مخاطر المشروع"
                         rows={risks}
@@ -634,14 +634,14 @@ export const ProjectControlsPanel: React.FC<Props> = ({ projectId, canUpdate, ca
                             key: 'risk', header: 'الخطر',
                             render: (risk) => (
                               <div>
-                                <p className="font-bold text-slate-800">{risk.title}</p>
-                                {risk.mitigation && <p className="text-[10px] text-slate-400">التخفيف: {risk.mitigation}</p>}
+                                <p className="font-bold text-ink">{risk.title}</p>
+                                {risk.mitigation && <p className="text-[10px] text-muted">التخفيف: {risk.mitigation}</p>}
                               </div>
                             ),
                           },
-                          { key: 'severity', header: 'الخطورة', render: (risk) => <span className="text-slate-600">{RISK_SEVERITY_LABELS[risk.severity]}</span> },
-                          { key: 'prob', header: 'الاحتمالية', render: (risk) => <span className="text-slate-600">{RISK_PROBABILITY_LABELS[risk.probability]}</span> },
-                          { key: 'owner', header: 'المسؤول', render: (risk) => <span className="text-slate-600">{risk.ownerName || '—'}</span> },
+                          { key: 'severity', header: 'الخطورة', render: (risk) => <span className="text-ink-secondary">{RISK_SEVERITY_LABELS[risk.severity]}</span> },
+                          { key: 'prob', header: 'الاحتمالية', render: (risk) => <span className="text-ink-secondary">{RISK_PROBABILITY_LABELS[risk.probability]}</span> },
+                          { key: 'owner', header: 'المسؤول', render: (risk) => <span className="text-ink-secondary">{risk.ownerName || '—'}</span> },
                           {
                             key: 'status', header: 'الحالة',
                             render: (risk) => canUpdate ? (
@@ -650,7 +650,7 @@ export const ProjectControlsPanel: React.FC<Props> = ({ projectId, canUpdate, ca
                                   try { service.updateRisk(risk.id, { status: event.target.value as ProjectRiskStatus }); load(); }
                                   catch (error: any) { fail(error, 'تعذر تحديث الخطر.'); }
                                 }}
-                                className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[10px] font-bold">
+                                className="rounded-lg border border-line bg-surface px-2 py-1 text-[10px] font-bold">
                                 {Object.entries(RISK_STATUS_LABELS).map(([value, label]) => (
                                   <option key={value} value={value}>{label}</option>
                                 ))}
@@ -663,7 +663,7 @@ export const ProjectControlsPanel: React.FC<Props> = ({ projectId, canUpdate, ca
                               <button onClick={() => {
                                 if (!window.confirm(`حذف الخطر "${risk.title}"؟`)) return;
                                 try { service.deleteRisk(risk.id); load(); } catch (error: any) { fail(error, 'تعذر حذف الخطر.'); }
-                              }} className="rounded p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600" title="حذف">
+                              }} className="rounded p-1 text-muted hover:bg-danger-soft hover:text-danger" title="حذف">
                                 <Trash2 className="h-3.5 w-3.5" />
                               </button>
                             ) : null,
@@ -673,9 +673,9 @@ export const ProjectControlsPanel: React.FC<Props> = ({ projectId, canUpdate, ca
 
           </div>
           {canUpdate && (
-            <form onSubmit={submitRisk} className="space-y-2 rounded-xl border border-slate-200 bg-white p-3 text-xs">
-              <h3 className="flex items-center gap-1.5 font-black text-slate-900">
-                <AlertTriangle className="h-4 w-4 text-amber-600" /> إضافة خطر
+            <form onSubmit={submitRisk} className="space-y-2 rounded-xl border border-line bg-surface p-3 text-xs">
+              <h3 className="flex items-center gap-1.5 font-black text-ink">
+                <AlertTriangle className="h-4 w-4 text-warning" /> إضافة خطر
               </h3>
               <input required placeholder="عنوان الخطر" value={riskForm.title}
                 onChange={(event) => setRiskForm({ ...riskForm, title: event.target.value })} className={inputClass} />
@@ -697,7 +697,7 @@ export const ProjectControlsPanel: React.FC<Props> = ({ projectId, canUpdate, ca
                 onChange={(event) => setRiskForm({ ...riskForm, ownerName: event.target.value })} className={inputClass} />
               <input placeholder="خطة التخفيف" value={riskForm.mitigation}
                 onChange={(event) => setRiskForm({ ...riskForm, mitigation: event.target.value })} className={inputClass} />
-              <button type="submit" className="flex w-full items-center justify-center gap-1 rounded-lg bg-amber-600 py-1.5 font-bold text-white">
+              <button type="submit" className="flex w-full items-center justify-center gap-1 rounded-lg bg-warning py-1.5 font-bold text-white">
                 <Plus className="h-3.5 w-3.5" /> إضافة
               </button>
             </form>
@@ -707,7 +707,7 @@ export const ProjectControlsPanel: React.FC<Props> = ({ projectId, canUpdate, ca
 
       {tab === 'changes' && (
         <div className="grid gap-3 lg:grid-cols-3">
-          <div className="overflow-hidden rounded-xl border border-slate-200 bg-white lg:col-span-2">
+          <div className="overflow-hidden rounded-xl border border-line bg-surface lg:col-span-2">
             <DataTable
                         ariaLabel="طلبات تغيير المشروع"
                         rows={changes}
@@ -718,15 +718,15 @@ export const ProjectControlsPanel: React.FC<Props> = ({ projectId, canUpdate, ca
                             key: 'change', header: 'الطلب',
                             render: (change) => (
                               <div>
-                                <p className="font-bold text-slate-800">{change.title}</p>
-                                {change.description && <p className="text-[10px] text-slate-400">{change.description}</p>}
-                                {change.decisionNote && <p className="text-[10px] text-slate-400">قرار: {change.decisionNote}</p>}
+                                <p className="font-bold text-ink">{change.title}</p>
+                                {change.description && <p className="text-[10px] text-muted">{change.description}</p>}
+                                {change.decisionNote && <p className="text-[10px] text-muted">قرار: {change.decisionNote}</p>}
                               </div>
                             ),
                           },
                           { key: 'cost', header: 'الأثر المالي', render: (change) => <span className="font-mono">{money(change.costImpact)}</span> },
                           { key: 'time', header: 'الأثر الزمني', render: (change) => <span>{change.timeImpactDays} يوم</span> },
-                          { key: 'requester', header: 'مقدم الطلب', render: (change) => <span className="text-slate-600">{change.requesterName || '—'}</span> },
+                          { key: 'requester', header: 'مقدم الطلب', render: (change) => <span className="text-ink-secondary">{change.requesterName || '—'}</span> },
                           {
                             key: 'status', header: 'الحالة',
                             render: (change) => (
@@ -739,10 +739,10 @@ export const ProjectControlsPanel: React.FC<Props> = ({ projectId, canUpdate, ca
                             key: 'actions', header: '',
                             render: (change) => canApprove && change.status === 'PENDING' ? (
                               <div className="flex gap-1">
-                                <button onClick={() => decideChange(change, 'APPROVED')} className="rounded bg-emerald-50 p-1 text-emerald-700" title="اعتماد">
+                                <button onClick={() => decideChange(change, 'APPROVED')} className="rounded bg-success-soft p-1 text-success" title="اعتماد">
                                   <Check className="h-3.5 w-3.5" />
                                 </button>
-                                <button onClick={() => decideChange(change, 'REJECTED')} className="rounded bg-rose-50 p-1 text-rose-700" title="رفض">
+                                <button onClick={() => decideChange(change, 'REJECTED')} className="rounded bg-danger-soft p-1 text-danger" title="رفض">
                                   <X className="h-3.5 w-3.5" />
                                 </button>
                               </div>
@@ -753,9 +753,9 @@ export const ProjectControlsPanel: React.FC<Props> = ({ projectId, canUpdate, ca
 
           </div>
           {canUpdate && (
-            <form onSubmit={submitChange} className="space-y-2 rounded-xl border border-slate-200 bg-white p-3 text-xs">
-              <h3 className="flex items-center gap-1.5 font-black text-slate-900">
-                <ClipboardList className="h-4 w-4 text-violet-600" /> طلب تغيير
+            <form onSubmit={submitChange} className="space-y-2 rounded-xl border border-line bg-surface p-3 text-xs">
+              <h3 className="flex items-center gap-1.5 font-black text-ink">
+                <ClipboardList className="h-4 w-4 text-primary" /> طلب تغيير
               </h3>
               <input required placeholder="عنوان الطلب" value={changeForm.title}
                 onChange={(event) => setChangeForm({ ...changeForm, title: event.target.value })} className={inputClass} />
@@ -767,10 +767,10 @@ export const ProjectControlsPanel: React.FC<Props> = ({ projectId, canUpdate, ca
               </div>
               <textarea placeholder="الوصف" value={changeForm.description}
                 onChange={(event) => setChangeForm({ ...changeForm, description: event.target.value })} className={inputClass} rows={2} />
-              <button type="submit" className="flex w-full items-center justify-center gap-1 rounded-lg bg-violet-600 py-1.5 font-bold text-white">
+              <button type="submit" className="flex w-full items-center justify-center gap-1 rounded-lg bg-primary py-1.5 font-bold text-white">
                 <Plus className="h-3.5 w-3.5" /> تسجيل الطلب
               </button>
-              {!canApprove && <p className="text-[10px] text-slate-400">الاعتماد يتطلب صلاحية اعتماد طلبات التغيير.</p>}
+              {!canApprove && <p className="text-[10px] text-muted">الاعتماد يتطلب صلاحية اعتماد طلبات التغيير.</p>}
             </form>
           )}
         </div>
@@ -778,7 +778,7 @@ export const ProjectControlsPanel: React.FC<Props> = ({ projectId, canUpdate, ca
 
       {tab === 'deliverables' && (
         <div className="grid gap-3 lg:grid-cols-3">
-          <div className="overflow-hidden rounded-xl border border-slate-200 bg-white lg:col-span-2">
+          <div className="overflow-hidden rounded-xl border border-line bg-surface lg:col-span-2">
             <DataTable
                         ariaLabel="مخرجات المشروع"
                         rows={deliverables}
@@ -789,13 +789,13 @@ export const ProjectControlsPanel: React.FC<Props> = ({ projectId, canUpdate, ca
                             key: 'deliverable', header: 'المخرج',
                             render: (deliverable) => (
                               <div>
-                                <p className="font-bold text-slate-800">{deliverable.title}</p>
-                                {deliverable.description && <p className="text-[10px] text-slate-400">{deliverable.description}</p>}
+                                <p className="font-bold text-ink">{deliverable.title}</p>
+                                {deliverable.description && <p className="text-[10px] text-muted">{deliverable.description}</p>}
                               </div>
                             ),
                           },
-                          { key: 'due', header: 'الاستحقاق', render: (deliverable) => <span className="font-mono text-slate-600">{deliverable.dueDate || '—'}</span> },
-                          { key: 'delivered', header: 'التسليم', render: (deliverable) => <span className="font-mono text-slate-600">{deliverable.deliveredAt?.slice(0, 10) || '—'}</span> },
+                          { key: 'due', header: 'الاستحقاق', render: (deliverable) => <span className="font-mono text-ink-secondary">{deliverable.dueDate || '—'}</span> },
+                          { key: 'delivered', header: 'التسليم', render: (deliverable) => <span className="font-mono text-ink-secondary">{deliverable.deliveredAt?.slice(0, 10) || '—'}</span> },
                           {
                             key: 'status', header: 'الحالة',
                             render: (deliverable) => canUpdate ? (
@@ -804,7 +804,7 @@ export const ProjectControlsPanel: React.FC<Props> = ({ projectId, canUpdate, ca
                                   try { service.updateDeliverable(deliverable.id, { status: event.target.value as ProjectDeliverableStatus }); load(); }
                                   catch (error: any) { fail(error, 'تعذر تحديث المخرج.'); }
                                 }}
-                                className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[10px] font-bold">
+                                className="rounded-lg border border-line bg-surface px-2 py-1 text-[10px] font-bold">
                                 {Object.entries(DELIVERABLE_STATUS_LABELS).map(([value, label]) => (
                                   <option key={value} value={value}>{label}</option>
                                 ))}
@@ -817,7 +817,7 @@ export const ProjectControlsPanel: React.FC<Props> = ({ projectId, canUpdate, ca
                               <button onClick={() => {
                                 if (!window.confirm(`حذف المخرج "${deliverable.title}"؟`)) return;
                                 try { service.deleteDeliverable(deliverable.id); load(); } catch (error: any) { fail(error, 'تعذر حذف المخرج.'); }
-                              }} className="rounded p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600" title="حذف">
+                              }} className="rounded p-1 text-muted hover:bg-danger-soft hover:text-danger" title="حذف">
                                 <Trash2 className="h-3.5 w-3.5" />
                               </button>
                             ) : null,
@@ -827,9 +827,9 @@ export const ProjectControlsPanel: React.FC<Props> = ({ projectId, canUpdate, ca
 
           </div>
           {canUpdate && (
-            <form onSubmit={submitDeliverable} className="space-y-2 rounded-xl border border-slate-200 bg-white p-3 text-xs">
-              <h3 className="flex items-center gap-1.5 font-black text-slate-900">
-                <CalendarCheck2 className="h-4 w-4 text-teal-600" /> إضافة مخرج
+            <form onSubmit={submitDeliverable} className="space-y-2 rounded-xl border border-line bg-surface p-3 text-xs">
+              <h3 className="flex items-center gap-1.5 font-black text-ink">
+                <CalendarCheck2 className="h-4 w-4 text-success" /> إضافة مخرج
               </h3>
               <input required placeholder="عنوان المخرج" value={deliverableForm.title}
                 onChange={(event) => setDeliverableForm({ ...deliverableForm, title: event.target.value })} className={inputClass} />
@@ -837,7 +837,7 @@ export const ProjectControlsPanel: React.FC<Props> = ({ projectId, canUpdate, ca
                 onChange={(event) => setDeliverableForm({ ...deliverableForm, dueDate: event.target.value })} className={inputClass} />
               <textarea placeholder="الوصف" value={deliverableForm.description}
                 onChange={(event) => setDeliverableForm({ ...deliverableForm, description: event.target.value })} className={inputClass} rows={2} />
-              <button type="submit" className="flex w-full items-center justify-center gap-1 rounded-lg bg-teal-600 py-1.5 font-bold text-white">
+              <button type="submit" className="flex w-full items-center justify-center gap-1 rounded-lg bg-success py-1.5 font-bold text-white">
                 <Plus className="h-3.5 w-3.5" /> إضافة
               </button>
             </form>

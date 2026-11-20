@@ -49,11 +49,11 @@
   },
   "support": {
     "profileDefaults": "implemented",
-    "industrySpecificWorkflows": "not-implemented",
+    "industrySpecificWorkflows": "partially-implemented",
     "industrySpecificReports": "not-implemented",
-    "industrySpecificDocumentTemplates": "not-implemented",
-    "typedCustomFieldStorage": "not-implemented",
-    "customsAndLandedCostWorkflows": "not-implemented",
+    "industrySpecificDocumentTemplates": "partially-implemented",
+    "typedCustomFieldStorage": "implemented-for-profile-declared-fields",
+    "customsAndLandedCostWorkflows": "partially-implemented",
     "multiCurrencyTradeProcessing": "not-implemented"
   },
   "printTemplates": [

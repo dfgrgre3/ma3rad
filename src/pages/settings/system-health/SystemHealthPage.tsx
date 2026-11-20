@@ -17,10 +17,10 @@ import {
 type ActionMessage = { type: 'success' | 'error'; text: string };
 
 const STATUS_STYLES: Record<DiagnosticStatus, string> = {
-  PASS: 'bg-emerald-50 text-emerald-700 ring-emerald-600/20 dark:bg-emerald-950/40 dark:text-emerald-300',
-  WARN: 'bg-amber-50 text-amber-700 ring-amber-600/20 dark:bg-amber-950/40 dark:text-amber-300',
-  FAIL: 'bg-rose-50 text-rose-700 ring-rose-600/20 dark:bg-rose-950/40 dark:text-rose-300',
-  NOT_RUN: 'bg-slate-100 text-slate-600 ring-slate-500/20 dark:bg-slate-800 dark:text-slate-300',
+  PASS: 'bg-success-soft text-success ring-success/20 dark:bg-success/40 ',
+  WARN: 'bg-warning-soft text-warning ring-warning/20 dark:bg-warning/40 ',
+  FAIL: 'bg-danger-soft text-danger ring-danger/20 dark:bg-danger/40 ',
+  NOT_RUN: 'bg-surface-sunken text-ink-secondary ring-primary/20 ',
 };
 
 const STATUS_LABELS: Record<DiagnosticStatus, string> = {
@@ -93,15 +93,15 @@ function MetricCard({
   detail: string;
 }) {
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+    <section className="rounded-2xl border border-line bg-surface p-4 shadow-sm ">
       <div className="flex items-start gap-3">
-        <div className="rounded-xl bg-sky-50 p-2.5 text-sky-700 dark:bg-sky-950/40 dark:text-sky-300">
+        <div className="rounded-xl bg-accent-soft p-2.5 text-primary dark:bg-primary/40 ">
           <Icon className="h-5 w-5" aria-hidden="true" />
         </div>
         <div className="min-w-0">
-          <p className="text-xs font-medium text-slate-500 dark:text-slate-400">{title}</p>
-          <p className="mt-1 break-words text-lg font-black text-slate-900 dark:text-slate-100">{value}</p>
-          <p className="mt-1 text-[11px] leading-5 text-slate-500 dark:text-slate-400">{detail}</p>
+          <p className="text-xs font-medium text-muted ">{title}</p>
+          <p className="mt-1 break-words text-lg font-black text-ink ">{value}</p>
+          <p className="mt-1 text-[11px] leading-5 text-muted ">{detail}</p>
         </div>
       </div>
     </section>
@@ -213,8 +213,8 @@ export const SystemHealthPage: React.FC = () => {
   };
 
   return (
-    <div className="h-full overflow-y-auto bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
-      <div className="sticky top-0 z-10 border-b border-slate-200 bg-white/95 px-5 py-4 shadow-sm backdrop-blur dark:border-slate-800 dark:bg-slate-900/95">
+    <div className="h-full overflow-y-auto bg-surface-muted text-ink ">
+      <div className="sticky top-0 z-10 border-b border-line bg-surface/95 px-5 py-4 shadow-sm backdrop-blur dark:bg-primary/95">
         <PageHeader
           icon={<Cpu className="h-5 w-5" aria-hidden="true" />}
           title="مركز صحة النظام وتشخيصه"
@@ -224,7 +224,7 @@ export const SystemHealthPage: React.FC = () => {
               type="button"
               onClick={exportReport}
               disabled={!stats}
-              className="inline-flex items-center gap-2 rounded-xl border border-slate-300 px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+              className="inline-flex items-center gap-2 rounded-xl border border-line-strong px-3 py-2 text-xs font-bold text-ink hover:bg-surface-sunken disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-primary"
             >
               <Download className="h-4 w-4" aria-hidden="true" />
               تصدير التقرير
@@ -233,7 +233,7 @@ export const SystemHealthPage: React.FC = () => {
               type="button"
               onClick={() => void runHealthAudit()}
               disabled={isRunningCheck || Boolean(actionInProgress)}
-              className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-xs font-bold text-white transition hover:bg-slate-700 disabled:cursor-wait disabled:opacity-60 dark:bg-sky-700 dark:hover:bg-sky-600"
+              className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-xs font-bold text-white transition hover:bg-primary disabled:cursor-wait disabled:opacity-60 dark:hover:bg-primary"
             >
               <RefreshCw className={`h-4 w-4 ${isRunningCheck ? 'animate-spin' : ''}`} aria-hidden="true" />
               {isRunningCheck ? 'جارٍ الفحص...' : 'إعادة الفحص'}
@@ -244,7 +244,7 @@ export const SystemHealthPage: React.FC = () => {
 
       <main className="space-y-4 p-3 sm:p-4">
         {errorMessage && (
-          <div role="alert" className="flex items-start gap-2 rounded-xl border border-rose-300 bg-rose-50 p-3 text-sm text-rose-800 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-200">
+          <div role="alert" className="flex items-start gap-2 rounded-xl border border-danger bg-danger-soft p-3 text-sm text-danger dark:bg-danger/40 ">
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
             <span>{errorMessage}</span>
           </div>
@@ -255,29 +255,29 @@ export const SystemHealthPage: React.FC = () => {
             role={actionMessage.type === 'error' ? 'alert' : 'status'}
             className={`rounded-xl border p-3 text-sm ${
               actionMessage.type === 'error'
-                ? 'border-rose-300 bg-rose-50 text-rose-800 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-200'
-                : 'border-emerald-300 bg-emerald-50 text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-200'
+                ? 'border-danger bg-danger-soft text-danger dark:bg-danger/40 '
+                : 'border-success bg-success-soft text-success dark:bg-success/40 '
             }`}
           >
             {actionMessage.text}
           </div>
         )}
 
-        <section className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between dark:border-slate-700 dark:bg-slate-900">
+        <section className="flex flex-col gap-3 rounded-2xl border border-line bg-surface p-4 sm:flex-row sm:items-center sm:justify-between ">
           <div className="flex items-center gap-3">
-            <div className={`rounded-xl p-2 ${overall === 'PASS' ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300' : overall === 'FAIL' ? 'bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300' : 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300'}`}>
+            <div className={`rounded-xl p-2 ${overall === 'PASS' ? 'bg-success-soft text-success dark:bg-success/40 dark:text-success' : overall === 'FAIL' ? 'bg-danger-soft text-danger dark:bg-danger/40 dark:text-danger' : 'bg-warning-soft text-warning dark:bg-warning/40 dark:text-warning'}`}>
               <Activity className="h-5 w-5" aria-hidden="true" />
             </div>
             <div>
               <h2 className="text-sm font-black">الحالة العامة</h2>
-              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+              <p className="mt-1 text-xs text-muted ">
                 {isRunningCheck ? 'جارٍ تحديث البيانات والفحوص...' : `آخر فحص: ${formatDate(stats?.timestamp)}`}
               </p>
             </div>
           </div>
           <div className="flex items-center gap-3">
             <StatusBadge status={overall} />
-            <span className="text-xs text-slate-500 dark:text-slate-400">
+            <span className="text-xs text-muted ">
               {failedChecks} فحص فاشل من {allChecks.length}
             </span>
           </div>
@@ -311,75 +311,75 @@ export const SystemHealthPage: React.FC = () => {
         </section>
 
         <section className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-          <div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
+          <div className="rounded-2xl border border-line bg-surface p-4 ">
             <h2 className="mb-4 flex items-center gap-2 text-sm font-black">
-              <Cpu className="h-4 w-4 text-sky-600" aria-hidden="true" />
+              <Cpu className="h-4 w-4 text-primary" aria-hidden="true" />
               موارد وبيئة التشغيل الفعلية
             </h2>
             {runtime?.system ? (
               <dl className="grid grid-cols-1 gap-3 text-xs sm:grid-cols-2">
-                <div><dt className="text-slate-500 dark:text-slate-400">إصدار التطبيق</dt><dd className="mt-1 font-bold">{runtime.system.version} {runtime.system.packaged ? '· إصدار مثبت' : '· بيئة تطوير'}</dd></div>
-                <div><dt className="text-slate-500 dark:text-slate-400">النظام والمعمارية</dt><dd className="mt-1 font-bold" dir="ltr">{runtime.system.platform} {runtime.system.osRelease} · {runtime.system.arch}</dd></div>
-                <div><dt className="text-slate-500 dark:text-slate-400">المعالجات المنطقية</dt><dd className="mt-1 font-bold">{formatNumber(runtime.system.cpuCount)}</dd></div>
-                <div><dt className="text-slate-500 dark:text-slate-400">مدة تشغيل التطبيق</dt><dd className="mt-1 font-bold">{Math.floor(runtime.system.processUptimeSeconds / 3600)} ساعة و{Math.floor(runtime.system.processUptimeSeconds % 3600 / 60)} دقيقة</dd></div>
-                <div><dt className="text-slate-500 dark:text-slate-400">ذاكرة التطبيق (RSS)</dt><dd className="mt-1 font-bold">{formatBytes(runtime.system.processMemoryBytes)}</dd></div>
-                <div><dt className="text-slate-500 dark:text-slate-400">ذاكرة الجهاز المتاحة</dt><dd className="mt-1 font-bold">{formatBytes(runtime.system.freeMemoryBytes)} من {formatBytes(runtime.system.totalMemoryBytes)}</dd></div>
-                <div className="sm:col-span-2"><dt className="text-slate-500 dark:text-slate-400">المساحة المتاحة على قرص البيانات</dt><dd className="mt-1 font-bold">{runtime.system.disk.available ? `${formatBytes(runtime.system.disk.freeBytes)} من ${formatBytes(runtime.system.disk.totalBytes)}` : runtime.system.disk.error}</dd></div>
+                <div><dt className="text-muted ">إصدار التطبيق</dt><dd className="mt-1 font-bold">{runtime.system.version} {runtime.system.packaged ? '· إصدار مثبت' : '· بيئة تطوير'}</dd></div>
+                <div><dt className="text-muted ">النظام والمعمارية</dt><dd className="mt-1 font-bold" dir="ltr">{runtime.system.platform} {runtime.system.osRelease} · {runtime.system.arch}</dd></div>
+                <div><dt className="text-muted ">المعالجات المنطقية</dt><dd className="mt-1 font-bold">{formatNumber(runtime.system.cpuCount)}</dd></div>
+                <div><dt className="text-muted ">مدة تشغيل التطبيق</dt><dd className="mt-1 font-bold">{Math.floor(runtime.system.processUptimeSeconds / 3600)} ساعة و{Math.floor(runtime.system.processUptimeSeconds % 3600 / 60)} دقيقة</dd></div>
+                <div><dt className="text-muted ">ذاكرة التطبيق (RSS)</dt><dd className="mt-1 font-bold">{formatBytes(runtime.system.processMemoryBytes)}</dd></div>
+                <div><dt className="text-muted ">ذاكرة الجهاز المتاحة</dt><dd className="mt-1 font-bold">{formatBytes(runtime.system.freeMemoryBytes)} من {formatBytes(runtime.system.totalMemoryBytes)}</dd></div>
+                <div className="sm:col-span-2"><dt className="text-muted ">المساحة المتاحة على قرص البيانات</dt><dd className="mt-1 font-bold">{runtime.system.disk.available ? `${formatBytes(runtime.system.disk.freeBytes)} من ${formatBytes(runtime.system.disk.totalBytes)}` : runtime.system.disk.error}</dd></div>
               </dl>
             ) : (
-              <p className="rounded-xl bg-slate-50 p-3 text-xs text-slate-500 dark:bg-slate-800 dark:text-slate-400">معلومات موارد الجهاز غير متاحة في بيئة التشغيل الحالية.</p>
+              <p className="rounded-xl bg-surface-muted p-3 text-xs text-muted ">معلومات موارد الجهاز غير متاحة في بيئة التشغيل الحالية.</p>
             )}
           </div>
 
-          <div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
+          <div className="rounded-2xl border border-line bg-surface p-4 ">
             <h2 className="mb-4 flex items-center gap-2 text-sm font-black">
-              <HardDrive className="h-4 w-4 text-indigo-600" aria-hidden="true" />
+              <HardDrive className="h-4 w-4 text-primary" aria-hidden="true" />
               النسخ الاحتياطية المحلية
             </h2>
             <dl className="grid grid-cols-1 gap-3 text-xs sm:grid-cols-2">
-              <div><dt className="text-slate-500 dark:text-slate-400">عدد النسخ المشفرة على القرص</dt><dd className="mt-1 font-bold">{runtime?.backups.count == null ? 'غير متاح' : formatNumber(runtime.backups.count)}</dd></div>
-              <div><dt className="text-slate-500 dark:text-slate-400">إجمالي حجم ملفات النسخ</dt><dd className="mt-1 font-bold">{formatBytes(runtime?.backups.bytes)}</dd></div>
-              <div className="sm:col-span-2"><dt className="text-slate-500 dark:text-slate-400">تاريخ أحدث نسخة</dt><dd className="mt-1 font-bold">{formatDate(latestBackup)}</dd></div>
+              <div><dt className="text-muted ">عدد النسخ المشفرة على القرص</dt><dd className="mt-1 font-bold">{runtime?.backups.count == null ? 'غير متاح' : formatNumber(runtime.backups.count)}</dd></div>
+              <div><dt className="text-muted ">إجمالي حجم ملفات النسخ</dt><dd className="mt-1 font-bold">{formatBytes(runtime?.backups.bytes)}</dd></div>
+              <div className="sm:col-span-2"><dt className="text-muted ">تاريخ أحدث نسخة</dt><dd className="mt-1 font-bold">{formatDate(latestBackup)}</dd></div>
             </dl>
-            {runtime?.backups.latestName && <p className="mt-2 break-all text-[11px] text-slate-500 dark:text-slate-400" dir="ltr">{runtime.backups.latestName}</p>}
-            {runtime?.backups.error && <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">{runtime.backups.error}</p>}
+            {runtime?.backups.latestName && <p className="mt-2 break-all text-[11px] text-muted " dir="ltr">{runtime.backups.latestName}</p>}
+            {runtime?.backups.error && <p className="mt-2 text-xs text-warning ">{runtime.backups.error}</p>}
           </div>
         </section>
 
-        <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
-          <div className="border-b border-slate-200 px-4 py-3 dark:border-slate-700">
+        <section className="overflow-hidden rounded-2xl border border-line bg-surface ">
+          <div className="border-b border-line px-4 py-3 ">
             <h2 className="text-sm font-black">نتائج الفحوص التفصيلية</h2>
-            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">كل نتيجة مرتبطة بقياس مباشر أو استعلام فعلي؛ غير المتاح لا يُعرض كنجاح.</p>
+            <p className="mt-1 text-xs text-muted ">كل نتيجة مرتبطة بقياس مباشر أو استعلام فعلي؛ غير المتاح لا يُعرض كنجاح.</p>
           </div>
-          <div className="divide-y divide-slate-100 dark:divide-slate-800">
+          <div className="divide-y divide-line-strong dark:divide-primary">
             {allChecks.map((check) => (
               <div key={check.key} className="grid grid-cols-1 gap-2 px-4 py-3 sm:grid-cols-[minmax(150px,0.8fr)_minmax(220px,2fr)_auto_auto] sm:items-center">
                 <div className="text-xs font-bold">{check.label}</div>
-                <div className="text-xs leading-5 text-slate-600 dark:text-slate-300">{check.detail}</div>
+                <div className="text-xs leading-5 text-ink-secondary ">{check.detail}</div>
                 <StatusBadge status={check.status} />
-                <div className="text-[11px] text-slate-500">{check.durationMs} مللي ثانية</div>
+                <div className="text-[11px] text-muted">{check.durationMs} مللي ثانية</div>
               </div>
             ))}
             {allChecks.length === 0 && (
-              <p className="px-4 py-8 text-center text-sm text-slate-500">ابدأ الفحص لعرض نتائج التشخيص.</p>
+              <p className="px-4 py-8 text-center text-sm text-muted">ابدأ الفحص لعرض نتائج التشخيص.</p>
             )}
           </div>
         </section>
 
         <section className="grid grid-cols-1 gap-4 xl:grid-cols-2">
           {canMaintain && (
-            <div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
+            <div className="rounded-2xl border border-line bg-surface p-4 ">
               <h2 className="mb-3 flex items-center gap-2 text-sm font-black">
-                <Wrench className="h-4 w-4 text-teal-600" aria-hidden="true" />
+                <Wrench className="h-4 w-4 text-success" aria-hidden="true" />
                 إجراءات الصيانة
               </h2>
-              <p className="mb-4 text-xs leading-5 text-slate-500 dark:text-slate-400">تتطلب هذه الإجراءات صلاحية صيانة قاعدة البيانات. يُنصح بأخذ نسخة احتياطية قبل تنفيذها.</p>
+              <p className="mb-4 text-xs leading-5 text-muted ">تتطلب هذه الإجراءات صلاحية صيانة قاعدة البيانات. يُنصح بأخذ نسخة احتياطية قبل تنفيذها.</p>
               <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
                   onClick={handleVacuum}
                   disabled={Boolean(actionInProgress) || isRunningCheck}
-                  className="rounded-xl border border-slate-300 px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-100 disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                  className="rounded-xl border border-line-strong px-3 py-2 text-xs font-bold text-ink hover:bg-surface-sunken disabled:opacity-50 dark:hover:bg-primary"
                 >
                   {actionInProgress === 'vacuum' ? 'جارٍ الضغط...' : 'ضغط قاعدة البيانات'}
                 </button>
@@ -387,7 +387,7 @@ export const SystemHealthPage: React.FC = () => {
                   type="button"
                   onClick={handleReindex}
                   disabled={Boolean(actionInProgress) || isRunningCheck}
-                  className="rounded-xl border border-slate-300 px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-100 disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                  className="rounded-xl border border-line-strong px-3 py-2 text-xs font-bold text-ink hover:bg-surface-sunken disabled:opacity-50 dark:hover:bg-primary"
                 >
                   {actionInProgress === 'reindex' ? 'جارٍ إعادة البناء...' : 'إعادة بناء الفهارس'}
                 </button>
@@ -396,7 +396,7 @@ export const SystemHealthPage: React.FC = () => {
                     type="button"
                     onClick={handleBackup}
                     disabled={Boolean(actionInProgress) || isRunningCheck}
-                    className="rounded-xl bg-teal-700 px-3 py-2 text-xs font-bold text-white hover:bg-teal-600 disabled:opacity-50"
+                    className="rounded-xl bg-success px-3 py-2 text-xs font-bold text-white hover:bg-success disabled:opacity-50"
                   >
                     {actionInProgress === 'backup' ? 'جارٍ إنشاء النسخة...' : 'إنشاء نسخة احتياطية الآن'}
                   </button>
@@ -405,29 +405,29 @@ export const SystemHealthPage: React.FC = () => {
             </div>
           )}
 
-          <div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
+          <div className="rounded-2xl border border-line bg-surface p-4 ">
             <h2 className="mb-3 text-sm font-black">إحصائيات قاعدة البيانات</h2>
             <dl className="space-y-2 text-xs">
-              <div className="flex justify-between gap-4"><dt className="text-slate-500 dark:text-slate-400">الأصناف</dt><dd className="font-bold">{formatNumber(stats?.totalProducts)}</dd></div>
-              <div className="flex justify-between gap-4"><dt className="text-slate-500 dark:text-slate-400">فواتير المبيعات</dt><dd className="font-bold">{formatNumber(stats?.totalInvoices)}</dd></div>
-              <div className="flex justify-between gap-4"><dt className="text-slate-500 dark:text-slate-400">حركات المخزون</dt><dd className="font-bold">{formatNumber(stats?.totalTransactions)}</dd></div>
-              <div className="flex justify-between gap-4"><dt className="text-slate-500 dark:text-slate-400">الاتساق المحاسبي</dt><dd className="font-bold">{financialCheck?.detail ?? 'لم يُنفذ بعد'}</dd></div>
-              <div className="flex justify-between gap-4"><dt className="text-slate-500 dark:text-slate-400">حالة حفظ البيانات</dt><dd className="font-bold">{runtime ? `${PERSISTENCE_LABELS[runtime.databasePersistence.status]} · ${STORAGE_BACKEND_LABELS[runtime.databasePersistence.backend]}` : 'غير متاحة'}</dd></div>
+              <div className="flex justify-between gap-4"><dt className="text-muted ">الأصناف</dt><dd className="font-bold">{formatNumber(stats?.totalProducts)}</dd></div>
+              <div className="flex justify-between gap-4"><dt className="text-muted ">فواتير المبيعات</dt><dd className="font-bold">{formatNumber(stats?.totalInvoices)}</dd></div>
+              <div className="flex justify-between gap-4"><dt className="text-muted ">حركات المخزون</dt><dd className="font-bold">{formatNumber(stats?.totalTransactions)}</dd></div>
+              <div className="flex justify-between gap-4"><dt className="text-muted ">الاتساق المحاسبي</dt><dd className="font-bold">{financialCheck?.detail ?? 'لم يُنفذ بعد'}</dd></div>
+              <div className="flex justify-between gap-4"><dt className="text-muted ">حالة حفظ البيانات</dt><dd className="font-bold">{runtime ? `${PERSISTENCE_LABELS[runtime.databasePersistence.status]} · ${STORAGE_BACKEND_LABELS[runtime.databasePersistence.backend]}` : 'غير متاحة'}</dd></div>
             </dl>
           </div>
         </section>
 
-        <section className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
+        <section className="rounded-2xl border border-line bg-surface p-4 ">
           <h2 className="mb-3 text-sm font-black">سجل نتائج الفحص</h2>
           <div className="space-y-2">
             {(stats?.history ?? []).slice().reverse().slice(0, 10).map((entry) => (
-              <div key={entry.timestamp} className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2 text-xs last:border-0 dark:border-slate-800">
-                <span className="text-slate-500 dark:text-slate-400">{formatDate(entry.timestamp)}</span>
+              <div key={entry.timestamp} className="flex flex-wrap items-center justify-between gap-2 border-b border-line pb-2 text-xs last:border-0 ">
+                <span className="text-muted ">{formatDate(entry.timestamp)}</span>
                 <StatusBadge status={entry.overall} />
-                <span className="text-slate-500 dark:text-slate-400">{entry.checks.filter((check) => check.status === 'FAIL').length} فحص فاشل من {entry.checks.length}</span>
+                <span className="text-muted ">{entry.checks.filter((check) => check.status === 'FAIL').length} فحص فاشل من {entry.checks.length}</span>
               </div>
             ))}
-            {(!stats?.history || stats.history.length === 0) && <p className="text-xs text-slate-500">لا توجد نتائج سابقة محفوظة.</p>}
+            {(!stats?.history || stats.history.length === 0) && <p className="text-xs text-muted">لا توجد نتائج سابقة محفوظة.</p>}
           </div>
         </section>
       </main>

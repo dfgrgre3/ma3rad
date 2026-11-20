@@ -21,11 +21,11 @@ export const CreateTransferModal: React.FC<CreateTransferModalProps> = ({
   onSubmit,
   onClose,
 }) => (
-  <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-    <div className="bg-white rounded-3xl p-6 w-full max-w-xl shadow-2xl border border-slate-100 max-h-[90vh] flex flex-col">
-      <div className="flex items-center justify-between pb-3 border-b border-slate-100 shrink-0">
-        <h3 className="font-black text-slate-900 text-sm">طلب تحويل مخزني جديد</h3>
-        <button onClick={onClose} className="p-1 rounded-lg text-slate-400 hover:bg-slate-100">
+  <div className="fixed inset-0 bg-primary/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div className="bg-surface rounded-3xl p-6 w-full max-w-xl shadow-2xl border border-line max-h-[90vh] flex flex-col">
+      <div className="flex items-center justify-between pb-3 border-b border-line shrink-0">
+        <h3 className="font-black text-ink text-sm">طلب تحويل مخزني جديد</h3>
+        <button onClick={onClose} className="p-1 rounded-lg text-muted hover:bg-surface-sunken">
           <X className="w-4 h-4" />
         </button>
       </div>
@@ -33,12 +33,12 @@ export const CreateTransferModal: React.FC<CreateTransferModalProps> = ({
       <form onSubmit={onSubmit} className="mt-4 space-y-4 flex-1 overflow-y-auto">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <label htmlFor="transfer-from-warehouse" className="block text-xs font-bold text-slate-600 mb-1">من مخزن (المصدر)</label>
+            <label htmlFor="transfer-from-warehouse" className="block text-xs font-bold text-ink-secondary mb-1">من مخزن (المصدر)</label>
             <select
               id="transfer-from-warehouse"
               value={fromWhId}
               onChange={(e) => onFromWhChange(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-sky-500"
+              className="w-full px-3 py-2 bg-surface-muted border border-line rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-primary"
               required
             >
               {warehouses.map(w => (
@@ -48,12 +48,12 @@ export const CreateTransferModal: React.FC<CreateTransferModalProps> = ({
           </div>
 
           <div>
-            <label htmlFor="transfer-to-warehouse" className="block text-xs font-bold text-slate-600 mb-1">إلى مخزن (الوجهة)</label>
+            <label htmlFor="transfer-to-warehouse" className="block text-xs font-bold text-ink-secondary mb-1">إلى مخزن (الوجهة)</label>
             <select
               id="transfer-to-warehouse"
               value={toWhId}
               onChange={(e) => onToWhChange(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-sky-500"
+              className="w-full px-3 py-2 bg-surface-muted border border-line rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-primary"
               required
             >
               {warehouses.map(w => (
@@ -65,19 +65,19 @@ export const CreateTransferModal: React.FC<CreateTransferModalProps> = ({
 
         <div>
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold text-slate-700">الأصناف المراد تحويلها</span>
+            <span className="text-xs font-bold text-ink">الأصناف المراد تحويلها</span>
             <button
               type="button"
               onClick={onAddItemRow}
-              className="text-xs text-sky-600 font-bold hover:underline flex items-center gap-1"
+              className="text-xs text-primary font-bold hover:underline flex items-center gap-1"
             >
               <Plus className="w-3.5 h-3.5" /> إضافة صنف
             </button>
           </div>
 
-          <div className="space-y-2 max-h-56 overflow-y-auto border border-slate-200 rounded-xl p-3 bg-slate-50/50">
+          <div className="space-y-2 max-h-56 overflow-y-auto border border-line rounded-xl p-3 bg-surface-muted/50">
             {requestItems.map((item, idx) => (
-              <div key={idx} className="flex items-center gap-2 bg-white p-2.5 rounded-xl border border-slate-200">
+              <div key={idx} className="flex items-center gap-2 bg-surface p-2.5 rounded-xl border border-line">
                 <label htmlFor={`transfer-product-${idx}`} className="sr-only">الصنف {idx + 1}</label>
                 <ProductPicker
                   id={`transfer-product-${idx}`}
@@ -105,7 +105,7 @@ export const CreateTransferModal: React.FC<CreateTransferModalProps> = ({
                     next[idx].quantityM2 = Number.parseFloat(e.target.value) || 0;
                     onRequestItemsChange(next);
                   }}
-                  className="w-24 px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-mono font-bold text-center"
+                  className="w-24 px-2 py-1.5 bg-surface-muted border border-line rounded-lg text-xs font-mono font-bold text-center"
                   required
                 />
 
@@ -113,7 +113,7 @@ export const CreateTransferModal: React.FC<CreateTransferModalProps> = ({
                   <button
                     type="button"
                     onClick={() => onRemoveItemRow(idx)}
-                    className="p-1 rounded text-rose-500 hover:bg-rose-50"
+                    className="p-1 rounded text-danger hover:bg-danger-soft"
                   >
                     <X className="w-4 h-4" />
                   </button>
@@ -124,28 +124,28 @@ export const CreateTransferModal: React.FC<CreateTransferModalProps> = ({
         </div>
 
         <div>
-          <label htmlFor="transfer-notes" className="block text-xs font-bold text-slate-600 mb-1">ملاحظات التحويل</label>
+          <label htmlFor="transfer-notes" className="block text-xs font-bold text-ink-secondary mb-1">ملاحظات التحويل</label>
           <textarea
             id="transfer-notes"
             rows={2}
             value={requestNotes}
             onChange={(e) => onRequestNotesChange(e.target.value)}
             placeholder="سبب التحويل أو بيانات السائق..."
-            className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-sky-500"
+            className="w-full px-3 py-2 bg-surface-muted border border-line rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-primary"
           />
         </div>
 
-        <div className="pt-3 border-t border-slate-100 flex gap-2 justify-end shrink-0">
+        <div className="pt-3 border-t border-line flex gap-2 justify-end shrink-0">
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50"
+            className="px-4 py-2 rounded-xl border border-line text-xs font-bold text-ink-secondary hover:bg-surface-muted"
           >
             إلغاء
           </button>
           <button
             type="submit"
-            className="px-5 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-black shadow-md shadow-sky-600/20"
+            className="px-5 py-2 rounded-xl bg-primary hover:bg-primary text-white text-xs font-black shadow-md shadow-primary/20"
           >
             إرسال الطلب للاعتماد
           </button>

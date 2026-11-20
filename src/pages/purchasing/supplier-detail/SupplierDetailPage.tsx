@@ -332,23 +332,23 @@ export const SupplierDetailPage: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex h-full items-center justify-center bg-slate-50">
-        <Loader2 className="w-8 h-8 animate-spin text-sky-600" />
+      <div className="flex h-full items-center justify-center bg-surface-muted">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
       </div>
     );
   }
 
   if (!supplier) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-4 bg-slate-50 p-6 text-center">
-        <div className="w-16 h-16 rounded-2xl bg-amber-100 text-amber-600 flex items-center justify-center">
+      <div className="flex h-full flex-col items-center justify-center gap-4 bg-surface-muted p-6 text-center">
+        <div className="w-16 h-16 rounded-2xl bg-warning-soft text-warning flex items-center justify-center">
           <AlertTriangle className="w-8 h-8" />
         </div>
-        <h2 className="text-xl font-black text-slate-900">المورد غير موجود</h2>
-        <p className="text-sm text-slate-500">لم يتم العثور على مورد بهذا المعرّف، أو ربما تم حذفه.</p>
+        <h2 className="text-xl font-black text-ink">المورد غير موجود</h2>
+        <p className="text-sm text-muted">لم يتم العثور على مورد بهذا المعرّف، أو ربما تم حذفه.</p>
         <button
           onClick={() => navigate('/suppliers')}
-          className="mt-2 inline-flex items-center gap-2 rounded-xl bg-sky-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-sky-700"
+          className="mt-2 inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-white hover:bg-primary"
         >
           <ArrowRight className="w-4 h-4" />
           <span>العودة لقائمة الموردين</span>
@@ -358,7 +358,7 @@ export const SupplierDetailPage: React.FC = () => {
   }
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
+    <div className="h-full flex flex-col bg-surface-muted text-ink overflow-hidden">
       {/* Top Header */}
       <SupplierHeader
         supplier={supplier}

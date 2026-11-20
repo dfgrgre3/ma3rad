@@ -3,9 +3,9 @@ import type { PlatformTenantProfile } from '../../../services/domains/platform/p
 import { formatDateTime } from '../components/PlatformUI';
 
 export const InfoItem: React.FC<{ label: string; value: React.ReactNode; ltr?: boolean }> = ({ label, value, ltr }) => (
-  <div className="rounded-lg border border-slate-200 bg-white px-3 py-2">
-    <dt className="text-[10.5px] font-semibold text-slate-500">{label}</dt>
-    <dd className={`mt-0.5 text-[12px] font-bold text-slate-800 ${ltr ? 'font-mono' : ''}`} dir={ltr ? 'ltr' : undefined}>
+  <div className="rounded-lg border border-line bg-surface px-3 py-2">
+    <dt className="text-[10.5px] font-semibold text-muted">{label}</dt>
+    <dd className={`mt-0.5 text-[12px] font-bold text-ink ${ltr ? 'font-mono' : ''}`} dir={ltr ? 'ltr' : undefined}>
       {value || '—'}
     </dd>
   </div>
@@ -18,13 +18,13 @@ export const SectionCard: React.FC<{
   action?: React.ReactNode;
   children: React.ReactNode;
 }> = ({ title, subtitle, icon, action, children }) => (
-  <section className="rounded-xl border border-slate-200 bg-white shadow-sm">
-    <header className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-3 py-2.5">
+  <section className="rounded-xl border border-line bg-surface shadow-sm">
+    <header className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-3 py-2.5">
       <div className="flex min-w-0 items-center gap-2">
-        {icon && <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-600">{icon}</span>}
+        {icon && <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-surface-sunken text-ink-secondary">{icon}</span>}
         <div className="min-w-0">
-          <h4 className="truncate text-[12.5px] font-bold text-slate-800">{title}</h4>
-          {subtitle && <p className="truncate text-[10.5px] text-slate-500">{subtitle}</p>}
+          <h4 className="truncate text-[12.5px] font-bold text-ink">{title}</h4>
+          {subtitle && <p className="truncate text-[10.5px] text-muted">{subtitle}</p>}
         </div>
       </div>
       {action}
@@ -35,17 +35,17 @@ export const SectionCard: React.FC<{
 
 export const LogList: React.FC<{ entries: PlatformTenantProfile['activityLog']; empty: string }> = ({ entries, empty }) => (
   entries.length === 0 ? (
-    <p className="px-3 py-4 text-[11px] text-slate-500">{empty}</p>
+    <p className="px-3 py-4 text-[11px] text-muted">{empty}</p>
   ) : (
-    <ol className="divide-y divide-slate-100">
+    <ol className="divide-y divide-line-strong">
       {entries.map((entry) => (
         <li key={entry.id} className="flex flex-wrap items-center gap-2 px-3 py-2">
-          <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[9.5px] font-bold text-slate-600">
+          <span className="shrink-0 rounded-full bg-surface-sunken px-2 py-0.5 text-[9.5px] font-bold text-ink-secondary">
             {entry.entityType === 'ACTIVATION' ? 'تفعيل' : entry.entityType === 'TENANT' ? 'إدارة' : entry.entityType}
           </span>
-          <p className="min-w-0 flex-1 truncate text-[11.5px] font-semibold text-slate-800">{entry.action}</p>
-          <span className="shrink-0 text-[10px] text-slate-500">{entry.actorName || 'النظام'}</span>
-          <span className="shrink-0 text-[10px] text-slate-400">{formatDateTime(entry.createdAt)}</span>
+          <p className="min-w-0 flex-1 truncate text-[11.5px] font-semibold text-ink">{entry.action}</p>
+          <span className="shrink-0 text-[10px] text-muted">{entry.actorName || 'النظام'}</span>
+          <span className="shrink-0 text-[10px] text-muted">{formatDateTime(entry.createdAt)}</span>
         </li>
       ))}
     </ol>

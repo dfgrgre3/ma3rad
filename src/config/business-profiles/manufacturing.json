@@ -49,9 +49,9 @@
     "profileDefaults": "implemented",
     "productionModule": "available",
     "industrySpecificWorkflows": "partially-implemented",
-    "industrySpecificReports": "not-implemented",
-    "industrySpecificDocumentTemplates": "not-implemented",
-    "typedCustomFieldStorage": "not-implemented"
+    "industrySpecificReports": "implemented",
+    "industrySpecificDocumentTemplates": "partially-implemented",
+    "typedCustomFieldStorage": "implemented-for-profile-declared-fields"
   },
   "printTemplates": [
     {

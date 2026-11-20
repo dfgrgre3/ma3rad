@@ -66,7 +66,7 @@ export const StockTransfersPage: React.FC = () => {
   const viewTab: StockTransferTab = activeTab === 'summary' && !canViewSummary ? 'history' : activeTab;
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
+    <div className="h-full flex flex-col bg-surface-muted text-ink overflow-hidden">
       <StockTransfersHeader
         loading={loading}
         canCreateTransfer={canCreateTransfer}

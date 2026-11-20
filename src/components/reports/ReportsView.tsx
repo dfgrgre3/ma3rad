@@ -151,10 +151,10 @@ export const ReportsView: React.FC = () => {
       {/* Quick access to advanced report pages */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         {([
-          { label: 'تقارير المبيعات المتقدمة', desc: 'حسب الفئة والمنتج والعميل والمندوب', icon: ShoppingCart, color: 'from-teal-500 to-cyan-600', href: '#/reports?tab=sales' },
-          { label: 'تقارير المشتريات والمخزون', desc: 'الموردون وقيمة المخزون', icon: Truck, color: 'from-orange-500 to-amber-600', href: '#/reports?tab=purchases' },
-          { label: 'القوائم المالية', desc: 'الميزانية وأعمار الذمم والتدفق', icon: PieChart, color: 'from-violet-500 to-purple-600', href: '#/reports?tab=finance' },
-          { label: 'الأرباح والخسائر', desc: 'قائمة الدخل وتحليل الهامش', icon: BarChart3, color: 'from-emerald-500 to-green-600', href: '#/reports?tab=profitLoss' },
+          { label: 'تقارير المبيعات المتقدمة', desc: 'حسب الفئة والمنتج والعميل والمندوب', icon: ShoppingCart, color: 'from-success to-primary', href: '#/reports?tab=sales' },
+          { label: 'تقارير المشتريات والمخزون', desc: 'الموردون وقيمة المخزون', icon: Truck, color: 'from-warning to-warning', href: '#/reports?tab=purchases' },
+          { label: 'القوائم المالية', desc: 'الميزانية وأعمار الذمم والتدفق', icon: PieChart, color: 'from-primary to-primary', href: '#/reports?tab=finance' },
+          { label: 'الأرباح والخسائر', desc: 'قائمة الدخل وتحليل الهامش', icon: BarChart3, color: 'from-success to-success', href: '#/reports?tab=profitLoss' },
         ] as const).map(card => {
           const Icon = card.icon;
           return (
@@ -287,7 +287,7 @@ export const ReportsView: React.FC = () => {
                       <div className="w-8 h-8 rounded-[var(--ui-radius-sm)] bg-[var(--win-danger-soft)] text-[var(--win-danger-text)] font-bold text-xs flex items-center justify-center">{idx + 1}</div>
                       <span className="font-bold text-sm text-[var(--win-text)]">{cat.category}</span>
                     </div>
-                    <span className="font-black text-rose-600">{CeramicMath.formatCurrency(cat.total)}</span>
+                    <span className="font-black text-danger">{CeramicMath.formatCurrency(cat.total)}</span>
                   </div>
                 ))}
               </div>

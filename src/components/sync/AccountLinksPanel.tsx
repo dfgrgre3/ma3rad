@@ -12,10 +12,10 @@ import type { AccountLinkSummary } from '../../types/sync';
 import { useToast } from '../ui/Toast';
 
 const STATUS_STYLES: Record<string, { label: string; cls: string }> = {
-  PENDING: { label: 'بانتظار الربط', cls: 'bg-amber-50 text-amber-700 border-amber-200' },
-  ACTIVE: { label: 'مرتبط ونشط', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-  DISABLED: { label: 'معطّل', cls: 'bg-slate-100 text-slate-500 border-slate-200' },
-  REVOKED: { label: 'ملغي', cls: 'bg-rose-50 text-rose-700 border-rose-200' },
+  PENDING: { label: 'بانتظار الربط', cls: 'bg-warning-soft text-warning border-warning-border' },
+  ACTIVE: { label: 'مرتبط ونشط', cls: 'bg-success-soft text-success border-success-border' },
+  DISABLED: { label: 'معطّل', cls: 'bg-surface-sunken text-muted border-line' },
+  REVOKED: { label: 'ملغي', cls: 'bg-danger-soft text-danger border-danger-border' },
 };
 
 const MODE_OPTIONS: Array<{ value: ChangeApprovalMode; label: string; hint: string }> = [
@@ -155,9 +155,9 @@ export const AccountLinksPanel: React.FC = () => {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <Link2 className="h-5 w-5 text-indigo-600" />
-          <h3 className="text-sm font-black text-slate-900">الحسابات المرتبطة بكود / مفتاح API</h3>
-          <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-[11px] font-bold text-indigo-700">
+          <Link2 className="h-5 w-5 text-primary" />
+          <h3 className="text-sm font-black text-ink">الحسابات المرتبطة بكود / مفتاح API</h3>
+          <span className="rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-bold text-primary">
             {items.filter((item) => item.status === 'ACTIVE').length} نشط
           </span>
         </div>
@@ -165,14 +165,14 @@ export const AccountLinksPanel: React.FC = () => {
           <button
             type="button"
             onClick={refresh}
-            className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-bold text-slate-700 hover:bg-slate-50"
+            className="flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-1.5 text-[11px] font-bold text-ink hover:bg-surface-muted"
           >
             <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} /> تحديث
           </button>
           <button
             type="button"
             onClick={() => setIssueOpen(true)}
-            className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-[11px] font-bold text-white hover:bg-indigo-700"
+            className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-[11px] font-bold text-white hover:bg-primary"
           >
             <Plus className="h-3.5 w-3.5" /> ربط حساب جديد
           </button>
@@ -180,9 +180,9 @@ export const AccountLinksPanel: React.FC = () => {
       </div>
 
       {/* Approval policy */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-4">
-        <p className="flex items-center gap-1.5 text-[11px] font-bold text-slate-700">
-          <ShieldCheck className="h-3.5 w-3.5 text-indigo-500" /> سياسة اعتماد تعديلات الفروع والحسابات
+      <div className="rounded-2xl border border-line bg-surface p-4">
+        <p className="flex items-center gap-1.5 text-[11px] font-bold text-ink">
+          <ShieldCheck className="h-3.5 w-3.5 text-primary" /> سياسة اعتماد تعديلات الفروع والحسابات
         </p>
         <div className="mt-2 grid gap-2 sm:grid-cols-3">
           {MODE_OPTIONS.map((option) => (
@@ -192,23 +192,23 @@ export const AccountLinksPanel: React.FC = () => {
               onClick={() => changeMode(option.value)}
               className={`rounded-xl border p-3 text-right transition ${
                 mode === option.value
-                  ? 'border-indigo-400 bg-indigo-50/70'
-                  : 'border-slate-200 bg-white hover:border-slate-300'
+                  ? 'border-primary bg-accent-soft/70'
+                  : 'border-line bg-surface hover:border-line-strong'
               }`}
             >
-              <span className="block text-xs font-black text-slate-900">{option.label}</span>
-              <span className="mt-1 block text-[10px] text-slate-500">{option.hint}</span>
+              <span className="block text-xs font-black text-ink">{option.label}</span>
+              <span className="mt-1 block text-[10px] text-muted">{option.hint}</span>
             </button>
           ))}
         </div>
       </div>
 
       {/* Recipient side: activate with a code or API token received from the owner */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-4">
-        <p className="flex items-center gap-1.5 text-[11px] font-bold text-slate-700">
-          <KeyRound className="h-3.5 w-3.5 text-indigo-500" /> تفعيل ربط بكود أو مفتاح API مستلم
+      <div className="rounded-2xl border border-line bg-surface p-4">
+        <p className="flex items-center gap-1.5 text-[11px] font-bold text-ink">
+          <KeyRound className="h-3.5 w-3.5 text-primary" /> تفعيل ربط بكود أو مفتاح API مستلم
         </p>
-        <p className="mt-1 text-[10px] text-slate-500">
+        <p className="mt-1 text-[10px] text-muted">
           أدخل الكود أو المفتاح الذي سلّمه لك صاحب النشاط مع كلمة سر الربط.
         </p>
         <div className="mt-2 grid gap-2 sm:grid-cols-[1fr_1fr_auto_auto]">
@@ -216,19 +216,19 @@ export const AccountLinksPanel: React.FC = () => {
             value={activation.value}
             onChange={(event) => setActivation({ ...activation, value: event.target.value })}
             placeholder={activation.useToken ? 'lkn_...' : 'LK-XXXXXXXX'}
-            className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 font-mono text-xs"
+            className="rounded-xl border border-line bg-surface-muted px-3 py-2 font-mono text-xs"
           />
           <input
             value={activation.password}
             onChange={(event) => setActivation({ ...activation, password: event.target.value })}
             type="password"
             placeholder="كلمة سر الربط"
-            className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs"
+            className="rounded-xl border border-line bg-surface-muted px-3 py-2 text-xs"
           />
           <button
             type="button"
             onClick={() => setActivation({ ...activation, useToken: !activation.useToken })}
-            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-[11px] font-bold text-slate-600 hover:bg-slate-50"
+            className="rounded-xl border border-line bg-surface px-3 py-2 text-[11px] font-bold text-ink-secondary hover:bg-surface-muted"
           >
             {activation.useToken ? 'مفتاح API' : 'كود'}
           </button>
@@ -236,7 +236,7 @@ export const AccountLinksPanel: React.FC = () => {
             type="button"
             onClick={activate}
             disabled={activating}
-            className="flex items-center justify-center gap-1.5 rounded-xl bg-slate-900 px-4 py-2 text-[11px] font-bold text-white hover:bg-slate-800 disabled:opacity-60"
+            className="flex items-center justify-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-[11px] font-bold text-white hover:bg-primary disabled:opacity-60"
           >
             {activating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Link2 className="h-3.5 w-3.5" />} تفعيل
           </button>
@@ -244,34 +244,34 @@ export const AccountLinksPanel: React.FC = () => {
       </div>
 
       {credentials && (
-        <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4">
+        <div className="rounded-2xl border border-success-border bg-success-soft/70 p-4">
           <div className="flex items-start justify-between gap-2">
             <div>
-              <p className="text-xs font-black text-emerald-800">بيانات ربط «{credentials.companyName}»</p>
-              <p className="text-[11px] text-emerald-700">
+              <p className="text-xs font-black text-success">بيانات ربط «{credentials.companyName}»</p>
+              <p className="text-[11px] text-success">
                 سلّمها للحساب الآخر مرة واحدة فقط — لا يمكن استرجاع كلمة السر لاحقًا.
               </p>
             </div>
-            <button type="button" onClick={() => setCredentials(null)} className="text-emerald-700 hover:text-emerald-900">
+            <button type="button" onClick={() => setCredentials(null)} className="text-success hover:text-success">
               <X className="h-4 w-4" />
             </button>
           </div>
           <div className="mt-3 space-y-2">
             {credentials.code && (
-              <div className="flex items-center justify-between gap-2 rounded-xl border border-emerald-200 bg-white px-3 py-2">
-                <span className="text-[10px] font-bold text-slate-500">كود الربط</span>
-                <span className="font-mono text-sm font-black tracking-wider text-slate-900">{credentials.code}</span>
-                <button type="button" onClick={() => copy(credentials.code!, 'code')} className="rounded-lg p-1 text-slate-500 hover:bg-slate-100">
-                  {copied === 'code' ? <Check className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}
+              <div className="flex items-center justify-between gap-2 rounded-xl border border-success-border bg-surface px-3 py-2">
+                <span className="text-[10px] font-bold text-muted">كود الربط</span>
+                <span className="font-mono text-sm font-black tracking-wider text-ink">{credentials.code}</span>
+                <button type="button" onClick={() => copy(credentials.code!, 'code')} className="rounded-lg p-1 text-muted hover:bg-surface-sunken">
+                  {copied === 'code' ? <Check className="h-4 w-4 text-success" /> : <Copy className="h-4 w-4" />}
                 </button>
               </div>
             )}
             {credentials.apiToken && (
-              <div className="flex items-center justify-between gap-2 rounded-xl border border-emerald-200 bg-white px-3 py-2">
-                <span className="text-[10px] font-bold text-slate-500">مفتاح API</span>
-                <span className="truncate font-mono text-[11px] font-bold tracking-wider text-slate-900">{credentials.apiToken}</span>
-                <button type="button" onClick={() => copy(credentials.apiToken!, 'token')} className="rounded-lg p-1 text-slate-500 hover:bg-slate-100">
-                  {copied === 'token' ? <Check className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}
+              <div className="flex items-center justify-between gap-2 rounded-xl border border-success-border bg-surface px-3 py-2">
+                <span className="text-[10px] font-bold text-muted">مفتاح API</span>
+                <span className="truncate font-mono text-[11px] font-bold tracking-wider text-ink">{credentials.apiToken}</span>
+                <button type="button" onClick={() => copy(credentials.apiToken!, 'token')} className="rounded-lg p-1 text-muted hover:bg-surface-sunken">
+                  {copied === 'token' ? <Check className="h-4 w-4 text-success" /> : <Copy className="h-4 w-4" />}
                 </button>
               </div>
             )}
@@ -280,7 +280,7 @@ export const AccountLinksPanel: React.FC = () => {
       )}
 
       {/* Links table */}
-      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+      <div className="overflow-hidden rounded-2xl border border-line bg-surface">
         <DataTable
           ariaLabel="الحسابات المرتبطة"
           rows={loading ? [] : items}
@@ -295,19 +295,19 @@ export const AccountLinksPanel: React.FC = () => {
                 const status = STATUS_STYLES[link.status] ?? STATUS_STYLES.PENDING;
                 return (
                   <span>
-                    <span className="flex items-center gap-1.5 font-bold text-slate-900">
-                      <Building2 className="h-3.5 w-3.5 text-slate-400" /> {link.companyName}
+                    <span className="flex items-center gap-1.5 font-bold text-ink">
+                      <Building2 className="h-3.5 w-3.5 text-muted" /> {link.companyName}
                     </span>
-                    <span className="mt-0.5 flex items-center gap-1 font-mono text-[10px] text-slate-400">
+                    <span className="mt-0.5 flex items-center gap-1 font-mono text-[10px] text-muted">
                       <span>{link.branchId || 'كل الفروع'}</span>
                       {(link.linkCode || link.apiToken) && (
                         <button
                           type="button"
                           onClick={() => copy(String(link.linkCode || link.apiToken), link.id)}
                           title="نسخ بيانات الربط"
-                          className="rounded p-0.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                          className="rounded p-0.5 text-muted hover:bg-surface-sunken hover:text-ink-secondary"
                         >
-                          {copied === link.id ? <Check className="h-3 w-3 text-emerald-600" /> : <Copy className="h-3 w-3" />}
+                          {copied === link.id ? <Check className="h-3 w-3 text-success" /> : <Copy className="h-3 w-3" />}
                         </button>
                       )}
                     </span>
@@ -330,8 +330,8 @@ export const AccountLinksPanel: React.FC = () => {
                   onClick={() => toggleApproval(link)}
                   className={`flex items-center gap-1 rounded-lg border px-2 py-0.5 text-[10px] font-bold ${
                     link.requiresApproval
-                      ? 'border-amber-200 bg-amber-50 text-amber-700'
-                      : 'border-slate-200 bg-white text-slate-500'
+                      ? 'border-warning-border bg-warning-soft text-warning'
+                      : 'border-line bg-surface text-muted'
                   }`}
                 >
                   {link.requiresApproval ? <ShieldCheck className="h-3 w-3" /> : <ShieldOff className="h-3 w-3" />}
@@ -345,35 +345,35 @@ export const AccountLinksPanel: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setPermissionsFor(link)}
-                  className="rounded-lg border border-slate-200 px-2 py-0.5 text-[10px] font-bold text-slate-600 hover:bg-slate-50"
+                  className="rounded-lg border border-line px-2 py-0.5 text-[10px] font-bold text-ink-secondary hover:bg-surface-muted"
                 >
                   {link.permissions.length} صلاحية
                 </button>
               ),
             },
-            { key: 'verified', header: 'آخر تحقق', render: (link: any) => <span className="font-mono text-[10px] text-slate-500">{formatTimestamp(link.lastVerifiedAt)}</span> },
+            { key: 'verified', header: 'آخر تحقق', render: (link: any) => <span className="font-mono text-[10px] text-muted">{formatTimestamp(link.lastVerifiedAt)}</span> },
             {
               key: 'pending', header: 'معلّق',
-              render: (link: any) => <span className={`text-[11px] font-black ${link.pendingChanges > 0 ? 'text-amber-600' : 'text-slate-400'}`}>{link.pendingChanges}</span>,
+              render: (link: any) => <span className={`text-[11px] font-black ${link.pendingChanges > 0 ? 'text-warning' : 'text-muted'}`}>{link.pendingChanges}</span>,
             },
             {
               key: 'actions', header: 'إجراءات',
               render: (link: any) => (
                 <div className="flex items-center gap-1">
                   {link.status === 'REVOKED' ? (
-                    <span className="text-[10px] text-slate-400">—</span>
+                    <span className="text-[10px] text-muted">—</span>
                   ) : (
                     <>
                       {link.status === 'ACTIVE' ? (
-                        <button type="button" onClick={() => setEnabled(link, false)} title="تعطيل" className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100">
+                        <button type="button" onClick={() => setEnabled(link, false)} title="تعطيل" className="rounded-lg p-1.5 text-muted hover:bg-surface-sunken">
                           <PowerOff className="h-3.5 w-3.5" />
                         </button>
                       ) : (
-                        <button type="button" onClick={() => setEnabled(link, true)} title="تفعيل" className="rounded-lg p-1.5 text-emerald-600 hover:bg-emerald-50">
+                        <button type="button" onClick={() => setEnabled(link, true)} title="تفعيل" className="rounded-lg p-1.5 text-success hover:bg-success-soft">
                           <Power className="h-3.5 w-3.5" />
                         </button>
                       )}
-                      <button type="button" onClick={() => revoke(link)} title="إلغاء" className="rounded-lg p-1.5 text-rose-600 hover:bg-rose-50">
+                      <button type="button" onClick={() => revoke(link)} title="إلغاء" className="rounded-lg p-1.5 text-danger hover:bg-danger-soft">
                         {busy === link.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
                       </button>
                     </>
@@ -450,29 +450,29 @@ const IssueLinkModal: React.FC<{
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-primary/40 p-4 backdrop-blur-sm">
+      <div className="w-full max-w-lg rounded-2xl border border-line bg-surface p-5 shadow-2xl">
         <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-sm font-black text-slate-900">ربط حساب شركة جديد</h3>
-          <button type="button" onClick={onClose} className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100">
+          <h3 className="text-sm font-black text-ink">ربط حساب شركة جديد</h3>
+          <button type="button" onClick={onClose} className="rounded-lg p-1.5 text-muted hover:bg-surface-sunken">
             <X className="h-4 w-4" />
           </button>
         </div>
         <form onSubmit={submit} className="space-y-3 text-xs">
           <div>
-            <label htmlFor="link-company" className="mb-1 block font-bold text-slate-700">اسم حساب الشركة *</label>
+            <label htmlFor="link-company" className="mb-1 block font-bold text-ink">اسم حساب الشركة *</label>
             <input
               id="link-company"
               required
               value={form.companyName}
               onChange={(event) => setForm({ ...form, companyName: event.target.value })}
-              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 font-semibold"
+              className="w-full rounded-xl border border-line bg-surface-muted px-3 py-2 font-semibold"
               placeholder="مثال: فرع الشركة الشقيق"
             />
           </div>
           <div className="grid gap-2 sm:grid-cols-2">
             <div>
-              <label htmlFor="link-password" className="mb-1 block font-bold text-slate-700">كلمة سر الربط *</label>
+              <label htmlFor="link-password" className="mb-1 block font-bold text-ink">كلمة سر الربط *</label>
               <input
                 id="link-password"
                 required
@@ -480,17 +480,17 @@ const IssueLinkModal: React.FC<{
                 minLength={6}
                 value={form.password}
                 onChange={(event) => setForm({ ...form, password: event.target.value })}
-                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 font-mono"
+                className="w-full rounded-xl border border-line bg-surface-muted px-3 py-2 font-mono"
                 placeholder="6 محارف على الأقل"
               />
             </div>
             <div>
-              <label htmlFor="link-branch" className="mb-1 block font-bold text-slate-700">الفرع المخصص</label>
+              <label htmlFor="link-branch" className="mb-1 block font-bold text-ink">الفرع المخصص</label>
               <select
                 id="link-branch"
                 value={form.branchId}
                 onChange={(event) => setForm({ ...form, branchId: event.target.value })}
-                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 font-bold"
+                className="w-full rounded-xl border border-line bg-surface-muted px-3 py-2 font-bold"
               >
                 <option value="">كل الفروع المتاحة</option>
                 {branches.map((branch) => (
@@ -502,31 +502,31 @@ const IssueLinkModal: React.FC<{
 
           <div className="grid gap-2 sm:grid-cols-2">
             <div>
-              <p className="mb-1 font-bold text-slate-700">نوع بيانات الربط</p>
+              <p className="mb-1 font-bold text-ink">نوع بيانات الربط</p>
               <div className="flex gap-2">
                 <button
                   type="button"
                   onClick={() => setForm({ ...form, useApiToken: false })}
-                  className={`flex-1 rounded-xl border px-3 py-2 font-bold ${!form.useApiToken ? 'border-indigo-400 bg-indigo-50 text-indigo-700' : 'border-slate-200 bg-white text-slate-600'}`}
+                  className={`flex-1 rounded-xl border px-3 py-2 font-bold ${!form.useApiToken ? 'border-primary bg-accent-soft text-primary' : 'border-line bg-surface text-ink-secondary'}`}
                 >
                   <KeyRound className="ml-1 inline h-3.5 w-3.5" /> كود
                 </button>
                 <button
                   type="button"
                   onClick={() => setForm({ ...form, useApiToken: true })}
-                  className={`flex-1 rounded-xl border px-3 py-2 font-bold ${form.useApiToken ? 'border-indigo-400 bg-indigo-50 text-indigo-700' : 'border-slate-200 bg-white text-slate-600'}`}
+                  className={`flex-1 rounded-xl border px-3 py-2 font-bold ${form.useApiToken ? 'border-primary bg-accent-soft text-primary' : 'border-line bg-surface text-ink-secondary'}`}
                 >
                   <Lock className="ml-1 inline h-3.5 w-3.5" /> API
                 </button>
               </div>
             </div>
             <div className="flex items-end">
-              <label className="flex w-full cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 font-bold text-slate-700">
+              <label className="flex w-full cursor-pointer items-center gap-2 rounded-xl border border-line bg-surface-muted px-3 py-2 font-bold text-ink">
                 <input
                   type="checkbox"
                   checked={form.requiresApproval}
                   onChange={(event) => setForm({ ...form, requiresApproval: event.target.checked })}
-                  className="h-4 w-4 rounded border-slate-300"
+                  className="h-4 w-4 rounded border-line-strong"
                 />
                 تعديلات هذا الحساب تحتاج اعتمادك
               </label>
@@ -534,16 +534,16 @@ const IssueLinkModal: React.FC<{
           </div>
 
           <div>
-            <p className="mb-1 font-bold text-slate-700">الصلاحيات الممنوحة</p>
+            <p className="mb-1 font-bold text-ink">الصلاحيات الممنوحة</p>
             <PermissionPicker
               selected={form.permissions}
               onChange={(permissions) => setForm({ ...form, permissions })}
             />
           </div>
 
-          <div className="flex justify-end gap-2 border-t border-slate-100 pt-3">
-            <button type="button" onClick={onClose} className="rounded-xl bg-slate-100 px-4 py-2 font-bold text-slate-700">إلغاء</button>
-            <button type="submit" disabled={saving} className="flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2 font-bold text-white hover:bg-indigo-700 disabled:opacity-60">
+          <div className="flex justify-end gap-2 border-t border-line pt-3">
+            <button type="button" onClick={onClose} className="rounded-xl bg-surface-sunken px-4 py-2 font-bold text-ink">إلغاء</button>
+            <button type="submit" disabled={saving} className="flex items-center gap-2 rounded-xl bg-primary px-5 py-2 font-bold text-white hover:bg-primary disabled:opacity-60">
               {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />} إصدار البيانات
             </button>
           </div>
@@ -588,24 +588,24 @@ const PermissionPicker: React.FC<{
   }, [groups, search]);
 
   return (
-    <div className="rounded-xl border border-slate-200">
-      <div className="relative border-b border-slate-100 p-2">
-        <Search className="absolute right-4 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+    <div className="rounded-xl border border-line">
+      <div className="relative border-b border-line p-2">
+        <Search className="absolute right-4 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted" />
         <input
           value={search}
           onChange={(event) => setSearch(event.target.value)}
           placeholder="بحث في الصلاحيات…"
-          className="w-full rounded-lg bg-slate-50 py-1.5 pl-2 pr-8 text-[11px] focus:outline-none"
+          className="w-full rounded-lg bg-surface-muted py-1.5 pl-2 pr-8 text-[11px] focus:outline-none"
         />
       </div>
       <div className="max-h-48 space-y-3 overflow-y-auto p-2">
         {filtered.map((module) => (
           <div key={module.module}>
-            <p className="mb-1 text-[10px] font-black uppercase tracking-wide text-slate-400">{module.module}</p>
+            <p className="mb-1 text-[10px] font-black uppercase tracking-wide text-muted">{module.module}</p>
             <div className="space-y-2">
               {module.groups.map((group) => (
                 <div key={`${module.module}-${group.name}`}>
-                  <p className="text-[10px] font-bold text-slate-500">{group.name}</p>
+                  <p className="text-[10px] font-bold text-muted">{group.name}</p>
                   <div className="mt-1 flex flex-wrap gap-1">
                     {group.permissions.map((permission) => {
                       const active = selectedSet.has(permission.code);
@@ -617,8 +617,8 @@ const PermissionPicker: React.FC<{
                           title={permission.code}
                           className={`rounded-lg border px-2 py-0.5 text-[10px] font-bold transition ${
                             active
-                              ? 'border-indigo-400 bg-indigo-50 text-indigo-700'
-                              : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                              ? 'border-primary bg-accent-soft text-primary'
+                              : 'border-line bg-surface text-ink-secondary hover:bg-surface-muted'
                           }`}
                         >
                           {permission.name}
@@ -631,12 +631,12 @@ const PermissionPicker: React.FC<{
             </div>
           </div>
         ))}
-        {filtered.length === 0 && <p className="p-3 text-center text-[11px] text-slate-400">لا توجد صلاحيات مطابقة.</p>}
+        {filtered.length === 0 && <p className="p-3 text-center text-[11px] text-muted">لا توجد صلاحيات مطابقة.</p>}
       </div>
-      <div className="border-t border-slate-100 px-2 py-1.5 text-[10px] text-slate-500">
+      <div className="border-t border-line px-2 py-1.5 text-[10px] text-muted">
         تم اختيار {selected.length} صلاحية
         {selected.length > 0 && (
-          <button type="button" onClick={() => onChange([])} className="mr-2 font-bold text-rose-600 hover:underline">
+          <button type="button" onClick={() => onChange([])} className="mr-2 font-bold text-danger hover:underline">
             مسح الكل
           </button>
         )}
@@ -671,18 +671,18 @@ const PermissionsModal: React.FC<{
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-xl rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-primary/40 p-4 backdrop-blur-sm">
+      <div className="w-full max-w-xl rounded-2xl border border-line bg-surface p-5 shadow-2xl">
         <div className="mb-3 flex items-center justify-between">
-          <h3 className="text-sm font-black text-slate-900">صلاحيات «{link.companyName}»</h3>
-          <button type="button" onClick={onClose} className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100">
+          <h3 className="text-sm font-black text-ink">صلاحيات «{link.companyName}»</h3>
+          <button type="button" onClick={onClose} className="rounded-lg p-1.5 text-muted hover:bg-surface-sunken">
             <X className="h-4 w-4" />
           </button>
         </div>
         <PermissionPicker selected={selected} onChange={setSelected} />
-        <div className="mt-3 flex justify-end gap-2 border-t border-slate-100 pt-3 text-xs">
-          <button type="button" onClick={onClose} className="rounded-xl bg-slate-100 px-4 py-2 font-bold text-slate-700">إلغاء</button>
-          <button type="button" onClick={save} disabled={saving} className="flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2 font-bold text-white hover:bg-indigo-700 disabled:opacity-60">
+        <div className="mt-3 flex justify-end gap-2 border-t border-line pt-3 text-xs">
+          <button type="button" onClick={onClose} className="rounded-xl bg-surface-sunken px-4 py-2 font-bold text-ink">إلغاء</button>
+          <button type="button" onClick={save} disabled={saving} className="flex items-center gap-2 rounded-xl bg-primary px-5 py-2 font-bold text-white hover:bg-primary disabled:opacity-60">
             {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />} حفظ الصلاحيات
           </button>
         </div>

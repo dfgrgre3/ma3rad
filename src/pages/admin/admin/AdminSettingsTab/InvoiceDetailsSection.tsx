@@ -22,12 +22,12 @@ export const InvoiceDetailsSection: React.FC<InvoiceDetailsSectionProps> = ({
   invoiceSectionOrder,
   moveInvoiceSection,
 }) => (
-  <section className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 space-y-4">
-    <div className="flex items-start gap-2 border-b border-slate-100 dark:border-slate-800 pb-3">
-      <SlidersHorizontal className="mt-0.5 h-4 w-4 text-sky-600" />
+  <section className="rounded-2xl border border-line bg-surface p-4 space-y-4">
+    <div className="flex items-start gap-2 border-b border-line pb-3">
+      <SlidersHorizontal className="mt-0.5 h-4 w-4 text-primary" />
       <div>
-        <h4 className="text-xs font-black text-slate-800 dark:text-slate-200">تفاصيل الفاتورة ومظهرها</h4>
-        <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+        <h4 className="text-xs font-black text-ink ">تفاصيل الفاتورة ومظهرها</h4>
+        <p className="mt-1 text-[11px] text-muted ">
           تُحفظ البيانات كما هي؛ هذه الخيارات تحدد ما يظهر في النسخة المطبوعة فقط. اللونان يستخدمان إعدادات الهوية المشتركة.
         </p>
       </div>
@@ -40,13 +40,13 @@ export const InvoiceDetailsSection: React.FC<InvoiceDetailsSectionProps> = ({
         { key: 'invoiceShowPaymentSplits' as const, label: 'إظهار تفاصيل الدفعات المجزأة' },
         { key: 'invoiceShowNotes' as const, label: 'إظهار الملاحظات الإضافية' },
       ].map((option) => (
-        <label key={option.key} className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50/60 p-2.5 text-[11px] font-semibold text-slate-700 dark:border-slate-700 dark:bg-slate-800/40 dark:text-slate-200">
+        <label key={option.key} className="flex items-center gap-2 rounded-lg border border-line bg-surface-muted/60 p-2.5 text-[11px] font-semibold text-ink dark:bg-primary/40 ">
           <input
             type="checkbox"
             checked={settings[option.key] === true}
             disabled={readOnly}
             onChange={(event) => set(option.key, event.target.checked)}
-            className="accent-sky-600"
+            className="accent-primary"
           />
           {option.label}
         </label>
@@ -59,13 +59,13 @@ export const InvoiceDetailsSection: React.FC<InvoiceDetailsSectionProps> = ({
         {invoiceSectionOrder.map((section, index) => {
           const option = INVOICE_SECTION_OPTIONS.find((item) => item.id === section)!;
           return (
-            <div key={section} className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 px-2.5 py-2 dark:border-slate-700">
-              <span className="text-[11px] font-semibold text-slate-700 dark:text-slate-200">{index + 1}. {option.label}</span>
+            <div key={section} className="flex items-center justify-between gap-2 rounded-lg border border-line px-2.5 py-2 ">
+              <span className="text-[11px] font-semibold text-ink ">{index + 1}. {option.label}</span>
               <div className="flex gap-1">
-                <button type="button" aria-label={`تحريك ${option.label} لأعلى`} disabled={readOnly || index === 0} onClick={() => moveInvoiceSection(section, -1)} className="rounded border border-slate-200 p-1 text-slate-600 disabled:opacity-40 dark:border-slate-700 dark:text-slate-300">
+                <button type="button" aria-label={`تحريك ${option.label} لأعلى`} disabled={readOnly || index === 0} onClick={() => moveInvoiceSection(section, -1)} className="rounded border border-line p-1 text-ink-secondary disabled:opacity-40 ">
                   <ArrowUp className="h-3 w-3" />
                 </button>
-                <button type="button" aria-label={`تحريك ${option.label} لأسفل`} disabled={readOnly || index === invoiceSectionOrder.length - 1} onClick={() => moveInvoiceSection(section, 1)} className="rounded border border-slate-200 p-1 text-slate-600 disabled:opacity-40 dark:border-slate-700 dark:text-slate-300">
+                <button type="button" aria-label={`تحريك ${option.label} لأسفل`} disabled={readOnly || index === invoiceSectionOrder.length - 1} onClick={() => moveInvoiceSection(section, 1)} className="rounded border border-line p-1 text-ink-secondary disabled:opacity-40 ">
                   <ArrowDown className="h-3 w-3" />
                 </button>
               </div>
@@ -91,12 +91,12 @@ export const InvoiceDetailsSection: React.FC<InvoiceDetailsSectionProps> = ({
             <option value="Arial">أريال</option>
           </select>
         </Field>
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 p-2.5 dark:border-slate-700">
-          <label className="flex items-center gap-2 text-[11px] font-semibold text-slate-700 dark:text-slate-200">
-            <input type="checkbox" checked={settings.invoiceShowBrandLogo !== false} disabled={readOnly} onChange={(event) => set('invoiceShowBrandLogo', event.target.checked)} className="accent-sky-600" />
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-line p-2.5 ">
+          <label className="flex items-center gap-2 text-[11px] font-semibold text-ink ">
+            <input type="checkbox" checked={settings.invoiceShowBrandLogo !== false} disabled={readOnly} onChange={(event) => set('invoiceShowBrandLogo', event.target.checked)} className="accent-primary" />
             إظهار شعار المعرض
           </label>
-          <label className="cursor-pointer rounded-lg border border-dashed border-slate-300 px-2.5 py-1.5 text-[10px] font-bold text-slate-600 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800">
+          <label className="cursor-pointer rounded-lg border border-dashed border-line-strong px-2.5 py-1.5 text-[10px] font-bold text-ink-secondary hover:bg-surface-muted dark:hover:bg-primary">
             <Upload className="mr-1 inline h-3 w-3" />{settings.brandLogoDataUrl ? 'تغيير الشعار' : 'رفع الشعار'}
             <input type="file" accept="image/*" disabled={readOnly} className="hidden" onChange={(event) => onLogo(event.target.files?.[0])} />
           </label>

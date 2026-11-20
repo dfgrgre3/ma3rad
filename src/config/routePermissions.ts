@@ -40,6 +40,12 @@ export const ROUTE_PERMISSIONS: RoutePermissionRule[] = [
   // المبيعات ونقطة البيع
   { path: '/pos', any: ['sales.pos.view', 'sales.create'] },
   { path: '/restaurant', any: ['restaurant.view', 'orders.view'] },
+  { path: '/hospitality', any: ['orders.view', 'restaurant.view'] },
+  { path: '/workshop', all: ['operations.view'] },
+  { path: '/education', all: ['customers.view'] },
+  { path: '/ceramics', any: ['sales.view', 'products.view'] },
+  { path: '/retail', any: ['sales.view', 'products.view'] },
+  { path: '/time-billing', all: ['projects.view'] },
   { path: '/sales', all: ['sales.view'] },
   { path: '/sales/analytics', any: ['sales.analytics.view', 'sales.view'] },
   { path: '/sales/cycle', any: ['sales.cycle.view', 'sales.view'] },
@@ -78,6 +84,7 @@ export const ROUTE_PERMISSIONS: RoutePermissionRule[] = [
   { path: '/inventory/locations', any: ['inventory.locations.view', 'inventory.view'] },
   { path: '/inventory/damage-quarantine', any: ['inventory.damage.view', 'inventory.adjust'] },
   { path: '/inventory/reconciliation', any: ['inventory.reconciliation.view', 'inventory.view'] },
+  { path: '/inventory/expiry', any: ['inventory.view', 'inventory.adjust'] },
 
   // الفروع والمخازن
   { path: '/branches', all: ['branches.view'] },
@@ -128,6 +135,9 @@ export const ROUTE_PERMISSIONS: RoutePermissionRule[] = [
   { path: '/finance/assets', any: ['finance.assets.view', 'finance.view'] },
 
   // المشاريع والعمليات
+  { path: '/projects/execution', all: ['projects.view'] },
+  { path: '/projects/sites', all: ['projects.view'] },
+  { path: '/projects/boq', all: ['projects.view'] },
   { path: '/projects', all: ['projects.view'] },
   { path: '/fleet/dashboard', any: ['operations.fleet.view', 'deliveries.view'] },
   { path: '/facility-management', any: ['operations.view'] },

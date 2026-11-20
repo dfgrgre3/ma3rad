@@ -219,7 +219,7 @@ export const PlatformActivitySettingsPage: React.FC = () => {
       <PageHeader
         title="إدارة الأنشطة والقوالب التجارية للعملاء"
         description="تخصيص نشاط كل عميل بمعزل تام: قوالب الأنشطة، الوحدات، المصطلحات، وسجل استرجاع الإصدارات السابقة."
-        icon={<Layers className="h-5 w-5 text-indigo-600" />}
+        icon={<Layers className="h-5 w-5 text-primary" />}
         actions={
           <div className="flex items-center gap-2">
             <Button
@@ -236,15 +236,15 @@ export const PlatformActivitySettingsPage: React.FC = () => {
       />
 
       {/* Tenant Selection Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-line bg-surface p-4 shadow-sm">
         <div className="flex items-center gap-3">
-          <Building className="h-5 w-5 text-slate-400" />
+          <Building className="h-5 w-5 text-muted" />
           <div>
-            <label className="text-xs font-bold text-slate-700 block">حدد العميل المستهدف:</label>
+            <label className="text-xs font-bold text-ink block">حدد العميل المستهدف:</label>
             <select
               value={selectedTenantId}
               onChange={(e) => setSelectedTenantId(e.target.value)}
-              className={`${inputClass} !py-1 text-xs min-w-[260px] font-semibold text-slate-800`}
+              className={`${inputClass} !py-1 text-xs min-w-[260px] font-semibold text-ink`}
             >
               {tenants.map((t) => (
                 <option key={t.id} value={t.id}>
@@ -256,31 +256,31 @@ export const PlatformActivitySettingsPage: React.FC = () => {
         </div>
 
         {activityConfig && selectedTenant && (
-          <div className="flex items-center gap-4 text-xs bg-slate-50 border border-slate-200 rounded-lg px-4 py-2">
+          <div className="flex items-center gap-4 text-xs bg-surface-muted border border-line rounded-lg px-4 py-2">
             <div>
               النشاط الحالي:{' '}
-              <strong className="text-indigo-700">
+              <strong className="text-primary">
                 {allActivities.find((a) => a.id === activityConfig.activityId)?.label || activityConfig.activityId}
               </strong>
             </div>
             <div>
-              الإصدار المطبق: <strong className="text-slate-800">#{activityConfig.version}</strong>
+              الإصدار المطبق: <strong className="text-ink">#{activityConfig.version}</strong>
             </div>
             <div>
-              الوحدات النشطة: <strong className="text-emerald-700">{activityConfig.enabledModules.length}</strong>
+              الوحدات النشطة: <strong className="text-success">{activityConfig.enabledModules.length}</strong>
             </div>
           </div>
         )}
       </div>
 
       {/* Tabs */}
-      <div className="flex overflow-x-auto border-b border-slate-200 bg-white px-2 pt-2 rounded-t-xl gap-1">
+      <div className="flex overflow-x-auto border-b border-line bg-surface px-2 pt-2 rounded-t-xl gap-1">
         <button
           onClick={() => setActiveTab('catalog')}
           className={`flex items-center gap-2 border-b-2 px-4 py-3 text-xs font-semibold whitespace-nowrap transition-colors ${
             activeTab === 'catalog'
-              ? 'border-indigo-600 text-indigo-700 bg-indigo-50/40'
-              : 'border-transparent text-slate-600 hover:text-slate-900'
+              ? 'border-primary text-primary bg-accent-soft/40'
+              : 'border-transparent text-ink-secondary hover:text-ink'
           }`}
         >
           <Layers className="h-4 w-4" /> كتالوج وقوالب الأنشطة الجاهزة
@@ -289,8 +289,8 @@ export const PlatformActivitySettingsPage: React.FC = () => {
           onClick={() => setActiveTab('modules')}
           className={`flex items-center gap-2 border-b-2 px-4 py-3 text-xs font-semibold whitespace-nowrap transition-colors ${
             activeTab === 'modules'
-              ? 'border-indigo-600 text-indigo-700 bg-indigo-50/40'
-              : 'border-transparent text-slate-600 hover:text-slate-900'
+              ? 'border-primary text-primary bg-accent-soft/40'
+              : 'border-transparent text-ink-secondary hover:text-ink'
           }`}
         >
           <Sliders className="h-4 w-4" /> الوحدات المطلوبة ({enabledModules.length})
@@ -299,8 +299,8 @@ export const PlatformActivitySettingsPage: React.FC = () => {
           onClick={() => setActiveTab('terminology')}
           className={`flex items-center gap-2 border-b-2 px-4 py-3 text-xs font-semibold whitespace-nowrap transition-colors ${
             activeTab === 'terminology'
-              ? 'border-indigo-600 text-indigo-700 bg-indigo-50/40'
-              : 'border-transparent text-slate-600 hover:text-slate-900'
+              ? 'border-primary text-primary bg-accent-soft/40'
+              : 'border-transparent text-ink-secondary hover:text-ink'
           }`}
         >
           <Tag className="h-4 w-4" /> المصطلحات والشاشات
@@ -309,8 +309,8 @@ export const PlatformActivitySettingsPage: React.FC = () => {
           onClick={() => setActiveTab('history')}
           className={`flex items-center gap-2 border-b-2 px-4 py-3 text-xs font-semibold whitespace-nowrap transition-colors ${
             activeTab === 'history'
-              ? 'border-indigo-600 text-indigo-700 bg-indigo-50/40'
-              : 'border-transparent text-slate-600 hover:text-slate-900'
+              ? 'border-primary text-primary bg-accent-soft/40'
+              : 'border-transparent text-ink-secondary hover:text-ink'
           }`}
         >
           <History className="h-4 w-4" /> سجل الإصدارات والاسترجاع ({versions.length})
@@ -318,13 +318,13 @@ export const PlatformActivitySettingsPage: React.FC = () => {
       </div>
 
       {/* Main Tab Content Card */}
-      <div className="rounded-b-xl rounded-tr-xl border border-slate-200 bg-white p-6 shadow-sm">
+      <div className="rounded-b-xl rounded-tr-xl border border-line bg-surface p-6 shadow-sm">
         {/* 1. Catalog Tab */}
         {activeTab === 'catalog' && (
           <div className="space-y-4">
             <div className="flex flex-wrap items-center gap-3">
               <div className="relative min-w-[260px] flex-1">
-                <Search className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <Search className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
                 <input
                   value={catalogSearch}
                   onChange={(e) => setCatalogSearch(e.target.value)}
@@ -356,38 +356,38 @@ export const PlatformActivitySettingsPage: React.FC = () => {
                     key={act.id}
                     className={`rounded-xl border p-4 transition-all flex flex-col justify-between ${
                       isCurrent
-                        ? 'border-indigo-600 bg-indigo-50/40 ring-1 ring-indigo-600 shadow-sm'
-                        : 'border-slate-200 bg-white hover:border-slate-300'
+                        ? 'border-primary bg-accent-soft/40 ring-1 ring-primary shadow-sm'
+                        : 'border-line bg-surface hover:border-line-strong'
                     }`}
                   >
                     <div>
                       <div className="flex items-start justify-between gap-2">
-                        <h4 className="text-xs font-bold text-slate-900">{act.label}</h4>
+                        <h4 className="text-xs font-bold text-ink">{act.label}</h4>
                         {isCurrent && (
-                          <span className="shrink-0 inline-flex items-center gap-1 rounded-full bg-indigo-600 text-white text-[9.5px] px-2 py-0.5 font-bold">
+                          <span className="shrink-0 inline-flex items-center gap-1 rounded-full bg-primary text-white text-[9.5px] px-2 py-0.5 font-bold">
                             <CheckCircle2 className="h-3 w-3" /> النشاط المحدد
                           </span>
                         )}
                       </div>
-                      <p className="text-[11px] text-slate-500 mt-1 line-clamp-2">
+                      <p className="text-[11px] text-muted mt-1 line-clamp-2">
                         {profile.description.ar}
                       </p>
                       <div className="mt-3 flex flex-wrap gap-1">
                         {profile.modules.enabledByDefault.slice(0, 4).map((mod) => (
-                          <span key={mod} className="rounded bg-slate-100 text-slate-600 px-1.5 py-0.5 text-[9.5px]">
+                          <span key={mod} className="rounded bg-surface-sunken text-ink-secondary px-1.5 py-0.5 text-[9.5px]">
                             {mod}
                           </span>
                         ))}
                         {profile.modules.enabledByDefault.length > 4 && (
-                          <span className="text-[9.5px] text-slate-400">
+                          <span className="text-[9.5px] text-muted">
                             +{profile.modules.enabledByDefault.length - 4} وحدات
                           </span>
                         )}
                       </div>
                     </div>
 
-                    <div className="pt-4 mt-3 border-t border-slate-100 flex items-center justify-between">
-                      <span className="text-[10px] font-mono text-slate-400">{act.id}</span>
+                    <div className="pt-4 mt-3 border-t border-line flex items-center justify-between">
+                      <span className="text-[10px] font-mono text-muted">{act.id}</span>
                       <Button
                         variant={isCurrent ? 'secondary' : 'ghost'}
                         size="sm"
@@ -409,12 +409,12 @@ export const PlatformActivitySettingsPage: React.FC = () => {
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-sm font-bold text-slate-900">الوحدات المفعلة لنشاط هذا العميل</h3>
-                <p className="text-xs text-slate-500">
+                <h3 className="text-sm font-bold text-ink">الوحدات المفعلة لنشاط هذا العميل</h3>
+                <p className="text-xs text-muted">
                   تحديد الوحدات المتاحة لهذا العميل دون التأثير على أي عميل آخر على المنصة.
                 </p>
               </div>
-              <span className="text-xs font-semibold text-slate-600 bg-slate-100 px-3 py-1 rounded-full">
+              <span className="text-xs font-semibold text-ink-secondary bg-surface-sunken px-3 py-1 rounded-full">
                 {enabledModules.length} وحدة مفعلة
               </span>
             </div>
@@ -426,7 +426,7 @@ export const PlatformActivitySettingsPage: React.FC = () => {
                   <label
                     key={mod.id}
                     className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${
-                      isEnabled ? 'border-indigo-300 bg-indigo-50/30' : 'border-slate-200 bg-white hover:bg-slate-50'
+                      isEnabled ? 'border-accent-border bg-accent-soft/30' : 'border-line bg-surface hover:bg-surface-muted'
                     }`}
                   >
                     <input
@@ -434,14 +434,14 @@ export const PlatformActivitySettingsPage: React.FC = () => {
                       checked={isEnabled}
                       onChange={() => toggleModule(mod.id)}
                       disabled={!canManageActivity}
-                      className="mt-1 h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                      className="mt-1 h-4 w-4 rounded border-line-strong text-primary focus:ring-primary"
                     />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-slate-900">{mod.label}</span>
-                        <span className="text-[9.5px] font-mono text-slate-400">{mod.id}</span>
+                        <span className="text-xs font-bold text-ink">{mod.label}</span>
+                        <span className="text-[9.5px] font-mono text-muted">{mod.id}</span>
                       </div>
-                      <p className="text-[11px] text-slate-500 mt-0.5 line-clamp-1">{mod.description}</p>
+                      <p className="text-[11px] text-muted mt-0.5 line-clamp-1">{mod.description}</p>
                     </div>
                   </label>
                 );
@@ -454,15 +454,15 @@ export const PlatformActivitySettingsPage: React.FC = () => {
         {activeTab === 'terminology' && (
           <div className="space-y-4">
             <div>
-              <h3 className="text-sm font-bold text-slate-900">تخصيص المصطلحات والشاشات القطاعية</h3>
-              <p className="text-xs text-slate-500">
+              <h3 className="text-sm font-bold text-ink">تخصيص المصطلحات والشاشات القطاعية</h3>
+              <p className="text-xs text-muted">
                 مواءمة مسميات النظام لتناسب طبيعة نشاط العميل (مثال: "صنف" مقابل "طبق" أو "خدمة" أو "عقار").
               </p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl pt-2">
               <div>
-                <label className="text-xs font-bold text-slate-700 block mb-1">مسمى المنتج / الصنف الأساسي</label>
+                <label className="text-xs font-bold text-ink block mb-1">مسمى المنتج / الصنف الأساسي</label>
                 <input
                   type="text"
                   value={customTerminology['product_name'] || ''}
@@ -473,7 +473,7 @@ export const PlatformActivitySettingsPage: React.FC = () => {
               </div>
 
               <div>
-                <label className="text-xs font-bold text-slate-700 block mb-1">مسمى الطرف المقابل (العميل)</label>
+                <label className="text-xs font-bold text-ink block mb-1">مسمى الطرف المقابل (العميل)</label>
                 <input
                   type="text"
                   value={customTerminology['customer_name'] || ''}
@@ -484,7 +484,7 @@ export const PlatformActivitySettingsPage: React.FC = () => {
               </div>
 
               <div>
-                <label className="text-xs font-bold text-slate-700 block mb-1">مسمى المخزن / المستودع</label>
+                <label className="text-xs font-bold text-ink block mb-1">مسمى المخزن / المستودع</label>
                 <input
                   type="text"
                   value={customTerminology['warehouse_name'] || ''}
@@ -495,7 +495,7 @@ export const PlatformActivitySettingsPage: React.FC = () => {
               </div>
 
               <div>
-                <label className="text-xs font-bold text-slate-700 block mb-1">مسمى الفاتورة / أمر البيع</label>
+                <label className="text-xs font-bold text-ink block mb-1">مسمى الفاتورة / أمر البيع</label>
                 <input
                   type="text"
                   value={customTerminology['invoice_name'] || ''}
@@ -512,40 +512,40 @@ export const PlatformActivitySettingsPage: React.FC = () => {
         {activeTab === 'history' && (
           <div className="space-y-4">
             <div>
-              <h3 className="text-sm font-bold text-slate-900">سجل إصدارات النشاط والاسترجاع (Snapshots)</h3>
-              <p className="text-xs text-slate-500">
+              <h3 className="text-sm font-bold text-ink">سجل إصدارات النشاط والاسترجاع (Snapshots)</h3>
+              <p className="text-xs text-muted">
                 يتم حفظ نسخة تلقائية مع كل تعديل على نشاط العميل مع إمكانية استرجاع أي إصدار سابق فوراً.
               </p>
             </div>
 
             {versions.length === 0 ? (
               <EmptyState
-                icon={<History className="h-5 w-5 text-slate-400" />}
+                icon={<History className="h-5 w-5 text-muted" />}
                 title="لا توجد إصدارات سابقة"
                 description="سيتم إنشاء لقطات تاريخية عند إجراء أول عملية حفظ لنشاط العميل."
               />
             ) : (
-              <div className="overflow-x-auto rounded-xl border border-slate-200">
+              <div className="overflow-x-auto rounded-xl border border-line">
                 <DataTable
                   ariaLabel="سجل إصدارات الأنشطة"
                   rows={versions}
                   rowKey={(ver: any) => String(ver.id)}
                   dense
                   tableClassName="text-xs"
-                  rowClassName={() => 'transition hover:bg-slate-50/70'}
+                  rowClassName={() => 'transition hover:bg-surface-muted/70'}
                   columns={[
-                    { key: 'ver', header: 'رقم الإصدار', render: (ver: any) => <span className="font-bold text-indigo-700">#{ver.version}</span> },
-                    { key: 'activity', header: 'النشاط التجاري', render: (ver: any) => <span className="font-semibold text-slate-800">{allActivities.find((a: any) => a.id === ver.activityId)?.label || ver.activityId}</span> },
-                    { key: 'reason', header: 'سبب التحديث', render: (ver: any) => <span className="text-slate-600">{ver.changeSummary || '—'}</span> },
-                    { key: 'by', header: 'المنفذ', render: (ver: any) => <span className="text-slate-600">{ver.createdBy || 'النظام'}</span> },
-                    { key: 'date', header: 'تاريخ الإصدار', render: (ver: any) => <span className="font-mono text-slate-400" dir="ltr">{formatDateTime(ver.createdAt)}</span> },
+                    { key: 'ver', header: 'رقم الإصدار', render: (ver: any) => <span className="font-bold text-primary">#{ver.version}</span> },
+                    { key: 'activity', header: 'النشاط التجاري', render: (ver: any) => <span className="font-semibold text-ink">{allActivities.find((a: any) => a.id === ver.activityId)?.label || ver.activityId}</span> },
+                    { key: 'reason', header: 'سبب التحديث', render: (ver: any) => <span className="text-ink-secondary">{ver.changeSummary || '—'}</span> },
+                    { key: 'by', header: 'المنفذ', render: (ver: any) => <span className="text-ink-secondary">{ver.createdBy || 'النظام'}</span> },
+                    { key: 'date', header: 'تاريخ الإصدار', render: (ver: any) => <span className="font-mono text-muted" dir="ltr">{formatDateTime(ver.createdAt)}</span> },
                     {
                       key: 'action', header: 'الإجراء', align: 'center',
                       render: (ver: any) => canManageActivity ? (
                         <Button
                           variant="secondary"
                           size="sm"
-                          leadingIcon={<RotateCcw className="h-3 w-3 text-amber-600" />}
+                          leadingIcon={<RotateCcw className="h-3 w-3 text-warning" />}
                           onClick={() => handleRollback(ver.version)}
                           className="text-xs"
                         >

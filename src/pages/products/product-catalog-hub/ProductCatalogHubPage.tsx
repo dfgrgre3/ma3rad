@@ -41,11 +41,11 @@ export const ProductCatalogHubPage: React.FC = () => {
   const ActivePage = activeTab ? PAGE_BY_TAB[activeTab as keyof typeof PAGE_BY_TAB] : null;
 
   if (matchedTab && !matchedAllowed) {
-    return <div className="flex h-full items-center justify-center p-6 text-sm font-bold text-slate-500">لا تملك صلاحية الوصول إلى هذا القسم من كتالوج المنتجات.</div>;
+    return <div className="flex h-full items-center justify-center p-6 text-sm font-bold text-muted">لا تملك صلاحية الوصول إلى هذا القسم من كتالوج المنتجات.</div>;
   }
 
   if (!activeTab || !ActivePage) {
-    return <div className="flex h-full items-center justify-center p-6 text-sm font-bold text-slate-500">لا تملك صلاحية الوصول إلى كتالوج المنتجات.</div>;
+    return <div className="flex h-full items-center justify-center p-6 text-sm font-bold text-muted">لا تملك صلاحية الوصول إلى كتالوج المنتجات.</div>;
   }
 
   return (

@@ -29,24 +29,24 @@ export const PosPageOverlays: React.FC<{ vm: PosViewVm }> = ({ vm }) => {
   return (
     <>
       {isDiscountedStocksOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4" role="dialog" aria-modal="true" aria-label="مخزون البيع المخفض">
-          <div className="max-h-[80vh] w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-2xl">
-            <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-primary/50 p-4" role="dialog" aria-modal="true" aria-label="مخزون البيع المخفض">
+          <div className="max-h-[80vh] w-full max-w-2xl overflow-hidden rounded-2xl bg-surface shadow-2xl">
+            <div className="flex items-center justify-between border-b border-line px-5 py-4">
               <div>
-                <h2 className="text-sm font-black text-slate-900">مخزون البيع المخفض</h2>
-                <p className="mt-1 text-xs text-slate-500">كل بند يُخصم من سجل الحجر وتُستخدم تكلفته وسعره المعتمدان.</p>
+                <h2 className="text-sm font-black text-ink">مخزون البيع المخفض</h2>
+                <p className="mt-1 text-xs text-muted">كل بند يُخصم من سجل الحجر وتُستخدم تكلفته وسعره المعتمدان.</p>
               </div>
-              <button type="button" onClick={() => setIsDiscountedStocksOpen(false)} className="rounded-lg px-3 py-2 text-sm font-bold text-slate-600 hover:bg-slate-100">إغلاق</button>
+              <button type="button" onClick={() => setIsDiscountedStocksOpen(false)} className="rounded-lg px-3 py-2 text-sm font-bold text-ink-secondary hover:bg-surface-sunken">إغلاق</button>
             </div>
             <div className="max-h-[65vh] space-y-2 overflow-auto p-4">
               {discountedStocks.map((source) => {
                 const product = products.find((candidate) => candidate.id === source.productId);
                 if (!product) return null;
                 return (
-                  <div key={source.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-purple-100 bg-purple-50/50 p-3">
+                  <div key={source.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-accent-border bg-accent-soft/50 p-3">
                     <div className="min-w-0">
-                      <div className="text-sm font-black text-slate-900">{source.productName} <span className="font-mono text-xs text-purple-700">({source.specialNumber})</span></div>
-                      <div className="mt-1 text-xs text-slate-600">
+                      <div className="text-sm font-black text-ink">{source.productName} <span className="font-mono text-xs text-primary">({source.specialNumber})</span></div>
+                      <div className="mt-1 text-xs text-ink-secondary">
                         المتاح {formatProductQuantity(Number(source.availableQuantityM2), product)} • السعر {Number(source.discountedUnitPrice).toLocaleString('ar-EG')} ج.م / {getProductUnitLabel(product)}
                       </div>
                     </div>
@@ -56,14 +56,14 @@ export const PosPageOverlays: React.FC<{ vm: PosViewVm }> = ({ vm }) => {
                         addDiscountedToCart(product, source);
                         setIsDiscountedStocksOpen(false);
                       }}
-                      className="rounded-lg bg-purple-700 px-3 py-2 text-xs font-black text-white hover:bg-purple-800"
+                      className="rounded-lg bg-primary px-3 py-2 text-xs font-black text-white hover:bg-primary"
                     >
                       أضف للسلة
                     </button>
                   </div>
                 );
               })}
-              {discountedStocks.length === 0 && <p className="py-8 text-center text-sm text-slate-500">لا توجد كميات مسعّرة للبيع المخفض في هذا المخزن.</p>}
+              {discountedStocks.length === 0 && <p className="py-8 text-center text-sm text-muted">لا توجد كميات مسعّرة للبيع المخفض في هذا المخزن.</p>}
             </div>
           </div>
         </div>

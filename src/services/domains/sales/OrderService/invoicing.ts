@@ -9,6 +9,7 @@ import { postLedgerEntry } from '../../../../database/repositories/ledger';
 import { localDateString } from '../../../../utils/shared/date';
 import { getOrder } from './queries';
 import { audit, logStatus, releaseReservations } from './internals';
+import { OperationalFieldService } from '../../products/OperationalFieldService';
 import type { ConvertOrderOptions } from './types';
 
 export function convertToInvoice(
@@ -72,6 +73,7 @@ export function convertToInvoice(
       paymentType: invoicePaymentType,
       notes: options.notes || `فاتورة مبيعات للطلب ${order.orderNumber}`,
     });
+    new OperationalFieldService().copyRecordFieldValues('orders', order.id, 'sales_invoices', invoice.id);
 
     const depositRows = db.query<{ id: string; amount: number; paymentMethod: string }>(
       `SELECT od.id, (od.amount - COALESCE((SELECT SUM(r.amount) FROM order_deposit_refunds r

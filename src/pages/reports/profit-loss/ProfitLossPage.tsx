@@ -85,89 +85,89 @@ export const ProfitLossPage: React.FC = () => {
   };
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
-      <div className="bg-white border-b border-slate-200 px-6 pt-4">
+    <div className="h-full flex flex-col bg-surface-muted text-ink overflow-hidden">
+      <div className="bg-surface border-b border-line px-6 pt-4">
         <PageHeader
           icon={<PieChart className="w-5 h-5" />}
           title="قائمة الأرباح والخسائر"
           description="تحليل الإيرادات والتكاليف والمصروفات للفترة المحددة"
           actions={
-            <button onClick={exportCsv} className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-bold transition shrink-0">
+            <button onClick={exportCsv} className="flex items-center gap-2 px-4 py-2 bg-success hover:bg-success text-white rounded-xl text-sm font-bold transition shrink-0">
               <Download className="w-4 h-4" /> تصدير CSV
             </button>
           }
         />
       </div>
 
-      <div className="px-6 py-3 bg-white border-b border-slate-200 flex flex-wrap items-end gap-3">
+      <div className="px-6 py-3 bg-surface border-b border-line flex flex-wrap items-end gap-3">
         <div>
-          <label className="block text-[10px] font-bold text-slate-500 mb-1">من تاريخ</label>
-          <div className="relative"><CalendarDays className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" /><input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="pl-3 pr-9 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold" /></div>
+          <label className="block text-[10px] font-bold text-muted mb-1">من تاريخ</label>
+          <div className="relative"><CalendarDays className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted" /><input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="pl-3 pr-9 py-2 bg-surface-muted border border-line rounded-xl text-xs font-bold" /></div>
         </div>
         <div>
-          <label className="block text-[10px] font-bold text-slate-500 mb-1">إلى تاريخ</label>
-          <div className="relative"><CalendarDays className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" /><input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="pl-3 pr-9 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold" /></div>
+          <label className="block text-[10px] font-bold text-muted mb-1">إلى تاريخ</label>
+          <div className="relative"><CalendarDays className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted" /><input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="pl-3 pr-9 py-2 bg-surface-muted border border-line rounded-xl text-xs font-bold" /></div>
         </div>
       </div>
 
       <div className="flex-1 overflow-auto p-6">
-        {error && <div className="mb-3 px-4 py-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold">{error}</div>}
-        {scopeWarning && <div className="mb-3 px-4 py-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs font-semibold">{scopeWarning}</div>}
-        {loading ? <div className="py-16 flex justify-center"><Loader2 className="w-6 h-6 animate-spin text-emerald-500" /></div> : (
+        {error && <div className="mb-3 px-4 py-2.5 rounded-xl bg-danger-soft border border-danger-border text-danger text-xs font-semibold">{error}</div>}
+        {scopeWarning && <div className="mb-3 px-4 py-2.5 rounded-xl bg-warning-soft border border-warning-border text-warning text-xs font-semibold">{scopeWarning}</div>}
+        {loading ? <div className="py-16 flex justify-center"><Loader2 className="w-6 h-6 animate-spin text-success" /></div> : (
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-            <div className="xl:col-span-2 bg-white border border-slate-200 rounded-xl overflow-hidden">
-              <div className="px-5 py-3 border-b border-slate-200 bg-slate-50">
+            <div className="xl:col-span-2 bg-surface border border-line rounded-xl overflow-hidden">
+              <div className="px-5 py-3 border-b border-line bg-surface-muted">
                 <h3 className="text-sm font-black">قائمة الدخل التحليلية</h3>
-                <p className="text-[10px] text-slate-400 mt-0.5">{from} — {to}</p>
+                <p className="text-[10px] text-muted mt-0.5">{from} — {to}</p>
               </div>
-              <div className="divide-y divide-slate-100">
+              <div className="divide-y divide-line-strong">
                 <div className="flex items-center justify-between px-5 py-3.5">
-                  <span className="text-sm font-bold text-slate-700">إيرادات البضاعة</span>
-                  <span className="font-mono font-black text-slate-900">{fmt(pnl.merchandiseRevenue)}</span>
-                </div>
-                <div className="flex items-center justify-between px-5 py-3.5">
-                  <span className="text-sm text-slate-600">إيرادات الشحن (منفصلة)</span>
-                  <span className="font-mono font-bold text-slate-800">{fmt(pnl.shippingRevenue)}</span>
+                  <span className="text-sm font-bold text-ink">إيرادات البضاعة</span>
+                  <span className="font-mono font-black text-ink">{fmt(pnl.merchandiseRevenue)}</span>
                 </div>
                 <div className="flex items-center justify-between px-5 py-3.5">
-                  <span className="text-sm text-slate-600">إيرادات أخرى</span>
-                  <span className="font-mono font-bold text-slate-800">{fmt(pnl.otherRevenue)}</span>
+                  <span className="text-sm text-ink-secondary">إيرادات الشحن (منفصلة)</span>
+                  <span className="font-mono font-bold text-ink">{fmt(pnl.shippingRevenue)}</span>
                 </div>
                 <div className="flex items-center justify-between px-5 py-3.5">
-                  <span className="text-sm text-slate-600">(−) تكلفة البضاعة المباعة</span>
-                  <span className="font-mono font-bold text-rose-600">{fmt(pnl.costOfGoodsSold)}</span>
-                </div>
-                <div className="flex items-center justify-between px-5 py-4 bg-emerald-50/50">
-                  <span className="text-sm font-black text-emerald-800">إجمالي ربح البضاعة</span>
-                  <span className="font-mono font-black text-emerald-800 text-lg">{fmt(pnl.grossProfit)}</span>
+                  <span className="text-sm text-ink-secondary">إيرادات أخرى</span>
+                  <span className="font-mono font-bold text-ink">{fmt(pnl.otherRevenue)}</span>
                 </div>
                 <div className="flex items-center justify-between px-5 py-3.5">
-                  <span className="text-sm text-slate-600">(−) المصروفات التشغيلية</span>
-                  <span className="font-mono font-bold text-rose-600">{fmt(pnl.expenses)}</span>
+                  <span className="text-sm text-ink-secondary">(−) تكلفة البضاعة المباعة</span>
+                  <span className="font-mono font-bold text-danger">{fmt(pnl.costOfGoodsSold)}</span>
                 </div>
-                <div className={`flex items-center justify-between px-5 py-4 ${pnl.netProfit >= 0 ? 'bg-sky-50/60' : 'bg-rose-50/60'}`}>
-                  <span className={`text-sm font-black ${pnl.netProfit >= 0 ? 'text-sky-800' : 'text-rose-800'}`}>صافي الربح / (الخسارة)</span>
-                  <span className={`font-mono font-black text-xl ${pnl.netProfit >= 0 ? 'text-sky-800' : 'text-rose-800'}`}>{fmt(pnl.netProfit)}</span>
+                <div className="flex items-center justify-between px-5 py-4 bg-success-soft/50">
+                  <span className="text-sm font-black text-success">إجمالي ربح البضاعة</span>
+                  <span className="font-mono font-black text-success text-lg">{fmt(pnl.grossProfit)}</span>
+                </div>
+                <div className="flex items-center justify-between px-5 py-3.5">
+                  <span className="text-sm text-ink-secondary">(−) المصروفات التشغيلية</span>
+                  <span className="font-mono font-bold text-danger">{fmt(pnl.expenses)}</span>
+                </div>
+                <div className={`flex items-center justify-between px-5 py-4 ${pnl.netProfit >= 0 ? 'bg-accent-soft/60' : 'bg-danger-soft/60'}`}>
+                  <span className={`text-sm font-black ${pnl.netProfit >= 0 ? 'text-primary' : 'text-danger'}`}>صافي الربح / (الخسارة)</span>
+                  <span className={`font-mono font-black text-xl ${pnl.netProfit >= 0 ? 'text-primary' : 'text-danger'}`}>{fmt(pnl.netProfit)}</span>
                 </div>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-px bg-slate-200 border-t border-slate-200">
-                <div className="bg-white px-4 py-3 text-center">
-                  <div className="text-[10px] text-slate-400 font-bold">هامش صافي الربح</div>
-                  <div className={`text-lg font-black mt-1 ${pnl.margin >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>{pnl.margin}%</div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-px bg-surface-sunken border-t border-line">
+                <div className="bg-surface px-4 py-3 text-center">
+                  <div className="text-[10px] text-muted font-bold">هامش صافي الربح</div>
+                  <div className={`text-lg font-black mt-1 ${pnl.margin >= 0 ? 'text-success' : 'text-danger'}`}>{pnl.margin}%</div>
                 </div>
-                <div className="bg-white px-4 py-3 text-center">
-                  <div className="text-[10px] text-slate-400 font-bold">نسبة تكلفة البضاعة</div>
-                  <div className="text-lg font-black mt-1 text-slate-800">{percentageOfRevenue(pnl.costOfGoodsSold, pnl.revenue)}%</div>
+                <div className="bg-surface px-4 py-3 text-center">
+                  <div className="text-[10px] text-muted font-bold">نسبة تكلفة البضاعة</div>
+                  <div className="text-lg font-black mt-1 text-ink">{percentageOfRevenue(pnl.costOfGoodsSold, pnl.revenue)}%</div>
                 </div>
-                <div className="bg-white px-4 py-3 text-center">
-                  <div className="text-[10px] text-slate-400 font-bold">نسبة المصروفات</div>
-                  <div className="text-lg font-black mt-1 text-slate-800">{percentageOfRevenue(pnl.expenses, pnl.revenue)}%</div>
+                <div className="bg-surface px-4 py-3 text-center">
+                  <div className="text-[10px] text-muted font-bold">نسبة المصروفات</div>
+                  <div className="text-lg font-black mt-1 text-ink">{percentageOfRevenue(pnl.expenses, pnl.revenue)}%</div>
                 </div>
               </div>
             </div>
 
-            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-              <div className={`mb-4 rounded-xl border px-4 py-3 text-xs ${Math.abs(pnl.expenseReconciliationDifference) < 0.01 ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-amber-200 bg-amber-50 text-amber-900'}`}>
+            <div className="bg-surface border border-line rounded-xl overflow-hidden">
+              <div className={`mb-4 rounded-xl border px-4 py-3 text-xs ${Math.abs(pnl.expenseReconciliationDifference) < 0.01 ? 'border-success-border bg-success-soft text-success' : 'border-warning-border bg-warning-soft text-warning'}`}>
                 <div className="font-black">مصالحة المصروفات للفترة {from} — {to}</div>
                 <div className="mt-1 flex flex-wrap gap-x-5 gap-y-1">
                   <span>القيود المرحلة (قائمة الدخل): {fmt(pnl.expenses)}</span>
@@ -178,26 +178,26 @@ export const ProfitLossPage: React.FC = () => {
                   <div className="mt-1">يوجد فرق بين سجل المصروفات والقيود المرحلة؛ راجع القيود اليدوية والتسويات والمصروفات غير المرحلة قبل اعتماد التقرير.</div>
                 )}
               </div>
-              <div className="px-5 py-3 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
+              <div className="px-5 py-3 border-b border-line bg-surface-muted flex items-center justify-between">
                 <h3 className="text-sm font-black">توزيع المصروفات</h3>
-                <span className="text-[10px] font-bold text-slate-400">مصدر المصروفات: {fmt(expenseTotal)}</span>
+                <span className="text-[10px] font-bold text-muted">مصدر المصروفات: {fmt(expenseTotal)}</span>
               </div>
               <div className="p-4 space-y-3">
                 {expenses.map((e) => (
                   <div key={e.category}>
                     <div className="flex items-center justify-between text-[11px] mb-1">
-                      <span className="font-bold text-slate-700">{e.category}</span>
-                      <span className="font-mono text-slate-500">{fmt(Number(e.total))}</span>
+                      <span className="font-bold text-ink">{e.category}</span>
+                      <span className="font-mono text-muted">{fmt(Number(e.total))}</span>
                     </div>
-                    <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                      <div className="h-full bg-rose-400 rounded-full" style={{ width: `${Math.max(2, (Number(e.total) / maxExpense) * 100)}%` }} />
+                    <div className="h-2 bg-surface-sunken rounded-full overflow-hidden">
+                      <div className="h-full bg-danger rounded-full" style={{ width: `${Math.max(2, (Number(e.total) / maxExpense) * 100)}%` }} />
                     </div>
                   </div>
                 ))}
-                {expenses.length === 0 && <div className="py-10 text-center text-xs text-slate-400">لا توجد مصروفات في هذه الفترة</div>}
+                {expenses.length === 0 && <div className="py-10 text-center text-xs text-muted">لا توجد مصروفات في هذه الفترة</div>}
               </div>
-              <div className="px-4 py-3 border-t border-slate-100 flex items-center gap-2 text-[10px] text-slate-400">
-                {pnl.netProfit >= 0 ? <TrendingUp className="w-3.5 h-3.5 text-emerald-500" /> : <TrendingDown className="w-3.5 h-3.5 text-rose-500" />}
+              <div className="px-4 py-3 border-t border-line flex items-center gap-2 text-[10px] text-muted">
+                {pnl.netProfit >= 0 ? <TrendingUp className="w-3.5 h-3.5 text-success" /> : <TrendingDown className="w-3.5 h-3.5 text-danger" />}
                 {pnl.netProfit >= 0 ? 'المنشأة تحقق أرباحاً في هذه الفترة' : 'المنشأة تحقق خسارة في هذه الفترة'}
               </div>
             </div>

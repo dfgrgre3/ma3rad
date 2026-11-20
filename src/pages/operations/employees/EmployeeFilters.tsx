@@ -27,42 +27,42 @@ export const EmployeeFilters: React.FC<EmployeeFiltersProps> = ({
     <>
       {/* Sub-toolbar (Search and Location Filter) - visible on directories, ledger, etc. */}
       {activeTab !== 'analytics' && (
-        <div className="p-4 bg-slate-50 border-b border-slate-200 flex flex-col md:flex-row gap-3">
+        <div className="p-4 bg-surface-muted border-b border-line flex flex-col md:flex-row gap-3">
           <div className="relative flex-1">
-            <Search className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+            <Search className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
             <input
               type="text"
               placeholder="بحث باسم العامل، رقم الهاتف، أو المسمى الوظيفي..."
               value={searchQuery}
               onChange={(e) => onSearchQueryChange(e.target.value)}
-              className="w-full pl-4 pr-10 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-orange-500/50 transition"
+              className="w-full pl-4 pr-10 py-2.5 bg-surface border border-line rounded-xl text-sm text-ink placeholder-muted focus:outline-none focus:border-warning/50 transition"
             />
           </div>
 
-          <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-xl border border-slate-200">
-            <Filter className="w-4 h-4 text-slate-500" />
-            <span className="text-xs text-slate-500 font-bold ml-1">حسب موقع العمل:</span>
+          <div className="flex items-center gap-2 bg-surface px-3 py-1.5 rounded-xl border border-line">
+            <Filter className="w-4 h-4 text-muted" />
+            <span className="text-xs text-muted font-bold ml-1">حسب موقع العمل:</span>
             <select
               value={selectedLocation}
               onChange={(e) => onSelectedLocationChange(e.target.value)}
-              className="bg-transparent text-xs text-slate-800 font-bold focus:outline-none cursor-pointer"
+              className="bg-transparent text-xs text-ink font-bold focus:outline-none cursor-pointer"
             >
-              <option value="ALL" className="bg-white text-slate-800">الكل</option>
+              <option value="ALL" className="bg-surface text-ink">الكل</option>
               {locations.map(loc => (
-                <option key={loc} value={loc} className="bg-white text-slate-800">{loc}</option>
+                <option key={loc} value={loc} className="bg-surface text-ink">{loc}</option>
               ))}
             </select>
           </div>
 
           {activeTab === 'attendance' && (
-            <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-xl border border-slate-200">
-              <Calendar className="w-4 h-4 text-slate-500" />
-              <span className="text-xs text-slate-500 font-bold">تاريخ الحضور:</span>
+            <div className="flex items-center gap-2 bg-surface px-3 py-1.5 rounded-xl border border-line">
+              <Calendar className="w-4 h-4 text-muted" />
+              <span className="text-xs text-muted font-bold">تاريخ الحضور:</span>
               <input
                 type="date"
                 value={attendanceDate}
                 onChange={(e) => onAttendanceDateChange(e.target.value)}
-                className="bg-transparent text-xs text-slate-800 font-bold focus:outline-none cursor-pointer"
+                className="bg-transparent text-xs text-ink font-bold focus:outline-none cursor-pointer"
               />
             </div>
           )}

@@ -13,7 +13,7 @@ export const SalesTrendCard: React.FC<SalesTrendCardProps> = ({ chartData }) => 
   const hasSales = chartData.some((point) => point.sales !== 0);
 
   return (
-    <section className="min-w-0 lg:col-span-2 rounded-[2px] border border-[#d9d9d9] bg-white p-3.5 dark:border-[#3d3d3d] dark:bg-[#2b2b2b]">
+    <section className="min-w-0 lg:col-span-2 rounded-[2px] border border-[#d9d9d9] bg-surface p-3.5 dark:border-[#3d3d3d] dark:bg-[#2b2b2b]">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div>
           <h3 className="text-[12px] font-extrabold text-[#1b1b1b] dark:text-[#f0f0f0]">حركة المبيعات خلال آخر 7 أيام</h3>

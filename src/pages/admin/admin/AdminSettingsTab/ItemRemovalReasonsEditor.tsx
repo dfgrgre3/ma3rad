@@ -22,12 +22,12 @@ export const ItemRemovalReasonsEditor: React.FC<ItemRemovalReasonsEditorProps> =
   showAddReason,
   setShowAddReason,
 }) => (
-  <div className="pt-3 border-t border-slate-100 dark:border-slate-800 space-y-2">
+  <div className="pt-3 border-t border-line space-y-2">
     <div className="text-right">
-      <div className="text-xs font-black text-slate-900 dark:text-slate-100">
+      <div className="text-xs font-black text-ink ">
         أسباب حذف سطر من الفاتورة
       </div>
-      <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+      <div className="text-[11px] text-muted mt-0.5">
         بتظهر اختيارات سريعة في ديالوج حذف السطر في الكاشير — والكاشير يقدر يكتب سبب تاني.
       </div>
     </div>
@@ -41,7 +41,7 @@ export const ItemRemovalReasonsEditor: React.FC<ItemRemovalReasonsEditorProps> =
       ).map((reason, idx) => (
         <div
           key={idx}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-200 shadow-sm"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-line bg-surface text-xs font-semibold text-ink shadow-sm"
         >
           <button
             type="button"
@@ -52,7 +52,7 @@ export const ItemRemovalReasonsEditor: React.FC<ItemRemovalReasonsEditorProps> =
               current.splice(idx, 1);
               set('posItemRemovalReasons', current as any);
             }}
-            className="text-slate-400 hover:text-rose-500 transition p-0.5"
+            className="text-muted hover:text-danger transition p-0.5"
             title="حذف هذا السبب"
           >
             <X className="w-3.5 h-3.5" />
@@ -63,7 +63,7 @@ export const ItemRemovalReasonsEditor: React.FC<ItemRemovalReasonsEditorProps> =
 
       {/* زر وحقل إضافة سبب */}
       {showAddReason ? (
-        <div className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg border border-[#1e5871] bg-white dark:bg-slate-800">
+        <div className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg border border-[#1e5871] bg-surface ">
           <input
             type="text"
             autoFocus
@@ -87,7 +87,7 @@ export const ItemRemovalReasonsEditor: React.FC<ItemRemovalReasonsEditorProps> =
               }
             }}
             placeholder="اكتب السبب واضغط Enter"
-            className="text-xs bg-transparent text-slate-800 dark:text-slate-200 focus:outline-none w-36"
+            className="text-xs bg-transparent text-ink focus:outline-none w-36"
           />
           <button
             type="button"
@@ -104,7 +104,7 @@ export const ItemRemovalReasonsEditor: React.FC<ItemRemovalReasonsEditorProps> =
               }
               setShowAddReason(false);
             }}
-            className="text-xs text-sky-600 hover:text-sky-800 font-bold px-1"
+            className="text-xs text-primary hover:text-primary font-bold px-1"
           >
             إضافة
           </button>
@@ -114,7 +114,7 @@ export const ItemRemovalReasonsEditor: React.FC<ItemRemovalReasonsEditorProps> =
               setShowAddReason(false);
               setNewReasonInput('');
             }}
-            className="text-slate-400 hover:text-slate-600 p-0.5"
+            className="text-muted hover:text-ink-secondary p-0.5"
           >
             <X className="w-3.5 h-3.5" />
           </button>
@@ -123,7 +123,7 @@ export const ItemRemovalReasonsEditor: React.FC<ItemRemovalReasonsEditorProps> =
         <button
           type="button"
           onClick={() => setShowAddReason(true)}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-dashed border-slate-300 dark:border-slate-600 hover:border-[#1e5871] bg-transparent text-xs font-bold text-slate-600 dark:text-slate-300 hover:text-[#1e5871] transition"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-dashed border-line-strong hover:border-[#1e5871] bg-transparent text-xs font-bold text-ink-secondary hover:text-[#1e5871] transition"
         >
           <Plus className="w-3.5 h-3.5" />
           <span>إضافة سبب</span>

@@ -13,15 +13,15 @@ export interface TabProps {
 }
 
 const ORDER_STATUS: Record<string, { label: string; className: string }> = {
-  PLANNED: { label: 'مخطط', className: 'bg-slate-100 text-slate-600' },
-  RELEASED: { label: 'صادر', className: 'bg-sky-100 text-sky-700' },
-  IN_PROGRESS: { label: 'قيد التنفيذ', className: 'bg-amber-100 text-amber-700' },
-  COMPLETED: { label: 'مكتمل', className: 'bg-emerald-100 text-emerald-700' },
-  CANCELLED: { label: 'ملغى', className: 'bg-rose-100 text-rose-700' },
+  PLANNED: { label: 'مخطط', className: 'bg-surface-sunken text-ink-secondary' },
+  RELEASED: { label: 'صادر', className: 'bg-accent-soft text-primary' },
+  IN_PROGRESS: { label: 'قيد التنفيذ', className: 'bg-warning-soft text-warning' },
+  COMPLETED: { label: 'مكتمل', className: 'bg-success-soft text-success' },
+  CANCELLED: { label: 'ملغى', className: 'bg-danger-soft text-danger' },
 };
 
 export const statusBadge = (status: string) => {
-  const meta = ORDER_STATUS[status] || { label: status, className: 'bg-slate-100 text-slate-600' };
+  const meta = ORDER_STATUS[status] || { label: status, className: 'bg-surface-sunken text-ink-secondary' };
   return <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${meta.className}`}>{meta.label}</span>;
 };
 
@@ -35,31 +35,49 @@ export const OverviewTab: React.FC<TabProps> = ({ service, data, reload, canMana
   const today = new Date().toISOString().slice(0, 10);
   const delayed = orders.filter((o) => o.dueDate && o.dueDate < today && !['COMPLETED', 'CANCELLED'].includes(o.status));
   const overloaded = data.capacityPlan.filter((row) => (row.loadPercent ?? 0) > 100);
+  const oeeRows = (data.oee?.centers || []).filter((row: any) => row.oeePercent != null);
+  const avgOee = oeeRows.length
+    ? Math.round(oeeRows.reduce((sum: number, row: any) => sum + Number(row.oeePercent), 0) / oeeRows.length)
+    : null;
+  const openIncidents = (data.hseIncidents || []).filter((row: any) => row.status !== 'CLOSED');
+  const seriousIncidents = openIncidents.filter((row: any) => ['SERIOUS', 'CRITICAL'].includes(row.severity));
+  const permitAlerts = data.hsePermitAlerts || { expiring: [], expired: [] };
 
   const kpis = [
-    { label: 'أوامر نشطة', value: active.length, tone: 'text-sky-600' },
-    { label: 'أوامر مخططة', value: planned.length, tone: 'text-slate-700' },
-    { label: 'أوامر متأخرة', value: delayed.length, tone: delayed.length ? 'text-rose-600' : 'text-emerald-600' },
-    { label: 'إجمالي المكتملة', value: completed.length, tone: 'text-emerald-600' },
-    { label: 'تكلفة WIP (مواد)', value: data.wip.totalMaterialCost.toLocaleString(), tone: 'text-amber-600' },
-    { label: 'مراكز فوق الطاقة', value: overloaded.length, tone: overloaded.length ? 'text-rose-600' : 'text-emerald-600' },
-    { label: 'صيانة وقائية متأخرة', value: data.maintenanceAlerts.overdue.length, tone: data.maintenanceAlerts.overdue.length ? 'text-rose-600' : 'text-emerald-600' },
+    { label: 'أوامر نشطة', value: active.length, tone: 'text-primary' },
+    { label: 'أوامر مخططة', value: planned.length, tone: 'text-ink' },
+    { label: 'أوامر متأخرة', value: delayed.length, tone: delayed.length ? 'text-danger' : 'text-success' },
+    { label: 'إجمالي المكتملة', value: completed.length, tone: 'text-success' },
+    { label: 'تكلفة WIP (مواد)', value: data.wip.totalMaterialCost.toLocaleString(), tone: 'text-warning' },
+    { label: 'مراكز فوق الطاقة', value: overloaded.length, tone: overloaded.length ? 'text-danger' : 'text-success' },
+    { label: 'صيانة وقائية متأخرة', value: data.maintenanceAlerts.overdue.length, tone: data.maintenanceAlerts.overdue.length ? 'text-danger' : 'text-success' },
+    { label: 'OEE متوسط', value: avgOee == null ? '—' : `${avgOee}%`, tone: avgOee == null ? 'text-muted' : avgOee >= 65 ? 'text-success' : avgOee >= 40 ? 'text-warning' : 'text-danger' },
+    { label: 'حوادث سلامة مفتوحة', value: openIncidents.length, tone: seriousIncidents.length ? 'text-danger' : openIncidents.length ? 'text-warning' : 'text-success' },
+    { label: 'تصاريح منتهية/قاربت', value: permitAlerts.expired.length + permitAlerts.expiring.length, tone: permitAlerts.expired.length ? 'text-danger' : permitAlerts.expiring.length ? 'text-warning' : 'text-success' },
   ];
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
+      {(seriousIncidents.length > 0 || permitAlerts.expired.length > 0 || data.maintenanceAlerts.overdue.length > 0) && (
+        <div className="rounded-xl border border-danger-border bg-danger-soft p-3 text-xs text-danger">
+          <span className="font-black">تنبيهات المصنع: </span>
+          {seriousIncidents.length > 0 && <span className="ml-2">{seriousIncidents.length} حادث سلامة خطير/جسيم مفتوح ({seriousIncidents.map((i: any) => i.incidentDate).join('، ')})</span>}
+          {permitAlerts.expired.length > 0 && <span className="ml-2">{permitAlerts.expired.length} تصريح عمل خطرة منتهي ({permitAlerts.expired.map((p: any) => p.permitNumber).join('، ')})</span>}
+          {data.maintenanceAlerts.overdue.length > 0 && <span className="ml-2">{data.maintenanceAlerts.overdue.length} صيانة وقائية متأخرة</span>}
+        </div>
+      )}
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5">
         {kpis.map((kpi) => (
-          <div key={kpi.label} className="rounded-xl border border-slate-200 bg-white p-4">
-            <div className="text-[11px] font-bold text-slate-500">{kpi.label}</div>
+          <div key={kpi.label} className="rounded-xl border border-line bg-surface p-4">
+            <div className="text-[11px] font-bold text-muted">{kpi.label}</div>
             <div className={`mt-1 text-2xl font-black ${kpi.tone}`}>{kpi.value}</div>
           </div>
         ))}
       </div>
 
       <div className="grid gap-3 lg:grid-cols-2">
-        <div className="rounded-xl border border-slate-200 bg-white p-3">
-          <h3 className="mb-2 text-sm font-black text-slate-900">أحدث أوامر الإنتاج</h3>
+        <div className="rounded-xl border border-line bg-surface p-3">
+          <h3 className="mb-2 text-sm font-black text-ink">أحدث أوامر الإنتاج</h3>
           <DataTable
             ariaLabel="أحدث أوامر الإنتاج"
             rows={orders.slice(0, 8)}
@@ -77,8 +95,8 @@ export const OverviewTab: React.FC<TabProps> = ({ service, data, reload, canMana
           />
         </div>
 
-        <div className="rounded-xl border border-slate-200 bg-white p-3">
-          <h3 className="mb-2 text-sm font-black text-slate-900">حمل مراكز العمل</h3>
+        <div className="rounded-xl border border-line bg-surface p-3">
+          <h3 className="mb-2 text-sm font-black text-ink">حمل مراكز العمل</h3>
           <DataTable
             ariaLabel="حمل مراكز العمل"
             rows={data.capacityPlan}
@@ -93,24 +111,24 @@ export const OverviewTab: React.FC<TabProps> = ({ service, data, reload, canMana
                 key: 'load', header: 'النسبة',
                 render: (row) => row.loadPercent == null
                   ? '—'
-                  : <span className={`font-bold ${row.loadPercent > 100 ? 'text-rose-600' : row.loadPercent > 80 ? 'text-amber-600' : 'text-emerald-600'}`}>{row.loadPercent}%</span>,
+                  : <span className={`font-bold ${row.loadPercent > 100 ? 'text-danger' : row.loadPercent > 80 ? 'text-warning' : 'text-success'}`}>{row.loadPercent}%</span>,
               },
             ]}
             emptyTitle="لا توجد مراكز عمل."
           />
         </div>
 
-        <div className="rounded-xl border border-slate-200 bg-white p-3 lg:col-span-2">
+        <div className="rounded-xl border border-line bg-surface p-3 lg:col-span-2">
           <div className="mb-2 flex items-center justify-between">
-            <h3 className="text-sm font-black text-slate-900">
+            <h3 className="text-sm font-black text-ink">
               نواقص المواد
               {data.materialShortages.length > 0 && (
-                <span className="mr-2 rounded-full bg-rose-100 px-2 py-0.5 text-[11px] text-rose-700">{data.materialShortages.length}</span>
+                <span className="mr-2 rounded-full bg-danger-soft px-2 py-0.5 text-[11px] text-danger">{data.materialShortages.length}</span>
               )}
             </h3>
             {canManage && data.purchaseSuggestions.length > 0 && (
               <button
-                className="rounded-lg bg-emerald-600 px-3 py-1 text-xs font-bold text-white"
+                className="rounded-lg bg-success px-3 py-1 text-xs font-bold text-white"
                 onClick={() => {
                   try {
                     const created = service.createPurchaseRequestsFromShortages();
@@ -128,7 +146,7 @@ export const OverviewTab: React.FC<TabProps> = ({ service, data, reload, canMana
           {data.purchaseSuggestions.length > 0 && (
             <div className="mb-2 flex flex-wrap gap-1">
               {data.purchaseSuggestions.slice(0, 6).map((row) => (
-                <span key={`${row.componentProductId}-${row.warehouseId}`} className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] text-slate-600" title={row.orderNumbers.join('، ')}>
+                <span key={`${row.componentProductId}-${row.warehouseId}`} className="rounded-full bg-surface-sunken px-2 py-0.5 text-[11px] text-ink-secondary" title={row.orderNumbers.join('، ')}>
                   {row.componentName}: يُقترح شراء {row.suggestedQty} (≈ {row.estimatedValue.toLocaleString()})
                 </span>
               ))}
@@ -144,7 +162,7 @@ export const OverviewTab: React.FC<TabProps> = ({ service, data, reload, canMana
               { key: 'component', header: 'المكوّن', render: (row) => row.componentName },
               { key: 'required', header: 'المطلوب', render: (row) => row.requiredQty },
               { key: 'available', header: 'المتاح', render: (row) => row.availableQty },
-              { key: 'deficit', header: 'العجز', render: (row) => <b className="text-rose-600">{row.deficitQty}</b> },
+              { key: 'deficit', header: 'العجز', render: (row) => <b className="text-danger">{row.deficitQty}</b> },
               { key: 'status', header: 'حالة الأمر', render: (row) => statusBadge(row.orderStatus) },
             ]}
             emptyTitle="لا توجد نواقص — كل المواد متوفرة."

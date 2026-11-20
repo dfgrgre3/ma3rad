@@ -54,41 +54,41 @@ export const BrandingTab: React.FC<BrandingTabProps> = ({ settings, set, onLogo,
                 aria-pressed={active}
                 className={`rounded-xl border p-3 text-right transition ${
                   active
-                    ? 'border-sky-500 bg-sky-50 ring-1 ring-sky-500 dark:bg-sky-500/10'
-                    : 'border-slate-200 hover:border-sky-300 dark:border-slate-700'
+                    ? 'border-primary bg-accent-soft ring-1 ring-primary dark:bg-primary/10'
+                    : 'border-line hover:border-accent-border '
                 }`}
               >
                 <NavigationLayoutPreview variant={option.value} />
                 <span className="mt-2 flex items-center justify-between gap-2">
-                  <span className="text-xs font-bold text-slate-900 dark:text-slate-100">{option.label}</span>
-                  {active && <Check className="h-4 w-4 shrink-0 text-sky-600 dark:text-sky-400" />}
+                  <span className="text-xs font-bold text-ink ">{option.label}</span>
+                  {active && <Check className="h-4 w-4 shrink-0 text-primary " />}
                 </span>
-                <span className="mt-1 block text-[10px] leading-relaxed text-slate-500 dark:text-slate-400">{option.hint}</span>
+                <span className="mt-1 block text-[10px] leading-relaxed text-muted ">{option.hint}</span>
               </button>
             );
           })}
         </div>
-        <p className="mt-2 text-[11px] text-slate-400">
+        <p className="mt-2 text-[11px] text-muted">
           يطبَّق على الشاشات الكبيرة (1024px فأكثر). الشاشات الصغيرة تبقى على القائمة المنسدلة دائمًا.
         </p>
       </Field>
       <Field label="شعار الصورة">
         <div className="flex items-center gap-2">
-          <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-dashed border-slate-300 dark:border-slate-600 px-3 py-2 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800">
+          <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-dashed border-line-strong px-3 py-2 text-xs font-bold text-ink-secondary hover:bg-surface-muted dark:hover:bg-primary">
             <Upload className="h-4 w-4" /> اختيار صورة
             <input type="file" accept="image/*" className="hidden" onChange={(e) => onLogo(e.target.files?.[0])} />
           </label>
           {settings.brandLogoDataUrl && (
-            <button onClick={() => set('brandLogoDataUrl', '')} className="rounded-lg border border-rose-200 px-2 py-2 text-[11px] font-bold text-rose-500 hover:bg-rose-50 dark:border-rose-500/30">
+            <button onClick={() => set('brandLogoDataUrl', '')} className="rounded-lg border border-danger-border px-2 py-2 text-[11px] font-bold text-danger hover:bg-danger-soft dark:border-danger/30">
               إزالة
             </button>
           )}
         </div>
       </Field>
     </div>
-    <div className="rounded-2xl border border-slate-200 dark:border-slate-700 p-4">
-      <div className="mb-2 text-xs font-bold text-slate-500">معاينة فورية</div>
-      <div className="flex items-center gap-3 rounded-xl border border-slate-200 dark:border-slate-700 p-3">
+    <div className="rounded-2xl border border-line p-4">
+      <div className="mb-2 text-xs font-bold text-muted">معاينة فورية</div>
+      <div className="flex items-center gap-3 rounded-xl border border-line p-3">
         <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-xl text-lg font-black text-white shadow-lg" style={previewStyle}>
           {settings.brandLogoDataUrl ? (
             <img src={settings.brandLogoDataUrl} alt="الشعار" className="h-full w-full object-cover" />
@@ -97,15 +97,15 @@ export const BrandingTab: React.FC<BrandingTabProps> = ({ settings, set, onLogo,
           )}
         </div>
         <div className="min-w-0">
-          <div className="truncate text-sm font-extrabold text-slate-900 dark:text-slate-100">{settings.brandName || 'سيراميسيس'}</div>
-          <div className="truncate text-[11px] text-slate-500">{settings.showroomName}</div>
+          <div className="truncate text-sm font-extrabold text-ink ">{settings.brandName || 'سيراميسيس'}</div>
+          <div className="truncate text-[11px] text-muted">{settings.showroomName}</div>
         </div>
       </div>
       <div className="mt-3 flex gap-2">
         <span className="h-8 flex-1 rounded-lg" style={{ background: settings.brandPrimaryColor }} />
         <span className="h-8 flex-1 rounded-lg" style={{ background: settings.brandAccentColor }} />
       </div>
-      <p className="mt-3 text-[11px] leading-relaxed text-slate-400">
+      <p className="mt-3 text-[11px] leading-relaxed text-muted">
         يُحفظ الشعار داخل قاعدة البيانات (Base64). للشعارات الكبيرة يُفضّل استخدام صورة مضغوطة أقل من 400KB.
       </p>
     </div>

@@ -376,8 +376,8 @@ export const OtherReceivablesPage: React.FC = () => {
     link.click();
   };
   return (
-    <div className="h-full flex flex-col bg-slate-50 overflow-hidden">
-      <div className="bg-white px-5 pt-4 pb-1">
+    <div className="h-full flex flex-col bg-surface-muted overflow-hidden">
+      <div className="bg-surface px-5 pt-4 pb-1">
         <PageHeader
           title="المستحقات الأخرى"
           description="حقوق مالية وغير مالية منفصلة عن الفواتير والبضائع المنتظرة"
@@ -386,13 +386,13 @@ export const OtherReceivablesPage: React.FC = () => {
               <>
                 <button
                   onClick={() => exportReport("excel")}
-                  className="px-3 py-2 bg-emerald-700 text-white rounded-xl text-sm"
+                  className="px-3 py-2 bg-success text-white rounded-xl text-sm"
                 >
                   جدول بيانات
                 </button>
                 <button
                   onClick={() => exportReport("pdf")}
-                  className="px-3 py-2 bg-slate-700 text-white rounded-xl text-sm"
+                  className="px-3 py-2 bg-primary text-white rounded-xl text-sm"
                 >
                   طباعة / مستند
                 </button>
@@ -406,7 +406,7 @@ export const OtherReceivablesPage: React.FC = () => {
                   setForm(blank);
                   setOpen(true);
                 }}
-                className="px-4 py-2 bg-sky-700 text-white rounded-xl text-sm font-bold inline-flex gap-2"
+                className="px-4 py-2 bg-primary text-white rounded-xl text-sm font-bold inline-flex gap-2"
               >
                 <Plus className="w-4 h-4" /> مستحق جديد
               </button>
@@ -414,9 +414,9 @@ export const OtherReceivablesPage: React.FC = () => {
           </div>}
         />
       </div>
-      <div className="p-4 bg-white border-b flex flex-wrap gap-2">
+      <div className="p-4 bg-surface border-b flex flex-wrap gap-2">
         <div className="relative flex-1 min-w-48">
-          <Search className="absolute right-3 top-3 w-4 h-4 text-slate-400" />
+          <Search className="absolute right-3 top-3 w-4 h-4 text-muted" />
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -464,11 +464,11 @@ export const OtherReceivablesPage: React.FC = () => {
       <main className="flex-1 overflow-auto p-4">
         <div className="grid gap-3">
           {filtered.map((row) => (
-            <article key={row.id} className="bg-white border rounded-2xl p-4">
+            <article key={row.id} className="bg-surface border rounded-2xl p-4">
               <div className="flex flex-wrap justify-between gap-3">
                 <div>
                   <h2 className="font-black">{row.title}</h2>
-                  <p className="text-sm text-slate-600 mt-1">
+                  <p className="text-sm text-ink-secondary mt-1">
                     {row.type} · {row.responsibleName || "جهة غير محددة"} ·{" "}
                     {row.phone || "لا يوجد هاتف"}
                   </p>
@@ -480,12 +480,12 @@ export const OtherReceivablesPage: React.FC = () => {
                       ? `${row.amount.toLocaleString("ar-EG")} ج.م`
                       : "حق غير مالي"}
                   </div>
-                  <div className="text-slate-500">
+                  <div className="text-muted">
                     {row.quantity != null
                       ? `${row.quantity} ${row.unit || ""}`
                       : ""}
                   </div>
-                  <div className="text-xs text-slate-500">
+                  <div className="text-xs text-muted">
                     الاستحقاق: {row.dueDate || "غير محدد"}
                   </div>
                 </div>
@@ -534,7 +534,7 @@ export const OtherReceivablesPage: React.FC = () => {
                     %
                     <button
                       onClick={() => edit(row)}
-                      className="inline-flex items-center gap-1 text-sky-700"
+                      className="inline-flex items-center gap-1 text-primary"
                     >
                       <Pencil className="w-3.5 h-3.5" /> تعديل
                     </button>
@@ -552,7 +552,7 @@ export const OtherReceivablesPage: React.FC = () => {
                 >
                   <Download className="w-3.5 h-3.5" /> المرفقات
                 </button>
-                <span className="text-slate-500 mr-auto">
+                <span className="text-muted mr-auto">
                   {row.notes || ""}
                 </span>
               </div>
@@ -563,7 +563,7 @@ export const OtherReceivablesPage: React.FC = () => {
                       <div key={event.id}>
                         <b>{event.updateType}</b> · {event.userName || "مستخدم"}{" "}
                         · {event.createdAt}
-                        <div className="text-slate-500 break-all">
+                        <div className="text-muted break-all">
                           {event.details}
                         </div>
                       </div>
@@ -580,7 +580,7 @@ export const OtherReceivablesPage: React.FC = () => {
                       <button
                         key={file.id}
                         onClick={() => downloadAttachment(file)}
-                        className="block text-sky-700 underline"
+                        className="block text-primary underline"
                       >
                         {file.fileName} · {file.mimeType}
                       </button>
@@ -593,17 +593,17 @@ export const OtherReceivablesPage: React.FC = () => {
             </article>
           ))}
           {!filtered.length && (
-            <div className="p-12 text-center bg-white border border-dashed rounded-2xl text-slate-500">
+            <div className="p-12 text-center bg-surface border border-dashed rounded-2xl text-muted">
               لا توجد مستحقات مسجلة
             </div>
           )}
         </div>
       </main>
       {open && (
-        <div className="fixed inset-0 z-50 bg-slate-900/40 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-primary/40 flex items-center justify-center p-4">
           <form
             onSubmit={save}
-            className="bg-white rounded-2xl p-5 max-w-xl w-full max-h-[90vh] overflow-auto"
+            className="bg-surface rounded-2xl p-5 max-w-xl w-full max-h-[90vh] overflow-auto"
           >
             <h2 className="font-black text-lg mb-4">
               {selectedId ? "تعديل المستحق" : "تسجيل مستحق"}
@@ -680,7 +680,7 @@ export const OtherReceivablesPage: React.FC = () => {
               />
             </label>
             {newFiles.map((file) => (
-              <div key={file.name} className="text-xs text-slate-500">
+              <div key={file.name} className="text-xs text-muted">
                 {file.name}
               </div>
             ))}
@@ -693,11 +693,11 @@ export const OtherReceivablesPage: React.FC = () => {
                   setNewFiles([]);
                   setForm(blank);
                 }}
-                className="px-4 py-2 bg-slate-100 rounded-lg"
+                className="px-4 py-2 bg-surface-sunken rounded-lg"
               >
                 إلغاء
               </button>
-              <button className="px-4 py-2 bg-sky-700 text-white rounded-lg font-bold inline-flex gap-2">
+              <button className="px-4 py-2 bg-primary text-white rounded-lg font-bold inline-flex gap-2">
                 <Save className="w-4 h-4" />
                 حفظ
               </button>

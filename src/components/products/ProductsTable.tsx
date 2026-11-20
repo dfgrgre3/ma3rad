@@ -69,7 +69,7 @@ export const ProductsTable: React.FC<ProductsTableProps> = ({
           type="checkbox"
           checked={products.length > 0 && products.every((product) => selectedProductIds.includes(product.id))}
           onChange={onTogglePageSelection}
-          className="rounded border-slate-300 text-sky-600"
+          className="rounded border-line-strong text-primary"
         />
       ),
       headerClassName: 'text-center',
@@ -80,7 +80,7 @@ export const ProductsTable: React.FC<ProductsTableProps> = ({
           type="checkbox"
           checked={selectedProductIds.includes(product.id)}
           onChange={() => onToggleProductSelection(product.id)}
-          className="rounded border-slate-300 text-sky-600"
+          className="rounded border-line-strong text-primary"
         />
       ),
     });
@@ -92,15 +92,15 @@ export const ProductsTable: React.FC<ProductsTableProps> = ({
       header: 'الصنف',
       render: (product) => (
         <div className="flex items-center gap-2">
-          <div className="h-10 w-10 shrink-0 overflow-hidden rounded-lg border border-slate-200 bg-slate-100">
+          <div className="h-10 w-10 shrink-0 overflow-hidden rounded-lg border border-line bg-surface-sunken">
             {product.imagePath
               ? <img src={product.imagePath} alt={product.name} className="h-full w-full object-cover" />
-              : <div className="flex h-full w-full items-center justify-center text-slate-300"><Package className="h-4 w-4" /></div>}
+              : <div className="flex h-full w-full items-center justify-center text-muted"><Package className="h-4 w-4" /></div>}
           </div>
           <div>
-            <div className="font-bold text-slate-900">{product.name}</div>
-            <div className="text-[10px] text-slate-500">
-              {product.color || '—'} | {product.finish || '—'} {!product.isActive && <span className="font-bold text-rose-500">(موقوف)</span>}
+            <div className="font-bold text-ink">{product.name}</div>
+            <div className="text-[10px] text-muted">
+              {product.color || '—'} | {product.finish || '—'} {!product.isActive && <span className="font-bold text-danger">(موقوف)</span>}
             </div>
           </div>
         </div>
@@ -112,8 +112,8 @@ export const ProductsTable: React.FC<ProductsTableProps> = ({
       className: 'font-mono',
       render: (product) => (
         <>
-          <div className="font-bold text-slate-900">{product.barcode}</div>
-          <div className="text-[10px] text-slate-500">{product.sku}</div>
+          <div className="font-bold text-ink">{product.barcode}</div>
+          <div className="text-[10px] text-muted">{product.sku}</div>
         </>
       ),
     },
@@ -122,8 +122,8 @@ export const ProductsTable: React.FC<ProductsTableProps> = ({
       header: 'النوع والماركة',
       render: (product) => (
         <>
-          <div className="font-bold text-slate-700">{product.categoryName || '—'}</div>
-          <div className="text-[10px] text-slate-500">{product.brandName || '—'}</div>
+          <div className="font-bold text-ink">{product.categoryName || '—'}</div>
+          <div className="text-[10px] text-muted">{product.brandName || '—'}</div>
         </>
       ),
     },
@@ -135,10 +135,10 @@ export const ProductsTable: React.FC<ProductsTableProps> = ({
       header: 'المقاس والفرز',
       render: (product) => (
         <>
-          <span className="font-bold text-slate-700">{product.productType === 'GENERAL' ? '—' : product.size}</span>
+          <span className="font-bold text-ink">{product.productType === 'GENERAL' ? '—' : product.size}</span>
           {product.productType !== 'GENERAL' && (
             <div className="text-[10px]">
-              <span className={`font-extrabold ${product.grade === 'GRADE_1' ? 'text-sky-600' : 'text-amber-600'}`}>
+              <span className={`font-extrabold ${product.grade === 'GRADE_1' ? 'text-primary' : 'text-warning'}`}>
                 {gradeLabel(product.grade)}
               </span>
             </div>
@@ -159,13 +159,13 @@ export const ProductsTable: React.FC<ProductsTableProps> = ({
   columns.push({
     key: 'unit',
     header: 'التحويل',
-    className: 'font-semibold text-slate-700',
+    className: 'font-semibold text-ink',
     render: (product) => product.productType === 'GENERAL' ? (
       <div>وحدة المخزون: {getProductUnitLabel(product)}</div>
     ) : (
       <>
         <div>{product.metersPerBox} {product.baseUnit === 'LINEAR_METER' ? 'م' : 'م²'} / كرتونة</div>
-        <div className="text-[10px] text-slate-500">{product.piecesPerBox} قطعة / كرتونة</div>
+        <div className="text-[10px] text-muted">{product.piecesPerBox} قطعة / كرتونة</div>
       </>
     ),
   });
@@ -174,7 +174,7 @@ export const ProductsTable: React.FC<ProductsTableProps> = ({
     columns.push({
       key: 'cost',
       header: 'التكلفة',
-      className: 'font-mono text-slate-600',
+      className: 'font-mono text-ink-secondary',
       render: (product) => CeramicMath.formatCurrency(product.costPrice),
     });
   }
@@ -182,7 +182,7 @@ export const ProductsTable: React.FC<ProductsTableProps> = ({
     columns.push({
       key: 'price',
       header: 'سعر الوحدة',
-      className: 'font-black text-sky-600',
+      className: 'font-black text-primary',
       render: (product) => CeramicMath.formatCurrency(product.sellingPriceM2),
     });
   }
@@ -190,7 +190,7 @@ export const ProductsTable: React.FC<ProductsTableProps> = ({
     columns.push({
       key: 'box-price',
       header: 'سعر الكرتونة',
-      className: 'font-bold text-slate-900',
+      className: 'font-bold text-ink',
       render: (product) => product.productType === 'GENERAL'
         ? '—'
         : CeramicMath.formatCurrency(product.sellingPriceBox || (product.sellingPriceM2 * product.metersPerBox)),
@@ -210,9 +210,9 @@ export const ProductsTable: React.FC<ProductsTableProps> = ({
             {product.productType === 'GENERAL' ? `${round(stock.m2, 3)} ${getProductUnitLabel(product)}` : (
               <>
                 {CeramicMath.formatM2(stock.m2)}
-                <span className="mx-1 text-slate-400">|</span>
+                <span className="mx-1 text-muted">|</span>
                 {round(stock.boxes)} كرتونة
-                <span className="mx-1 text-slate-400">|</span>
+                <span className="mx-1 text-muted">|</span>
                 {Math.round(stock.pieces)} قطعة
               </>
             )}
@@ -227,13 +227,13 @@ export const ProductsTable: React.FC<ProductsTableProps> = ({
       className: 'text-center',
       render: (product) => (
         <div className="flex items-center justify-center gap-1">
-          <button type="button" onClick={() => onOpenDetails(product)} className="rounded-lg p-1.5 text-slate-500 transition hover:bg-sky-50 hover:text-sky-600" title="عرض التفاصيل" aria-label={`عرض تفاصيل ${product.name}`}><Eye className="h-4 w-4" /></button>
-          {canAdjustInventory && <button type="button" onClick={() => onOpenStock(product)} className="rounded-lg p-1.5 text-slate-500 transition hover:bg-emerald-50 hover:text-emerald-600" title="إضافة كمية للمخزون" aria-label={`إضافة كمية للمخزون: ${product.name}`}><PackagePlus className="h-4 w-4" /></button>}
-          {canUpdateProduct && <button type="button" onClick={() => onOpenEdit(product)} className="rounded-lg p-1.5 text-slate-500 transition hover:bg-slate-100" title="تعديل" aria-label={`تعديل ${product.name}`}><Edit className="h-4 w-4" /></button>}
-          {canCreateProduct && <button type="button" onClick={() => onDuplicate(product)} className="rounded-lg p-1.5 text-slate-500 transition hover:bg-indigo-50 hover:text-indigo-600" title="نسخ الصنف" aria-label={`نسخ ${product.name}`}><Copy className="h-4 w-4" /></button>}
-          {canExportProducts && <button type="button" onClick={onOpenBarcodes} className="rounded-lg p-1.5 text-slate-500 transition hover:bg-violet-50 hover:text-violet-600" title="طباعة باركود" aria-label={`طباعة باركود ${product.name}`}><Barcode className="h-4 w-4" /></button>}
-          {canDeleteProduct && <button type="button" onClick={() => onToggleActive(product)} className={`rounded-lg p-1.5 transition ${product.isActive ? 'text-slate-500 hover:bg-amber-50 hover:text-amber-600' : 'text-emerald-600 hover:bg-emerald-50'}`} title={product.isActive ? 'إيقاف الصنف' : 'تفعيل الصنف'} aria-label={`${product.isActive ? 'إيقاف' : 'تفعيل'} ${product.name}`}><Power className="h-4 w-4" /></button>}
-          {canDeleteProduct && <button type="button" onClick={() => onDelete(product.id)} className="rounded-lg p-1.5 text-slate-500 transition hover:bg-red-50 hover:text-red-600" title="حذف" aria-label={`حذف ${product.name}`}><Trash2 className="h-4 w-4" /></button>}
+          <button type="button" onClick={() => onOpenDetails(product)} className="rounded-lg p-1.5 text-muted transition hover:bg-accent-soft hover:text-primary" title="عرض التفاصيل" aria-label={`عرض تفاصيل ${product.name}`}><Eye className="h-4 w-4" /></button>
+          {canAdjustInventory && <button type="button" onClick={() => onOpenStock(product)} className="rounded-lg p-1.5 text-muted transition hover:bg-success-soft hover:text-success" title="إضافة كمية للمخزون" aria-label={`إضافة كمية للمخزون: ${product.name}`}><PackagePlus className="h-4 w-4" /></button>}
+          {canUpdateProduct && <button type="button" onClick={() => onOpenEdit(product)} className="rounded-lg p-1.5 text-muted transition hover:bg-surface-sunken" title="تعديل" aria-label={`تعديل ${product.name}`}><Edit className="h-4 w-4" /></button>}
+          {canCreateProduct && <button type="button" onClick={() => onDuplicate(product)} className="rounded-lg p-1.5 text-muted transition hover:bg-accent-soft hover:text-primary" title="نسخ الصنف" aria-label={`نسخ ${product.name}`}><Copy className="h-4 w-4" /></button>}
+          {canExportProducts && <button type="button" onClick={onOpenBarcodes} className="rounded-lg p-1.5 text-muted transition hover:bg-accent-soft hover:text-primary" title="طباعة باركود" aria-label={`طباعة باركود ${product.name}`}><Barcode className="h-4 w-4" /></button>}
+          {canDeleteProduct && <button type="button" onClick={() => onToggleActive(product)} className={`rounded-lg p-1.5 transition ${product.isActive ? 'text-muted hover:bg-warning-soft hover:text-warning' : 'text-success hover:bg-success-soft'}`} title={product.isActive ? 'إيقاف الصنف' : 'تفعيل الصنف'} aria-label={`${product.isActive ? 'إيقاف' : 'تفعيل'} ${product.name}`}><Power className="h-4 w-4" /></button>}
+          {canDeleteProduct && <button type="button" onClick={() => onDelete(product.id)} className="rounded-lg p-1.5 text-muted transition hover:bg-danger-soft hover:text-danger" title="حذف" aria-label={`حذف ${product.name}`}><Trash2 className="h-4 w-4" /></button>}
         </div>
       ),
     },
@@ -247,7 +247,7 @@ export const ProductsTable: React.FC<ProductsTableProps> = ({
       rowKey={(product) => product.id}
       tableClassName="text-right text-xs"
       minWidth={1200}
-      rowClassName={(product) => `${product.isActive ? '' : 'opacity-60'} transition-colors hover:bg-slate-50`}
+      rowClassName={(product) => `${product.isActive ? '' : 'opacity-60'} transition-colors hover:bg-surface-muted`}
     />
   );
 };

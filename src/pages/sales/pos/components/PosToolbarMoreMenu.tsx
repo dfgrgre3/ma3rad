@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { MoreHorizontal, MonitorSmartphone, Tv, Undo2, Users, Wallet } from 'lucide-react';
 import type { PosToolbarProps } from './PosToolbar';
+import { usePosActivityCopy } from '../../../../hooks/pages/sales/pos/usePosActivityCopy';
 
 type PosToolbarMoreMenuProps = Pick<
   PosToolbarProps,
@@ -15,6 +16,7 @@ type PosToolbarMoreMenuProps = Pick<
 >;
 
 export const PosToolbarMoreMenu: React.FC<PosToolbarMoreMenuProps> = (props) => {
+  const copy = usePosActivityCopy();
   const [moreOpen, setMoreOpen] = useState(false);
   const moreRef = useRef<HTMLDivElement>(null);
 
@@ -43,36 +45,36 @@ export const PosToolbarMoreMenu: React.FC<PosToolbarMoreMenuProps> = (props) => 
         aria-haspopup="menu"
         aria-expanded={moreOpen}
         aria-label="المزيد من خيارات نقطة البيع"
-        className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border transition whitespace-nowrap bg-slate-100 text-slate-700 border-slate-300 hover:bg-slate-200 ${moreOpen ? 'bg-slate-200' : ''}`}
+        className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border transition whitespace-nowrap bg-surface-sunken text-ink border-line-strong hover:bg-surface-sunken ${moreOpen ? 'bg-surface-sunken' : ''}`}
       >
         <MoreHorizontal className="w-4 h-4" />
         <span className="hidden lg:inline">المزيد</span>
       </button>
       {moreOpen && (
-        <div role="menu" className="absolute left-0 z-40 mt-2 w-64 rounded-2xl border border-slate-200 bg-white shadow-2xl py-1.5 overflow-hidden">
+        <div role="menu" className="absolute left-0 z-40 mt-2 w-64 rounded-2xl border border-line bg-surface shadow-2xl py-1.5 overflow-hidden">
           {props.activeShift && (
-            <button type="button" role="menuitem" onClick={() => { setMoreOpen(false); props.onSwitchUser(); }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 transition">
-              <Users className="w-4 h-4 text-slate-400" /> {props.actingUserName ? `المستخدم: ${props.actingUserName}` : 'تبديل المستخدم (PIN)'}
+            <button type="button" role="menuitem" onClick={() => { setMoreOpen(false); props.onSwitchUser(); }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold text-ink hover:bg-surface-muted transition">
+              <Users className="w-4 h-4 text-muted" /> {props.actingUserName ? `المستخدم: ${props.actingUserName}` : 'تبديل المستخدم (PIN)'}
             </button>
           )}
           {props.actingUserName && (
-            <button type="button" role="menuitem" onClick={() => { setMoreOpen(false); props.onResetActingUser(); }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold text-amber-700 hover:bg-amber-50 transition">
-              <Undo2 className="w-4 h-4 text-amber-500" /> العودة للمستخدم الأصلي
+            <button type="button" role="menuitem" onClick={() => { setMoreOpen(false); props.onResetActingUser(); }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold text-warning hover:bg-warning-soft transition">
+              <Undo2 className="w-4 h-4 text-warning" /> العودة للمستخدم الأصلي
             </button>
           )}
           {props.activeShift && (
-            <button type="button" role="menuitem" onClick={() => { setMoreOpen(false); props.onOpenCustomerDisplay(); }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 transition">
-              <Tv className="w-4 h-4 text-slate-400" /> شاشة عرض العميل
+            <button type="button" role="menuitem" onClick={() => { setMoreOpen(false); props.onOpenCustomerDisplay(); }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold text-ink hover:bg-surface-muted transition">
+              <Tv className="w-4 h-4 text-muted" /> شاشة {copy.displayTitle}
             </button>
           )}
           {props.activeShift && (
-            <button type="button" role="menuitem" onClick={() => { setMoreOpen(false); props.onToggleTouchMode(); }} aria-pressed={props.touchMode} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 transition">
-              <MonitorSmartphone className="w-4 h-4 text-slate-400" /> وضع شاشة اللمس
-              <span className={`mr-auto text-[10px] px-2 py-0.5 rounded-full ${props.touchMode ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>{props.touchMode ? 'مفعل' : 'متوقف'}</span>
+            <button type="button" role="menuitem" onClick={() => { setMoreOpen(false); props.onToggleTouchMode(); }} aria-pressed={props.touchMode} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold text-ink hover:bg-surface-muted transition">
+              <MonitorSmartphone className="w-4 h-4 text-muted" /> وضع شاشة اللمس
+              <span className={`mr-auto text-[10px] px-2 py-0.5 rounded-full ${props.touchMode ? 'bg-success-soft text-success' : 'bg-surface-sunken text-muted'}`}>{props.touchMode ? 'مفعل' : 'متوقف'}</span>
             </button>
           )}
-          <button type="button" role="menuitem" onClick={() => { setMoreOpen(false); props.onOpenCashboxes(); }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 transition">
-            <Wallet className="w-4 h-4 text-slate-400" /> الخزينة وصناديق الكاش
+          <button type="button" role="menuitem" onClick={() => { setMoreOpen(false); props.onOpenCashboxes(); }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold text-ink hover:bg-surface-muted transition">
+            <Wallet className="w-4 h-4 text-muted" /> الخزينة وصناديق الكاش
           </button>
         </div>
       )}

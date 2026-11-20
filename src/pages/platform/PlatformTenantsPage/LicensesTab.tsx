@@ -45,7 +45,7 @@ export const LicensesTab: React.FC<LicensesTabProps> = ({
                         {
                           key: 'key', header: 'مفتاح الترخيص',
                           render: (license) => (
-                            <button type="button" onClick={() => copyToClipboard(license.licenseKey, 'مفتاح الترخيص')} className="inline-flex items-center gap-1 font-mono text-[10.5px] text-slate-700 hover:text-emerald-700" dir="ltr">
+                            <button type="button" onClick={() => copyToClipboard(license.licenseKey, 'مفتاح الترخيص')} className="inline-flex items-center gap-1 font-mono text-[10.5px] text-ink hover:text-success" dir="ltr">
                               {license.licenseKey} <Copy className="h-3 w-3" />
                             </button>
                           ),

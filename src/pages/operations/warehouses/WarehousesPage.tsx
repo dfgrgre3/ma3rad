@@ -288,8 +288,8 @@ export const WarehousesPage: React.FC = () => {
   }, [stockByWarehouse]);
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
-      <div className="bg-white px-6 pt-4">
+    <div className="h-full flex flex-col bg-surface-muted text-ink overflow-hidden">
+      <div className="bg-surface px-6 pt-4">
         <PageHeader
           icon={<Warehouse className="h-5 w-5" />}
           title={pageCopy?.title || 'المخازن والمستودعات'}
@@ -297,7 +297,7 @@ export const WarehousesPage: React.FC = () => {
           actions={
             <CentralLimitGuard metric="maxWarehouses">
               {canManage && (
-                <button onClick={openCreate} className="flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-sm font-semibold transition shrink-0">
+                <button onClick={openCreate} className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary text-white rounded-xl text-sm font-semibold transition shrink-0">
                   <Plus className="w-4 h-4" /> إضافة مخزن جديد
                 </button>
               )}
@@ -307,49 +307,49 @@ export const WarehousesPage: React.FC = () => {
       </div>
 
       {/* Global Summary Cards */}
-      <div className="p-4 bg-white border-b border-slate-200">
-        {stockMetricsError && <div role="alert" className="mb-3 px-4 py-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold">تعذر تحميل مؤشرات المخزون: {stockMetricsError}</div>}
+      <div className="p-4 bg-surface border-b border-line">
+        {stockMetricsError && <div role="alert" className="mb-3 px-4 py-2.5 rounded-xl bg-danger-soft border border-danger-border text-danger text-xs font-semibold">تعذر تحميل مؤشرات المخزون: {stockMetricsError}</div>}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-3">
-          <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
-            <div className="text-xs text-slate-500 font-semibold mb-1">إجمالي الرصيد حسب الوحدة</div>
-            <div className="text-lg font-black text-slate-900">{stockMetricsLoading || stockMetricsError ? '—' : formatQuantitiesByUnit(globalTotals.quantityByUnit)}</div>
+          <div className="bg-surface-muted rounded-xl p-4 border border-line">
+            <div className="text-xs text-muted font-semibold mb-1">إجمالي الرصيد حسب الوحدة</div>
+            <div className="text-lg font-black text-ink">{stockMetricsLoading || stockMetricsError ? '—' : formatQuantitiesByUnit(globalTotals.quantityByUnit)}</div>
           </div>
-          <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
-            <div className="text-xs text-slate-500 font-semibold mb-1">المتاح للبيع حسب الوحدة</div>
-            <div className="text-lg font-black text-emerald-600">{stockMetricsLoading || stockMetricsError ? '—' : formatQuantitiesByUnit(globalTotals.availableByUnit)}</div>
+          <div className="bg-surface-muted rounded-xl p-4 border border-line">
+            <div className="text-xs text-muted font-semibold mb-1">المتاح للبيع حسب الوحدة</div>
+            <div className="text-lg font-black text-success">{stockMetricsLoading || stockMetricsError ? '—' : formatQuantitiesByUnit(globalTotals.availableByUnit)}</div>
           </div>
-          <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
-            <div className="text-xs text-slate-500 font-semibold mb-1">المحجوز للطلبيات حسب الوحدة</div>
-            <div className="text-lg font-black text-amber-600">{stockMetricsLoading || stockMetricsError ? '—' : formatQuantitiesByUnit(globalTotals.reservedByUnit)}</div>
+          <div className="bg-surface-muted rounded-xl p-4 border border-line">
+            <div className="text-xs text-muted font-semibold mb-1">المحجوز للطلبيات حسب الوحدة</div>
+            <div className="text-lg font-black text-warning">{stockMetricsLoading || stockMetricsError ? '—' : formatQuantitiesByUnit(globalTotals.reservedByUnit)}</div>
           </div>
-          <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
-            <div className="text-xs text-slate-500 font-semibold mb-1">قيمة المخزون الإجمالية</div>
-            <div className="text-lg font-black text-violet-600">{stockMetricsLoading || stockMetricsError ? '—' : globalTotals.totalValue.toLocaleString('ar-EG', { maximumFractionDigits: 2 })}</div>
+          <div className="bg-surface-muted rounded-xl p-4 border border-line">
+            <div className="text-xs text-muted font-semibold mb-1">قيمة المخزون الإجمالية</div>
+            <div className="text-lg font-black text-primary">{stockMetricsLoading || stockMetricsError ? '—' : globalTotals.totalValue.toLocaleString('ar-EG', { maximumFractionDigits: 2 })}</div>
           </div>
-          <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
-            <div className="text-xs text-slate-500 font-semibold mb-1">أصناف مخزنة</div>
-            <div className="text-lg font-black text-sky-600">{stockMetricsLoading || stockMetricsError ? '—' : globalTotals.productCount}</div>
+          <div className="bg-surface-muted rounded-xl p-4 border border-line">
+            <div className="text-xs text-muted font-semibold mb-1">أصناف مخزنة</div>
+            <div className="text-lg font-black text-primary">{stockMetricsLoading || stockMetricsError ? '—' : globalTotals.productCount}</div>
           </div>
-          <div className={`bg-rose-50 rounded-xl p-4 border border-rose-200 ${globalTotals.lowStockCount > 0 ? 'border-rose-300' : 'border-rose-200'}`}>
-            <div className="text-xs text-slate-500 font-semibold mb-1 flex items-center gap-1">
-              <AlertTriangle className="w-4 h-4 text-rose-600" /> أصناف منتهية/منخفضة
+          <div className={`bg-danger-soft rounded-xl p-4 border border-danger-border ${globalTotals.lowStockCount > 0 ? 'border-danger' : 'border-danger-border'}`}>
+            <div className="text-xs text-muted font-semibold mb-1 flex items-center gap-1">
+              <AlertTriangle className="w-4 h-4 text-danger" /> أصناف منتهية/منخفضة
             </div>
-            <div className="text-lg font-black text-rose-600">{stockMetricsLoading || stockMetricsError ? '—' : globalTotals.lowStockCount}</div>
+            <div className="text-lg font-black text-danger">{stockMetricsLoading || stockMetricsError ? '—' : globalTotals.lowStockCount}</div>
           </div>
         </div>
       </div>
 
-      <div className="p-4 bg-white border-b border-slate-200">
+      <div className="p-4 bg-surface border-b border-line">
         <form onSubmit={(e) => { e.preventDefault(); load(); }} className="relative">
-          <Search className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="بحث باسم المخزن أو العنوان ثم اضغط إدخال..." className="w-full pl-4 pr-10 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-violet-400" />
+          <Search className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="بحث باسم المخزن أو العنوان ثم اضغط إدخال..." className="w-full pl-4 pr-10 py-2.5 bg-surface border border-line rounded-xl text-sm focus:outline-none focus:border-primary" />
         </form>
         <div className="mt-3"><OperationalFieldsFilter fields={fields} values={fieldFilters} onChange={setFieldFilters} /></div>
       </div>
 
       <div className="flex-1 overflow-y-auto p-4">
-        {error && <div className="mb-3 px-4 py-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold">{error}</div>}
-        {loading ? <div className="py-16 flex justify-center"><Loader2 className="w-6 h-6 animate-spin text-violet-500" /></div> : (
+        {error && <div className="mb-3 px-4 py-2.5 rounded-xl bg-danger-soft border border-danger-border text-danger text-xs font-semibold">{error}</div>}
+        {loading ? <div className="py-16 flex justify-center"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div> : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {warehouses.filter((warehouse) => matchesOperationalFieldFilters(warehouse.id, valuesByWarehouse, fieldFilters)).map((w) => {
               const m = metricsByWarehouse[w.id];
@@ -359,13 +359,13 @@ export const WarehousesPage: React.FC = () => {
               );
               const lowStockItems = stock.filter(isLowStock).slice(0, 3);
               return (
-                <div key={w.id} className="bg-white border border-slate-200 hover:border-slate-300 rounded-xl p-5 transition flex flex-col justify-between group">
+                <div key={w.id} className="bg-surface border border-line hover:border-line-strong rounded-xl p-5 transition flex flex-col justify-between group">
                   <div>
                     <div className="flex items-center justify-between mb-2">
-                      <h3 className="font-extrabold text-slate-900 group-hover:text-violet-600 transition text-base">{w.name}</h3>
-                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold border ${w.isActive ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>{w.isActive ? 'نشط' : 'معطل'}</span>
+                      <h3 className="font-extrabold text-ink group-hover:text-primary transition text-base">{w.name}</h3>
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold border ${w.isActive ? 'bg-success-soft text-success border-success-border' : 'bg-surface-sunken text-muted border-line'}`}>{w.isActive ? 'نشط' : 'معطل'}</span>
                     </div>
-                    <p className="text-[10px] font-mono text-slate-400 mb-3">{w.code} {w.isDefault && <span className="text-violet-600 font-bold">• افتراضي</span>}</p>
+                    <p className="text-[10px] font-mono text-muted mb-3">{w.code} {w.isDefault && <span className="text-primary font-bold">• افتراضي</span>}</p>
                     <div className="mb-3">
                       {canManage ? (
                         <select
@@ -374,62 +374,62 @@ export const WarehousesPage: React.FC = () => {
                           onChange={(e) => {
                             if (isWarehouseType(e.target.value)) handleWarehouseTypeChange(w.id, e.target.value);
                           }}
-                          className="w-full px-2.5 py-2 bg-slate-50 rounded-lg border border-slate-200 text-xs font-bold"
+                          className="w-full px-2.5 py-2 bg-surface-muted rounded-lg border border-line text-xs font-bold"
                         >
                           {WAREHOUSE_TYPES.map((warehouseType) => (
                             <option key={warehouseType} value={warehouseType}>{WAREHOUSE_TYPE_LABELS[warehouseType]}</option>
                           ))}
                         </select>
                       ) : (
-                        <span className="text-[10px] text-slate-600 font-bold">{WAREHOUSE_TYPE_LABELS[w.warehouseType]}</span>
+                        <span className="text-[10px] text-ink-secondary font-bold">{WAREHOUSE_TYPE_LABELS[w.warehouseType]}</span>
                       )}
                     </div>
-                    <div className="space-y-2 text-xs text-slate-500">
+                    <div className="space-y-2 text-xs text-muted">
                       <div className="flex items-start gap-1.5"><MapPin className="w-4 h-4 shrink-0 mt-0.5" /><span>{w.location || '—'}</span></div>
                       <div className="flex items-center gap-1.5"><Database className="w-4 h-4" /><span>الفرع: {w.branchName || '—'}</span></div>
                     </div>
                     <div className="mt-3 space-y-2">
                       {stockMetricsError ? (
-                        <div role="alert" className="bg-rose-50 rounded-xl p-3 border border-rose-200 text-xs font-semibold text-rose-700">تعذر تحميل مؤشرات هذا المخزن.</div>
+                        <div role="alert" className="bg-danger-soft rounded-xl p-3 border border-danger-border text-xs font-semibold text-danger">تعذر تحميل مؤشرات هذا المخزن.</div>
                       ) : stockMetricsLoading || !m ? (
-                        <div className="bg-slate-50 rounded-xl p-3 border border-slate-100 text-xs text-slate-500">جارٍ تحميل مؤشرات المخزون...</div>
+                        <div className="bg-surface-muted rounded-xl p-3 border border-line text-xs text-muted">جارٍ تحميل مؤشرات المخزون...</div>
                       ) : (
-                        <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
+                        <div className="bg-surface-muted rounded-xl p-3 border border-line">
                           <div className="flex items-start justify-between text-xs mb-1 gap-2">
-                            <span className="text-slate-500 shrink-0">إجمالي الرصيد</span>
-                            <span className="font-bold text-slate-900 text-left">{formatQuantitiesByUnit(m.quantityByUnit)}</span>
+                            <span className="text-muted shrink-0">إجمالي الرصيد</span>
+                            <span className="font-bold text-ink text-left">{formatQuantitiesByUnit(m.quantityByUnit)}</span>
                           </div>
                           <div className="flex items-start justify-between text-xs mb-1 gap-2">
-                            <span className="text-slate-500 shrink-0">المتاح للبيع</span>
-                            <span className="font-bold text-emerald-600 text-left">{formatQuantitiesByUnit(m.availableByUnit)}</span>
+                            <span className="text-muted shrink-0">المتاح للبيع</span>
+                            <span className="font-bold text-success text-left">{formatQuantitiesByUnit(m.availableByUnit)}</span>
                           </div>
                           <div className="flex items-start justify-between text-xs mb-1 gap-2">
-                            <span className="text-slate-500 shrink-0">المحجوز للطلبيات</span>
-                            <span className="font-bold text-amber-600 text-left">{formatQuantitiesByUnit(m.reservedByUnit)}</span>
+                            <span className="text-muted shrink-0">المحجوز للطلبيات</span>
+                            <span className="font-bold text-warning text-left">{formatQuantitiesByUnit(m.reservedByUnit)}</span>
                           </div>
                           <div className="flex items-center justify-between text-xs">
-                            <span className="text-slate-500">قيمة المخزون</span>
-                            <span className="font-bold text-violet-600">{m.totalValue.toLocaleString('ar-EG', { maximumFractionDigits: 2 })}</span>
+                            <span className="text-muted">قيمة المخزون</span>
+                            <span className="font-bold text-primary">{m.totalValue.toLocaleString('ar-EG', { maximumFractionDigits: 2 })}</span>
                           </div>
                         </div>
                       )}
                       {m && m.lowStockCount > 0 && (
-                        <div className="bg-rose-50 rounded-xl p-2.5 border border-rose-200">
+                        <div className="bg-danger-soft rounded-xl p-2.5 border border-danger-border">
                           <div className="flex items-center gap-1.5 text-xs">
-                            <AlertTriangle className="w-3.5 h-3.5 text-rose-600" />
-                            <span className="text-rose-700 font-semibold">{m.lowStockCount} صنف منتهي أو منخفض</span>
+                            <AlertTriangle className="w-3.5 h-3.5 text-danger" />
+                            <span className="text-danger font-semibold">{m.lowStockCount} صنف منتهي أو منخفض</span>
                           </div>
                         </div>
                       )}
-                      {!stockMetricsError && !stockMetricsLoading && m && <div className="mt-2 bg-slate-50 rounded-xl p-2 border border-slate-100">
+                      {!stockMetricsError && !stockMetricsLoading && m && <div className="mt-2 bg-surface-muted rounded-xl p-2 border border-line">
                         <div className="flex items-center justify-between text-[10px] mb-1">
-                          <span className="text-slate-500">أصناف مخزنة</span>
-                          <span className="font-bold text-slate-900">{m.productCount} صنف</span>
+                          <span className="text-muted">أصناف مخزنة</span>
+                          <span className="font-bold text-ink">{m.productCount} صنف</span>
                         </div>
                         {lowStockItems.length > 0 && (
-                          <div className="text-[10px] text-slate-500">
+                          <div className="text-[10px] text-muted">
                             <div className="mb-1">أصناف منخفضة:</div>
-                            <ul className="list-disc list-inside space-y-0.5 text-rose-600">
+                            <ul className="list-disc list-inside space-y-0.5 text-danger">
                               {lowStockItems.map((item) => (
                                 <li key={item.productId}>{item.productName || item.productId}</li>
                               ))}
@@ -452,16 +452,16 @@ export const WarehousesPage: React.FC = () => {
                   </div>
                   {canManage && (
                     <div className="mt-3 flex flex-wrap gap-1.5">
-                      <button onClick={() => openEdit(w)} className="flex-1 min-w-[92px] px-2.5 py-2 bg-slate-100 text-slate-700 font-bold rounded-xl text-xs hover:bg-slate-200 transition flex items-center justify-center gap-1">
+                      <button onClick={() => openEdit(w)} className="flex-1 min-w-[92px] px-2.5 py-2 bg-surface-sunken text-ink font-bold rounded-xl text-xs hover:bg-surface-sunken transition flex items-center justify-center gap-1">
                         <Pencil className="w-3.5 h-3.5" /> تعديل
                       </button>
                       {hasStock && canTransfer && (
-                        <button onClick={() => openTransfer(w)} disabled={!w.isActive} className="flex-1 min-w-[105px] px-2.5 py-2 bg-amber-50 text-amber-700 font-bold rounded-xl text-xs hover:bg-amber-100 transition flex items-center justify-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed">
+                        <button onClick={() => openTransfer(w)} disabled={!w.isActive} className="flex-1 min-w-[105px] px-2.5 py-2 bg-warning-soft text-warning font-bold rounded-xl text-xs hover:bg-warning-soft transition flex items-center justify-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed">
                           <ArrowLeftRight className="w-3.5 h-3.5" /> نقل الرصيد
                         </button>
                       )}
                       {w.isActive && !w.isDefault && (
-                        <button onClick={() => handleSetDefault(w)} className="flex-1 min-w-[100px] px-2.5 py-2 bg-violet-50 text-violet-700 font-bold rounded-xl text-xs hover:bg-violet-100 transition flex items-center justify-center gap-1">
+                        <button onClick={() => handleSetDefault(w)} className="flex-1 min-w-[100px] px-2.5 py-2 bg-accent-soft text-primary font-bold rounded-xl text-xs hover:bg-accent-soft transition flex items-center justify-center gap-1">
                           <Star className="w-3.5 h-3.5" /> تعيين افتراضي
                         </button>
                       )}
@@ -469,12 +469,12 @@ export const WarehousesPage: React.FC = () => {
                         onClick={() => handleWarehouseActivation(w)}
                         disabled={w.isActive && (hasStock || stockMetricsLoading || Boolean(stockMetricsError))}
                         title={w.isActive && hasStock ? 'انقل الأرصدة وألغِ الحجوزات قبل تعطيل المخزن' : undefined}
-                        className={`flex-1 min-w-[92px] px-2.5 py-2 font-bold rounded-xl text-xs transition flex items-center justify-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed ${w.isActive ? 'bg-rose-50 text-rose-700 hover:bg-rose-100' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'}`}
+                        className={`flex-1 min-w-[92px] px-2.5 py-2 font-bold rounded-xl text-xs transition flex items-center justify-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed ${w.isActive ? 'bg-danger-soft text-danger hover:bg-danger-soft' : 'bg-success-soft text-success hover:bg-success-soft'}`}
                       >
                         <Power className="w-3.5 h-3.5" /> {w.isActive ? 'تعطيل' : 'إعادة تفعيل'}
                       </button>
                       {hasStock && !canTransfer && (
-                        <p className="w-full text-[10px] text-amber-700 text-center">
+                        <p className="w-full text-[10px] text-warning text-center">
                           يلزم منح صلاحية التحويل المخزني لنقل الرصيد قبل التعطيل.
                         </p>
                       )}
@@ -483,30 +483,30 @@ export const WarehousesPage: React.FC = () => {
                 </div>
               );
             })}
-            {warehouses.length === 0 && <div className="col-span-full py-16 text-center text-slate-500 border-2 border-dashed border-slate-200 rounded-2xl bg-white">لا توجد مخازن</div>}
+            {warehouses.length === 0 && <div className="col-span-full py-16 text-center text-muted border-2 border-dashed border-line rounded-2xl bg-surface">لا توجد مخازن</div>}
           </div>
         )}
       </div>
 
       {modalOpen && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-md w-full p-6">
+        <div className="fixed inset-0 bg-primary/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-surface rounded-2xl border border-line shadow-2xl max-w-md w-full p-6">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-base font-extrabold text-slate-900">{editingWarehouse ? 'تعديل بيانات المخزن' : 'إضافة مخزن جديد'}</h3>
-              <button onClick={() => setModalOpen(false)} className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100"><X className="w-4 h-4" /></button>
+              <h3 className="text-base font-extrabold text-ink">{editingWarehouse ? 'تعديل بيانات المخزن' : 'إضافة مخزن جديد'}</h3>
+              <button onClick={() => setModalOpen(false)} className="p-1.5 rounded-lg text-muted hover:bg-surface-sunken"><X className="w-4 h-4" /></button>
             </div>
             <form onSubmit={handleSaveWarehouse} className="space-y-3 text-xs">
-              <div><label className="font-bold text-slate-700 block mb-1">اسم المخزن *</label><input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-semibold" /></div>
-              <div><label className="font-bold text-slate-700 block mb-1">الموقع</label><input value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200" /></div>
+              <div><label className="font-bold text-ink block mb-1">اسم المخزن *</label><input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="w-full px-3 py-2 bg-surface-muted rounded-xl border border-line font-semibold" /></div>
+              <div><label className="font-bold text-ink block mb-1">الموقع</label><input value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} className="w-full px-3 py-2 bg-surface-muted rounded-xl border border-line" /></div>
               <div>
-                <label className="font-bold text-slate-700 block mb-1">نوع المستودع</label>
+                <label className="font-bold text-ink block mb-1">نوع المستودع</label>
                 <select
                   required
                   value={form.warehouseType}
                   onChange={(e) => {
                     if (isWarehouseType(e.target.value)) setForm({ ...form, warehouseType: e.target.value });
                   }}
-                  className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold"
+                  className="w-full px-3 py-2 bg-surface-muted rounded-xl border border-line font-bold"
                 >
                   {WAREHOUSE_TYPES.map((warehouseType) => (
                     <option key={warehouseType} value={warehouseType}>{WAREHOUSE_TYPE_LABELS[warehouseType]}</option>
@@ -514,16 +514,16 @@ export const WarehousesPage: React.FC = () => {
                 </select>
               </div>
               <div>
-                <label className="font-bold text-slate-700 block mb-1">الفرع</label>
-                <select value={form.branchId} onChange={(e) => setForm({ ...form, branchId: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold">
+                <label className="font-bold text-ink block mb-1">الفرع</label>
+                <select value={form.branchId} onChange={(e) => setForm({ ...form, branchId: e.target.value })} className="w-full px-3 py-2 bg-surface-muted rounded-xl border border-line font-bold">
                   <option value="">— بدون فرع —</option>
                   {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
                 </select>
               </div>
               <OperationalFieldsForm fields={fields} values={values} onChange={setValues} title="بيانات إضافية للمخزن" />
-              <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
-                <button type="button" onClick={() => setModalOpen(false)} className="px-4 py-2 bg-slate-100 text-slate-700 font-bold rounded-xl">إلغاء</button>
-                <button type="submit" disabled={saving} className="px-5 py-2 bg-violet-600 hover:bg-violet-700 text-white font-bold rounded-xl flex items-center gap-2">{saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />} {editingWarehouse ? 'حفظ التعديلات' : 'إضافة'}</button>
+              <div className="flex justify-end gap-2 pt-3 border-t border-line">
+                <button type="button" onClick={() => setModalOpen(false)} className="px-4 py-2 bg-surface-sunken text-ink font-bold rounded-xl">إلغاء</button>
+                <button type="submit" disabled={saving} className="px-5 py-2 bg-primary hover:bg-primary text-white font-bold rounded-xl flex items-center gap-2">{saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />} {editingWarehouse ? 'حفظ التعديلات' : 'إضافة'}</button>
               </div>
             </form>
           </div>
@@ -531,24 +531,24 @@ export const WarehousesPage: React.FC = () => {
       )}
 
       {transferWarehouse && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-md w-full p-6">
+        <div className="fixed inset-0 bg-primary/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-surface rounded-2xl border border-line shadow-2xl max-w-md w-full p-6">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-base font-extrabold text-slate-900">طلب نقل الرصيد قبل تعطيل المخزن</h3>
-              <button onClick={() => setTransferWarehouse(null)} className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100"><X className="w-4 h-4" /></button>
+              <h3 className="text-base font-extrabold text-ink">طلب نقل الرصيد قبل تعطيل المخزن</h3>
+              <button onClick={() => setTransferWarehouse(null)} className="p-1.5 rounded-lg text-muted hover:bg-surface-sunken"><X className="w-4 h-4" /></button>
             </div>
-            <p className="text-sm text-slate-600 mb-4">
+            <p className="text-sm text-ink-secondary mb-4">
               سيتم إنشاء طلب لنقل جميع أرصدة «{transferWarehouse.name}» بما فيها أرصدة الأصناف المعطلة. يبقى المخزن نشطًا حتى اعتماد التحويل وإرساله واستلامه، ثم يمكنك تعطيله. تُرفض المخازن التي لديها حجوزات أو أرصدة سالبة.
             </p>
-            <label className="font-bold text-slate-700 block mb-1 text-xs">المخزن المستهدف</label>
-            <select value={transferDestinationId} onChange={(e) => setTransferDestinationId(e.target.value)} className="w-full px-3 py-2.5 bg-slate-50 rounded-xl border border-slate-200 text-sm font-bold">
+            <label className="font-bold text-ink block mb-1 text-xs">المخزن المستهدف</label>
+            <select value={transferDestinationId} onChange={(e) => setTransferDestinationId(e.target.value)} className="w-full px-3 py-2.5 bg-surface-muted rounded-xl border border-line text-sm font-bold">
               {warehouses.filter((warehouse) => warehouse.isActive && warehouse.id !== transferWarehouse.id).map((warehouse) => (
                 <option key={warehouse.id} value={warehouse.id}>{warehouse.name} — {warehouse.branchName || 'بدون فرع'}</option>
               ))}
             </select>
-            <div className="flex justify-end gap-2 pt-4 mt-4 border-t border-slate-100">
-              <button type="button" onClick={() => setTransferWarehouse(null)} className="px-4 py-2 bg-slate-100 text-slate-700 font-bold rounded-xl">إلغاء</button>
-              <button type="button" onClick={handleTransferRequest} disabled={transferSaving || !transferDestinationId} className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl flex items-center gap-2 disabled:opacity-50">
+            <div className="flex justify-end gap-2 pt-4 mt-4 border-t border-line">
+              <button type="button" onClick={() => setTransferWarehouse(null)} className="px-4 py-2 bg-surface-sunken text-ink font-bold rounded-xl">إلغاء</button>
+              <button type="button" onClick={handleTransferRequest} disabled={transferSaving || !transferDestinationId} className="px-4 py-2 bg-warning hover:bg-warning text-white font-bold rounded-xl flex items-center gap-2 disabled:opacity-50">
                 {transferSaving && <Loader2 className="w-3.5 h-3.5 animate-spin" />} إنشاء طلب نقل
               </button>
             </div>

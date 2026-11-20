@@ -13,13 +13,13 @@ export const OperationalFieldsFilter: React.FC<{
   return (
     <div className="flex flex-wrap gap-2">
       {filterable.map((field) => (
-        <label key={field.id} className="min-w-36 text-[10px] font-bold text-slate-500">
+        <label key={field.id} className="min-w-36 text-[10px] font-bold text-muted">
           <span className="mb-1 block">{field.name}</span>
           {field.dataType === 'SELECT' && field.values.length ? (
             <select
               value={values[field.id] || ''}
               onChange={(event) => onChange({ ...values, [field.id]: event.target.value })}
-              className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs"
+              className="w-full rounded-lg border border-line bg-surface px-2 py-1.5 text-xs"
             >
               <option value="">الكل</option>
               {field.values.map((option) => <option key={option.id} value={option.value}>{option.label}</option>)}
@@ -29,7 +29,7 @@ export const OperationalFieldsFilter: React.FC<{
               type="search"
               value={values[field.id] || ''}
               onChange={(event) => onChange({ ...values, [field.id]: event.target.value })}
-              className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs"
+              className="w-full rounded-lg border border-line bg-surface px-2 py-1.5 text-xs"
             />
           )}
         </label>

@@ -14,15 +14,15 @@ export const DeliveryModal: React.FC<DeliveryModalProps> = ({
   <Modal onClose={onClose} wide>
     <form onSubmit={onSubmit} className="space-y-3 text-xs">
       <div className="flex items-center justify-between">
-        <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
-          <PackageCheck className="w-5 h-5 text-sky-600" /> تسجيل تسليم الطلب {deliveryTarget.orderNumber}
+        <h3 className="text-base font-black text-ink flex items-center gap-2">
+          <PackageCheck className="w-5 h-5 text-primary" /> تسجيل تسليم الطلب {deliveryTarget.orderNumber}
         </h3>
-        <button type="button" onClick={onClose} className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100"><X className="w-4 h-4" /></button>
+        <button type="button" onClick={onClose} className="p-1.5 rounded-lg text-muted hover:bg-surface-sunken"><X className="w-4 h-4" /></button>
       </div>
-      <div className="bg-sky-50 border border-sky-200 rounded-xl p-3 text-[11px] text-sky-800">
+      <div className="bg-accent-soft border border-accent-border rounded-xl p-3 text-[11px] text-primary">
         يمكن التسليم على دفعات. عدّل الكميات المسلّمة الآن وسيتم خصمها من المتبقي لكل بند.
       </div>
-      <div className="border border-slate-200 rounded-xl overflow-x-auto">
+      <div className="border border-line rounded-xl overflow-x-auto">
         <DataTable
         ariaLabel="بنود التسليم"
         rows={deliveryTarget.items || []}
@@ -35,19 +35,19 @@ export const DeliveryModal: React.FC<DeliveryModalProps> = ({
           {
             key: 'product', header: 'الصنف',
             render: (item: any) => (
-              <span className="font-bold text-slate-800">
+              <span className="font-bold text-ink">
                 {item.productName}
-                <div className="text-[9px] font-normal text-slate-400">{item.size} • {item.grade}</div>
+                <div className="text-[9px] font-normal text-muted">{item.size} • {item.grade}</div>
               </span>
             ),
           },
           { key: 'req', header: 'المطلوب', render: (item: any) => <span className="font-mono">{formatProductQuantity(Number(item.quantityM2), item)}</span> },
-          { key: 'delivered', header: 'المسلّم سابقاً', render: (item: any) => <span className="font-mono text-emerald-600">{Number(item.deliveredM2 || 0).toFixed(2)}</span> },
+          { key: 'delivered', header: 'المسلّم سابقاً', render: (item: any) => <span className="font-mono text-success">{Number(item.deliveredM2 || 0).toFixed(2)}</span> },
           {
             key: 'remaining', header: 'المتبقي',
             render: (item: any) => {
               const remaining = Math.max(0, Number(item.quantityM2) - Number(item.deliveredM2 || 0));
-              return <span className="font-mono text-amber-600">{remaining.toFixed(2)}</span>;
+              return <span className="font-mono text-warning">{remaining.toFixed(2)}</span>;
             },
           },
           {
@@ -63,7 +63,7 @@ export const DeliveryModal: React.FC<DeliveryModalProps> = ({
                     ...prev,
                     [item.id]: Math.min(remaining, Number(e.target.value) || 0),
                   }))}
-                  className="w-full rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 font-mono disabled:bg-slate-100"
+                  className="w-full rounded-lg border border-line bg-surface-muted px-2 py-1.5 font-mono disabled:bg-surface-sunken"
                 />
               );
             },
@@ -81,11 +81,11 @@ export const DeliveryModal: React.FC<DeliveryModalProps> = ({
             });
             setDeliveryLines(all);
           }}
-          className="text-[11px] font-bold text-sky-600 hover:text-sky-700"
+          className="text-[11px] font-bold text-primary hover:text-primary"
         >
           تسليم كل المتبقي
         </button>
-        <span className="text-[11px] font-bold text-slate-500">
+        <span className="text-[11px] font-bold text-muted">
           إجمالي هذه الدفعة: {summarizeOrderQuantity(
             (detailItems || []).map((item) => ({ ...item, deliveredM2: Number(deliveryLines[item.id]) || 0 })),
             'deliveredM2'
@@ -93,12 +93,12 @@ export const DeliveryModal: React.FC<DeliveryModalProps> = ({
         </span>
       </div>
       <div>
-        <label className="font-bold text-slate-700 block mb-1">ملاحظات التسليم</label>
-        <input value={deliveryNote} onChange={(e) => setDeliveryNote(e.target.value)} placeholder="مندوب التسليم / رقم السيارة / ملاحظات..." className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200" />
+        <label className="font-bold text-ink block mb-1">ملاحظات التسليم</label>
+        <input value={deliveryNote} onChange={(e) => setDeliveryNote(e.target.value)} placeholder="مندوب التسليم / رقم السيارة / ملاحظات..." className="w-full px-3 py-2 bg-surface-muted rounded-xl border border-line" />
       </div>
-      <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
-        <button type="button" onClick={onClose} className="px-4 py-2 bg-slate-100 text-slate-700 font-bold rounded-xl">إلغاء</button>
-        <button type="submit" disabled={saving} className="px-5 py-2 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-xl flex items-center gap-2">
+      <div className="flex justify-end gap-2 pt-3 border-t border-line">
+        <button type="button" onClick={onClose} className="px-4 py-2 bg-surface-sunken text-ink font-bold rounded-xl">إلغاء</button>
+        <button type="submit" disabled={saving} className="px-5 py-2 bg-primary hover:bg-primary text-white font-bold rounded-xl flex items-center gap-2">
           {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />} حفظ التسليم
         </button>
       </div>

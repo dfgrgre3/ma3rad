@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { DataTable } from '../ui/DataTable';
-import { 
-  Truck, Plus, Search, 
+import {
+  Truck, Plus, Search,
   Sparkles,
-  ChevronDown
+  ChevronDown,
+  Printer
 } from 'lucide-react';
 import { PurchaseService } from '../../services/domains/purchases/PurchaseService';
 import { SupplierService } from '../../services/domains/suppliers/SupplierService';
@@ -24,8 +25,10 @@ import { useToast } from '../ui/Toast';
 import { PurchaseInvoiceDto } from '../../types/purchasing/components';
 import { OperationalFieldService, type OperationalFieldDefinition } from '../../services/domains/products/OperationalFieldService';
 import { OperationalFieldsSummary } from '../products/OperationalFieldsSummary';
+import { OperationalFieldsChips } from '../products/OperationalFieldsChips';
 import { OperationalFieldsRecordEditor } from '../products/OperationalFieldsRecordEditor';
 import { OperationalFieldsFilter, matchesOperationalFieldFilters, type OperationalFieldFilters } from '../products/OperationalFieldsFilter';
+import { PrintService } from '../../services/shared/PrintService';
 
 const fmt = (n: number) => new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 2 }).format(Number(n) || 0) + ' ج.م';
 
@@ -36,6 +39,7 @@ const getBoxesCount = (product: Product | undefined, quantity: number): number =
 
 export const PurchasesView: React.FC = () => {
   const purchasingLabel = useBusinessTerm('modules.purchasing');
+  const newPurchaseLabel = useBusinessTerm('actions.newPurchaseInvoice');
   const { label: businessProfileLabel } = useBusinessProfileMeta();
   const purchaseService = useMemo(() => new PurchaseService(), []);
   const supplierService = useMemo(() => new SupplierService(), []);
@@ -226,7 +230,7 @@ export const PurchasesView: React.FC = () => {
               leadingIcon={<Plus className="h-4 w-4" />}
               onClick={() => { setOperationalFieldValues({}); setIsModalOpen(true); }}
             >
-              فاتورة توريد / مشتريات جديدة
+              {newPurchaseLabel}
             </Button>
           ) : undefined
         }
@@ -254,10 +258,20 @@ export const PurchasesView: React.FC = () => {
           isRowExpanded={(inv: any) => expandedId === inv.id && !!expandedDetails}
           renderExpandedRow={(inv: any) => (
             <div className="rounded-[var(--win-radius)] border border-[var(--win-border)] bg-[var(--win-surface)] p-4 space-y-3">
-              <h4 className="text-xs font-black flex items-center gap-1.5">
-                <Sparkles className="h-4 w-4 text-[var(--cerami-primary-readable)]" />
-                أصناف الفاتورة وتوزيع تكلفة الوصول الحقيقية (Landed Cost):
-              </h4>
+              <div className="flex items-center justify-between gap-2">
+                <h4 className="text-xs font-black flex items-center gap-1.5">
+                  <Sparkles className="h-4 w-4 text-[var(--cerami-primary-readable)]" />
+                  أصناف الفاتورة وتوزيع تكلفة الوصول الحقيقية (Landed Cost):
+                </h4>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  leadingIcon={<Printer className="h-3.5 w-3.5" />}
+                  onClick={() => new PrintService().printPurchaseInvoice(expandedDetails)}
+                >
+                  طباعة الفاتورة
+                </Button>
+              </div>
               <DataTable
                 ariaLabel="أصناف أمر الشراء وتكلفة الوصول"
                 rows={expandedDetails?.items || []}
@@ -309,6 +323,10 @@ export const PurchasesView: React.FC = () => {
               },
             },
             { key: 'total', header: 'الإجمالي النهائي', render: (inv: any) => <span className="font-black">{fmt(inv.total_amount)}</span> },
+            ...(operationalFields.length > 0 ? [{
+              key: 'activityFields', header: 'بيانات النشاط',
+              render: (inv: any) => <OperationalFieldsChips fields={operationalFields} values={valuesByPurchase[inv.id]} />,
+            }] : []),
             {
               key: 'paid', header: 'المسدد / المتبقي',
               render: (inv: any) => {

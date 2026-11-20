@@ -8,11 +8,11 @@ import type { PendingChange } from '../../types/sync';
 import { useToast } from '../ui/Toast';
 
 const STATUS_STYLES: Record<string, { label: string; cls: string }> = {
-  PENDING: { label: 'بانتظار الاعتماد', cls: 'bg-amber-50 text-amber-700 border-amber-200' },
-  APPLIED: { label: 'تم الاعتماد', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-  APPROVED: { label: 'تم الاعتماد', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-  REJECTED: { label: 'مرفوض', cls: 'bg-rose-50 text-rose-700 border-rose-200' },
-  CANCELLED: { label: 'ملغي', cls: 'bg-slate-100 text-slate-500 border-slate-200' },
+  PENDING: { label: 'بانتظار الاعتماد', cls: 'bg-warning-soft text-warning border-warning-border' },
+  APPLIED: { label: 'تم الاعتماد', cls: 'bg-success-soft text-success border-success-border' },
+  APPROVED: { label: 'تم الاعتماد', cls: 'bg-success-soft text-success border-success-border' },
+  REJECTED: { label: 'مرفوض', cls: 'bg-danger-soft text-danger border-danger-border' },
+  CANCELLED: { label: 'ملغي', cls: 'bg-surface-sunken text-muted border-line' },
 };
 
 function formatTimestamp(value?: string | null): string {
@@ -133,10 +133,10 @@ export const SyncChangeApprovalsPanel: React.FC<Props> = ({ requestedBy, canDeci
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <UserCheck className="h-5 w-5 text-indigo-600" />
-          <h3 className="text-sm font-black text-slate-900">اعتماد تعديلات الفروع والحسابات المرتبطة</h3>
+          <UserCheck className="h-5 w-5 text-primary" />
+          <h3 className="text-sm font-black text-ink">اعتماد تعديلات الفروع والحسابات المرتبطة</h3>
           {pendingCount > 0 && (
-            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-black text-amber-800">
+            <span className="rounded-full bg-warning-soft px-2 py-0.5 text-[11px] font-black text-warning">
               {pendingCount} بانتظار القرار
             </span>
           )}
@@ -144,7 +144,7 @@ export const SyncChangeApprovalsPanel: React.FC<Props> = ({ requestedBy, canDeci
         <button
           type="button"
           onClick={refresh}
-          className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-bold text-slate-700 hover:bg-slate-50"
+          className="flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-1.5 text-[11px] font-bold text-ink hover:bg-surface-muted"
         >
           <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
           تحديث
@@ -155,12 +155,12 @@ export const SyncChangeApprovalsPanel: React.FC<Props> = ({ requestedBy, canDeci
         {/* List */}
         <div className="lg:col-span-2 space-y-2 max-h-[520px] overflow-y-auto pr-1">
           {loading && (
-            <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white p-4 text-xs text-slate-500">
+            <div className="flex items-center gap-2 rounded-xl border border-line bg-surface p-4 text-xs text-muted">
               <Loader2 className="h-4 w-4 animate-spin" /> جارٍ التحميل…
             </div>
           )}
           {!loading && changes.length === 0 && (
-            <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-6 text-center text-xs text-slate-500">
+            <div className="rounded-xl border border-dashed border-line bg-surface-muted p-6 text-center text-xs text-muted">
               لا توجد تعديلات بانتظار الاعتماد.
             </div>
           )}
@@ -173,20 +173,20 @@ export const SyncChangeApprovalsPanel: React.FC<Props> = ({ requestedBy, canDeci
                 type="button"
                 onClick={() => { setSelectedId(change.id); setNotes(''); setRecipientIds([]); }}
                 className={`w-full text-right rounded-xl border p-3 transition ${
-                  active ? 'border-indigo-400 bg-indigo-50/60 shadow-sm' : 'border-slate-200 bg-white hover:border-slate-300'
+                  active ? 'border-primary bg-accent-soft/60 shadow-sm' : 'border-line bg-surface hover:border-line-strong'
                 }`}
               >
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-xs font-bold text-slate-900 truncate">{change.title}</span>
+                  <span className="text-xs font-bold text-ink truncate">{change.title}</span>
                   <span className={`shrink-0 rounded border px-1.5 py-0.5 text-[10px] font-bold ${status.cls}`}>
                     {status.label}
                   </span>
                 </div>
-                {change.summary && <p className="mt-1 text-[11px] text-slate-600 line-clamp-2">{change.summary}</p>}
-                <div className="mt-1.5 flex flex-wrap items-center gap-2 text-[10px] text-slate-400">
-                  <span className="font-bold text-slate-500">{change.requestedByName || '—'}</span>
+                {change.summary && <p className="mt-1 text-[11px] text-ink-secondary line-clamp-2">{change.summary}</p>}
+                <div className="mt-1.5 flex flex-wrap items-center gap-2 text-[10px] text-muted">
+                  <span className="font-bold text-muted">{change.requestedByName || '—'}</span>
                   <span className="font-mono">{formatTimestamp(change.createdAt)}</span>
-                  <span className="rounded bg-slate-100 px-1.5 py-0.5 font-bold text-slate-600">
+                  <span className="rounded bg-surface-sunken px-1.5 py-0.5 font-bold text-ink-secondary">
                     {operationLabel(change.operationType)} {entityLabel(change.entityType)}
                   </span>
                 </div>
@@ -198,28 +198,28 @@ export const SyncChangeApprovalsPanel: React.FC<Props> = ({ requestedBy, canDeci
         {/* Detail */}
         <div className="lg:col-span-3">
           {!selected ? (
-            <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-10 text-center text-xs text-slate-500">
+            <div className="rounded-2xl border border-dashed border-line bg-surface-muted p-10 text-center text-xs text-muted">
               اختر تعديلًا من القائمة لعرض تفاصيله واتخاذ القرار.
             </div>
           ) : (
-            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
+            <div className="rounded-2xl border border-line bg-surface p-5 shadow-sm space-y-4">
               <div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="rounded-md bg-indigo-50 px-2 py-0.5 text-[10px] font-black text-indigo-700">
+                  <span className="rounded-md bg-accent-soft px-2 py-0.5 text-[10px] font-black text-primary">
                     {operationLabel(selected.operationType)} {entityLabel(selected.entityType)}
                   </span>
-                  <span className="text-[11px] font-bold text-slate-500">{selected.requestedByName || '—'}</span>
+                  <span className="text-[11px] font-bold text-muted">{selected.requestedByName || '—'}</span>
                   {selected.requestedByRole && (
-                    <span className="text-[10px] text-slate-400">({selected.requestedByRole})</span>
+                    <span className="text-[10px] text-muted">({selected.requestedByRole})</span>
                   )}
-                  <span className="flex items-center gap-1 text-[10px] font-mono text-slate-400">
+                  <span className="flex items-center gap-1 text-[10px] font-mono text-muted">
                     <Clock className="h-3 w-3" /> {formatTimestamp(selected.createdAt)}
                   </span>
                 </div>
-                <h4 className="mt-2 text-sm font-black text-slate-900">{selected.title}</h4>
-                {selected.summary && <p className="mt-1 text-xs text-slate-600">{selected.summary}</p>}
+                <h4 className="mt-2 text-sm font-black text-ink">{selected.title}</h4>
+                {selected.summary && <p className="mt-1 text-xs text-ink-secondary">{selected.summary}</p>}
                 {selected.decisionNotes && (
-                  <p className="mt-2 rounded-lg bg-slate-50 p-2 text-[11px] text-slate-600">
+                  <p className="mt-2 rounded-lg bg-surface-muted p-2 text-[11px] text-ink-secondary">
                     ملاحظات القرار: {selected.decisionNotes}
                   </p>
                 )}
@@ -227,13 +227,13 @@ export const SyncChangeApprovalsPanel: React.FC<Props> = ({ requestedBy, canDeci
 
               {selected.notes && selected.notes.length > 0 && (
                 <div className="space-y-1.5">
-                  <p className="flex items-center gap-1.5 text-[11px] font-bold text-slate-600">
+                  <p className="flex items-center gap-1.5 text-[11px] font-bold text-ink-secondary">
                     <MessageSquare className="h-3.5 w-3.5" /> سجل الملاحظات
                   </p>
                   {selected.notes.map((note) => (
-                    <div key={note.id} className="rounded-lg border border-slate-100 bg-slate-50/70 p-2 text-[11px] text-slate-700">
+                    <div key={note.id} className="rounded-lg border border-line bg-surface-muted/70 p-2 text-[11px] text-ink">
                       <span className="font-bold">{note.createdByName || '—'}</span>
-                      <span className="text-slate-400"> → {note.recipientLabel || '—'} · {formatTimestamp(note.createdAt)}</span>
+                      <span className="text-muted"> → {note.recipientLabel || '—'} · {formatTimestamp(note.createdAt)}</span>
                       <p className="mt-0.5">{note.notes}</p>
                     </div>
                   ))}
@@ -243,24 +243,24 @@ export const SyncChangeApprovalsPanel: React.FC<Props> = ({ requestedBy, canDeci
               {selected.status === 'PENDING' && canDecide && (
                 <>
                   <div className="space-y-2">
-                    <label className="block text-[11px] font-bold text-slate-700">
+                    <label className="block text-[11px] font-bold text-ink">
                       ملاحظة لصاحب التعديل (تُرسل مع القرار):
                       <textarea
                         value={notes}
                         onChange={(event) => setNotes(event.target.value)}
                         rows={3}
                         placeholder="مثال: راجع الكمية قبل الاعتماد، أو سبب الرفض…"
-                        className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                        className="mt-1 w-full rounded-xl border border-line-strong px-3 py-2 text-xs focus:ring-2 focus:ring-primary focus:outline-none"
                       />
                     </label>
                   </div>
 
                   <div className="space-y-2">
-                    <p className="flex items-center gap-1.5 text-[11px] font-bold text-slate-700">
+                    <p className="flex items-center gap-1.5 text-[11px] font-bold text-ink">
                       <Building2 className="h-3.5 w-3.5" /> إرسال الملاحظة إلى حسابات إضافية
                     </p>
                     {users.length === 0 ? (
-                      <p className="text-[11px] text-slate-400">لا توجد حسابات متاحة للإرسال.</p>
+                      <p className="text-[11px] text-muted">لا توجد حسابات متاحة للإرسال.</p>
                     ) : (
                       <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto">
                         {users.map((user) => {
@@ -272,8 +272,8 @@ export const SyncChangeApprovalsPanel: React.FC<Props> = ({ requestedBy, canDeci
                               onClick={() => toggleRecipient(user.id)}
                               className={`rounded-lg border px-2 py-1 text-[11px] font-bold transition ${
                                 active
-                                  ? 'border-indigo-400 bg-indigo-50 text-indigo-700'
-                                  : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                                  ? 'border-primary bg-accent-soft text-primary'
+                                  : 'border-line bg-surface text-ink-secondary hover:bg-surface-muted'
                               }`}
                             >
                               {user.fullName}
@@ -284,12 +284,12 @@ export const SyncChangeApprovalsPanel: React.FC<Props> = ({ requestedBy, canDeci
                     )}
                   </div>
 
-                  <div className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-100 pt-3">
+                  <div className="flex flex-wrap items-center justify-end gap-2 border-t border-line pt-3">
                     <button
                       type="button"
                       onClick={sendNote}
                       disabled={busy === selected.id}
-                      className="flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                      className="flex items-center gap-1.5 rounded-xl border border-line-strong bg-surface px-3 py-2 text-xs font-bold text-ink hover:bg-surface-muted disabled:opacity-50"
                     >
                       <Send className="h-3.5 w-3.5" /> إرسال الملاحظة فقط
                     </button>
@@ -297,7 +297,7 @@ export const SyncChangeApprovalsPanel: React.FC<Props> = ({ requestedBy, canDeci
                       type="button"
                       onClick={() => decide(selected, false)}
                       disabled={busy === selected.id}
-                      className="flex items-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 px-4 py-2 text-xs font-bold text-rose-700 hover:bg-rose-100 disabled:opacity-50"
+                      className="flex items-center gap-1.5 rounded-xl border border-danger-border bg-danger-soft px-4 py-2 text-xs font-bold text-danger hover:bg-danger-soft disabled:opacity-50"
                     >
                       {busy === selected.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <X className="h-3.5 w-3.5" />} رفض
                     </button>
@@ -305,7 +305,7 @@ export const SyncChangeApprovalsPanel: React.FC<Props> = ({ requestedBy, canDeci
                       type="button"
                       onClick={() => decide(selected, true)}
                       disabled={busy === selected.id}
-                      className="flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
+                      className="flex items-center gap-1.5 rounded-xl bg-success px-4 py-2 text-xs font-bold text-white hover:bg-success disabled:opacity-50"
                     >
                       {busy === selected.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />} اعتماد
                     </button>

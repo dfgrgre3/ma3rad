@@ -29,16 +29,16 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
   sendingMessage,
   onSend,
 }) => (
-  <div className="border-t border-slate-800 p-3 bg-slate-950/70 space-y-2">
+  <div className="border-t border-line-strong p-3 bg-primary/70 space-y-2">
     {/* Canned replies pill list */}
     {cannedReplies.length > 0 && (
       <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-[11px]">
-        <span className="text-slate-500 shrink-0 font-semibold">ردود جاهزة:</span>
+        <span className="text-muted shrink-0 font-semibold">ردود جاهزة:</span>
         {cannedReplies.map((c) => (
           <button
             key={c.id}
             onClick={() => onInsertCannedReply(c.body)}
-            className="shrink-0 rounded-md bg-slate-800 hover:bg-slate-700 border border-slate-700 px-2 py-0.5 text-slate-300 hover:text-white transition-colors"
+            className="shrink-0 rounded-md bg-primary hover:bg-primary border border-line-strong px-2 py-0.5 text-muted hover:text-white transition-colors"
           >
             {c.title}
           </button>
@@ -58,7 +58,7 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
             : 'اكتب ردًا للعميل...'
         }
         className={`${inputClass} text-xs resize-none ${
-          isInternal ? 'border-amber-500/50 focus:border-amber-500' : ''
+          isInternal ? 'border-warning/50 focus:border-warning' : ''
         }`}
       />
     </div>
@@ -66,14 +66,14 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
     {/* Composer controls */}
     <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
       <div className="flex items-center gap-3">
-        <label className="flex items-center gap-1.5 text-xs text-slate-300 cursor-pointer select-none">
+        <label className="flex items-center gap-1.5 text-xs text-muted cursor-pointer select-none">
           <input
             type="checkbox"
             checked={isInternal}
             onChange={(e) => onIsInternalChange(e.target.checked)}
-            className="rounded border-slate-700 bg-slate-800 text-amber-500 focus:ring-amber-500"
+            className="rounded border-line-strong bg-primary text-warning focus:ring-warning"
           />
-          <span className={isInternal ? 'text-amber-400 font-bold' : ''}>
+          <span className={isInternal ? 'text-warning font-bold' : ''}>
             رسالة داخلية فقط
           </span>
         </label>
@@ -83,7 +83,7 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
           value={attachmentUrl}
           onChange={(e) => onAttachmentUrlChange(e.target.value)}
           placeholder="رابط المرفق (اختياري)"
-          className="rounded border border-slate-800 bg-slate-900 px-2 py-1 text-[11px] text-slate-300 max-w-[160px]"
+          className="rounded border border-line-strong bg-primary px-2 py-1 text-[11px] text-muted max-w-[160px]"
         />
       </div>
 

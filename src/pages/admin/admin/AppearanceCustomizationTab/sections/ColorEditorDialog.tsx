@@ -33,7 +33,7 @@ export const ColorEditorDialog: React.FC<ColorEditorDialogProps> = ({ editor, re
   if (!selectedColorConfig || !activeColorKey) return null;
 
   return (
-    <div className="appearance-color-backdrop fixed inset-0 z-50 flex items-center justify-center bg-slate-900/35 p-4 backdrop-blur-[2px]" onMouseDown={(event) => {
+    <div className="appearance-color-backdrop fixed inset-0 z-50 flex items-center justify-center bg-primary/35 p-4 backdrop-blur-[2px]" onMouseDown={(event) => {
       if (event.target === event.currentTarget) closeColorEditor();
     }}>
       <div
@@ -73,7 +73,7 @@ export const ColorEditorDialog: React.FC<ColorEditorDialogProps> = ({ editor, re
             <div className="appearance-color-preview rounded-xl border border-[var(--cerami-border)] p-3">
               <p className="text-xs font-semibold text-[var(--cerami-text-secondary)]">معاينة مباشرة</p>
               <div className="mt-3 rounded-lg border border-[var(--cerami-border)] p-3" style={{ backgroundColor: draftColor }}>
-                <div className="flex items-center justify-between gap-2 rounded-md border border-white/30 bg-white/10 px-3 py-2 text-xs font-semibold shadow-sm" style={{ color: draftTextColor }}>
+                <div className="flex items-center justify-between gap-2 rounded-md border border-white/30 bg-surface/10 px-3 py-2 text-xs font-semibold shadow-sm" style={{ color: draftTextColor }}>
                   <span>نموذج تطبيق</span>
                   <span className="rounded-full bg-black/10 px-2 py-0.5">{draftColor.toUpperCase()}</span>
                 </div>

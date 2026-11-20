@@ -14,7 +14,9 @@ import { getDetailedInvoiceHtml } from './PrintService/templates/detailed';
 import { getThermalInvoiceHtml } from './PrintService/templates/thermal';
 import { printThermalReceipt as printThermalReceiptDocument } from './PrintService/thermalReceipt';
 import {
+  printAreaTakeoffDocument,
   printOrderDocument,
+  printPurchaseInvoiceDocument,
   printPurchaseReturnDocument,
   printQuotationDocument,
   printSalesReturnDocument,
@@ -145,12 +147,21 @@ export class PrintService {
     printQuotationDocument(quotation);
   }
 
+  /** مقاييسة مساحة سيراميك — مجموعة بنود لنفس رقم المقاييسة. */
+  public printAreaTakeoff(lines: any[]): void {
+    printAreaTakeoffDocument(lines);
+  }
+
   public printOrder(order: any): void {
     printOrderDocument(order);
   }
 
   public printSalesReturn(salesReturn: any): void {
     printSalesReturnDocument(salesReturn);
+  }
+
+  public printPurchaseInvoice(purchase: any): void {
+    printPurchaseInvoiceDocument(purchase);
   }
 
   public printPurchaseReturn(purchaseReturn: any): void {

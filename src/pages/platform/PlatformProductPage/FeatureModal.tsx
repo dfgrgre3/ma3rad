@@ -74,10 +74,10 @@ export const FeatureModal: React.FC<FeatureModalProps> = ({
           onChange={(e) => setForm({ ...form, minPlanTier: e.target.value })}
         />
       </Field>
-      <div className="flex items-center justify-between rounded-xl border border-slate-200 px-3 py-2">
+      <div className="flex items-center justify-between rounded-xl border border-line px-3 py-2">
         <div>
-          <p className="text-[12px] font-bold text-slate-800">بيئة اختبار فقط (Staging)</p>
-          <p className="text-[10px] text-slate-500">حصر الميزة لمجموعات الاختبار قبل الإطلاق العام.</p>
+          <p className="text-[12px] font-bold text-ink">بيئة اختبار فقط (Staging)</p>
+          <p className="text-[10px] text-muted">حصر الميزة لمجموعات الاختبار قبل الإطلاق العام.</p>
         </div>
         <Toggle checked={form.isStagingOnly} onChange={(val) => setForm({ ...form, isStagingOnly: val })} label="Staging" />
       </div>
@@ -90,7 +90,7 @@ export const FeatureModal: React.FC<FeatureModalProps> = ({
           value={form.pagePathsText}
           onChange={(e) => setForm({ ...form, pagePathsText: e.target.value })}
         />
-        <p className="mt-1 text-[10px] text-slate-500">
+        <p className="mt-1 text-[10px] text-muted">
           صفحات التطبيق التي تملكها هذه الميزة — تُخفى تلقائياً عن العملاء غير المشمولين بها.
         </p>
       </Field>
@@ -98,10 +98,10 @@ export const FeatureModal: React.FC<FeatureModalProps> = ({
         <textarea rows={2} className={inputClass} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
       </Field>
     </div>
-    <div className="mt-3 flex items-center justify-between rounded-xl border border-slate-200 px-3 py-2">
+    <div className="mt-3 flex items-center justify-between rounded-xl border border-line px-3 py-2">
       <div>
-        <p className="text-[12px] font-bold text-slate-800">تفعيل الميزة</p>
-        <p className="text-[10.5px] text-slate-500">عند التعطيل لن تكون الميزة متاحة لأي مشترك إلا بتخصيص صريح.</p>
+        <p className="text-[12px] font-bold text-ink">تفعيل الميزة</p>
+        <p className="text-[10.5px] text-muted">عند التعطيل لن تكون الميزة متاحة لأي مشترك إلا بتخصيص صريح.</p>
       </div>
       <Toggle checked={form.isEnabled} onChange={(next) => setForm({ ...form, isEnabled: next })} label="تفعيل الميزة" />
     </div>

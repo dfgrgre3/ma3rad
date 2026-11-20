@@ -5,6 +5,8 @@ import {
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
+  Copy,
+  KeyRound,
   LayoutGrid,
   MonitorSmartphone,
   Sparkles,
@@ -24,6 +26,7 @@ import { Button } from '../../../components/ui/Button';
 import { Modal } from '../../../components/ui/Modal';
 import { EmptyState, StatusBadge, Toggle } from '../components/PlatformUI';
 import { useToast } from '../../../components/ui/Toast';
+import type { CreatedAccountInfo } from './constants';
 
 // ─── Normalization helpers (local rows are camelCase, central API may return snake_case) ───
 
@@ -139,21 +142,21 @@ const StepIndicator: React.FC<{ step: number }> = ({ step }) => (
         const active = index === step;
         return (
           <React.Fragment key={item.key}>
-            {index > 0 && <span className={`h-px flex-1 ${index <= step ? 'bg-emerald-500' : 'bg-slate-200'}`} />}
+            {index > 0 && <span className={`h-px flex-1 ${index <= step ? 'bg-success' : 'bg-surface-sunken'}`} />}
             <li className="flex items-center gap-2">
               <span
                 className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-[11px] font-black transition ${
                   done
-                    ? 'border-emerald-500 bg-emerald-600 text-white'
+                    ? 'border-success bg-success text-white'
                     : active
-                      ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
-                      : 'border-slate-200 bg-slate-50 text-slate-400'
+                      ? 'border-success bg-success-soft text-success'
+                      : 'border-line bg-surface-muted text-muted'
                 }`}
                 aria-current={active ? 'step' : undefined}
               >
                 {done ? <Check className="h-4 w-4" /> : index + 1}
               </span>
-              <span className={`hidden text-[11px] font-semibold sm:inline ${active ? 'text-emerald-700' : done ? 'text-slate-600' : 'text-slate-400'}`}>
+              <span className={`hidden text-[11px] font-semibold sm:inline ${active ? 'text-success' : done ? 'text-ink-secondary' : 'text-muted'}`}>
                 {item.label}
               </span>
             </li>
@@ -162,8 +165,8 @@ const StepIndicator: React.FC<{ step: number }> = ({ step }) => (
       })}
     </ol>
     <div className="mt-2 flex items-center justify-between sm:hidden">
-      <span className="text-[12px] font-bold text-slate-700">الخطوة {step + 1} من {WIZARD_STEPS.length}</span>
-      <span className="text-[11px] font-semibold text-emerald-700">{WIZARD_STEPS[step].label}</span>
+      <span className="text-[12px] font-bold text-ink">الخطوة {step + 1} من {WIZARD_STEPS.length}</span>
+      <span className="text-[11px] font-semibold text-success">{WIZARD_STEPS[step].label}</span>
     </div>
   </div>
 );
@@ -401,12 +404,12 @@ export const TenantCatalogWizard: React.FC<TenantCatalogWizardProps> = ({
     const planDefault = defaultFor(kind, code, fallbackEnabled);
     if (desired !== planDefault) {
       return desired
-        ? { label: 'إضافة خاصة', className: 'bg-violet-50 text-violet-700 border-violet-200' }
-        : { label: 'موقوفة للعميل', className: 'bg-rose-50 text-rose-700 border-rose-200' };
+        ? { label: 'إضافة خاصة', className: 'bg-accent-soft text-primary border-accent-border' }
+        : { label: 'موقوفة للعميل', className: 'bg-danger-soft text-danger border-danger-border' };
     }
     return planDefault
-      ? { label: 'ضمن الباقة', className: 'bg-emerald-50 text-emerald-700 border-emerald-200' }
-      : { label: 'خارج الباقة', className: 'bg-slate-100 text-slate-500 border-slate-200' };
+      ? { label: 'ضمن الباقة', className: 'bg-success-soft text-success border-success-border' }
+      : { label: 'خارج الباقة', className: 'bg-surface-sunken text-muted border-line' };
   };
 
   return (
@@ -450,19 +453,19 @@ export const TenantCatalogWizard: React.FC<TenantCatalogWizardProps> = ({
       <StepIndicator step={step} />
 
       {loading ? (
-        <div className="py-16 text-center text-sm font-semibold text-slate-500">جارٍ تحميل كتالوج الصفحات والمميزات...</div>
+        <div className="py-16 text-center text-sm font-semibold text-muted">جارٍ تحميل كتالوج الصفحات والمميزات...</div>
       ) : error ? (
-        <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-[12px] font-semibold text-rose-700">
+        <div role="alert" className="rounded-xl border border-danger-border bg-danger-soft px-4 py-3 text-[12px] font-semibold text-danger">
           {error}
-          <button type="button" onClick={load} className="mr-3 text-emerald-700 hover:underline">إعادة المحاولة</button>
+          <button type="button" onClick={load} className="mr-3 text-success hover:underline">إعادة المحاولة</button>
         </div>
       ) : step === 0 ? (
         <div className="space-y-3">
-          <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5">
-            <p className="text-[11.5px] font-bold text-slate-600">
+          <div className="flex items-center justify-between rounded-xl border border-line bg-surface-muted px-4 py-2.5">
+            <p className="text-[11.5px] font-bold text-ink-secondary">
               الصفحات تتبع الوحدات — كل وحدة تحوي شاشاتها داخل تطبيق العميل.
             </p>
-            <span className="shrink-0 rounded-full bg-white px-2.5 py-1 text-[10.5px] font-bold text-slate-500 ring-1 ring-slate-200">
+            <span className="shrink-0 rounded-full bg-surface px-2.5 py-1 text-[10.5px] font-bold text-muted ring-1 ring-line-strong">
               {modules.filter((m) => selections[keyOf('MODULE', m.code)] ?? defaultFor('MODULE', m.code, m.isEnabled)).length} / {modules.length} مفعّلة
             </span>
           </div>
@@ -477,15 +480,15 @@ export const TenantCatalogWizard: React.FC<TenantCatalogWizardProps> = ({
                 return (
                   <div
                     key={module.id || module.code}
-                    className={`rounded-xl border p-3 transition ${checked ? 'border-emerald-200 bg-emerald-50/40' : 'border-slate-200 bg-white opacity-80'}`}
+                    className={`rounded-xl border p-3 transition ${checked ? 'border-success-border bg-success-soft/40' : 'border-line bg-surface opacity-80'}`}
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
-                        <p className="flex flex-wrap items-center gap-1.5 text-[12.5px] font-bold text-slate-800">
+                        <p className="flex flex-wrap items-center gap-1.5 text-[12.5px] font-bold text-ink">
                           {module.name}
-                          <span className="font-mono text-[9.5px] font-normal text-slate-400" dir="ltr">{module.code}</span>
+                          <span className="font-mono text-[9.5px] font-normal text-muted" dir="ltr">{module.code}</span>
                         </p>
-                        <p className="mt-0.5 text-[10.5px] text-slate-500">{module.description || 'بدون وصف'}</p>
+                        <p className="mt-0.5 text-[10.5px] text-muted">{module.description || 'بدون وصف'}</p>
                       </div>
                       <Toggle
                         checked={checked}
@@ -497,23 +500,23 @@ export const TenantCatalogWizard: React.FC<TenantCatalogWizardProps> = ({
                     <div className="mt-2 flex flex-wrap items-center gap-1.5">
                       <span className={`rounded-full border px-2 py-0.5 text-[9.5px] font-bold ${badge.className}`}>{badge.label}</span>
                       {!module.isEnabled && (
-                        <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[9.5px] font-bold text-slate-400">معطّلة على مستوى المنصة</span>
+                        <span className="rounded-full border border-line bg-surface-muted px-2 py-0.5 text-[9.5px] font-bold text-muted">معطّلة على مستوى المنصة</span>
                       )}
                       {module.minPlanCode && (
-                        <span className="rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[9.5px] font-bold text-sky-600">حد أدنى: {module.minPlanCode}</span>
+                        <span className="rounded-full border border-accent-border bg-accent-soft px-2 py-0.5 text-[9.5px] font-bold text-primary">حد أدنى: {module.minPlanCode}</span>
                       )}
                     </div>
                     {module.screens.length > 0 && (
                       <div className="mt-2">
-                        <p className="mb-1 flex items-center gap-1 text-[9.5px] font-bold text-slate-400">
+                        <p className="mb-1 flex items-center gap-1 text-[9.5px] font-bold text-muted">
                           <MonitorSmartphone className="h-3 w-3" /> الشاشات ({module.screens.length})
                         </p>
                         <div className="flex flex-wrap gap-1">
                           {module.screens.slice(0, 4).map((screen) => (
-                            <span key={screen} className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[9.5px] font-semibold text-slate-500">{screen}</span>
+                            <span key={screen} className="rounded-md bg-surface-sunken px-1.5 py-0.5 text-[9.5px] font-semibold text-muted">{screen}</span>
                           ))}
                           {module.screens.length > 4 && (
-                            <span className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[9.5px] font-bold text-slate-400">+{module.screens.length - 4}</span>
+                            <span className="rounded-md bg-surface-sunken px-1.5 py-0.5 text-[9.5px] font-bold text-muted">+{module.screens.length - 4}</span>
                           )}
                         </div>
                       </div>
@@ -526,11 +529,11 @@ export const TenantCatalogWizard: React.FC<TenantCatalogWizardProps> = ({
         </div>
       ) : step === 1 ? (
         <div className="space-y-3">
-          <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5">
-            <p className="text-[11.5px] font-bold text-slate-600">
+          <div className="flex items-center justify-between rounded-xl border border-line bg-surface-muted px-4 py-2.5">
+            <p className="text-[11.5px] font-bold text-ink-secondary">
               المميزات تضيف قدرات داخل الوحدات (مزامنة، تقارير متقدمة، فوترة إلكترونية...).
             </p>
-            <span className="shrink-0 rounded-full bg-white px-2.5 py-1 text-[10.5px] font-bold text-slate-500 ring-1 ring-slate-200">
+            <span className="shrink-0 rounded-full bg-surface px-2.5 py-1 text-[10.5px] font-bold text-muted ring-1 ring-line-strong">
               {features.filter((f) => selections[keyOf('FEATURE', f.code)] ?? defaultFor('FEATURE', f.code, f.isEnabled)).length} / {features.length} مفعّلة
             </span>
           </div>
@@ -545,18 +548,18 @@ export const TenantCatalogWizard: React.FC<TenantCatalogWizardProps> = ({
                 return (
                   <div
                     key={feature.id || feature.code}
-                    className={`flex items-start justify-between gap-3 rounded-xl border p-3 transition ${checked ? 'border-emerald-200 bg-emerald-50/40' : 'border-slate-200 bg-white opacity-80'}`}
+                    className={`flex items-start justify-between gap-3 rounded-xl border p-3 transition ${checked ? 'border-success-border bg-success-soft/40' : 'border-line bg-surface opacity-80'}`}
                   >
                     <div className="min-w-0">
-                      <p className="flex flex-wrap items-center gap-1.5 text-[12.5px] font-bold text-slate-800">
+                      <p className="flex flex-wrap items-center gap-1.5 text-[12.5px] font-bold text-ink">
                         {feature.name}
-                        <span className="font-mono text-[9.5px] font-normal text-slate-400" dir="ltr">{feature.code}</span>
+                        <span className="font-mono text-[9.5px] font-normal text-muted" dir="ltr">{feature.code}</span>
                       </p>
-                      <p className="mt-0.5 text-[10.5px] text-slate-500">{feature.description || 'بدون وصف'}</p>
+                      <p className="mt-0.5 text-[10.5px] text-muted">{feature.description || 'بدون وصف'}</p>
                       <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                         <span className={`rounded-full border px-2 py-0.5 text-[9.5px] font-bold ${badge.className}`}>{badge.label}</span>
                         {feature.category && (
-                          <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[9.5px] font-bold text-slate-400">{feature.category}</span>
+                          <span className="rounded-full border border-line bg-surface-muted px-2 py-0.5 text-[9.5px] font-bold text-muted">{feature.category}</span>
                         )}
                       </div>
                     </div>
@@ -575,38 +578,38 @@ export const TenantCatalogWizard: React.FC<TenantCatalogWizardProps> = ({
       ) : (
         <div className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-3">
-            <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-center">
-              <p className="text-[22px] font-black text-slate-800">{modules.length}</p>
-              <p className="text-[10.5px] font-bold text-slate-500">وحدة / صفحة</p>
+            <div className="rounded-xl border border-line bg-surface-muted px-4 py-3 text-center">
+              <p className="text-[22px] font-black text-ink">{modules.length}</p>
+              <p className="text-[10.5px] font-bold text-muted">وحدة / صفحة</p>
             </div>
-            <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-center">
-              <p className="text-[22px] font-black text-slate-800">{features.length}</p>
-              <p className="text-[10.5px] font-bold text-slate-500">ميزة</p>
+            <div className="rounded-xl border border-line bg-surface-muted px-4 py-3 text-center">
+              <p className="text-[22px] font-black text-ink">{features.length}</p>
+              <p className="text-[10.5px] font-bold text-muted">ميزة</p>
             </div>
-            <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-center">
-              <p className="text-[22px] font-black text-emerald-700">{enabledCount}</p>
-              <p className="text-[10.5px] font-bold text-emerald-600">سيكون متاحاً للعميل</p>
+            <div className="rounded-xl border border-success-border bg-success-soft px-4 py-3 text-center">
+              <p className="text-[22px] font-black text-success">{enabledCount}</p>
+              <p className="text-[10.5px] font-bold text-success">سيكون متاحاً للعميل</p>
             </div>
           </div>
 
-          <div className="rounded-xl border border-slate-200">
-            <div className="border-b border-slate-100 bg-slate-50 px-4 py-2.5">
-              <p className="text-[11.5px] font-bold text-slate-600">
+          <div className="rounded-xl border border-line">
+            <div className="border-b border-line bg-surface-muted px-4 py-2.5">
+              <p className="text-[11.5px] font-bold text-ink-secondary">
                 انحرافات عن الباقة ({planName}) — {deviations.length === 0 ? 'لا توجد' : deviations.length}
               </p>
             </div>
             {deviations.length === 0 ? (
-              <p className="flex items-center gap-2 px-4 py-4 text-[11.5px] font-semibold text-emerald-700">
+              <p className="flex items-center gap-2 px-4 py-4 text-[11.5px] font-semibold text-success">
                 <CheckCircle2 className="h-4 w-4" /> الإعدادات الحالية تطابق الباقة تماماً — لن تُنشأ تجاوزات خاصة.
               </p>
             ) : (
-              <ul className="divide-y divide-slate-100">
+              <ul className="divide-y divide-line-strong">
                 {deviations.map((row) => (
                   <li key={`${row.kind}:${row.code}`} className="flex items-center justify-between gap-3 px-4 py-2.5 text-[11.5px]">
-                    <span className="font-bold text-slate-700">{row.name}</span>
+                    <span className="font-bold text-ink">{row.name}</span>
                     <span className="flex items-center gap-2">
                       <StatusBadge value={row.planDefault ? 'EXPIRED' : 'ACTIVE'} label={row.planDefault ? 'ضمن الباقة' : 'خارج الباقة'} />
-                      <ChevronLeft className="h-3.5 w-3.5 text-slate-400" />
+                      <ChevronLeft className="h-3.5 w-3.5 text-muted" />
                       <StatusBadge value={row.desired ? 'ACTIVE' : 'SUSPENDED'} label={row.desired ? 'مفعّل' : 'موقوف'} />
                     </span>
                   </li>
@@ -615,7 +618,7 @@ export const TenantCatalogWizard: React.FC<TenantCatalogWizardProps> = ({
             )}
           </div>
 
-          <div className="flex items-start gap-2 rounded-lg border border-sky-100 bg-sky-50 px-3 py-2.5 text-[11px] leading-5 text-sky-800">
+          <div className="flex items-start gap-2 rounded-lg border border-accent-border bg-accent-soft px-3 py-2.5 text-[11px] leading-5 text-primary">
             <Star className="mt-0.5 h-3.5 w-3.5 shrink-0" />
             <span>
               عند التطبيق تُسجَّل «تجاوزات عميل» فقط للعناصر المختلفة عن الباقة — إلغاء أي تجاوز يعيد العنصر لافتراضي الخطة.
@@ -632,30 +635,82 @@ export const TenantCatalogWizard: React.FC<TenantCatalogWizardProps> = ({
 interface TenantCreatedModalProps {
   open: boolean;
   tenant: PlatformTenant | null;
+  account?: CreatedAccountInfo | null;
   onClose: () => void;
   onContinue: () => void;
 }
 
-export const TenantCreatedModal: React.FC<TenantCreatedModalProps> = ({ open, tenant, onClose, onContinue }) => (
+export const TenantCreatedModal: React.FC<TenantCreatedModalProps> = ({ open, tenant, account, onClose, onContinue }) => {
+  const [copied, setCopied] = React.useState(false);
+  const credentialsText = account
+    ? [
+        `بيانات دخول ${tenant?.name ?? ''}`,
+        `اسم المستخدم: ${account.username}`,
+        account.temporaryPassword ? `كلمة المرور المؤقتة: ${account.temporaryPassword}` : null,
+        account.activationCode ? `كود التفعيل: ${account.activationCode}` : null,
+        `رابط الدخول: ${account.loginUrl}`,
+      ].filter(Boolean).join('\n')
+    : '';
+  const copyCredentials = async () => {
+    try {
+      await navigator.clipboard.writeText(credentialsText);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // الحافظة غير متاحة
+    }
+  };
+  return (
   <Modal
     open={open}
     onClose={onClose}
     title="تم إنشاء العميل بنجاح"
-    description={tenant ? `«${tenant.name}» جاهز الآن. هل تريد إعداد صفحاته ومميزاته فوراً أم الاكتفاء بالإنهاء؟` : undefined}
+    description={tenant ? `«${tenant.name}» جاهز الآن.${account ? ' تم إنشاء حساب الدخول له — انسخ بيانات الدخول قبل المغادرة.' : ' هل تريد إعداد صفحاته ومميزاته فوراً أم الاكتفاء بالإنهاء؟'}` : undefined}
     size="md"
   >
     <div className="space-y-4">
       {tenant && (
-        <div className="flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50/60 px-4 py-3">
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-600 text-white">
+        <div className="flex items-center gap-3 rounded-xl border border-success-border bg-success-soft/60 px-4 py-3">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-success text-white">
             <CheckCircle2 className="h-5 w-5" />
           </span>
           <div className="min-w-0">
-            <p className="truncate text-[13px] font-black text-slate-800">{tenant.name}</p>
-            <p className="text-[10.5px] text-slate-500">
+            <p className="truncate text-[13px] font-black text-ink">{tenant.name}</p>
+            <p className="text-[10.5px] text-muted">
               رقم العميل <span dir="ltr" className="font-mono font-bold">{tenant.code}</span>
               {tenant.planName ? ` · ${tenant.planName}` : ''}
             </p>
+          </div>
+        </div>
+      )}
+
+      {account && (
+        <div className="rounded-xl border border-accent-border bg-accent-soft/60 p-3.5">
+          <div className="flex items-center justify-between gap-2">
+            <p className="flex items-center gap-1.5 text-[11.5px] font-black text-primary">
+              <KeyRound className="h-3.5 w-3.5" /> تم إنشاء حساب الدخول للعميل
+            </p>
+            <Button variant="secondary" size="sm" leadingIcon={<Copy className="h-3 w-3" />} onClick={copyCredentials}>
+              {copied ? 'تم النسخ' : 'نسخ بيانات الدخول'}
+            </Button>
+          </div>
+          <div className="mt-2 grid gap-1.5 text-[11px] sm:grid-cols-2">
+            <div className="flex items-center justify-between gap-2 rounded-lg bg-surface/80 px-2.5 py-1.5">
+              <span className="text-muted">اسم المستخدم</span>
+              <span className="font-mono font-bold text-ink" dir="ltr">{account.username}</span>
+            </div>
+            <div className="flex items-center justify-between gap-2 rounded-lg bg-surface/80 px-2.5 py-1.5">
+              <span className="text-muted">كلمة المرور المؤقتة</span>
+              <span className="font-mono font-bold text-success" dir="ltr">{account.temporaryPassword ?? '—'}</span>
+            </div>
+            <div className="flex items-center justify-between gap-2 rounded-lg bg-surface/80 px-2.5 py-1.5">
+              <span className="text-muted">كود التفعيل</span>
+              <span className="font-mono font-bold text-ink" dir="ltr">{account.activationCode ?? '—'}</span>
+            </div>
+            <div className="flex items-center justify-between gap-2 rounded-lg bg-surface/80 px-2.5 py-1.5">
+              <span className="text-muted">رابط الدخول</span>
+              <span className="truncate font-mono text-[10px] font-bold text-ink-secondary" dir="ltr">{account.loginUrl}</span>
+            </div>
           </div>
         </div>
       )}
@@ -664,16 +719,16 @@ export const TenantCreatedModal: React.FC<TenantCreatedModalProps> = ({ open, te
         <button
           type="button"
           onClick={onContinue}
-          className="group flex flex-col items-start gap-2 rounded-xl border-2 border-emerald-200 bg-emerald-50/50 p-4 text-right transition hover:border-emerald-400 hover:bg-emerald-50"
+          className="group flex flex-col items-start gap-2 rounded-xl border-2 border-success-border bg-success-soft/50 p-4 text-right transition hover:border-success hover:bg-success-soft"
         >
-          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-600 text-white transition group-hover:scale-105">
+          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-success text-white transition group-hover:scale-105">
             <LayoutGrid className="h-5 w-5" />
           </span>
-          <span className="text-[12.5px] font-black text-slate-800">إعداد الصفحات والمميزات</span>
-          <span className="text-[10.5px] leading-5 text-slate-500">
+          <span className="text-[12.5px] font-black text-ink">إعداد الصفحات والمميزات</span>
+          <span className="text-[10.5px] leading-5 text-muted">
             الانتقال التلقائي لمعالج يتيح إظهار/إخفاء الصفحات والوحدات والمميزات حسب الباقة أو بتجاوزات خاصة.
           </span>
-          <span className="mt-1 inline-flex items-center gap-1 text-[10.5px] font-bold text-emerald-700">
+          <span className="mt-1 inline-flex items-center gap-1 text-[10.5px] font-bold text-success">
             متابعة <ChevronLeft className="h-3.5 w-3.5" />
           </span>
         </button>
@@ -681,17 +736,18 @@ export const TenantCreatedModal: React.FC<TenantCreatedModalProps> = ({ open, te
         <button
           type="button"
           onClick={onClose}
-          className="group flex flex-col items-start gap-2 rounded-xl border-2 border-slate-200 bg-white p-4 text-right transition hover:border-slate-300 hover:bg-slate-50"
+          className="group flex flex-col items-start gap-2 rounded-xl border-2 border-line bg-surface p-4 text-right transition hover:border-line-strong hover:bg-surface-muted"
         >
-          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-500 transition group-hover:scale-105">
+          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-surface-sunken text-muted transition group-hover:scale-105">
             <X className="h-5 w-5" />
           </span>
-          <span className="text-[12.5px] font-black text-slate-800">إنهاء</span>
-          <span className="text-[10.5px] leading-5 text-slate-500">
+          <span className="text-[12.5px] font-black text-ink">إنهاء</span>
+          <span className="text-[10.5px] leading-5 text-muted">
             العودة لقائمة العملاء — يمكن إعداد الصفحات والمميزات لاحقاً من ملف العميل.
           </span>
         </button>
       </div>
     </div>
   </Modal>
-);
+  );
+};

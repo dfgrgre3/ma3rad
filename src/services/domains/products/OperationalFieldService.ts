@@ -349,6 +349,59 @@ export class OperationalFieldService {
     return Object.fromEntries(rows.map((row) => [row.fieldId, row.value]));
   }
 
+  /**
+   * Copies operational field values from one record onto another record of a
+   * different entity type, matched by field code — e.g. quotation → order or
+   * order → invoice during sales conversion, so site/delivery/cutting details
+   * survive the whole document chain. Values that fail target-side validation
+   * are skipped instead of aborting the surrounding transaction.
+   */
+  public copyRecordFieldValues(
+    fromEntityType: string,
+    fromRecordId: string,
+    toEntityType: string,
+    toRecordId: string,
+  ): void {
+    if (!fromRecordId || !toRecordId) return;
+    const sourceValues = this.getRecordValues(fromEntityType, fromRecordId);
+    if (!Object.keys(sourceValues).length) return;
+    const sourceDefs = this.getDefinitions(fromEntityType);
+    const targetDefsByCode = new Map(
+      this.getDefinitions(toEntityType).map((definition) => [definition.code, definition]),
+    );
+    if (!targetDefsByCode.size) return;
+    const actor = AuthService.getCurrentUser();
+    const targetBranchId = this.resolveRecordBranchId(toEntityType, toRecordId)
+      ?? (actor ? this.branchAccess.getCurrentBranchId(actor) : null);
+    this.db.executeTransaction((tx) => {
+      for (const source of sourceDefs) {
+        const raw = sourceValues[source.id];
+        if (raw === undefined || raw === '') continue;
+        const target = targetDefsByCode.get(source.code);
+        if (!target) continue;
+        let value: string | null;
+        try {
+          value = normalizeDynamicAttributeValue(target, raw);
+        } catch {
+          continue;
+        }
+        if (value === null) continue;
+        tx.run(
+          `INSERT INTO operational_field_values(id, entity_type, record_id, field_id, value, branch_id)
+           VALUES (?, ?, ?, ?, ?, ?)
+           ON CONFLICT(entity_type, record_id, field_id)
+           DO UPDATE SET value = excluded.value, branch_id = excluded.branch_id`,
+          [`op_val_${uuidv4().slice(0, 12)}`, toEntityType, toRecordId, target.id, value, targetBranchId],
+        );
+        const row = tx.query<{ id: string }>(
+          'SELECT id FROM operational_field_values WHERE entity_type = ? AND record_id = ? AND field_id = ?',
+          [toEntityType, toRecordId, target.id],
+        )[0];
+        if (row) this.sync.capture(tx, 'operational_field_value', row.id, 'UPSERT');
+      }
+    });
+  }
+
   public setRecordValues(
     entityType: string,
     recordId: string,

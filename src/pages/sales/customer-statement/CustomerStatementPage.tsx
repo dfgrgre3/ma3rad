@@ -22,9 +22,9 @@ const fmtAbs = (n: number) =>
   new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 2 }).format(Math.abs(Number(n) || 0)) + ' ج';
 
 const _PAYMENT_STATUS_MAP: Record<string, { label: string; color: string }> = {
-  PAID: { label: 'مسددة', color: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
-  PARTIAL: { label: 'جزئية', color: 'bg-amber-100 text-amber-700 border-amber-200' },
-  UNPAID: { label: 'غير مسددة', color: 'bg-rose-100 text-rose-700 border-rose-200' },
+  PAID: { label: 'مسددة', color: 'bg-success-soft text-success border-success-border' },
+  PARTIAL: { label: 'جزئية', color: 'bg-warning-soft text-warning border-warning-border' },
+  UNPAID: { label: 'غير مسددة', color: 'bg-danger-soft text-danger border-danger-border' },
 };
 
 const CUSTOMER_TYPES: Record<string, string> = {
@@ -74,40 +74,40 @@ const StatementTable: React.FC<StatementTableProps> = ({
   <>
     {loading ? (
       <div className="flex items-center justify-center py-12">
-        <Loader2 className="w-6 h-6 animate-spin text-sky-500" />
+        <Loader2 className="w-6 h-6 animate-spin text-primary" />
       </div>
     ) : rows.length === 0 ? (
-      <div className="py-12 text-center text-slate-400 dark:text-slate-500">
+      <div className="py-12 text-center text-muted ">
         <FileText className="w-12 h-12 mx-auto mb-2 opacity-30" />
         <p className="text-sm font-semibold">لا توجد حركات في هذه الفترة</p>
       </div>
     ) : (
-      <div className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+      <div className="rounded-xl border border-line overflow-hidden">
         <div className="overflow-x-auto max-h-96 overflow-y-auto">
           <DataTable
                     ariaLabel="حركات كشف الحساب"
                     rows={[...rows.map((r, i) => ({ ...r, _i: i })), { __total: true } as any]}
                     rowKey={(row: any) => row.__total ? '__total__' : String(row._i)}
-                    rowClassName={(row: any) => row.__total ? 'bg-slate-100 dark:bg-slate-800 font-bold' : `transition-colors ${
-                      row.type === 'invoice' ? 'hover:bg-rose-50/30 dark:hover:bg-rose-900/10' :
-                      row.type === 'return' ? 'hover:bg-amber-50/30 dark:hover:bg-amber-900/10' :
-                      'hover:bg-emerald-50/30 dark:hover:bg-emerald-900/10'
+                    rowClassName={(row: any) => row.__total ? 'bg-surface-sunken font-bold' : `transition-colors ${
+                      row.type === 'invoice' ? 'hover:bg-danger-soft/30 dark:hover:bg-danger/10' :
+                      row.type === 'return' ? 'hover:bg-warning-soft/30 dark:hover:bg-warning/10' :
+                      'hover:bg-success-soft/30 dark:hover:bg-success/10'
                     }`}
                     dense
                     columns={[
-                      { key: 'date', header: 'التاريخ', render: (row: any) => row.__total ? '' : <span className="text-slate-500 dark:text-slate-400 whitespace-nowrap">{row.date}</span> },
-                      { key: 'ref', header: 'المرجع', render: (row: any) => row.__total ? '' : <span className="font-semibold text-sky-600 dark:text-sky-400 whitespace-nowrap">{row.reference}</span> },
-                      { key: 'desc', header: 'البيان', render: (row: any) => row.__total ? <span className="text-xs text-slate-700 dark:text-slate-300">الإجمالي</span> : <span className="text-slate-700 dark:text-slate-300">{row.description}</span> },
-                      { key: 'debit', header: 'مدين', align: 'end', render: (row: any) => row.__total ? <span className="font-bold text-rose-700 dark:text-rose-400 text-xs whitespace-nowrap">{fmt(totalDebit)}</span> : <span className="font-semibold text-rose-600 dark:text-rose-400 whitespace-nowrap">{row.debit > 0 ? fmt(row.debit) : '—'}</span> },
-                      { key: 'credit', header: 'دائن', align: 'end', render: (row: any) => row.__total ? <span className="font-bold text-emerald-700 dark:text-emerald-400 text-xs whitespace-nowrap">{fmt(totalCredit)}</span> : <span className="font-semibold text-emerald-600 dark:text-emerald-400 whitespace-nowrap">{row.credit > 0 ? fmt(row.credit) : '—'}</span> },
+                      { key: 'date', header: 'التاريخ', render: (row: any) => row.__total ? '' : <span className="text-muted whitespace-nowrap">{row.date}</span> },
+                      { key: 'ref', header: 'المرجع', render: (row: any) => row.__total ? '' : <span className="font-semibold text-primary whitespace-nowrap">{row.reference}</span> },
+                      { key: 'desc', header: 'البيان', render: (row: any) => row.__total ? <span className="text-xs text-ink ">الإجمالي</span> : <span className="text-ink ">{row.description}</span> },
+                      { key: 'debit', header: 'مدين', align: 'end', render: (row: any) => row.__total ? <span className="font-bold text-danger text-xs whitespace-nowrap">{fmt(totalDebit)}</span> : <span className="font-semibold text-danger whitespace-nowrap">{row.debit > 0 ? fmt(row.debit) : '—'}</span> },
+                      { key: 'credit', header: 'دائن', align: 'end', render: (row: any) => row.__total ? <span className="font-bold text-success text-xs whitespace-nowrap">{fmt(totalCredit)}</span> : <span className="font-semibold text-success whitespace-nowrap">{row.credit > 0 ? fmt(row.credit) : '—'}</span> },
                       {
                         key: 'balance', header: 'الرصيد', align: 'end',
                         render: (row: any) => row.__total ? (
-                          <span className={`font-black text-xs whitespace-nowrap ${netBalance > 0 ? 'text-rose-700 dark:text-rose-400' : 'text-emerald-700 dark:text-emerald-400'}`}>
+                          <span className={`font-black text-xs whitespace-nowrap ${netBalance > 0 ? 'text-danger dark:text-danger' : 'text-success dark:text-success'}`}>
                             {fmt(Math.abs(netBalance))} {netBalance > 0 ? '(مدين)' : netBalance < 0 ? '(دائن)' : '(مصفّى)'}
                           </span>
                         ) : (
-                          <span className={`font-bold whitespace-nowrap ${row.balance > 0 ? 'text-rose-700 dark:text-rose-400' : row.balance < 0 ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-500'}`}>
+                          <span className={`font-bold whitespace-nowrap ${row.balance > 0 ? 'text-danger dark:text-danger' : row.balance < 0 ? 'text-success dark:text-success' : 'text-muted'}`}>
                             {fmt(Math.abs(row.balance))}
                             {row.balance !== 0 && <span className="text-[10px] mr-1">{row.balance > 0 ? 'م' : 'د'}</span>}
                           </span>
@@ -268,20 +268,20 @@ const StatementModal: React.FC<StatementModalProps> = ({ customer, canExport, on
   return (
     <>
       <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 backdrop-blur-sm p-4 pt-8 overflow-y-auto">
-        <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-4xl border border-slate-200 dark:border-slate-700">
+        <div className="bg-surface rounded-2xl shadow-2xl w-full max-w-4xl border border-line ">
           {/* Header */}
-          <div className="p-5 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between bg-gradient-to-l from-sky-600/5 to-transparent">
+          <div className="p-5 border-b border-line flex items-center justify-between bg-gradient-to-l from-primary/5 to-transparent">
             <div>
-              <h2 className="font-bold text-lg text-slate-900 dark:text-slate-100">كشف حساب</h2>
+              <h2 className="font-bold text-lg text-ink ">كشف حساب</h2>
               <div className="flex items-center gap-2 mt-0.5">
-                <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">{customer.name}</span>
-                <span className="text-xs text-slate-400">•</span>
-                <span className="text-xs text-slate-500">{customer.code}</span>
-                <span className="text-xs px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">{CUSTOMER_TYPES[customer.customerType]}</span>
+                <span className="text-sm font-semibold text-ink ">{customer.name}</span>
+                <span className="text-xs text-muted">•</span>
+                <span className="text-xs text-muted">{customer.code}</span>
+                <span className="text-xs px-2 py-0.5 rounded-md bg-surface-sunken text-ink-secondary ">{CUSTOMER_TYPES[customer.customerType]}</span>
               </div>
             </div>
-            <button onClick={onClose} className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
-              <X className="w-5 h-5 text-slate-500" />
+            <button onClick={onClose} className="p-2 rounded-xl hover:bg-surface-sunken dark:hover:bg-primary transition-colors">
+              <X className="w-5 h-5 text-muted" />
             </button>
           </div>
 
@@ -289,64 +289,64 @@ const StatementModal: React.FC<StatementModalProps> = ({ customer, canExport, on
             {/* Date range + actions */}
             <div className="flex flex-wrap items-center gap-3">
               <div className="flex items-center gap-2">
-                <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">من:</label>
-                <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 text-sm text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-sky-500" />
+                <label className="text-xs font-semibold text-muted ">من:</label>
+                <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="px-3 py-2 rounded-xl border border-line-strong bg-surface-muted text-sm text-ink focus:outline-none focus:ring-2 focus:ring-primary" />
               </div>
               <div className="flex items-center gap-2">
-                <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">إلى:</label>
-                <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 text-sm text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-sky-500" />
+                <label className="text-xs font-semibold text-muted ">إلى:</label>
+                <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="px-3 py-2 rounded-xl border border-line-strong bg-surface-muted text-sm text-ink focus:outline-none focus:ring-2 focus:ring-primary" />
               </div>
-              <button onClick={handlePrint} className="flex items-center gap-1.5 px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-600 text-sm font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all">
+              <button onClick={handlePrint} className="flex items-center gap-1.5 px-4 py-2 rounded-xl border border-line-strong text-sm font-semibold text-ink-secondary hover:bg-surface-muted dark:hover:bg-primary transition-all">
                 <Printer className="w-3.5 h-3.5" />طباعة
               </button>
-              {canExport && customer.phone && <button onClick={handleShareWhatsApp} className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-sm font-semibold text-white transition-all">
+              {canExport && customer.phone && <button onClick={handleShareWhatsApp} className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-success hover:bg-success text-sm font-semibold text-white transition-all">
                 <MessageCircle className="w-3.5 h-3.5" />إرسال واتساب
               </button>}
-              <button onClick={handleExport} className="flex items-center gap-1.5 px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-600 text-sm font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all">
+              <button onClick={handleExport} className="flex items-center gap-1.5 px-4 py-2 rounded-xl border border-line-strong text-sm font-semibold text-ink-secondary hover:bg-surface-muted dark:hover:bg-primary transition-all">
                 <Download className="w-3.5 h-3.5" />جدول بيانات
               </button>
             </div>
 
             {/* Summary Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
-              <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700 p-3">
-                <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">الرصيد الحالي</p>
-                <p className={`text-lg font-black mt-1 ${customer.currentBalance > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+              <div className="bg-surface-muted dark:bg-primary/50 rounded-xl border border-line p-3">
+                <p className="text-[10px] text-muted font-medium">الرصيد الحالي</p>
+                <p className={`text-lg font-black mt-1 ${customer.currentBalance > 0 ? 'text-danger dark:text-danger' : 'text-success dark:text-success'}`}>
                   {fmtAbs(customer.currentBalance)}
                 </p>
-                <p className="text-xs text-slate-500 mt-0.5">{customer.currentBalance > 0 ? '(مدين)' : customer.currentBalance < 0 ? '(دائن)' : 'مصفّى'}</p>
+                <p className="text-xs text-muted mt-0.5">{customer.currentBalance > 0 ? '(مدين)' : customer.currentBalance < 0 ? '(دائن)' : 'مصفّى'}</p>
               </div>
-              <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700 p-3">
-                <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">حد الائتمان</p>
-                <p className="text-lg font-black text-sky-600 dark:text-sky-400 mt-1">{fmt(customer.creditLimit)}</p>
-                <p className="text-xs text-slate-500 mt-0.5">الحد الأقصى المسموح</p>
+              <div className="bg-surface-muted dark:bg-primary/50 rounded-xl border border-line p-3">
+                <p className="text-[10px] text-muted font-medium">حد الائتمان</p>
+                <p className="text-lg font-black text-primary mt-1">{fmt(customer.creditLimit)}</p>
+                <p className="text-xs text-muted mt-0.5">الحد الأقصى المسموح</p>
               </div>
-              <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700 p-3">
-                <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">إجمالي المشتريات</p>
-                <p className="text-lg font-black text-violet-600 dark:text-violet-400 mt-1">{fmt(customer.totalPurchases)}</p>
-                <p className="text-xs text-slate-500 mt-0.5">إجمالي تاريخي</p>
+              <div className="bg-surface-muted dark:bg-primary/50 rounded-xl border border-line p-3">
+                <p className="text-[10px] text-muted font-medium">إجمالي المشتريات</p>
+                <p className="text-lg font-black text-primary mt-1">{fmt(customer.totalPurchases)}</p>
+                <p className="text-xs text-muted mt-0.5">إجمالي تاريخي</p>
               </div>
-              <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700 p-3">
-                <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">متأخرات بالفترة</p>
-                <p className={`text-lg font-black mt-1 ${overdueInvoices.length > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+              <div className="bg-surface-muted dark:bg-primary/50 rounded-xl border border-line p-3">
+                <p className="text-[10px] text-muted font-medium">متأخرات بالفترة</p>
+                <p className={`text-lg font-black mt-1 ${overdueInvoices.length > 0 ? 'text-danger dark:text-danger' : 'text-success dark:text-success'}`}>
                   {overdueInvoices.length}
                 </p>
-                <p className="text-xs text-slate-500 mt-0.5">فاتورة متأخرة</p>
+                <p className="text-xs text-muted mt-0.5">فاتورة متأخرة</p>
               </div>
             </div>
 
             {/* Overdue Alert */}
             {overdueInvoices.length > 0 && (
-              <div className="bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 rounded-xl p-4 flex items-start gap-3">
-                <AlertCircle className="w-5 h-5 text-rose-500 shrink-0 mt-0.5" />
+              <div className="bg-danger-soft dark:bg-danger/20 border border-danger-border rounded-xl p-4 flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-danger shrink-0 mt-0.5" />
                 <div>
-                  <p className="text-sm font-bold text-rose-700 dark:text-rose-300">فواتير متأخرة السداد</p>
+                  <p className="text-sm font-bold text-danger ">فواتير متأخرة السداد</p>
                   <div className="mt-2 space-y-1">
                     {overdueInvoices.map(inv => (
                       <div key={inv.id} className="flex items-center justify-between text-xs">
-                        <span className="text-rose-600 dark:text-rose-400 font-semibold">{inv.invoiceNumber}</span>
-                        <span className="text-slate-500">استحق: {inv.dueDate}</span>
-                        <span className="font-bold text-rose-700 dark:text-rose-300">{fmt(inv.remainingAmount)}</span>
+                        <span className="text-danger font-semibold">{inv.invoiceNumber}</span>
+                        <span className="text-muted">استحق: {inv.dueDate}</span>
+                        <span className="font-bold text-danger ">{fmt(inv.remainingAmount)}</span>
                       </div>
                     ))}
                   </div>
@@ -364,8 +364,8 @@ const StatementModal: React.FC<StatementModalProps> = ({ customer, canExport, on
             />
           </div>
 
-          <div className="p-4 border-t border-slate-200 dark:border-slate-700 flex justify-end">
-            <button onClick={onClose} className="px-6 py-2.5 rounded-xl border border-slate-300 dark:border-slate-600 text-sm font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all">إغلاق</button>
+          <div className="p-4 border-t border-line flex justify-end">
+            <button onClick={onClose} className="px-6 py-2.5 rounded-xl border border-line-strong text-sm font-semibold text-ink-secondary hover:bg-surface-muted dark:hover:bg-primary transition-all">إغلاق</button>
           </div>
         </div>
       </div>
@@ -455,22 +455,22 @@ export const CustomerStatementPage: React.FC = () => {
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   if (!canView) return (
-    <div className="p-8 text-center text-slate-500 dark:text-slate-400">
-      <AlertTriangle className="w-12 h-12 mx-auto mb-3 text-amber-400" />
+    <div className="p-8 text-center text-muted ">
+      <AlertTriangle className="w-12 h-12 mx-auto mb-3 text-warning" />
       <p className="font-semibold">ليس لديك صلاحية عرض هذه الصفحة.</p>
     </div>
   );
 
   return (
-    <div className="flex flex-col h-full bg-slate-50 dark:bg-slate-950">
+    <div className="flex flex-col h-full bg-surface-muted ">
       {/* Header */}
-      <div className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 px-6 pt-4">
+      <div className="bg-surface border-b border-line px-6 pt-4">
         <PageHeader
           icon={<FileText className="w-5 h-5" />}
           title="كشوفات حسابات العملاء"
           description="الرصيد الحالي — الفواتير المستحقة — المتأخرات"
           actions={
-            <button onClick={load} className="p-2 rounded-xl text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors" title="تحديث">
+            <button onClick={load} className="p-2 rounded-xl text-muted hover:bg-surface-sunken dark:hover:bg-primary transition-colors" title="تحديث">
               <RefreshCw className="w-4 h-4" />
             </button>
           }
@@ -479,25 +479,25 @@ export const CustomerStatementPage: React.FC = () => {
 
       {/* Filters */}
       <div className="px-6 py-4">
-        <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 p-4">
+        <div className="bg-surface rounded-xl border border-line p-4">
           <div className="flex flex-wrap gap-3">
-            <div className="flex items-center gap-2 flex-1 min-w-48 bg-slate-50 dark:bg-slate-800 rounded-xl px-3 py-2.5 border border-slate-200 dark:border-slate-700">
-              <Search className="w-4 h-4 text-slate-400 shrink-0" />
+            <div className="flex items-center gap-2 flex-1 min-w-48 bg-surface-muted rounded-xl px-3 py-2.5 border border-line ">
+              <Search className="w-4 h-4 text-muted shrink-0" />
               <input
                 value={search}
                 onChange={e => setSearch(e.target.value)}
                 placeholder="بحث بالاسم أو الهاتف أو الرمز..."
-                className="flex-1 text-sm bg-transparent text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none"
+                className="flex-1 text-sm bg-transparent text-ink placeholder-muted focus:outline-none"
               />
             </div>
-            <select value={filterType} onChange={e => setFilterType(e.target.value)} className="px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-sky-500">
+            <select value={filterType} onChange={e => setFilterType(e.target.value)} className="px-3 py-2.5 rounded-xl border border-line bg-surface-muted text-sm text-ink focus:outline-none focus:ring-2 focus:ring-primary">
               <option value="ALL">كل أنواع العملاء</option>
               <option value="RETAIL">قطاعي</option>
               <option value="CONTRACTOR">مقاول</option>
               <option value="WHOLESALE">جملة</option>
               <option value="ENGINEER">مهندس</option>
             </select>
-            <select value={filterBalance} onChange={e => setFilterBalance(e.target.value)} className="px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-sky-500">
+            <select value={filterBalance} onChange={e => setFilterBalance(e.target.value)} className="px-3 py-2.5 rounded-xl border border-line bg-surface-muted text-sm text-ink focus:outline-none focus:ring-2 focus:ring-primary">
               <option value="ALL">كل الأرصدة</option>
               <option value="DEBIT">مديونون فقط</option>
               <option value="CREDIT">لهم رصيد</option>
@@ -509,18 +509,18 @@ export const CustomerStatementPage: React.FC = () => {
 
       {/* Table */}
       <div className="flex-1 overflow-auto px-6 pb-6">
-        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
+        <div className="bg-surface rounded-2xl border border-line shadow-sm overflow-hidden">
           {loading ? (
             <div className="flex items-center justify-center py-20">
-              <Loader2 className="w-8 h-8 animate-spin text-sky-500" />
+              <Loader2 className="w-8 h-8 animate-spin text-primary" />
             </div>
           ) : error ? (
             <div className="p-8 text-center">
-              <AlertTriangle className="w-10 h-10 mx-auto text-rose-400 mb-3" />
-              <p className="text-sm text-rose-600">{error}</p>
+              <AlertTriangle className="w-10 h-10 mx-auto text-danger mb-3" />
+              <p className="text-sm text-danger">{error}</p>
             </div>
           ) : customers.length === 0 ? (
-            <div className="py-20 text-center text-slate-400 dark:text-slate-500">
+            <div className="py-20 text-center text-muted ">
               <Users className="w-14 h-14 mx-auto mb-3 opacity-30" />
               <p className="font-semibold text-sm">لا يوجد عملاء يطابقون المعايير</p>
             </div>
@@ -536,15 +536,15 @@ export const CustomerStatementPage: React.FC = () => {
                                         key: 'customer', header: 'العميل',
                                         render: (c) => (
                                           <div>
-                                            <p className="font-bold text-slate-900 dark:text-slate-100">{c.name}</p>
-                                            <p className="text-xs text-slate-500">{c.code} {c.phone && `• ${c.phone}`}</p>
+                                            <p className="font-bold text-ink ">{c.name}</p>
+                                            <p className="text-xs text-muted">{c.code} {c.phone && `• ${c.phone}`}</p>
                                           </div>
                                         ),
                                       },
                                       {
                                         key: 'type', header: 'النوع',
                                         render: (c) => (
-                                          <span className="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-xs font-semibold text-slate-600 dark:text-slate-400">
+                                          <span className="px-2.5 py-1 rounded-lg bg-surface-sunken text-xs font-semibold text-ink-secondary ">
                                             {CUSTOMER_TYPES[c.customerType] || c.customerType}
                                           </span>
                                         ),
@@ -553,43 +553,43 @@ export const CustomerStatementPage: React.FC = () => {
                                         key: 'balance', header: 'الرصيد الحالي',
                                         render: (c) => (
                                           <div className="flex items-center gap-1.5">
-                                            <span className={`font-bold text-sm ${c.currentBalance > 0 ? 'text-rose-600 dark:text-rose-400' : c.currentBalance < 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-500'}`}>
+                                            <span className={`font-bold text-sm ${c.currentBalance > 0 ? 'text-danger dark:text-danger' : c.currentBalance < 0 ? 'text-success dark:text-success' : 'text-muted'}`}>
                                               {fmtAbs(c.currentBalance)}
                                             </span>
                                             {c.currentBalance !== 0 && (
-                                              <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${c.currentBalance > 0 ? 'bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400' : 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400'}`}>
+                                              <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${c.currentBalance > 0 ? 'bg-danger-soft text-danger dark:bg-danger/30 dark:text-danger' : 'bg-success-soft text-success dark:bg-success/30 dark:text-success'}`}>
                                                 {c.currentBalance > 0 ? 'مدين' : 'دائن'}
                                               </span>
                                             )}
                                           </div>
                                         ),
                                       },
-                                      { key: 'limit', header: 'حد الائتمان', render: (c) => <span className="text-sky-600 dark:text-sky-400 font-semibold whitespace-nowrap">{fmt(c.creditLimit)}</span> },
-                                      { key: 'purchases', header: 'إجمالي المشتريات', render: (c) => <span className="text-violet-600 dark:text-violet-400 font-semibold whitespace-nowrap">{fmt(c.totalPurchases)}</span> },
+                                      { key: 'limit', header: 'حد الائتمان', render: (c) => <span className="text-primary font-semibold whitespace-nowrap">{fmt(c.creditLimit)}</span> },
+                                      { key: 'purchases', header: 'إجمالي المشتريات', render: (c) => <span className="text-primary font-semibold whitespace-nowrap">{fmt(c.totalPurchases)}</span> },
                                       {
                                         key: 'overdue', header: 'متأخرات',
                                         render: (c) => c.overdueInvoices > 0 ? (
                                           <div className="flex items-center gap-1.5">
-                                            <AlertCircle className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+                                            <AlertCircle className="w-3.5 h-3.5 text-danger shrink-0" />
                                             <div>
-                                              <p className="text-xs font-bold text-rose-600 dark:text-rose-400">{c.overdueInvoices} فاتورة</p>
-                                              <p className="text-[10px] text-rose-500">{fmt(c.overdueAmount)}</p>
+                                              <p className="text-xs font-bold text-danger ">{c.overdueInvoices} فاتورة</p>
+                                              <p className="text-[10px] text-danger">{fmt(c.overdueAmount)}</p>
                                             </div>
                                           </div>
                                         ) : (
-                                          <div className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
+                                          <div className="flex items-center gap-1 text-success ">
                                             <CheckCircle2 className="w-3.5 h-3.5" />
                                             <span className="text-xs font-semibold">لا متأخرات</span>
                                           </div>
                                         ),
                                       },
-                                      { key: 'last', header: 'آخر فاتورة', render: (c) => <span className="text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">{c.lastInvoiceDate || '—'}</span> },
+                                      { key: 'last', header: 'آخر فاتورة', render: (c) => <span className="text-xs text-muted whitespace-nowrap">{c.lastInvoiceDate || '—'}</span> },
                                       {
                                         key: 'actions', header: 'إجراءات',
                                         render: (c) => (
                                           <button
                                             onClick={() => setSelected(c)}
-                                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-50 dark:bg-violet-900/20 text-violet-600 dark:text-violet-400 text-xs font-semibold hover:bg-violet-100 dark:hover:bg-violet-900/30 transition-all border border-violet-200 dark:border-violet-800"
+                                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent-soft dark:bg-primary/20 text-primary text-xs font-semibold hover:bg-accent-soft dark:hover:bg-primary/30 transition-all border border-accent-border "
                                           >
                                             <Eye className="w-3.5 h-3.5" />
                                             الكشف
@@ -602,14 +602,14 @@ export const CustomerStatementPage: React.FC = () => {
               </div>
 
               {/* Pagination */}
-              <div className="px-4 py-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
-                <p className="text-xs text-slate-500 dark:text-slate-400">إجمالي {total} عميل</p>
+              <div className="px-4 py-3 border-t border-line flex items-center justify-between">
+                <p className="text-xs text-muted ">إجمالي {total} عميل</p>
                 <div className="flex items-center gap-1">
-                  <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-40 transition-all">
+                  <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="p-1.5 rounded-lg text-muted hover:text-ink hover:bg-surface-sunken dark:hover:bg-primary disabled:opacity-40 transition-all">
                     <ChevronRight className="w-4 h-4" />
                   </button>
-                  <span className="text-xs font-semibold text-slate-600 dark:text-slate-400 px-2">{page} / {totalPages}</span>
-                  <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-40 transition-all">
+                  <span className="text-xs font-semibold text-ink-secondary px-2">{page} / {totalPages}</span>
+                  <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="p-1.5 rounded-lg text-muted hover:text-ink hover:bg-surface-sunken dark:hover:bg-primary disabled:opacity-40 transition-all">
                     <ChevronLeft className="w-4 h-4" />
                   </button>
                 </div>

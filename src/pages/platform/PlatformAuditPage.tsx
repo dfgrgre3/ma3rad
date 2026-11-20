@@ -55,11 +55,11 @@ const ENTITY_LABELS: Record<string, string> = {
 };
 
 const SEVERITY_BADGES: Record<AuditSeverity, { bg: string; text: string; label: string; icon: React.ReactNode }> = {
-  INFO: { bg: 'bg-sky-50', text: 'text-sky-700 border-sky-200', label: 'معلومات', icon: <Info className="h-3 w-3" /> },
-  NOTICE: { bg: 'bg-slate-100', text: 'text-slate-700 border-slate-300', label: 'ملاحظة', icon: <Info className="h-3 w-3" /> },
-  WARNING: { bg: 'bg-amber-50', text: 'text-amber-800 border-amber-200', label: 'تحذير', icon: <AlertTriangle className="h-3 w-3" /> },
-  SECURITY: { bg: 'bg-purple-50', text: 'text-purple-700 border-purple-200', label: 'أمني', icon: <ShieldAlert className="h-3 w-3" /> },
-  CRITICAL: { bg: 'bg-rose-50', text: 'text-rose-700 border-rose-200', label: 'حرج', icon: <XCircle className="h-3 w-3" /> },
+  INFO: { bg: 'bg-accent-soft', text: 'text-primary border-accent-border', label: 'معلومات', icon: <Info className="h-3 w-3" /> },
+  NOTICE: { bg: 'bg-surface-sunken', text: 'text-ink border-line-strong', label: 'ملاحظة', icon: <Info className="h-3 w-3" /> },
+  WARNING: { bg: 'bg-warning-soft', text: 'text-warning border-warning-border', label: 'تحذير', icon: <AlertTriangle className="h-3 w-3" /> },
+  SECURITY: { bg: 'bg-accent-soft', text: 'text-primary border-accent-border', label: 'أمني', icon: <ShieldAlert className="h-3 w-3" /> },
+  CRITICAL: { bg: 'bg-danger-soft', text: 'text-danger border-danger-border', label: 'حرج', icon: <XCircle className="h-3 w-3" /> },
 };
 
 const ACTOR_LABELS: Record<AuditActorType, string> = {
@@ -316,7 +316,7 @@ export const PlatformAuditPage: React.FC = () => {
       <PageHeader
         title="سجل العمليات المركزي — Central Audit Trail"
         description="سجل موحد، مشفر بتسلسل SHA-256 وغير قابل للتعديل لتتبع عمليات الإدارة، العملاء، الأجهزة وواجهات API."
-        icon={<ScrollText className="h-5 w-5 text-indigo-600" />}
+        icon={<ScrollText className="h-5 w-5 text-primary" />}
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <Button
@@ -325,12 +325,12 @@ export const PlatformAuditPage: React.FC = () => {
               leadingIcon={
                 integrityState.checked ? (
                   integrityState.valid ? (
-                    <ShieldCheck className="h-4 w-4 text-emerald-600" />
+                    <ShieldCheck className="h-4 w-4 text-success" />
                   ) : (
-                    <ShieldAlert className="h-4 w-4 text-rose-600" />
+                    <ShieldAlert className="h-4 w-4 text-danger" />
                   )
                 ) : (
-                  <Lock className="h-4 w-4 text-slate-500" />
+                  <Lock className="h-4 w-4 text-muted" />
                 )
               }
               onClick={() => void handleVerifyIntegrity()}
@@ -347,7 +347,7 @@ export const PlatformAuditPage: React.FC = () => {
             <Button
               variant="secondary"
               size="sm"
-              leadingIcon={<Download className="h-3.5 w-3.5 text-slate-600" />}
+              leadingIcon={<Download className="h-3.5 w-3.5 text-ink-secondary" />}
               onClick={() => void handleFullExport()}
             >
               تصدير شامل ({total})
@@ -357,10 +357,10 @@ export const PlatformAuditPage: React.FC = () => {
       />
 
       {/* Advanced Filter Toolbar */}
-      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm space-y-3">
+      <div className="rounded-xl border border-line bg-surface p-4 shadow-sm space-y-3">
         <div className="flex flex-wrap items-center gap-3">
           <div className="relative min-w-[240px] flex-1">
-            <Search className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <Search className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
             <input
               value={search}
               onChange={(e) => {
@@ -449,12 +449,12 @@ export const PlatformAuditPage: React.FC = () => {
         </div>
 
         {/* Date Filters Row */}
-        <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-slate-100 text-xs">
-          <span className="flex items-center gap-1 font-semibold text-slate-500">
+        <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-line text-xs">
+          <span className="flex items-center gap-1 font-semibold text-muted">
             <Filter className="h-3.5 w-3.5" /> الفترة:
           </span>
           <div className="flex items-center gap-2">
-            <span className="text-slate-400">من:</span>
+            <span className="text-muted">من:</span>
             <input
               type="date"
               value={dateFrom}
@@ -466,7 +466,7 @@ export const PlatformAuditPage: React.FC = () => {
             />
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-slate-400">إلى:</span>
+            <span className="text-muted">إلى:</span>
             <input
               type="date"
               value={dateTo}
@@ -491,30 +491,30 @@ export const PlatformAuditPage: React.FC = () => {
                 setDateTo('');
                 setPage(1);
               }}
-              className="text-xs text-rose-600 hover:text-rose-700"
+              className="text-xs text-danger hover:text-danger"
             >
               إلغاء الفلاتر
             </Button>
           )}
-          <span className="mr-auto font-medium text-slate-500">
-            إجمالي السجلات: <strong className="text-slate-800">{total}</strong>
+          <span className="mr-auto font-medium text-muted">
+            إجمالي السجلات: <strong className="text-ink">{total}</strong>
           </span>
         </div>
       </div>
 
       {error && (
-        <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-2.5 text-xs font-semibold text-rose-700">
+        <div role="alert" className="rounded-lg border border-danger-border bg-danger-soft px-4 py-2.5 text-xs font-semibold text-danger">
           {error}
         </div>
       )}
 
       {/* Main Audit Table */}
-      <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+      <section className="overflow-hidden rounded-xl border border-line bg-surface shadow-sm">
         {loading ? (
-          <div className="py-20 text-center text-sm font-semibold text-slate-500">جارٍ تحميل سجل العمليات...</div>
+          <div className="py-20 text-center text-sm font-semibold text-muted">جارٍ تحميل سجل العمليات...</div>
         ) : entries.length === 0 ? (
           <EmptyState
-            icon={<ScrollText className="h-6 w-6 text-slate-400" />}
+            icon={<ScrollText className="h-6 w-6 text-muted" />}
             title="لا توجد عمليات مطابقة"
             description="لم يتم العثور على أي نشاط يطابق معايير الفلترة المحددة."
           />
@@ -526,9 +526,9 @@ export const PlatformAuditPage: React.FC = () => {
               rowKey={(entry: any) => String(entry.id)}
               dense
               tableClassName="text-xs"
-              rowClassName={() => 'transition-colors hover:bg-slate-50/70'}
+              rowClassName={() => 'transition-colors hover:bg-surface-muted/70'}
               columns={[
-                { key: 'time', header: 'الوقت والتاريخ', render: (entry: any) => <span className="whitespace-nowrap font-mono text-slate-500" dir="ltr">{formatDateTime(entry.createdAt)}</span> },
+                { key: 'time', header: 'الوقت والتاريخ', render: (entry: any) => <span className="whitespace-nowrap font-mono text-muted" dir="ltr">{formatDateTime(entry.createdAt)}</span> },
                 ...(!centralMode ? [{
                   key: 'severity', header: 'مستوى الخطورة',
                   render: (entry: any) => {
@@ -544,19 +544,19 @@ export const PlatformAuditPage: React.FC = () => {
                 ...(!centralMode ? [{
                   key: 'result', header: 'النتيجة',
                   render: (entry: any) => entry.status === 'SUCCESS' ? (
-                    <span className="inline-flex items-center gap-1 font-medium text-emerald-700"><CheckCircle2 className="h-3.5 w-3.5" /> ناجح</span>
+                    <span className="inline-flex items-center gap-1 font-medium text-success"><CheckCircle2 className="h-3.5 w-3.5" /> ناجح</span>
                   ) : entry.status === 'BLOCKED' ? (
-                    <span className="inline-flex items-center gap-1 font-medium text-purple-700"><Lock className="h-3.5 w-3.5" /> محظور</span>
+                    <span className="inline-flex items-center gap-1 font-medium text-primary"><Lock className="h-3.5 w-3.5" /> محظور</span>
                   ) : (
-                    <span className="inline-flex items-center gap-1 font-medium text-rose-700"><XCircle className="h-3.5 w-3.5" /> فاشل</span>
+                    <span className="inline-flex items-center gap-1 font-medium text-danger"><XCircle className="h-3.5 w-3.5" /> فاشل</span>
                   ),
                 }] : []),
                 {
                   key: 'actor', header: 'المنفذ',
                   render: (entry: any) => (
                     <span className="block">
-                      <span className="block font-semibold text-slate-800">{entry.actorName || 'النظام'}</span>
-                      <span className="block text-[10px] text-slate-400">{ACTOR_LABELS[(entry.actorType || 'SUPER_ADMIN') as keyof typeof ACTOR_LABELS]}</span>
+                      <span className="block font-semibold text-ink">{entry.actorName || 'النظام'}</span>
+                      <span className="block text-[10px] text-muted">{ACTOR_LABELS[(entry.actorType || 'SUPER_ADMIN') as keyof typeof ACTOR_LABELS]}</span>
                     </span>
                   ),
                 },
@@ -564,21 +564,21 @@ export const PlatformAuditPage: React.FC = () => {
                   key: 'action', header: 'الإجراء',
                   render: (entry: any) => (
                     <span className="block">
-                      <span className="block font-semibold text-slate-900">{entry.action}</span>
-                      {entry.entityId && <span className="block max-w-[200px] truncate font-mono text-[10px] text-slate-400" dir="ltr">{entry.entityId}</span>}
+                      <span className="block font-semibold text-ink">{entry.action}</span>
+                      {entry.entityId && <span className="block max-w-[200px] truncate font-mono text-[10px] text-muted" dir="ltr">{entry.entityId}</span>}
                     </span>
                   ),
                 },
                 {
                   key: 'entity', header: 'نوع الكيان',
-                  render: (entry: any) => <span className="rounded bg-slate-100 px-2 py-0.5 text-[10.5px] font-semibold text-slate-700">{ENTITY_LABELS[entry.entityType as keyof typeof ENTITY_LABELS] || entry.entityType}</span>,
+                  render: (entry: any) => <span className="rounded bg-surface-sunken px-2 py-0.5 text-[10.5px] font-semibold text-ink">{ENTITY_LABELS[entry.entityType as keyof typeof ENTITY_LABELS] || entry.entityType}</span>,
                 },
                 {
                   key: 'device', header: 'الجهاز / العنوان',
                   render: (entry: any) => (
-                    <span className="block whitespace-nowrap text-[11px] text-slate-500">
+                    <span className="block whitespace-nowrap text-[11px] text-muted">
                       <span className="block">{entry.deviceName || entry.deviceId || '—'}</span>
-                      {entry.ipAddress && <span className="block font-mono text-[10px] text-slate-400">{entry.ipAddress}</span>}
+                      {entry.ipAddress && <span className="block font-mono text-[10px] text-muted">{entry.ipAddress}</span>}
                     </span>
                   ),
                 },
@@ -588,7 +588,7 @@ export const PlatformAuditPage: React.FC = () => {
                     <Button
                       variant="ghost"
                       size="sm"
-                      leadingIcon={<Eye className="h-3.5 w-3.5 text-indigo-600" />}
+                      leadingIcon={<Eye className="h-3.5 w-3.5 text-primary" />}
                       onClick={() => setSelectedEntry(entry)}
                     >
                       معاينة
@@ -601,23 +601,23 @@ export const PlatformAuditPage: React.FC = () => {
         )}
 
         {/* Pagination Footer */}
-        <div className="flex flex-wrap items-center justify-between border-t border-slate-200 bg-slate-50/60 px-4 py-3 text-xs">
+        <div className="flex flex-wrap items-center justify-between border-t border-line bg-surface-muted/60 px-4 py-3 text-xs">
           <div className="flex items-center gap-2">
-            <span className="text-slate-500">حجم الصفحة:</span>
+            <span className="text-muted">حجم الصفحة:</span>
             <select
               value={pageSize}
               onChange={(e) => {
                 setPageSize(Number(e.target.value));
                 setPage(1);
               }}
-              className="rounded border border-slate-300 bg-white px-2 py-1 text-xs"
+              className="rounded border border-line-strong bg-surface px-2 py-1 text-xs"
             >
               <option value={15}>15</option>
               <option value={25}>25</option>
               <option value={50}>50</option>
               <option value={100}>100</option>
             </select>
-            <span className="text-slate-400">
+            <span className="text-muted">
               عرض {(page - 1) * pageSize + 1} إلى {Math.min(page * pageSize, total)} من {total}
             </span>
           </div>
@@ -632,7 +632,7 @@ export const PlatformAuditPage: React.FC = () => {
             >
               السابق
             </Button>
-            <span className="px-3 font-semibold text-slate-700">
+            <span className="px-3 font-semibold text-ink">
               صفحة {page} من {totalPages}
             </span>
             <Button
@@ -650,16 +650,16 @@ export const PlatformAuditPage: React.FC = () => {
 
       {/* Audit Detail & Diff Modal */}
       {selectedEntry && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm">
-          <div className="relative w-full max-w-2xl rounded-2xl border border-slate-200 bg-white shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
-            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4 bg-slate-50/80">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-primary/50 p-4 backdrop-blur-sm">
+          <div className="relative w-full max-w-2xl rounded-2xl border border-line bg-surface shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+            <div className="flex items-center justify-between border-b border-line px-6 py-4 bg-surface-muted/80">
               <div>
-                <h3 className="text-base font-bold text-slate-900">{selectedEntry.action}</h3>
-                <p className="text-xs text-slate-500 font-mono mt-0.5">{selectedEntry.id} · {formatDateTime(selectedEntry.createdAt)}</p>
+                <h3 className="text-base font-bold text-ink">{selectedEntry.action}</h3>
+                <p className="text-xs text-muted font-mono mt-0.5">{selectedEntry.id} · {formatDateTime(selectedEntry.createdAt)}</p>
               </div>
               <button
                 onClick={() => setSelectedEntry(null)}
-                className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-200 hover:text-slate-700"
+                className="rounded-lg p-1.5 text-muted hover:bg-surface-sunken hover:text-ink"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -667,30 +667,30 @@ export const PlatformAuditPage: React.FC = () => {
 
             <div className="overflow-y-auto p-6 space-y-4 text-xs">
               {/* Metadata Grid */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-3 rounded-xl bg-slate-50 border border-slate-200">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-3 rounded-xl bg-surface-muted border border-line">
                 <div>
-                  <span className="text-slate-400 block">المنفذ</span>
-                  <span className="font-semibold text-slate-800">{selectedEntry.actorName || 'النظام'} ({ACTOR_LABELS[selectedEntry.actorType || 'SUPER_ADMIN']})</span>
+                  <span className="text-muted block">المنفذ</span>
+                  <span className="font-semibold text-ink">{selectedEntry.actorName || 'النظام'} ({ACTOR_LABELS[selectedEntry.actorType || 'SUPER_ADMIN']})</span>
                 </div>
                 <div>
-                  <span className="text-slate-400 block">مستوى الخطورة</span>
-                  <span className="font-semibold text-slate-800">{selectedEntry.severity}</span>
+                  <span className="text-muted block">مستوى الخطورة</span>
+                  <span className="font-semibold text-ink">{selectedEntry.severity}</span>
                 </div>
                 <div>
-                  <span className="text-slate-400 block">الحالة</span>
-                  <span className="font-semibold text-slate-800">{selectedEntry.status}</span>
+                  <span className="text-muted block">الحالة</span>
+                  <span className="font-semibold text-ink">{selectedEntry.status}</span>
                 </div>
                 <div>
-                  <span className="text-slate-400 block">الكيان والمعرف</span>
-                  <span className="font-semibold text-slate-800">{ENTITY_LABELS[selectedEntry.entityType] || selectedEntry.entityType}: {selectedEntry.entityId || '—'}</span>
+                  <span className="text-muted block">الكيان والمعرف</span>
+                  <span className="font-semibold text-ink">{ENTITY_LABELS[selectedEntry.entityType] || selectedEntry.entityType}: {selectedEntry.entityId || '—'}</span>
                 </div>
                 <div>
-                  <span className="text-slate-400 block">الجهاز</span>
-                  <span className="font-semibold text-slate-800">{selectedEntry.deviceName || selectedEntry.deviceId || '—'}</span>
+                  <span className="text-muted block">الجهاز</span>
+                  <span className="font-semibold text-ink">{selectedEntry.deviceName || selectedEntry.deviceId || '—'}</span>
                 </div>
                 <div>
-                  <span className="text-slate-400 block">عنوان IP</span>
-                  <span className="font-mono text-slate-800">{selectedEntry.ipAddress || '—'}</span>
+                  <span className="text-muted block">عنوان IP</span>
+                  <span className="font-mono text-ink">{selectedEntry.ipAddress || '—'}</span>
                 </div>
               </div>
 
@@ -698,18 +698,18 @@ export const PlatformAuditPage: React.FC = () => {
               {(selectedEntry.oldValues || selectedEntry.newValues) && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-1">
-                    <span className="font-bold text-slate-700 flex items-center gap-1 text-rose-700">
-                      <span className="h-2 w-2 rounded-full bg-rose-500"></span> القيمة السابقة (Before):
+                    <span className="font-bold text-ink flex items-center gap-1 text-danger">
+                      <span className="h-2 w-2 rounded-full bg-danger"></span> القيمة السابقة (Before):
                     </span>
-                    <pre className="rounded-lg border border-slate-200 bg-slate-900 text-slate-100 p-3 text-[11px] font-mono overflow-x-auto max-h-48" dir="ltr">
+                    <pre className="rounded-lg border border-line bg-primary text-muted p-3 text-[11px] font-mono overflow-x-auto max-h-48" dir="ltr">
                       {formatJsonBlock(selectedEntry.oldValues)}
                     </pre>
                   </div>
                   <div className="space-y-1">
-                    <span className="font-bold text-slate-700 flex items-center gap-1 text-emerald-700">
-                      <span className="h-2 w-2 rounded-full bg-emerald-500"></span> القيمة الجديدة (After):
+                    <span className="font-bold text-ink flex items-center gap-1 text-success">
+                      <span className="h-2 w-2 rounded-full bg-success"></span> القيمة الجديدة (After):
                     </span>
-                    <pre className="rounded-lg border border-slate-200 bg-slate-900 text-slate-100 p-3 text-[11px] font-mono overflow-x-auto max-h-48" dir="ltr">
+                    <pre className="rounded-lg border border-line bg-primary text-muted p-3 text-[11px] font-mono overflow-x-auto max-h-48" dir="ltr">
                       {formatJsonBlock(selectedEntry.newValues)}
                     </pre>
                   </div>
@@ -719,28 +719,28 @@ export const PlatformAuditPage: React.FC = () => {
               {/* Details Payload */}
               {selectedEntry.details && (
                 <div className="space-y-1">
-                  <span className="font-bold text-slate-700">بيانات وتفاصيل العملية (Details Payload):</span>
-                  <pre className="rounded-lg border border-slate-200 bg-slate-50 text-slate-800 p-3 text-[11px] font-mono overflow-x-auto max-h-40" dir="ltr">
+                  <span className="font-bold text-ink">بيانات وتفاصيل العملية (Details Payload):</span>
+                  <pre className="rounded-lg border border-line bg-surface-muted text-ink p-3 text-[11px] font-mono overflow-x-auto max-h-40" dir="ltr">
                     {formatJsonBlock(selectedEntry.details)}
                   </pre>
                 </div>
               )}
 
               {/* Cryptographic Proof */}
-              <div className="p-3 rounded-lg border border-slate-200 bg-slate-50 space-y-1 text-[10.5px]">
-                <div className="flex items-center gap-1 font-bold text-slate-600">
-                  <Lock className="h-3 w-3 text-indigo-600" /> البصمة التشفيرية المانعة للتلاعب (Tamper-evident Hash Chain)
+              <div className="p-3 rounded-lg border border-line bg-surface-muted space-y-1 text-[10.5px]">
+                <div className="flex items-center gap-1 font-bold text-ink-secondary">
+                  <Lock className="h-3 w-3 text-primary" /> البصمة التشفيرية المانعة للتلاعب (Tamper-evident Hash Chain)
                 </div>
-                <div className="text-slate-500 truncate" dir="ltr">
-                  <strong className="text-slate-700">Prev Hash:</strong> {selectedEntry.prevHash || 'GENESIS'}
+                <div className="text-muted truncate" dir="ltr">
+                  <strong className="text-ink">Prev Hash:</strong> {selectedEntry.prevHash || 'GENESIS'}
                 </div>
-                <div className="text-slate-500 truncate" dir="ltr">
-                  <strong className="text-slate-700">Record Hash:</strong> {selectedEntry.recordHash || 'N/A'}
+                <div className="text-muted truncate" dir="ltr">
+                  <strong className="text-ink">Record Hash:</strong> {selectedEntry.recordHash || 'N/A'}
                 </div>
               </div>
             </div>
 
-            <div className="border-t border-slate-200 px-6 py-3 bg-slate-50 flex justify-end">
+            <div className="border-t border-line px-6 py-3 bg-surface-muted flex justify-end">
               <Button variant="secondary" size="sm" onClick={() => setSelectedEntry(null)}>
                 إغلاق
               </Button>

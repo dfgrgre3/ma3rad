@@ -50,11 +50,11 @@
   "support": {
     "profileDefaults": "implemented",
     "projectModule": "available",
-    "industrySpecificWorkflows": "not-implemented",
-    "industrySpecificReports": "not-implemented",
-    "industrySpecificDocumentTemplates": "not-implemented",
-    "typedCustomFieldStorage": "not-implemented",
-    "projectCostingAndProgressClaims": "not-implemented"
+    "industrySpecificWorkflows": "implemented",
+    "industrySpecificReports": "implemented",
+    "industrySpecificDocumentTemplates": "partially-implemented",
+    "typedCustomFieldStorage": "implemented-for-profile-declared-fields",
+    "projectCostingAndProgressClaims": "implemented"
   },
   "printTemplates": [
     {
@@ -69,95 +69,122 @@
   ],
   "dashboard": [
     {
-      "id": "month_sales",
+      "id": "active_projects",
       "label": {
-        "ar": "مبيعات الشهر",
-        "en": "month_sales"
+        "ar": "المشاريع الجارية",
+        "en": "Active Projects"
       },
-      "source": "sales",
+      "source": "projects",
+      "format": "number"
+    },
+    {
+      "id": "overdue_projects",
+      "label": {
+        "ar": "مشاريع متأخرة",
+        "en": "Overdue Projects"
+      },
+      "source": "projects",
+      "format": "number"
+    },
+    {
+      "id": "contract_value_total",
+      "label": {
+        "ar": "إجمالي قيم العقود",
+        "en": "Total Contract Value"
+      },
+      "source": "projects",
       "format": "currency"
     },
     {
-      "id": "net_profit",
+      "id": "certified_amount_total",
       "label": {
-        "ar": "صافي الربح",
-        "en": "net_profit"
+        "ar": "المستخلصات المعتمدة",
+        "en": "Certified Amounts"
       },
-      "source": "finance",
+      "source": "projects",
       "format": "currency"
     },
     {
-      "id": "total_debt",
+      "id": "collection_gap_total",
       "label": {
-        "ar": "إجمالي المديونيات",
-        "en": "total_debt"
+        "ar": "فجوة التحصيل",
+        "en": "Collection Gap"
       },
-      "source": "finance",
+      "source": "projects",
+      "format": "currency"
+    },
+    {
+      "id": "actual_cost_total",
+      "label": {
+        "ar": "التكاليف الفعلية",
+        "en": "Actual Costs"
+      },
+      "source": "projects",
       "format": "currency"
     },
     {
       "id": "receivables",
       "label": {
         "ar": "ديون العملاء",
-        "en": "receivables"
+        "en": "Customer Receivables"
       },
       "source": "finance",
-      "format": "currency"
-    },
-    {
-      "id": "gross_profit",
-      "label": {
-        "ar": "مجمل الربح",
-        "en": "gross_profit"
-      },
-      "source": "sales",
       "format": "currency"
     }
   ],
   "reports": [
     {
       "id": "r0",
-      "reportId": "sales-analysis",
-      "category": "sales",
+      "reportId": "project-certificates",
+      "category": "finance",
       "label": {
-        "ar": "sales-analysis",
-        "en": "sales-analysis"
+        "ar": "مستخلصات المشاريع",
+        "en": "Project Certificates"
       }
     },
     {
       "id": "r1",
-      "reportId": "financial-position",
-      "category": "sales",
+      "reportId": "project-cost-variance",
+      "category": "operations",
       "label": {
-        "ar": "financial-position",
-        "en": "financial-position"
+        "ar": "انحراف تكلفة المشاريع",
+        "en": "Project Cost Variance"
       }
     },
     {
       "id": "r2",
-      "reportId": "period-comparison",
-      "category": "sales",
+      "reportId": "financial-position",
+      "category": "finance",
       "label": {
-        "ar": "period-comparison",
-        "en": "period-comparison"
+        "ar": "المركز المالي",
+        "en": "Financial Position"
       }
     },
     {
       "id": "r3",
       "reportId": "ar-aging",
-      "category": "sales",
+      "category": "finance",
       "label": {
-        "ar": "ar-aging",
-        "en": "ar-aging"
+        "ar": "أعمار ذمم العملاء",
+        "en": "AR Aging"
       }
     },
     {
       "id": "r4",
-      "reportId": "branch-performance",
-      "category": "sales",
+      "reportId": "period-comparison",
+      "category": "core",
       "label": {
-        "ar": "branch-performance",
-        "en": "branch-performance"
+        "ar": "مقارنة الفترات",
+        "en": "Period Comparison"
+      }
+    },
+    {
+      "id": "r5",
+      "reportId": "site-daily-reports",
+      "category": "operations",
+      "label": {
+        "ar": "التقارير اليومية للمواقع",
+        "en": "Site Daily Reports"
       }
     }
   ],

@@ -55,7 +55,7 @@ const emptyForm: BranchForm = {
 };
 
 const inputClass =
-  'w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100';
+  'w-full rounded-xl border border-line bg-surface px-3 py-2.5 text-sm text-ink outline-none transition focus:border-primary focus:ring-2 focus:ring-primary';
 
 export const BranchesPage: React.FC = () => {
   const pageCopy = useActivityPageCopy('operations');
@@ -343,19 +343,19 @@ export const BranchesPage: React.FC = () => {
     warehouse.isActive && !warehouse.branchId && !branchWarehouses.some((row) => row.warehouseId === warehouse.id)
   );
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-slate-50 text-slate-900">
-      <div className="border-b border-slate-200 bg-white px-5 pt-4 sm:px-7">
+    <div className="flex h-full flex-col overflow-hidden bg-surface-muted text-ink">
+      <div className="border-b border-line bg-surface px-5 pt-4 sm:px-7">
         <PageHeader
           icon={<Building2 className="h-5 w-5" />}
           title={pageCopy?.title || 'إدارة الفروع والمعارض'}
           description={pageCopy?.description || 'بيانات الفروع، المسؤولون، المخازن، المستخدمون، وحركة كل فرع'}
           actions={<>
-            <button onClick={load} disabled={loading} className="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-50">
+            <button onClick={load} disabled={loading} className="flex items-center gap-2 rounded-xl border border-line px-3 py-2 text-xs font-bold text-ink-secondary hover:bg-surface-muted disabled:opacity-50">
               <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} /> تحديث
             </button>
             <CentralLimitGuard metric="maxBranches">
               {canCreate && (
-                <button onClick={openCreate} className="flex items-center gap-2 rounded-xl bg-sky-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-sky-700">
+                <button onClick={openCreate} className="flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-primary">
                   <Plus className="h-4 w-4" /> إضافة فرع
                 </button>
               )}
@@ -365,7 +365,7 @@ export const BranchesPage: React.FC = () => {
       </div>
 
       <main className="flex-1 overflow-y-auto p-4 sm:p-6">
-        {error && <div className="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</div>}
+        {error && <div className="mb-4 rounded-xl border border-danger-border bg-danger-soft px-4 py-3 text-sm text-danger">{error}</div>}
 
         <section className="mb-5 grid grid-cols-1 sm:grid-cols-2 gap-3 xl:grid-cols-4">
           <SummaryCard icon={<Building2 className="h-4 w-4" />} label="إجمالي الفروع" value={branches.length} tone="sky" />
@@ -375,19 +375,19 @@ export const BranchesPage: React.FC = () => {
         </section>
 
         {createdActivation && (
-          <section className="mb-5 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-emerald-950">
+          <section className="mb-5 rounded-2xl border border-success-border bg-success-soft p-4 text-success">
             <div className="mb-2 flex items-center gap-2 font-black"><ShieldCheck className="h-5 w-5" /> تم تجهيز الفرع بنجاح</div>
             <div className="grid gap-2 text-xs sm:grid-cols-3">
-              <div><span className="text-emerald-700">الفرع:</span> {createdActivation.branchName}</div>
-              <div><span className="text-emerald-700">نوع الجهاز:</span> {createdActivation.deviceType}</div>
-              <div><span className="text-emerald-700">رمز التفعيل:</span> <code className="font-black">{createdActivation.activationCode}</code></div>
+              <div><span className="text-success">الفرع:</span> {createdActivation.branchName}</div>
+              <div><span className="text-success">نوع الجهاز:</span> {createdActivation.deviceType}</div>
+              <div><span className="text-success">رمز التفعيل:</span> <code className="font-black">{createdActivation.activationCode}</code></div>
             </div>
           </section>
         )}
 
-        <section className="mb-4 flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-3 sm:flex-row sm:items-center">
+        <section className="mb-4 flex flex-col gap-3 rounded-2xl border border-line bg-surface p-3 sm:flex-row sm:items-center">
           <form onSubmit={(event) => { event.preventDefault(); load(); }} className="relative flex-1">
-            <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
             <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="ابحث بالاسم أو الكود أو المدينة أو العنوان" className={`${inputClass} pr-9`} />
           </form>
           <label className="relative min-w-40">
@@ -397,34 +397,34 @@ export const BranchesPage: React.FC = () => {
               <option value="ACTIVE">النشطة ({activeCount})</option>
               <option value="INACTIVE">المعطلة</option>
             </select>
-            <ChevronDown className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <ChevronDown className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
           </label>
         </section>
         <div className="mb-4"><OperationalFieldsFilter fields={operationalFields} values={fieldFilters} onChange={setFieldFilters} /></div>
 
         {loading ? (
-          <div className="flex justify-center py-20"><Loader2 className="h-7 w-7 animate-spin text-sky-500" /></div>
+          <div className="flex justify-center py-20"><Loader2 className="h-7 w-7 animate-spin text-primary" /></div>
         ) : visibleBranches.length ? (
           <section className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
             {visibleBranches.map((branch) => {
               const stats = statsByBranch.get(branch.id);
               const isSelectedBranch = branch.id === activeBranchId;
               return (
-                <article key={branch.id} className="flex flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-slate-300 hover:shadow-md">
+                <article key={branch.id} className="flex flex-col rounded-2xl border border-line bg-surface p-5 shadow-sm transition hover:border-line-strong hover:shadow-md">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
                         <h2 className="truncate text-base font-black">{branch.name}</h2>
-                        {branch.isMain && <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-1 text-[10px] font-bold text-amber-700"><Star className="h-3 w-3" /> افتراضي</span>}
+                        {branch.isMain && <span className="inline-flex items-center gap-1 rounded-full bg-warning-soft px-2 py-1 text-[10px] font-bold text-warning"><Star className="h-3 w-3" /> افتراضي</span>}
                       </div>
-                      <p className="mt-1 font-mono text-[11px] text-slate-400">{branch.code}</p>
+                      <p className="mt-1 font-mono text-[11px] text-muted">{branch.code}</p>
                     </div>
-                    <span className={`shrink-0 rounded-full border px-2.5 py-1 text-[10px] font-bold ${branch.isActive ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-slate-100 text-slate-500'}`}>
+                    <span className={`shrink-0 rounded-full border px-2.5 py-1 text-[10px] font-bold ${branch.isActive ? 'border-success-border bg-success-soft text-success' : 'border-line bg-surface-sunken text-muted'}`}>
                       {branch.isActive ? 'نشط' : 'معطل'}
                     </span>
                   </div>
 
-                  <div className="my-4 space-y-2.5 text-xs text-slate-600">
+                  <div className="my-4 space-y-2.5 text-xs text-ink-secondary">
                     <InfoRow icon={<MapPin />} value={[branch.address, branch.city].filter(Boolean).join('، ') || 'لا يوجد عنوان مسجل'} />
                     <InfoRow icon={<Phone />} value={branch.phone || 'لا يوجد هاتف'} href={branch.phone ? `tel:${branch.phone}` : undefined} />
                     <InfoRow icon={<Building2 />} value={branch.companyName || 'الشركة غير محددة'} />
@@ -445,37 +445,37 @@ export const BranchesPage: React.FC = () => {
                   />
 
                   {isSelectedBranch ? (
-                    <div className="mb-4 grid grid-cols-1 sm:grid-cols-2 gap-2 rounded-xl bg-slate-50 p-3">
+                    <div className="mb-4 grid grid-cols-1 sm:grid-cols-2 gap-2 rounded-xl bg-surface-muted p-3">
                       <div>
-                        <p className="text-[10px] font-semibold text-slate-500">إجمالي المبيعات</p>
-                        <p className="mt-1 text-sm font-black text-slate-800">{formatCurrency(Number(stats?.totalSales || 0), branch.companyCurrency)}</p>
+                        <p className="text-[10px] font-semibold text-muted">إجمالي المبيعات</p>
+                        <p className="mt-1 text-sm font-black text-ink">{formatCurrency(Number(stats?.totalSales || 0), branch.companyCurrency)}</p>
                       </div>
-                      <div className="border-r border-slate-200 pr-3">
-                        <p className="text-[10px] font-semibold text-slate-500">عدد الفواتير</p>
-                        <p className="mt-1 text-sm font-black text-slate-800">{Number(stats?.totalOrders || 0).toLocaleString('ar-EG')}</p>
+                      <div className="border-r border-line pr-3">
+                        <p className="text-[10px] font-semibold text-muted">عدد الفواتير</p>
+                        <p className="mt-1 text-sm font-black text-ink">{Number(stats?.totalOrders || 0).toLocaleString('ar-EG')}</p>
                       </div>
                     </div>
                   ) : (
-                    <p className="mb-4 rounded-xl bg-slate-50 p-3 text-center text-xs text-slate-500">بدّل إلى هذا الفرع لعرض بياناته التشغيلية.</p>
+                    <p className="mb-4 rounded-xl bg-surface-muted p-3 text-center text-xs text-muted">بدّل إلى هذا الفرع لعرض بياناته التشغيلية.</p>
                   )}
 
-                  <div className="mt-auto flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3">
+                  <div className="mt-auto flex flex-wrap items-center gap-2 border-t border-line pt-3">
                     {isSelectedBranch ? (
                       <>
-                        <button onClick={() => openManagement(branch, 'overview')} className="rounded-lg px-2.5 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100">التفاصيل</button>
-                        {canUpdate && <button onClick={() => openEdit(branch)} className="inline-flex items-center gap-1 rounded-lg px-2.5 py-2 text-xs font-bold text-sky-700 hover:bg-sky-50"><Pencil className="h-3.5 w-3.5" /> تعديل</button>}
-                        {canViewWarehouses && <button onClick={() => openManagement(branch, 'warehouses')} className="inline-flex items-center gap-1 rounded-lg px-2.5 py-2 text-xs font-bold text-violet-700 hover:bg-violet-50"><Warehouse className="h-3.5 w-3.5" /> المخازن</button>}
-                        {canManageUsers && <button onClick={() => openManagement(branch, 'users')} className="inline-flex items-center gap-1 rounded-lg px-2.5 py-2 text-xs font-bold text-indigo-700 hover:bg-indigo-50"><Users className="h-3.5 w-3.5" /> المستخدمون</button>}
+                        <button onClick={() => openManagement(branch, 'overview')} className="rounded-lg px-2.5 py-2 text-xs font-bold text-ink-secondary hover:bg-surface-sunken">التفاصيل</button>
+                        {canUpdate && <button onClick={() => openEdit(branch)} className="inline-flex items-center gap-1 rounded-lg px-2.5 py-2 text-xs font-bold text-primary hover:bg-accent-soft"><Pencil className="h-3.5 w-3.5" /> تعديل</button>}
+                        {canViewWarehouses && <button onClick={() => openManagement(branch, 'warehouses')} className="inline-flex items-center gap-1 rounded-lg px-2.5 py-2 text-xs font-bold text-primary hover:bg-accent-soft"><Warehouse className="h-3.5 w-3.5" /> المخازن</button>}
+                        {canManageUsers && <button onClick={() => openManagement(branch, 'users')} className="inline-flex items-center gap-1 rounded-lg px-2.5 py-2 text-xs font-bold text-primary hover:bg-accent-soft"><Users className="h-3.5 w-3.5" /> المستخدمون</button>}
                       </>
                     ) : branch.isActive ? (
-                      <button onClick={() => switchToBranch(branch)} className="rounded-lg bg-sky-50 px-3 py-2 text-xs font-bold text-sky-700 hover:bg-sky-100">التبديل إلى هذا الفرع</button>
+                      <button onClick={() => switchToBranch(branch)} className="rounded-lg bg-accent-soft px-3 py-2 text-xs font-bold text-primary hover:bg-accent-soft">التبديل إلى هذا الفرع</button>
                     ) : null}
                     {canUpdate && (
                       <button
                         onClick={() => changeStatus(branch)}
                         disabled={branch.isMain || (branch.isActive && !isSelectedBranch)}
                         title={branch.isMain ? 'عيّن فرعًا افتراضيًا آخر قبل تعطيل هذا الفرع' : undefined}
-                        className={`mr-auto inline-flex items-center gap-1 rounded-lg px-2.5 py-2 text-xs font-bold disabled:cursor-not-allowed disabled:opacity-40 ${branch.isActive ? 'text-rose-700 hover:bg-rose-50' : 'text-emerald-700 hover:bg-emerald-50'}`}
+                        className={`mr-auto inline-flex items-center gap-1 rounded-lg px-2.5 py-2 text-xs font-bold disabled:cursor-not-allowed disabled:opacity-40 ${branch.isActive ? 'text-danger hover:bg-danger-soft' : 'text-success hover:bg-success-soft'}`}
                       >
                         <Power className="h-3.5 w-3.5" /> {branch.isActive ? 'تعطيل' : 'تفعيل'}
                       </button>
@@ -486,10 +486,10 @@ export const BranchesPage: React.FC = () => {
             })}
           </section>
         ) : (
-          <div className="rounded-2xl border-2 border-dashed border-slate-200 bg-white py-16 text-center">
-            <Building2 className="mx-auto mb-3 h-8 w-8 text-slate-300" />
-            <p className="font-bold text-slate-600">{search || statusFilter !== 'ALL' ? 'لا توجد فروع مطابقة للبحث والتصفية.' : 'لا توجد فروع مسجلة حتى الآن.'}</p>
-            {canCreate && !search && <button onClick={openCreate} className="mt-3 text-sm font-bold text-sky-700 hover:underline">إضافة أول فرع</button>}
+          <div className="rounded-2xl border-2 border-dashed border-line bg-surface py-16 text-center">
+            <Building2 className="mx-auto mb-3 h-8 w-8 text-muted" />
+            <p className="font-bold text-ink-secondary">{search || statusFilter !== 'ALL' ? 'لا توجد فروع مطابقة للبحث والتصفية.' : 'لا توجد فروع مسجلة حتى الآن.'}</p>
+            {canCreate && !search && <button onClick={openCreate} className="mt-3 text-sm font-bold text-primary hover:underline">إضافة أول فرع</button>}
           </div>
         )}
       </main>
@@ -537,13 +537,13 @@ export const BranchesPage: React.FC = () => {
               )}
             </div>
             <OperationalFieldsForm fields={operationalFields} values={operationalFieldValues} onChange={setOperationalFieldValues} title="بيانات إضافية للفرع" />
-            <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
-              <input type="checkbox" checked={form.isDefault} onChange={(event) => setForm({ ...form, isDefault: event.target.checked })} className="h-4 w-4 accent-sky-600" />
-              <span><span className="block text-xs font-bold">تعيين كفرع افتراضي</span><span className="mt-0.5 block text-[10px] text-slate-500">سيحل هذا الفرع محل الفرع الافتراضي الحالي.</span></span>
+            <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-line bg-surface-muted p-3">
+              <input type="checkbox" checked={form.isDefault} onChange={(event) => setForm({ ...form, isDefault: event.target.checked })} className="h-4 w-4 accent-primary" />
+              <span><span className="block text-xs font-bold">تعيين كفرع افتراضي</span><span className="mt-0.5 block text-[10px] text-muted">سيحل هذا الفرع محل الفرع الافتراضي الحالي.</span></span>
             </label>
-            <div className="flex justify-end gap-2 border-t border-slate-100 pt-3">
-              <button type="button" onClick={() => setFormOpen(false)} className="rounded-xl bg-slate-100 px-4 py-2.5 text-xs font-bold text-slate-600">إلغاء</button>
-              <button type="submit" disabled={saving} className="inline-flex items-center gap-2 rounded-xl bg-sky-600 px-5 py-2.5 text-xs font-bold text-white disabled:opacity-50">
+            <div className="flex justify-end gap-2 border-t border-line pt-3">
+              <button type="button" onClick={() => setFormOpen(false)} className="rounded-xl bg-surface-sunken px-4 py-2.5 text-xs font-bold text-ink-secondary">إلغاء</button>
+              <button type="submit" disabled={saving} className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-xs font-bold text-white disabled:opacity-50">
                 {saving && <Loader2 className="h-4 w-4 animate-spin" />} {editing ? 'حفظ التعديلات' : 'إنشاء الفرع'}
               </button>
             </div>
@@ -553,7 +553,7 @@ export const BranchesPage: React.FC = () => {
 
       {managedBranch && (
         <Modal onClose={() => setManagedBranch(null)} title={managedBranch.name} wide>
-          <div className="mb-4 flex flex-wrap gap-2 border-b border-slate-100 pb-3">
+          <div className="mb-4 flex flex-wrap gap-2 border-b border-line pb-3">
             <TabButton active={managementTab === 'overview'} onClick={() => setManagementTab('overview')}>نظرة عامة</TabButton>
             {canViewWarehouses && <TabButton active={managementTab === 'warehouses'} onClick={() => setManagementTab('warehouses')}>المخازن</TabButton>}
             {canManageUsers && <TabButton active={managementTab === 'users'} onClick={() => setManagementTab('users')}>مستخدمو الفرع</TabButton>}
@@ -575,64 +575,64 @@ export const BranchesPage: React.FC = () => {
 
           {managementTab === 'warehouses' && canViewWarehouses && (
             <div className="space-y-4">
-              <div className="rounded-xl border border-slate-200 p-3">
+              <div className="rounded-xl border border-line p-3">
                 <h3 className="mb-3 text-xs font-black">ربط مخزن متاح بالفرع</h3>
                 <div className="flex flex-col gap-2 sm:flex-row">
                   <select value={selectedWarehouse} onChange={(event) => setSelectedWarehouse(event.target.value)} className={`${inputClass} flex-1`}>
                     <option value="">اختر مخزنًا غير مرتبط</option>
                     {availableWarehouses.map((warehouse) => <option key={warehouse.id} value={warehouse.id}>{warehouse.name} ({warehouse.code})</option>)}
                   </select>
-                  <label className="flex items-center gap-2 whitespace-nowrap px-2 text-xs font-semibold text-slate-600">
-                    <input type="checkbox" checked={primaryWarehouse} onChange={(event) => setPrimaryWarehouse(event.target.checked)} className="h-4 w-4 accent-violet-600" /> مخزن أساسي
+                  <label className="flex items-center gap-2 whitespace-nowrap px-2 text-xs font-semibold text-ink-secondary">
+                    <input type="checkbox" checked={primaryWarehouse} onChange={(event) => setPrimaryWarehouse(event.target.checked)} className="h-4 w-4 accent-primary" /> مخزن أساسي
                   </label>
-                  <button onClick={assignWarehouse} disabled={!selectedWarehouse} className="rounded-xl bg-violet-600 px-4 py-2 text-xs font-bold text-white disabled:opacity-40">ربط المخزن</button>
+                  <button onClick={assignWarehouse} disabled={!selectedWarehouse} className="rounded-xl bg-primary px-4 py-2 text-xs font-bold text-white disabled:opacity-40">ربط المخزن</button>
                 </div>
-                {!availableWarehouses.length && <p className="mt-2 text-[10px] text-slate-500">لا توجد مخازن غير مرتبطة. يمكنك إنشاء مخزن من صفحة المخازن واختيار الفرع مباشرة.</p>}
+                {!availableWarehouses.length && <p className="mt-2 text-[10px] text-muted">لا توجد مخازن غير مرتبطة. يمكنك إنشاء مخزن من صفحة المخازن واختيار الفرع مباشرة.</p>}
               </div>
               <div className="space-y-2">
                 {branchWarehouses.map((warehouse) => (
-                  <div key={warehouse.id} className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 px-3 py-2.5">
-                    <div className="flex items-center gap-2 text-sm font-bold"><Warehouse className="h-4 w-4 text-violet-600" /> {warehouse.warehouseName || warehouse.warehouseId}
-                      {warehouse.isPrimary && <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] text-amber-700">أساسي</span>}
-                      {warehouse.direct && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] text-slate-500">مرتبط مباشرة</span>}
+                  <div key={warehouse.id} className="flex items-center justify-between gap-3 rounded-xl border border-line px-3 py-2.5">
+                    <div className="flex items-center gap-2 text-sm font-bold"><Warehouse className="h-4 w-4 text-primary" /> {warehouse.warehouseName || warehouse.warehouseId}
+                      {warehouse.isPrimary && <span className="rounded-full bg-warning-soft px-2 py-0.5 text-[10px] text-warning">أساسي</span>}
+                      {warehouse.direct && <span className="rounded-full bg-surface-sunken px-2 py-0.5 text-[10px] text-muted">مرتبط مباشرة</span>}
                     </div>
-                    {!warehouse.direct && <button onClick={() => removeWarehouse(warehouse.warehouseId)} className="rounded-lg p-2 text-rose-600 hover:bg-rose-50" aria-label="إلغاء ربط المخزن"><X className="h-4 w-4" /></button>}
+                    {!warehouse.direct && <button onClick={() => removeWarehouse(warehouse.warehouseId)} className="rounded-lg p-2 text-danger hover:bg-danger-soft" aria-label="إلغاء ربط المخزن"><X className="h-4 w-4" /></button>}
                   </div>
                 ))}
-                {!branchWarehouses.length && <p className="py-6 text-center text-xs text-slate-500">لا توجد مخازن مرتبطة بهذا الفرع.</p>}
+                {!branchWarehouses.length && <p className="py-6 text-center text-xs text-muted">لا توجد مخازن مرتبطة بهذا الفرع.</p>}
               </div>
             </div>
           )}
 
           {managementTab === 'users' && canManageUsers && (
             <div>
-              <div className="mb-3 flex items-start gap-2 rounded-xl bg-indigo-50 p-3 text-xs text-indigo-800">
+              <div className="mb-3 flex items-start gap-2 rounded-xl bg-accent-soft p-3 text-xs text-primary">
                 <Users className="mt-0.5 h-4 w-4 shrink-0" />
                 <p>اختيار المستخدم يربطه بالفرع ويمنحه نطاقًا متاحًا لإدارة بياناته وفق صلاحيات دوره. لا يمكن إزالة آخر فرع لمستخدم نطاقه «الفروع المسندة».</p>
               </div>
               <div className="max-h-80 space-y-2 overflow-y-auto">
                 {branchUsers.map((user) => (
-                  <label key={user.id} className="flex cursor-pointer items-center gap-3 rounded-xl border border-slate-200 px-3 py-2.5 hover:bg-slate-50">
+                  <label key={user.id} className="flex cursor-pointer items-center gap-3 rounded-xl border border-line px-3 py-2.5 hover:bg-surface-muted">
                     <input
                       type="checkbox"
                       checked={selectedUserIds.includes(user.id)}
                       onChange={(event) => setSelectedUserIds((current) =>
                         event.target.checked ? [...current, user.id] : current.filter((id) => id !== user.id)
                       )}
-                      className="h-4 w-4 accent-indigo-600"
+                      className="h-4 w-4 accent-primary"
                     />
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-xs font-bold">{user.fullName}</span>
-                      <span className="mt-0.5 block text-[10px] text-slate-500">{user.username} · {user.role}</span>
+                      <span className="mt-0.5 block text-[10px] text-muted">{user.username} · {user.role}</span>
                     </span>
-                    {user.branchScope === 'ALL' && <span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] text-slate-500">وصول مركزي</span>}
-                    {user.isAssigned && <Check className="h-4 w-4 text-emerald-600" />}
+                    {user.branchScope === 'ALL' && <span className="rounded-full bg-surface-sunken px-2 py-1 text-[10px] text-muted">وصول مركزي</span>}
+                    {user.isAssigned && <Check className="h-4 w-4 text-success" />}
                   </label>
                 ))}
-                {!branchUsers.length && <p className="py-8 text-center text-xs text-slate-500">لا يوجد مستخدمون نشطون قابلون للإسناد.</p>}
+                {!branchUsers.length && <p className="py-8 text-center text-xs text-muted">لا يوجد مستخدمون نشطون قابلون للإسناد.</p>}
               </div>
-              <div className="mt-4 flex justify-end border-t border-slate-100 pt-3">
-                <button onClick={saveUserAssignments} disabled={saving} className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-xs font-bold text-white disabled:opacity-50">
+              <div className="mt-4 flex justify-end border-t border-line pt-3">
+                <button onClick={saveUserAssignments} disabled={saving} className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-xs font-bold text-white disabled:opacity-50">
                   {saving && <Loader2 className="h-4 w-4 animate-spin" />} حفظ إسناد المستخدمين
                 </button>
               </div>
@@ -655,33 +655,33 @@ const formatCurrency = (value: number, currency?: string | null): string => {
 
 const SummaryCard: React.FC<{ icon: React.ReactNode; label: string; value: string | number; tone: 'sky' | 'emerald' | 'violet' | 'amber' }> = ({ icon, label, value, tone }) => {
   const tones = {
-    sky: 'bg-sky-50 text-sky-600',
-    emerald: 'bg-emerald-50 text-emerald-600',
-    violet: 'bg-violet-50 text-violet-600',
-    amber: 'bg-amber-50 text-amber-600',
+    sky: 'bg-accent-soft text-primary',
+    emerald: 'bg-success-soft text-success',
+    violet: 'bg-accent-soft text-primary',
+    amber: 'bg-warning-soft text-warning',
   };
   return (
-  <div className="rounded-2xl border border-slate-200 bg-white p-4">
+  <div className="rounded-2xl border border-line bg-surface p-4">
     <div className={`mb-3 flex h-8 w-8 items-center justify-center rounded-xl ${tones[tone]}`}>{icon}</div>
-    <p className="text-[11px] font-semibold text-slate-500">{label}</p>
-    <p className="mt-1 truncate text-lg font-black text-slate-900">{value}</p>
+    <p className="text-[11px] font-semibold text-muted">{label}</p>
+    <p className="mt-1 truncate text-lg font-black text-ink">{value}</p>
   </div>
   );
 };
 
 const InfoRow: React.FC<{ icon: React.ReactElement<{ className?: string }>; value: string; href?: string }> = ({ icon, value, href }) => (
   <div className="flex items-center gap-2">
-    {React.cloneElement(icon, { className: 'h-4 w-4 shrink-0 text-slate-400' })}
-    {href ? <a href={href} className="truncate hover:text-sky-700">{value}</a> : <span className="truncate">{value}</span>}
+    {React.cloneElement(icon, { className: 'h-4 w-4 shrink-0 text-muted' })}
+    {href ? <a href={href} className="truncate hover:text-primary">{value}</a> : <span className="truncate">{value}</span>}
   </div>
 );
 
 const Modal: React.FC<{ title: string; onClose: () => void; children: React.ReactNode; wide?: boolean }> = ({ title, onClose, children, wide }) => (
-  <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-3 backdrop-blur-sm" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
-    <div className={`max-h-[92vh] w-full overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl sm:p-6 ${wide ? 'max-w-2xl' : 'max-w-xl'}`}>
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-primary/45 p-3 backdrop-blur-sm" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+    <div className={`max-h-[92vh] w-full overflow-y-auto rounded-2xl bg-surface p-5 shadow-2xl sm:p-6 ${wide ? 'max-w-2xl' : 'max-w-xl'}`}>
       <div className="mb-4 flex items-center justify-between gap-3">
         <h2 className="text-base font-black">{title}</h2>
-        <button onClick={onClose} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100" aria-label="إغلاق"><X className="h-4 w-4" /></button>
+        <button onClick={onClose} className="rounded-lg p-2 text-muted hover:bg-surface-sunken" aria-label="إغلاق"><X className="h-4 w-4" /></button>
       </div>
       {children}
     </div>
@@ -689,16 +689,16 @@ const Modal: React.FC<{ title: string; onClose: () => void; children: React.Reac
 );
 
 const FormField: React.FC<{ label: string; children: React.ReactNode; className?: string }> = ({ label, children, className = '' }) => (
-  <label className={`block ${className}`}><span className="mb-1.5 block text-xs font-bold text-slate-700">{label}</span>{children}</label>
+  <label className={`block ${className}`}><span className="mb-1.5 block text-xs font-bold text-ink">{label}</span>{children}</label>
 );
 
 const Detail: React.FC<{ label: string; value: string; code?: boolean }> = ({ label, value, code }) => (
-  <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
-    <p className="text-[10px] font-semibold text-slate-500">{label}</p>
-    <p className={`mt-1 break-words text-xs font-bold text-slate-800 ${code ? 'font-mono' : ''}`}>{value}</p>
+  <div className="rounded-xl border border-line bg-surface-muted px-3 py-2.5">
+    <p className="text-[10px] font-semibold text-muted">{label}</p>
+    <p className={`mt-1 break-words text-xs font-bold text-ink ${code ? 'font-mono' : ''}`}>{value}</p>
   </div>
 );
 
 const TabButton: React.FC<{ active: boolean; onClick: () => void; children: React.ReactNode }> = ({ active, onClick, children }) => (
-  <button onClick={onClick} className={`rounded-lg px-3 py-2 text-xs font-bold ${active ? 'bg-sky-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>{children}</button>
+  <button onClick={onClick} className={`rounded-lg px-3 py-2 text-xs font-bold ${active ? 'bg-primary text-white' : 'bg-surface-sunken text-ink-secondary hover:bg-surface-sunken'}`}>{children}</button>
 );

@@ -10,11 +10,11 @@ import type { Product } from '../../../types';
 
 import { useToast } from '../../../components/ui/Toast';
 const CATEGORY_LABELS: Record<PriceList['customerType'], { label: string; color: string }> = {
-  RETAIL: { label: 'بيع قطاعي', color: 'bg-emerald-50 text-emerald-600 border-emerald-200' },
-  WHOLESALE: { label: 'جملة الموزعين', color: 'bg-violet-50 text-violet-600 border-violet-200' },
-  CONTRACTOR: { label: 'سعر المقاولين', color: 'bg-sky-50 text-sky-600 border-sky-200' },
-  VIP: { label: 'عملاء VIP', color: 'bg-amber-50 text-amber-600 border-amber-200' },
-  PROJECT: { label: 'مشاريع', color: 'bg-indigo-50 text-indigo-600 border-indigo-200' },
+  RETAIL: { label: 'بيع قطاعي', color: 'bg-success-soft text-success border-success-border' },
+  WHOLESALE: { label: 'جملة الموزعين', color: 'bg-accent-soft text-primary border-accent-border' },
+  CONTRACTOR: { label: 'سعر المقاولين', color: 'bg-accent-soft text-primary border-accent-border' },
+  VIP: { label: 'عملاء VIP', color: 'bg-warning-soft text-warning border-warning-border' },
+  PROJECT: { label: 'مشاريع', color: 'bg-accent-soft text-primary border-accent-border' },
 };
 
 const fmt = (n: number) => new Intl.NumberFormat('ar-EG').format(Math.round(n)) + ' ج';
@@ -111,62 +111,62 @@ export const PricingPage: React.FC = () => {
   const filtered = lists.filter((p) => p.name.includes(search) || p.code.includes(search));
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
-      <div className="bg-white border-b border-slate-200 px-6 pt-4">
+    <div className="h-full flex flex-col bg-surface-muted text-ink overflow-hidden">
+      <div className="bg-surface border-b border-line px-6 pt-4">
         <PageHeader
           icon={<Percent className="w-5 h-5" />}
           title="قوائم تسعير السيراميك والمواد"
           description="إعداد الخصومات وقوائم الأسعار المخصصة للمقاولين والتجار وكبار العملاء"
           actions={canManage && (
-            <button onClick={() => setCreateOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-semibold transition shrink-0">
+            <button onClick={() => setCreateOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-success hover:bg-success text-white rounded-xl text-sm font-semibold transition shrink-0">
               <Plus className="w-4 h-4" /> إنشاء قائمة أسعار
             </button>
           )}
         />
       </div>
 
-      <div className="p-4 bg-white border-b border-slate-200">
+      <div className="p-4 bg-surface border-b border-line">
         <div className="relative">
-          <Search className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="بحث باسم أو كود القائمة..." className="w-full pl-4 pr-10 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-emerald-400" />
+          <Search className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="بحث باسم أو كود القائمة..." className="w-full pl-4 pr-10 py-2.5 bg-surface border border-line rounded-xl text-sm focus:outline-none focus:border-success" />
         </div>
       </div>
 
       <div className="flex-1 overflow-y-auto p-4">
-        {error && <div className="mb-3 px-4 py-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold">{error}</div>}
+        {error && <div className="mb-3 px-4 py-2.5 rounded-xl bg-danger-soft border border-danger-border text-danger text-xs font-semibold">{error}</div>}
         {loading ? (
-          <div className="py-16 flex justify-center"><Loader2 className="w-6 h-6 animate-spin text-emerald-500" /></div>
+          <div className="py-16 flex justify-center"><Loader2 className="w-6 h-6 animate-spin text-success" /></div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {filtered.map((list) => {
               const st = CATEGORY_LABELS[list.customerType] || CATEGORY_LABELS.RETAIL;
               return (
-                <div key={list.id} className="bg-white border border-slate-200 hover:border-slate-300 rounded-xl p-5 transition flex flex-col justify-between group">
+                <div key={list.id} className="bg-surface border border-line hover:border-line-strong rounded-xl p-5 transition flex flex-col justify-between group">
                   <div>
                     <div className="flex items-center justify-between mb-3">
                       <span className={`text-[10px] px-2.5 py-1 rounded-full font-bold border ${st.color}`}>{st.label}</span>
-                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold border ${list.isActive ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold border ${list.isActive ? 'bg-success-soft text-success border-success-border' : 'bg-surface-sunken text-muted border-line'}`}>
                         {list.isActive ? 'نشطة' : 'معطلة'}
                       </span>
                     </div>
                     <div className="flex items-center gap-2 mb-2">
-                      <h3 className="font-extrabold text-slate-900 group-hover:text-emerald-600 transition">{list.name}</h3>
-                      {list.isDefault && <span className="text-[9px] bg-sky-50 text-sky-600 px-1.5 py-0.5 rounded font-bold border border-sky-200">افتراضية</span>}
+                      <h3 className="font-extrabold text-ink group-hover:text-success transition">{list.name}</h3>
+                      {list.isDefault && <span className="text-[9px] bg-accent-soft text-primary px-1.5 py-0.5 rounded font-bold border border-accent-border">افتراضية</span>}
                     </div>
-                    <p className="text-[10px] font-mono text-slate-400 mb-2">{list.code}</p>
-                    <div className="text-xs text-slate-500 font-semibold">تضم {list.itemsCount} صنف بأسعار مخصصة.</div>
+                    <p className="text-[10px] font-mono text-muted mb-2">{list.code}</p>
+                    <div className="text-xs text-muted font-semibold">تضم {list.itemsCount} صنف بأسعار مخصصة.</div>
                     {(list.validFrom || list.validTo) && (
-                      <div className="text-[10px] text-slate-400 mt-1">الصلاحية: {list.validFrom || '—'} → {list.validTo || '—'}</div>
+                      <div className="text-[10px] text-muted mt-1">الصلاحية: {list.validFrom || '—'} → {list.validTo || '—'}</div>
                     )}
                   </div>
 
-                  <div className="mt-4 pt-3 border-t border-slate-100 flex justify-end gap-2">
+                  <div className="mt-4 pt-3 border-t border-line flex justify-end gap-2">
                     {canManage && (
-                      <button onClick={() => toggle(list)} className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition flex items-center gap-1 ${list.isActive ? 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100' : 'bg-emerald-50 text-emerald-600 border-emerald-200 hover:bg-emerald-100'}`}>
+                      <button onClick={() => toggle(list)} className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition flex items-center gap-1 ${list.isActive ? 'bg-surface-muted text-ink-secondary border-line hover:bg-surface-sunken' : 'bg-success-soft text-success border-success-border hover:bg-success-soft'}`}>
                         <Power className="w-3 h-3" /> {list.isActive ? 'تعطيل' : 'تفعيل'}
                       </button>
                     )}
-                    <button onClick={() => loadItems(list)} className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 border border-emerald-200 rounded-lg text-xs font-bold transition">
+                    <button onClick={() => loadItems(list)} className="px-3 py-1.5 bg-success-soft hover:bg-success-soft text-success border border-success-border rounded-lg text-xs font-bold transition">
                       عرض الأسعار
                     </button>
                   </div>
@@ -174,8 +174,8 @@ export const PricingPage: React.FC = () => {
               );
             })}
             {filtered.length === 0 && (
-              <div className="col-span-full py-16 text-center text-slate-500 border-2 border-dashed border-slate-200 rounded-2xl bg-white">
-                <Percent className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+              <div className="col-span-full py-16 text-center text-muted border-2 border-dashed border-line rounded-2xl bg-surface">
+                <Percent className="w-12 h-12 text-muted mx-auto mb-3" />
                 <p className="text-sm">لا توجد قوائم أسعار مطابقة</p>
               </div>
             )}
@@ -184,40 +184,40 @@ export const PricingPage: React.FC = () => {
       </div>
 
       {canManage && createOpen && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-md w-full p-6">
+        <div className="fixed inset-0 bg-primary/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-surface rounded-2xl border border-line shadow-2xl max-w-md w-full p-6">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-base font-extrabold text-slate-900">إنشاء قائمة أسعار</h3>
-              <button onClick={() => setCreateOpen(false)} className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100"><X className="w-4 h-4" /></button>
+              <h3 className="text-base font-extrabold text-ink">إنشاء قائمة أسعار</h3>
+              <button onClick={() => setCreateOpen(false)} className="p-1.5 rounded-lg text-muted hover:bg-surface-sunken"><X className="w-4 h-4" /></button>
             </div>
             <form onSubmit={handleCreate} className="space-y-3 text-xs">
               <div>
-                <label className="font-bold text-slate-700 block mb-1">اسم القائمة *</label>
-                <input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-semibold" />
+                <label className="font-bold text-ink block mb-1">اسم القائمة *</label>
+                <input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="w-full px-3 py-2 bg-surface-muted rounded-xl border border-line font-semibold" />
               </div>
               <div>
-                <label className="font-bold text-slate-700 block mb-1">نوع العملاء</label>
-                <select value={form.customerType} onChange={(e) => setForm({ ...form, customerType: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold">
+                <label className="font-bold text-ink block mb-1">نوع العملاء</label>
+                <select value={form.customerType} onChange={(e) => setForm({ ...form, customerType: e.target.value })} className="w-full px-3 py-2 bg-surface-muted rounded-xl border border-line font-bold">
                   {Object.entries(CATEGORY_LABELS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
                 </select>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">صالح من</label>
-                  <input type="date" value={form.validFrom} onChange={(e) => setForm({ ...form, validFrom: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-mono" />
+                  <label className="font-bold text-ink block mb-1">صالح من</label>
+                  <input type="date" value={form.validFrom} onChange={(e) => setForm({ ...form, validFrom: e.target.value })} className="w-full px-3 py-2 bg-surface-muted rounded-xl border border-line font-mono" />
                 </div>
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">صالح إلى</label>
-                  <input type="date" value={form.validTo} onChange={(e) => setForm({ ...form, validTo: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-mono" />
+                  <label className="font-bold text-ink block mb-1">صالح إلى</label>
+                  <input type="date" value={form.validTo} onChange={(e) => setForm({ ...form, validTo: e.target.value })} className="w-full px-3 py-2 bg-surface-muted rounded-xl border border-line font-mono" />
                 </div>
               </div>
-              <label className="flex items-center gap-2 font-bold text-slate-700">
+              <label className="flex items-center gap-2 font-bold text-ink">
                 <input type="checkbox" checked={form.isDefault} onChange={(e) => setForm({ ...form, isDefault: e.target.checked })} className="w-4 h-4 rounded" />
                 اجعلها القائمة الافتراضية
               </label>
-              <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
-                <button type="button" onClick={() => setCreateOpen(false)} className="px-4 py-2 bg-slate-100 text-slate-700 font-bold rounded-xl">إلغاء</button>
-                <button type="submit" disabled={saving} className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-bold rounded-xl flex items-center gap-2">
+              <div className="flex justify-end gap-2 pt-3 border-t border-line">
+                <button type="button" onClick={() => setCreateOpen(false)} className="px-4 py-2 bg-surface-sunken text-ink font-bold rounded-xl">إلغاء</button>
+                <button type="submit" disabled={saving} className="px-5 py-2 bg-success hover:bg-success disabled:opacity-60 text-white font-bold rounded-xl flex items-center gap-2">
                   {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />} إنشاء
                 </button>
               </div>
@@ -227,14 +227,14 @@ export const PricingPage: React.FC = () => {
       )}
 
       {activeList && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-3xl w-full p-6 max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-primary/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-surface rounded-2xl border border-line shadow-2xl max-w-3xl w-full p-6 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h3 className="text-base font-extrabold text-slate-900">أسعار: {activeList.name}</h3>
-                <p className="text-[10px] text-slate-500 font-mono">{activeList.code} • {activeList.itemsCount} صنف</p>
+                <h3 className="text-base font-extrabold text-ink">أسعار: {activeList.name}</h3>
+                <p className="text-[10px] text-muted font-mono">{activeList.code} • {activeList.itemsCount} صنف</p>
               </div>
-              <button onClick={() => setActiveList(null)} className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100"><X className="w-4 h-4" /></button>
+              <button onClick={() => setActiveList(null)} className="p-1.5 rounded-lg text-muted hover:bg-surface-sunken"><X className="w-4 h-4" /></button>
             </div>
 
             {canManage && (
@@ -247,33 +247,33 @@ export const PricingPage: React.FC = () => {
                   onChange={(productId) => setItemForm({ ...itemForm, productId })}
                   className="col-span-2"
                 />
-                <input required type="number" min="0.01" step="0.01" placeholder="سعر المتر" value={itemForm.priceM2} onChange={(e) => setItemForm({ ...itemForm, priceM2: e.target.value })} className="px-2 py-2 bg-slate-50 rounded-lg border border-slate-200 font-mono" />
-                <input type="number" min="0" step="0.01" placeholder="سعر الكرتونة" value={itemForm.priceBox} onChange={(e) => setItemForm({ ...itemForm, priceBox: e.target.value })} className="px-2 py-2 bg-slate-50 rounded-lg border border-slate-200 font-mono" />
-                <input type="number" min="0" step="0.01" placeholder="الحد الأدنى للمتر" value={itemForm.minQuantityM2} onChange={(e) => setItemForm({ ...itemForm, minQuantityM2: e.target.value })} className="px-2 py-2 bg-slate-50 rounded-lg border border-slate-200 font-mono" />
-                <button type="submit" className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg flex items-center justify-center gap-1">
+                <input required type="number" min="0.01" step="0.01" placeholder="سعر المتر" value={itemForm.priceM2} onChange={(e) => setItemForm({ ...itemForm, priceM2: e.target.value })} className="px-2 py-2 bg-surface-muted rounded-lg border border-line font-mono" />
+                <input type="number" min="0" step="0.01" placeholder="سعر الكرتونة" value={itemForm.priceBox} onChange={(e) => setItemForm({ ...itemForm, priceBox: e.target.value })} className="px-2 py-2 bg-surface-muted rounded-lg border border-line font-mono" />
+                <input type="number" min="0" step="0.01" placeholder="الحد الأدنى للمتر" value={itemForm.minQuantityM2} onChange={(e) => setItemForm({ ...itemForm, minQuantityM2: e.target.value })} className="px-2 py-2 bg-surface-muted rounded-lg border border-line font-mono" />
+                <button type="submit" className="px-3 py-2 bg-success hover:bg-success text-white font-bold rounded-lg flex items-center justify-center gap-1">
                   <Plus className="w-3.5 h-3.5" /> إضافة
                 </button>
               </form>
             )}
 
-            <div className="border border-slate-200 rounded-xl overflow-hidden">
+            <div className="border border-line rounded-xl overflow-hidden">
               <DataTable
               ariaLabel="أسعار مخصصة"
               rows={items}
               rowKey={(item: any) => String(item.id)}
               dense
               tableClassName="text-xs"
-              rowClassName={() => 'transition hover:bg-slate-50'}
+              rowClassName={() => 'transition hover:bg-surface-muted'}
               columns={[
-                { key: 'product', header: 'الصنف', render: (item: any) => <span className="font-bold text-slate-800">{item.productName}</span> },
-                { key: 'sku', header: 'الكود', render: (item: any) => <span className="font-mono text-slate-500">{item.productSku}</span> },
-                { key: 'm2', header: 'سعر المتر', render: (item: any) => <span className="font-bold text-emerald-600">{fmt(item.priceM2)}</span> },
-                { key: 'box', header: 'سعر الكرتونة', render: (item: any) => <span className="font-mono text-slate-600">{item.priceBox ? fmt(item.priceBox) : '—'}</span> },
-                { key: 'min', header: 'الحد الأدنى', render: (item: any) => <span className="font-mono text-slate-600">{item.minQuantityM2 || 0}</span> },
+                { key: 'product', header: 'الصنف', render: (item: any) => <span className="font-bold text-ink">{item.productName}</span> },
+                { key: 'sku', header: 'الكود', render: (item: any) => <span className="font-mono text-muted">{item.productSku}</span> },
+                { key: 'm2', header: 'سعر المتر', render: (item: any) => <span className="font-bold text-success">{fmt(item.priceM2)}</span> },
+                { key: 'box', header: 'سعر الكرتونة', render: (item: any) => <span className="font-mono text-ink-secondary">{item.priceBox ? fmt(item.priceBox) : '—'}</span> },
+                { key: 'min', header: 'الحد الأدنى', render: (item: any) => <span className="font-mono text-ink-secondary">{item.minQuantityM2 || 0}</span> },
                 {
                   key: 'del', header: '',
                   render: (item: any) => canManage ? (
-                    <button onClick={() => removeItem(item.id)} className="rounded-lg p-1.5 text-slate-400 transition hover:bg-rose-50 hover:text-rose-600"><Trash2 className="h-3.5 w-3.5" /></button>
+                    <button onClick={() => removeItem(item.id)} className="rounded-lg p-1.5 text-muted transition hover:bg-danger-soft hover:text-danger"><Trash2 className="h-3.5 w-3.5" /></button>
                   ) : null,
                 },
               ]}

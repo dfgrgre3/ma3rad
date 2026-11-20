@@ -13,6 +13,7 @@ import { CentralFeaturePermissionService } from '../licensing/CentralFeaturePerm
 import { ROUTE_PERMISSIONS } from '../../../config/routePermissions';
 import { getActivityHiddenPaths } from '../../../config/activityPageVisibility';
 import { getActivityNavLabel } from '../../../config/activityNavLabels';
+import { getActivityPathCopy } from '../../../config/activityPathCopy';
 import { Folder } from 'lucide-react';
 
 export interface NavOverrides {
@@ -160,6 +161,13 @@ export class NavigationService {
     '/operations': 'modules.operations',
     '/purchase-orders': 'modules.purchasing',
     '/purchasing': 'modules.purchasing',
+    '/orders': 'documents.orders',
+    '/quotations': 'documents.quotations',
+    '/purchases/orders': 'documents.purchaseOrders',
+    '/purchases': 'documents.purchaseInvoices',
+    '/crm': 'modules.crm',
+    '/finance': 'modules.finance',
+    '/hr': 'modules.hr',
   };
 
   private static readonly routePermissions: Array<{ path: string; all?: string[]; any?: string[] }> = [
@@ -302,6 +310,7 @@ export class NavigationService {
       labels[item.to]
       || AppConfigService.getPage(item.to).label
       || getActivityNavLabel(item.to, businessType)
+      || getActivityPathCopy(item.to, businessType)?.title
       || (NavigationService.pathTerms[item.to]
         ? term(NavigationService.pathTerms[item.to]!)
         : item.label);
@@ -378,7 +387,7 @@ export class NavigationService {
           return ra - rb;
         })
         .map(({ __enabled, __order, ...item }) => item);
-      return { id: g.id, label: labels[`group:${g.id}`] || g.label, icon: Folder, color: 'text-slate-500', items };
+      return { id: g.id, label: labels[`group:${g.id}`] || g.label, icon: Folder, color: 'text-muted', items };
     });
     const allMerged: NavGroupDef[] = [...merged, ...customGroupsDefs];
     const visibleMerged = allMerged.filter((group) => !hiddenGroupSet.has(group.id) || options.includeHidden);

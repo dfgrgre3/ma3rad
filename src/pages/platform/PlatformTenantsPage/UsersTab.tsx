@@ -43,26 +43,26 @@ export const UsersTab: React.FC<UsersTabProps> = ({
                       minWidth={720}
                       dense
                       columns={[
-                        { key: 'name', header: 'الاسم', render: (user) => <span className="text-[11.5px] font-bold text-slate-800">{user.fullName}</span> },
+                        { key: 'name', header: 'الاسم', render: (user) => <span className="text-[11.5px] font-bold text-ink">{user.fullName}</span> },
                         { key: 'username', header: 'اسم المستخدم', render: (user) => <span className="font-mono text-[10.5px]" dir="ltr">{user.username || '—'}</span> },
                         { key: 'email', header: 'البريد', render: (user) => <span className="text-[10.5px]" dir="ltr">{user.email || '—'}</span> },
                         { key: 'phone', header: 'الهاتف', render: (user) => <span className="text-[10.5px]" dir="ltr">{user.phone || '—'}</span> },
-                        { key: 'role', header: 'الدور', render: (user) => <span className="text-[10.5px] font-semibold text-slate-700">{user.role}</span> },
+                        { key: 'role', header: 'الدور', render: (user) => <span className="text-[10.5px] font-semibold text-ink">{user.role}</span> },
                         {
                           key: 'status', header: 'الحالة',
                           render: (user) => <StatusBadge value={user.status === 'ACTIVE' ? 'ACTIVE' : user.status === 'SUSPENDED' ? 'SUSPENDED' : 'TRIAL'} label={user.status === 'ACTIVE' ? 'نشط' : user.status === 'SUSPENDED' ? 'موقوف' : 'مدعو'} />,
                         },
-                        { key: 'notes', header: 'ملاحظات', render: (user) => <span className="text-[10.5px] text-slate-500">{user.notes || '—'}</span> },
+                        { key: 'notes', header: 'ملاحظات', render: (user) => <span className="text-[10.5px] text-muted">{user.notes || '—'}</span> },
                         {
                           key: 'action', header: 'إجراء',
                           render: (user) => (
                             <div className="flex items-center gap-1">
                               {canManageTenants && (<>
-                                <button type="button" onClick={() => openUserEdit(user)} className="rounded p-1.5 text-slate-500 hover:bg-sky-50 hover:text-sky-700" title="تعديل"><Pencil className="h-3.5 w-3.5" /></button>
-                                <button type="button" onClick={() => toggleUser(user, user.status !== 'ACTIVE')} className="rounded p-1.5 text-slate-500 hover:bg-amber-50 hover:text-amber-700" title={user.status === 'ACTIVE' ? 'تعليق' : 'تفعيل'}>
+                                <button type="button" onClick={() => openUserEdit(user)} className="rounded p-1.5 text-muted hover:bg-accent-soft hover:text-primary" title="تعديل"><Pencil className="h-3.5 w-3.5" /></button>
+                                <button type="button" onClick={() => toggleUser(user, user.status !== 'ACTIVE')} className="rounded p-1.5 text-muted hover:bg-warning-soft hover:text-warning" title={user.status === 'ACTIVE' ? 'تعليق' : 'تفعيل'}>
                                   {user.status === 'ACTIVE' ? <Ban className="h-3.5 w-3.5" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
                                 </button>
-                                <button type="button" onClick={() => deleteUser(user)} className="rounded p-1.5 text-slate-500 hover:bg-rose-50 hover:text-rose-700" title="حذف"><Trash2 className="h-3.5 w-3.5" /></button>
+                                <button type="button" onClick={() => deleteUser(user)} className="rounded p-1.5 text-muted hover:bg-danger-soft hover:text-danger" title="حذف"><Trash2 className="h-3.5 w-3.5" /></button>
                               </>)}
                             </div>
                           ),

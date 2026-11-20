@@ -240,8 +240,7 @@ export class ExecutiveCommandService {
         materialShortages: shortages.length,
         bomStockAlerts: bomAlerts.length,
       };
-    } catch (error) {
-      console.error('[executive] manufacturing summary failed', error);
+    } catch {
       return null;
     }
   }

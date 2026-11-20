@@ -9,9 +9,9 @@ interface CategoryDistributionCardProps {
 
 export const CategoryDistributionCard: React.FC<CategoryDistributionCardProps> = ({ categorySales }) => {
   return (
-    <div className="bg-white dark:bg-slate-900 p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs">
-      <h3 className="text-xs font-bold text-slate-900 dark:text-white mb-0.5">توزيع المبيعات حسب الفئة</h3>
-      <p className="text-[11px] text-slate-400 mb-2">الحصة النسبية لكل تصنيف</p>
+    <div className="bg-surface p-3.5 rounded-xl border border-line shadow-xs">
+      <h3 className="text-xs font-bold text-ink dark:text-white mb-0.5">توزيع المبيعات حسب الفئة</h3>
+      <p className="text-[11px] text-muted mb-2">الحصة النسبية لكل تصنيف</p>
       <div className="h-44 w-full" dir="ltr">
         <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 800, height: 176 }}>
           <PieChartRecharts>

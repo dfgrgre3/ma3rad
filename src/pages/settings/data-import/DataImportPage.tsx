@@ -416,19 +416,19 @@ export const DataImportPage: React.FC = () => {
     ? 0
     : item.data.rows.length - service.validate(item.data).length), 0);
 
-  if (!canOpen) return <div className="m-8 rounded-2xl border border-amber-200 bg-amber-50 p-6 text-sm font-bold text-amber-900">لا تملك صلاحية استيراد البيانات. يرجى التواصل مع مسؤول النظام لمنحك الصلاحية اللازمة.</div>;
+  if (!canOpen) return <div className="m-8 rounded-2xl border border-warning-border bg-warning-soft p-6 text-sm font-bold text-warning">لا تملك صلاحية استيراد البيانات. يرجى التواصل مع مسؤول النظام لمنحك الصلاحية اللازمة.</div>;
   return <div className="w-full p-4 md:p-8 space-y-6">
     {/* Sub Navigation Bar */}
-    <div className="flex items-center gap-2 border-b border-slate-200 pb-3">
+    <div className="flex items-center gap-2 border-b border-line pb-3">
       <Link
         to="/data-import"
-        className="px-4 py-2 rounded-xl text-xs font-black bg-sky-600 text-white shadow-sm"
+        className="px-4 py-2 rounded-xl text-xs font-black bg-primary text-white shadow-sm"
       >
         مركز استيراد الملفات
       </Link>
       <Link
         to="/data-import/types"
-        className="px-4 py-2 rounded-xl text-xs font-black text-slate-600 hover:bg-slate-100 transition"
+        className="px-4 py-2 rounded-xl text-xs font-black text-ink-secondary hover:bg-surface-sunken transition"
       >
         إدارة أنواع البيانات المرنة والسجلات
       </Link>
@@ -438,39 +438,39 @@ export const DataImportPage: React.FC = () => {
       icon={<FileSpreadsheet className="w-5 h-5" />}
       title="مركز استيراد البيانات"
       description="استورد الجداول والمستندات والصور، راجع البيانات وطابق الحقول قبل الحفظ، أو ادمج نسخة مشفرة."
-      actions={data && data.entity !== 'dynamic' && <button onClick={downloadTemplate} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50"><Download className="h-4 w-4"/>تنزيل قالب {ENTITY_META[data.entity].label}</button>}
+      actions={data && data.entity !== 'dynamic' && <button onClick={downloadTemplate} className="inline-flex items-center gap-2 rounded-xl border border-line bg-surface px-4 py-2.5 text-sm font-bold text-ink hover:bg-surface-muted"><Download className="h-4 w-4"/>تنزيل قالب {ENTITY_META[data.entity].label}</button>}
     />
 
     <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
-      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-5">
+      <section className="rounded-2xl border border-line bg-surface p-5 shadow-sm space-y-5">
         <div className="grid gap-4 md:grid-cols-2">
-          <label className="block"><span className="mb-2 block text-xs font-black text-slate-600">تحديد نوع البيانات</span><select value={manualEntity} onChange={e=>changeEntity(e.target.value as ImportEntity)} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm font-bold"><option value="">اكتشاف تلقائي من الملف</option>{Object.entries(ENTITY_META).filter(([,meta])=>PermissionService.can(currentUser,meta.permission)).map(([key,meta])=><option key={key} value={key}>{meta.label}</option>)}{PermissionService.can(currentUser,'admin.data')&&<option value="dynamic">إنشاء نوع بيانات مرن</option>}</select></label>
-          <label className="flex min-h-12 cursor-pointer items-center justify-center gap-2 rounded-xl bg-sky-600 px-4 py-3 text-sm font-black text-white hover:bg-sky-700">{busy?<Loader2 className="h-4 w-4 animate-spin"/>:<Upload className="h-4 w-4"/>}{fileName || 'اختر ملفًا للاستيراد'}<input type="file" accept=".xlsx,.xls,.csv,.pdf,.docx,.json,.xml,.txt,.png,.jpg,.jpeg,.webp,.gif,.ceramisys-backup,image/png,image/jpeg,image/webp,image/gif,application/pdf,application/json,text/plain,application/xml,application/octet-stream" className="hidden" onChange={e=>{void handleFile(e.target.files?.[0]);e.currentTarget.value='';}}/></label>
+          <label className="block"><span className="mb-2 block text-xs font-black text-ink-secondary">تحديد نوع البيانات</span><select value={manualEntity} onChange={e=>changeEntity(e.target.value as ImportEntity)} className="w-full rounded-xl border border-line bg-surface px-3 py-3 text-sm font-bold"><option value="">اكتشاف تلقائي من الملف</option>{Object.entries(ENTITY_META).filter(([,meta])=>PermissionService.can(currentUser,meta.permission)).map(([key,meta])=><option key={key} value={key}>{meta.label}</option>)}{PermissionService.can(currentUser,'admin.data')&&<option value="dynamic">إنشاء نوع بيانات مرن</option>}</select></label>
+          <label className="flex min-h-12 cursor-pointer items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-black text-white hover:bg-primary">{busy?<Loader2 className="h-4 w-4 animate-spin"/>:<Upload className="h-4 w-4"/>}{fileName || 'اختر ملفًا للاستيراد'}<input type="file" accept=".xlsx,.xls,.csv,.pdf,.docx,.json,.xml,.txt,.png,.jpg,.jpeg,.webp,.gif,.ceramisys-backup,image/png,image/jpeg,image/webp,image/gif,application/pdf,application/json,text/plain,application/xml,application/octet-stream" className="hidden" onChange={e=>{void handleFile(e.target.files?.[0]);e.currentTarget.value='';}}/></label>
         </div>
-        <p className="text-xs text-slate-500">الصيغ المدعومة: XLSX وXLS وCSV وPDF وDOCX وJSON وXML وTXT وصور PNG وJPG وWEBP وGIF، إضافة إلى النسخ المشفرة. الحد الأقصى لملفات DOCX وJSON وXML وTXT {MAX_DATA_FILE_IMPORT_BYTES / 1024 / 1024} ميجابايت، وللصورة {MAX_IMAGE_IMPORT_BYTES / 1024 / 1024} ميجابايت، ولـPDF {MAX_PDF_IMPORT_BYTES / 1024 / 1024} ميجابايت، وللجداول {MAX_SPREADSHEET_FILE_SIZE / 1024 / 1024} ميجابايت و{MAX_SPREADSHEET_ROWS.toLocaleString('ar-EG')} صف و{MAX_SPREADSHEET_COLUMNS} عمود. تُستخرج نصوص PDF والصور محليًا عبر OCR، وتُراجع كل البيانات قبل حفظها. النسخة المشفرة تُدمج بعد المراجعة ولا تستبدل قاعدة البيانات كاملة.</p>
-        {sheetImports.length > 1 && <div className="flex flex-wrap gap-2 rounded-xl border border-sky-200 bg-sky-50 p-3" aria-label="أوراق المصنف">
+        <p className="text-xs text-muted">الصيغ المدعومة: XLSX وXLS وCSV وPDF وDOCX وJSON وXML وTXT وصور PNG وJPG وWEBP وGIF، إضافة إلى النسخ المشفرة. الحد الأقصى لملفات DOCX وJSON وXML وTXT {MAX_DATA_FILE_IMPORT_BYTES / 1024 / 1024} ميجابايت، وللصورة {MAX_IMAGE_IMPORT_BYTES / 1024 / 1024} ميجابايت، ولـPDF {MAX_PDF_IMPORT_BYTES / 1024 / 1024} ميجابايت، وللجداول {MAX_SPREADSHEET_FILE_SIZE / 1024 / 1024} ميجابايت و{MAX_SPREADSHEET_ROWS.toLocaleString('ar-EG')} صف و{MAX_SPREADSHEET_COLUMNS} عمود. تُستخرج نصوص PDF والصور محليًا عبر OCR، وتُراجع كل البيانات قبل حفظها. النسخة المشفرة تُدمج بعد المراجعة ولا تستبدل قاعدة البيانات كاملة.</p>
+        {sheetImports.length > 1 && <div className="flex flex-wrap gap-2 rounded-xl border border-accent-border bg-accent-soft p-3" aria-label="أوراق المصنف">
           {sheetImports.map((item, index) => <button
             type="button"
             key={`${item.sheet.name}-${index}`}
             onClick={() => selectSheet(index)}
             aria-pressed={activeSheetIndex === index}
-            className={`rounded-lg px-3 py-2 text-xs font-black ${activeSheetIndex === index ? 'bg-sky-700 text-white' : 'bg-white text-sky-900'}`}
+            className={`rounded-lg px-3 py-2 text-xs font-black ${activeSheetIndex === index ? 'bg-primary text-white' : 'bg-surface text-primary'}`}
           >
             {item.sheet.name} · {item.data.entity === 'dynamic' ? 'نوع مرن' : ENTITY_META[item.data.entity].label}
           </button>)}
-          <span className="self-center text-xs text-slate-600">راجع مطابقة كل ورقة على حدة قبل الاستيراد.</span>
+          <span className="self-center text-xs text-ink-secondary">راجع مطابقة كل ورقة على حدة قبل الاستيراد.</span>
         </div>}
-        {message && <div role="status" aria-live="polite" className={`flex items-start gap-2 rounded-xl px-4 py-3 text-sm font-bold ${messageTone === 'success' ? 'bg-emerald-50 text-emerald-800' : messageTone === 'error' ? 'bg-rose-50 text-rose-800' : 'bg-amber-50 text-amber-800'}`}>{messageTone === 'success' ? <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0"/> : <AlertCircle className="mt-0.5 h-4 w-4 shrink-0"/>}<span>{message}</span></div>}
-        {encryptedBackupFile && <div className="flex flex-wrap items-end gap-3 rounded-xl border border-amber-200 bg-amber-50/60 p-4">
-          <label className="min-w-60 flex-1 text-xs font-black text-amber-950">كلمة مرور النسخة الاحتياطية
-            <span className="mt-1.5 flex overflow-hidden rounded-lg border border-amber-300 bg-white focus-within:ring-2 focus-within:ring-amber-400">
+        {message && <div role="status" aria-live="polite" className={`flex items-start gap-2 rounded-xl px-4 py-3 text-sm font-bold ${messageTone === 'success' ? 'bg-success-soft text-success' : messageTone === 'error' ? 'bg-danger-soft text-danger' : 'bg-warning-soft text-warning'}`}>{messageTone === 'success' ? <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0"/> : <AlertCircle className="mt-0.5 h-4 w-4 shrink-0"/>}<span>{message}</span></div>}
+        {encryptedBackupFile && <div className="flex flex-wrap items-end gap-3 rounded-xl border border-warning-border bg-warning-soft/60 p-4">
+          <label className="min-w-60 flex-1 text-xs font-black text-warning">كلمة مرور النسخة الاحتياطية
+            <span className="mt-1.5 flex overflow-hidden rounded-lg border border-warning bg-surface focus-within:ring-2 focus-within:ring-warning">
               <input
                 type={showBackupPassword ? 'text' : 'password'}
                 value={backupPassword}
                 onChange={event => setBackupPassword(event.target.value)}
                 onKeyDown={event => { if (event.key === 'Enter') void openEncryptedBackup(); }}
                 autoComplete="off"
-                className="min-w-0 flex-1 px-3 py-2.5 text-sm font-normal text-slate-900 outline-none"
+                className="min-w-0 flex-1 px-3 py-2.5 text-sm font-normal text-ink outline-none"
                 placeholder="أدخل كلمة المرور لفتح الملف"
               />
               <button
@@ -478,32 +478,32 @@ export const DataImportPage: React.FC = () => {
                 onClick={() => setShowBackupPassword(visible => !visible)}
                 aria-label={showBackupPassword ? 'إخفاء كلمة المرور' : 'إظهار كلمة المرور'}
                 aria-pressed={showBackupPassword}
-                className="px-3 text-amber-800 hover:bg-amber-50"
+                className="px-3 text-warning hover:bg-warning-soft"
               >
                 {showBackupPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
             </span>
           </label>
-          <button type="button" onClick={() => void openEncryptedBackup()} disabled={busy || !backupPassword} className="rounded-xl bg-amber-700 px-4 py-2.5 text-sm font-black text-white disabled:opacity-40">
+          <button type="button" onClick={() => void openEncryptedBackup()} disabled={busy || !backupPassword} className="rounded-xl bg-warning px-4 py-2.5 text-sm font-black text-white disabled:opacity-40">
             {busy ? 'جارٍ فتح الملف...' : 'فتح الملف'}
           </button>
         </div>}
-        {extractedText && <label className="block rounded-xl border border-sky-200 bg-sky-50/60 p-4 text-xs font-black text-sky-950">النص المستخرج — صحّح أخطاء القراءة قبل الاستيراد
-          <textarea value={extractedText} onChange={event=>changeExtractedText(event.target.value)} rows={10} className="mt-2 w-full rounded-lg border border-sky-200 bg-white p-3 text-sm font-normal leading-6 text-slate-800" dir="auto" />
-          <span className="mt-2 block text-[11px] font-normal text-sky-800">تتم المعالجة على الجهاز. ملفات PDF والصور تُقرأ بتقنية OCR المحلية للغتين العربية والإنجليزية.</span>
+        {extractedText && <label className="block rounded-xl border border-accent-border bg-accent-soft/60 p-4 text-xs font-black text-primary">النص المستخرج — صحّح أخطاء القراءة قبل الاستيراد
+          <textarea value={extractedText} onChange={event=>changeExtractedText(event.target.value)} rows={10} className="mt-2 w-full rounded-lg border border-accent-border bg-surface p-3 text-sm font-normal leading-6 text-ink" dir="auto" />
+          <span className="mt-2 block text-[11px] font-normal text-primary">تتم المعالجة على الجهاز. ملفات PDF والصور تُقرأ بتقنية OCR المحلية للغتين العربية والإنجليزية.</span>
         </label>}
-        {backupImport && <div role="dialog" aria-modal="true" aria-labelledby="backup-import-review-title" className="fixed inset-0 z-[100] flex flex-col gap-4 overflow-hidden bg-amber-50 p-3 text-slate-900 sm:p-5 lg:p-7">
+        {backupImport && <div role="dialog" aria-modal="true" aria-labelledby="backup-import-review-title" className="fixed inset-0 z-[100] flex flex-col gap-4 overflow-hidden bg-warning-soft p-3 text-ink sm:p-5 lg:p-7">
           <div className="shrink-0">
-            <h2 id="backup-import-review-title" className="text-xl font-black text-amber-950 sm:text-2xl">مراجعة النسخة المشفرة قبل الدمج</h2>
-            <p className="mt-2 text-sm leading-6 text-amber-900">السجلات الجديدة ستُضاف، والسجلات المتعارضة ستُحدّث بعد موافقتك. لن تُحذف البيانات الأخرى ولن تُستبدل قاعدة البيانات كاملة. الجداول المحمية لن تُستورد.</p>
+            <h2 id="backup-import-review-title" className="text-xl font-black text-warning sm:text-2xl">مراجعة النسخة المشفرة قبل الدمج</h2>
+            <p className="mt-2 text-sm leading-6 text-warning">السجلات الجديدة ستُضاف، والسجلات المتعارضة ستُحدّث بعد موافقتك. لن تُحذف البيانات الأخرى ولن تُستبدل قاعدة البيانات كاملة. الجداول المحمية لن تُستورد.</p>
           </div>
           <div className="flex shrink-0 flex-wrap gap-2 text-sm font-bold">
-            <span className="rounded-lg bg-white px-4 py-2.5">جداول: {backupImport.preview.tables.length}</span>
-            <span className="rounded-lg bg-emerald-100 px-4 py-2.5 text-emerald-900">جديد: {backupImport.preview.newRows}</span>
-            <span className="rounded-lg bg-orange-100 px-4 py-2.5 text-orange-900">متعارض: {backupImport.preview.conflictRows}</span>
-            <span className="rounded-lg bg-white px-4 py-2.5">متخطى: {backupImport.preview.skippedRows}</span>
+            <span className="rounded-lg bg-surface px-4 py-2.5">جداول: {backupImport.preview.tables.length}</span>
+            <span className="rounded-lg bg-success-soft px-4 py-2.5 text-success">جديد: {backupImport.preview.newRows}</span>
+            <span className="rounded-lg bg-warning-soft px-4 py-2.5 text-warning">متعارض: {backupImport.preview.conflictRows}</span>
+            <span className="rounded-lg bg-surface px-4 py-2.5">متخطى: {backupImport.preview.skippedRows}</span>
           </div>
-          <div className="min-h-0 flex-1 overflow-auto rounded-xl border border-amber-200 bg-white">
+          <div className="min-h-0 flex-1 overflow-auto rounded-xl border border-warning-border bg-surface">
             <DataTable
               ariaLabel="معاينة استيراد النسخة الاحتياطية"
               rows={backupImport.preview.tables}
@@ -514,20 +514,20 @@ export const DataImportPage: React.FC = () => {
               renderExpandedRow={(table) => (
                 <div className="space-y-2">
                   {table.sampleConflicts.map((conflict, index) => (
-                    <div key={`${conflict.key}-${index}`} className="rounded-lg bg-white p-3">
+                    <div key={`${conflict.key}-${index}`} className="rounded-lg bg-surface p-3">
                       <div className="font-bold">مفتاح السجل: {conflict.key}</div>
                       {conflict.changes.length
                         ? conflict.changes.map((change) => (
-                          <div key={change.column} className="mt-1 break-words text-slate-700">
+                          <div key={change.column} className="mt-1 break-words text-ink">
                             {change.column} — الحالي: {formatImportValue(change.existing)} ← الملف: {formatImportValue(change.imported)}
                           </div>
                         ))
-                        : <div className="mt-1 text-slate-600">لا توجد اختلافات في القيم.</div>}
+                        : <div className="mt-1 text-ink-secondary">لا توجد اختلافات في القيم.</div>}
                     </div>
                   ))}
                 </div>
               )}
-              expandedRowClassName="bg-amber-50"
+              expandedRowClassName="bg-warning-soft"
               columns={[
                 { key: 'table', header: 'الجدول', render: (table) => <span className="whitespace-nowrap font-mono font-bold">{table.table}</span> },
                 { key: 'incoming', header: 'في الملف', render: (table) => table.incomingRows },
@@ -537,17 +537,17 @@ export const DataImportPage: React.FC = () => {
                 { key: 'skipped', header: 'متخطى', render: (table) => table.skippedRows },
                 {
                   key: 'status', header: 'الحالة',
-                  render: (table) => <span className={`whitespace-nowrap font-bold ${table.protected ? 'text-amber-700' : 'text-emerald-700'}`}>{table.protected ? 'محمي — لن يُستورد' : 'جاهز للدمج'}</span>,
+                  render: (table) => <span className={`whitespace-nowrap font-bold ${table.protected ? 'text-warning' : 'text-success'}`}>{table.protected ? 'محمي — لن يُستورد' : 'جاهز للدمج'}</span>,
                 },
               ]}
             />
           </div>
-          <div className="flex shrink-0 flex-wrap gap-3 border-t border-amber-200 pt-3">
-            <button onClick={()=>void runBackupImport()} disabled={busy||backupImport.preview.newRows+backupImport.preview.conflictRows===0} className="rounded-xl bg-amber-700 px-5 py-3 text-sm font-black text-white disabled:opacity-40">{busy ? 'جارٍ الدمج...' : 'دمج السجلات المعروضة'}</button>
-            <button onClick={()=>setBackupImport(null)} disabled={busy} className="rounded-xl border border-amber-300 bg-white px-5 py-3 text-sm font-bold text-amber-900 disabled:opacity-40">إلغاء</button>
+          <div className="flex shrink-0 flex-wrap gap-3 border-t border-warning-border pt-3">
+            <button onClick={()=>void runBackupImport()} disabled={busy||backupImport.preview.newRows+backupImport.preview.conflictRows===0} className="rounded-xl bg-warning px-5 py-3 text-sm font-black text-white disabled:opacity-40">{busy ? 'جارٍ الدمج...' : 'دمج السجلات المعروضة'}</button>
+            <button onClick={()=>setBackupImport(null)} disabled={busy} className="rounded-xl border border-warning bg-surface px-5 py-3 text-sm font-bold text-warning disabled:opacity-40">إلغاء</button>
           </div>
         </div>}
-        {data?.entity === 'dynamic' && dynamicPreview && <div className="space-y-4 rounded-xl border border-violet-200 bg-violet-50/60 p-4"><div className="flex items-start gap-3"><WandSparkles className="mt-1 h-5 w-5 text-violet-700"/><div><h2 className="font-black text-violet-950">نوع غير معروف — سيُنشأ له تعريف قابل لإعادة الاستخدام</h2><p className="mt-1 text-xs leading-5 text-violet-900">سيتم استنتاج أنواع الحقول مبدئيًا، وحفظ كل قيمة أصلية كما وردت في الملف. يمكن تعديل التعريف والبحث والتصدير من إدارة الأنواع.</p></div></div><label className="block text-xs font-black text-slate-700">اسم نوع البيانات<input value={dynamicName} onChange={e=>setDynamicName(e.target.value)} className="mt-1.5 w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm" placeholder="اسم الورقة أو اسم واضح لهذا النوع"/></label><div className="overflow-auto rounded-lg border border-slate-200 bg-white"><DataTable
+        {data?.entity === 'dynamic' && dynamicPreview && <div className="space-y-4 rounded-xl border border-accent-border bg-accent-soft/60 p-4"><div className="flex items-start gap-3"><WandSparkles className="mt-1 h-5 w-5 text-primary"/><div><h2 className="font-black text-primary">نوع غير معروف — سيُنشأ له تعريف قابل لإعادة الاستخدام</h2><p className="mt-1 text-xs leading-5 text-primary">سيتم استنتاج أنواع الحقول مبدئيًا، وحفظ كل قيمة أصلية كما وردت في الملف. يمكن تعديل التعريف والبحث والتصدير من إدارة الأنواع.</p></div></div><label className="block text-xs font-black text-ink">اسم نوع البيانات<input value={dynamicName} onChange={e=>setDynamicName(e.target.value)} className="mt-1.5 w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-sm" placeholder="اسم الورقة أو اسم واضح لهذا النوع"/></label><div className="overflow-auto rounded-lg border border-line bg-surface"><DataTable
               ariaLabel="معاينة البيانات الديناميكية"
               rows={dynamicPreview.rows.slice(0, 8).map((row, i) => ({ __row: row, __i: i }))}
               rowKey={(r) => String(r.__i)}
@@ -559,13 +559,13 @@ export const DataImportPage: React.FC = () => {
                   render: (r: { __row: Record<string, unknown> }) => <span className="block max-w-48 truncate">{String(r.__row[h] ?? '')}</span>,
                 })),
               ]}
-            /></div><div className="flex flex-wrap items-center justify-between gap-3"><span className="text-xs font-bold text-slate-600">{dynamicPreview.rows.length} سجل · {dynamicPreview.headers.length} حقل · ستُحفظ القيم الأصلية كاملة</span><button onClick={runImport} disabled={!dynamicName.trim()||busy||!PermissionService.can(currentUser,'admin.data')} className="rounded-xl bg-violet-700 px-4 py-2.5 text-sm font-black text-white disabled:opacity-40">إنشاء النوع واستيراد البيانات</button></div>{dynamicResult&&<Link className="inline-block text-sm font-black text-violet-800 underline" to="/data-import/types">فتح إدارة الأنواع والسجلات</Link>}</div>}
+            /></div><div className="flex flex-wrap items-center justify-between gap-3"><span className="text-xs font-bold text-ink-secondary">{dynamicPreview.rows.length} سجل · {dynamicPreview.headers.length} حقل · ستُحفظ القيم الأصلية كاملة</span><button onClick={runImport} disabled={!dynamicName.trim()||busy||!PermissionService.can(currentUser,'admin.data')} className="rounded-xl bg-primary px-4 py-2.5 text-sm font-black text-white disabled:opacity-40">إنشاء النوع واستيراد البيانات</button></div>{dynamicResult&&<Link className="inline-block text-sm font-black text-primary underline" to="/data-import/types">فتح إدارة الأنواع والسجلات</Link>}</div>}
         {data && data.entity !== 'dynamic' && <>
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-slate-50 px-4 py-3"><div className="flex items-center gap-2"><WandSparkles className="h-4 w-4 text-violet-600"/><span className="text-sm font-black">نوع البيانات: {ENTITY_META[data.entity].label}</span><span className="text-xs text-slate-500">({data.rows.length} صف)</span></div><span className="text-xs font-bold text-slate-500">تم ربط {Object.keys(data.mapping).length} من {fields.length} عمود</span></div>
-          <div><h2 className="mb-3 text-sm font-black text-slate-800">مطابقة الأعمدة</h2><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{fields.map(field=><label key={field.key} className="text-xs font-bold text-slate-600">{field.label}{field.required&&<span className="text-rose-600"> *</span>}<select value={data.mapping[field.key]||''} onChange={e=>changeMapping(field.key,e.target.value)} className="mt-1.5 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs"><option value="">— غير مرتبط —</option>{data.headers.map(h=><option key={h} value={h}>{h}</option>)}</select></label>)}</div></div>
-          {(data.entity==='customers'||data.entity==='suppliers')&&<label className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs font-bold text-amber-900"><input type="checkbox" checked={allowBalances} onChange={e=>setAllowBalances(e.target.checked)} className="mt-0.5"/>تطبيق عمود الرصيد الافتتاحي على حسابات {ENTITY_META[data.entity].label}. يؤثر هذا على الأرصدة المالية.</label>}
-          {data.entity==='products'&&<div className="space-y-3 rounded-xl border border-amber-200 bg-amber-50 p-3"><label className="flex items-start gap-2 text-xs font-bold text-amber-900"><input type="checkbox" checked={allowStock} onChange={e=>toggleProductStock(e.target.checked)} className="mt-0.5"/>إضافة الكميات من عمود الرصيد الافتتاحي إلى مخزن تختاره يدويًا، مع تسجيل حركة مخزنية.</label>{allowStock&&<label className="block text-xs font-black text-amber-950">مخزن الرصيد الافتتاحي<select value={openingStockWarehouseId} onChange={e=>setOpeningStockWarehouseId(e.target.value)} className="mt-1.5 w-full rounded-lg border border-amber-300 bg-white px-3 py-2.5 text-sm"><option value="">اختر مخزنًا نشطًا</option>{openingStockWarehouses.map(warehouse=><option key={warehouse.id} value={warehouse.id}>{warehouse.name}</option>)}</select>{!openingStockWarehouses.length&&<span className="mt-1 block font-normal text-rose-700">لا توجد مخازن متاحة أو لا تملك صلاحية عرضها.</span>}</label>}</div>}
-          <div className="overflow-x-auto rounded-xl border border-slate-200"><DataTable
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-surface-muted px-4 py-3"><div className="flex items-center gap-2"><WandSparkles className="h-4 w-4 text-primary"/><span className="text-sm font-black">نوع البيانات: {ENTITY_META[data.entity].label}</span><span className="text-xs text-muted">({data.rows.length} صف)</span></div><span className="text-xs font-bold text-muted">تم ربط {Object.keys(data.mapping).length} من {fields.length} عمود</span></div>
+          <div><h2 className="mb-3 text-sm font-black text-ink">مطابقة الأعمدة</h2><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{fields.map(field=><label key={field.key} className="text-xs font-bold text-ink-secondary">{field.label}{field.required&&<span className="text-danger"> *</span>}<select value={data.mapping[field.key]||''} onChange={e=>changeMapping(field.key,e.target.value)} className="mt-1.5 w-full rounded-lg border border-line bg-surface px-2.5 py-2 text-xs"><option value="">— غير مرتبط —</option>{data.headers.map(h=><option key={h} value={h}>{h}</option>)}</select></label>)}</div></div>
+          {(data.entity==='customers'||data.entity==='suppliers')&&<label className="flex items-start gap-2 rounded-xl border border-warning-border bg-warning-soft p-3 text-xs font-bold text-warning"><input type="checkbox" checked={allowBalances} onChange={e=>setAllowBalances(e.target.checked)} className="mt-0.5"/>تطبيق عمود الرصيد الافتتاحي على حسابات {ENTITY_META[data.entity].label}. يؤثر هذا على الأرصدة المالية.</label>}
+          {data.entity==='products'&&<div className="space-y-3 rounded-xl border border-warning-border bg-warning-soft p-3"><label className="flex items-start gap-2 text-xs font-bold text-warning"><input type="checkbox" checked={allowStock} onChange={e=>toggleProductStock(e.target.checked)} className="mt-0.5"/>إضافة الكميات من عمود الرصيد الافتتاحي إلى مخزن تختاره يدويًا، مع تسجيل حركة مخزنية.</label>{allowStock&&<label className="block text-xs font-black text-warning">مخزن الرصيد الافتتاحي<select value={openingStockWarehouseId} onChange={e=>setOpeningStockWarehouseId(e.target.value)} className="mt-1.5 w-full rounded-lg border border-warning bg-surface px-3 py-2.5 text-sm"><option value="">اختر مخزنًا نشطًا</option>{openingStockWarehouses.map(warehouse=><option key={warehouse.id} value={warehouse.id}>{warehouse.name}</option>)}</select>{!openingStockWarehouses.length&&<span className="mt-1 block font-normal text-danger">لا توجد مخازن متاحة أو لا تملك صلاحية عرضها.</span>}</label>}</div>}
+          <div className="overflow-x-auto rounded-xl border border-line"><DataTable
             ariaLabel="معاينة بيانات الاستيراد"
             rows={data.rows.slice(0, 100).map((row, i) => ({ __row: row, __rowNo: i + 2 }))}
             rowKey={(r) => String(r.__rowNo)}
@@ -586,29 +586,29 @@ export const DataImportPage: React.FC = () => {
                 render: (r) => {
                   const rowIssues = issues.find((x) => x.row === r.__rowNo);
                   return rowIssues
-                    ? <span className="text-rose-700">{rowIssues.messages.join('، ')}</span>
-                    : <span className="inline-flex items-center gap-1 text-emerald-700"><CheckCircle2 className="h-3.5 w-3.5" />صالح</span>;
+                    ? <span className="text-danger">{rowIssues.messages.join('، ')}</span>
+                    : <span className="inline-flex items-center gap-1 text-success"><CheckCircle2 className="h-3.5 w-3.5" />صالح</span>;
                 },
               },
             ]}
-          />{data.rows.length>100&&<p className="bg-slate-50 p-2 text-center text-xs text-slate-500">معاينة أول 100 صف؛ سيتم فحص كل الصفوف عند الاستيراد.</p>}</div>
-          {result?.errors?.length ? <div className="max-h-36 overflow-auto rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800">{result.errors.map(e=><p key={e.row}>صف {e.row}: {e.messages.join('، ')}</p>)}</div>:null}
+          />{data.rows.length>100&&<p className="bg-surface-muted p-2 text-center text-xs text-muted">معاينة أول 100 صف؛ سيتم فحص كل الصفوف عند الاستيراد.</p>}</div>
+          {result?.errors?.length ? <div className="max-h-36 overflow-auto rounded-xl border border-danger-border bg-danger-soft p-3 text-xs text-danger">{result.errors.map(e=><p key={e.row}>صف {e.row}: {e.messages.join('، ')}</p>)}</div>:null}
         </>}
       </section>
 
-      <aside className="h-fit rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-        <h2 className="mb-3 font-black text-slate-900">أنواع البيانات المدعومة</h2>
-        <ul className="space-y-2">{Object.entries(ENTITY_META).filter(([,meta])=>PermissionService.can(currentUser,meta.permission)).map(([key,meta])=><li key={key} className={`rounded-lg px-3 py-2 text-xs font-bold ${data?.entity===key?'bg-sky-50 text-sky-800':'bg-slate-50 text-slate-600'}`}>{meta.label}</li>)}</ul>
-        {(PermissionService.can(currentUser,'admin.data')||PermissionService.can(currentUser,'settings.dynamic_data.view'))&&<Link to="/data-import/types" className="mt-4 block rounded-xl bg-violet-50 hover:bg-violet-100 p-3 text-xs font-black text-violet-900 border border-violet-200 transition">إدارة الأنواع المرنة والسجلات والعلاقات ←</Link>}
-        <div className="mt-4 rounded-xl bg-violet-50 p-3 text-xs leading-6 text-violet-900"><b>حقول إضافية:</b> الأصناف تشمل أكواد وباركود وأسعار ومقاسات وفرز ومتر الكرتونة وقطعها. يمكن تصدير القوالب من هنا وتعبئتها قبل الاستيراد.</div>
-        {data&&data.entity!=='dynamic'&&<><button onClick={runImport} disabled={totalValidCount===0||busy} className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-black text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-40">{busy?<Loader2 className="h-4 w-4 animate-spin"/>:<Upload className="h-4 w-4"/>}استيراد {totalValidCount>0?`${totalValidCount} سجل صالح`:''}</button><p className="mt-2 text-center text-[11px] text-slate-500">ستُستورد كل ورقة إلى الكيان المعروض عليها بعد مراجعتها؛ وتُتخطى الصفوف غير الصالحة مع توضيح السبب.</p></>}
+      <aside className="h-fit rounded-2xl border border-line bg-surface p-5 shadow-sm">
+        <h2 className="mb-3 font-black text-ink">أنواع البيانات المدعومة</h2>
+        <ul className="space-y-2">{Object.entries(ENTITY_META).filter(([,meta])=>PermissionService.can(currentUser,meta.permission)).map(([key,meta])=><li key={key} className={`rounded-lg px-3 py-2 text-xs font-bold ${data?.entity===key?'bg-accent-soft text-primary':'bg-surface-muted text-ink-secondary'}`}>{meta.label}</li>)}</ul>
+        {(PermissionService.can(currentUser,'admin.data')||PermissionService.can(currentUser,'settings.dynamic_data.view'))&&<Link to="/data-import/types" className="mt-4 block rounded-xl bg-accent-soft hover:bg-accent-soft p-3 text-xs font-black text-primary border border-accent-border transition">إدارة الأنواع المرنة والسجلات والعلاقات ←</Link>}
+        <div className="mt-4 rounded-xl bg-accent-soft p-3 text-xs leading-6 text-primary"><b>حقول إضافية:</b> الأصناف تشمل أكواد وباركود وأسعار ومقاسات وفرز ومتر الكرتونة وقطعها. يمكن تصدير القوالب من هنا وتعبئتها قبل الاستيراد.</div>
+        {data&&data.entity!=='dynamic'&&<><button onClick={runImport} disabled={totalValidCount===0||busy} className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-success px-4 py-3 text-sm font-black text-white hover:bg-success disabled:cursor-not-allowed disabled:opacity-40">{busy?<Loader2 className="h-4 w-4 animate-spin"/>:<Upload className="h-4 w-4"/>}استيراد {totalValidCount>0?`${totalValidCount} سجل صالح`:''}</button><p className="mt-2 text-center text-[11px] text-muted">ستُستورد كل ورقة إلى الكيان المعروض عليها بعد مراجعتها؛ وتُتخطى الصفوف غير الصالحة مع توضيح السبب.</p></>}
       </aside>
     </div>
-    {importBatches.length > 0 && <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-      <h2 className="mb-3 text-lg font-black text-slate-900">دفعات استيراد العملاء والمنتجات</h2>
-      <div className="space-y-2">{importBatches.map(batch => <div key={batch.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-slate-50 p-3 text-xs">
+    {importBatches.length > 0 && <section className="rounded-2xl border border-line bg-surface p-5 shadow-sm">
+      <h2 className="mb-3 text-lg font-black text-ink">دفعات استيراد العملاء والمنتجات</h2>
+      <div className="space-y-2">{importBatches.map(batch => <div key={batch.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-surface-muted p-3 text-xs">
         <span className="font-bold">{batch.entityType === 'customers' ? 'العملاء' : 'المنتجات'} · {batch.sourceName} · {batch.importedCount} سجل · {batch.status} · {new Date(batch.createdAt).toLocaleString()}</span>
-        {batch.status !== 'ROLLED_BACK' && <button type="button" onClick={() => rollbackImportBatch(batch)} disabled={!PermissionService.can(currentUser, batch.entityType === 'customers' ? 'ui.customers.list.delete' : 'ui.products.catalog.delete')} className="rounded-lg border border-rose-200 px-3 py-2 font-black text-rose-700 disabled:opacity-40">التراجع عن الدفعة</button>}
+        {batch.status !== 'ROLLED_BACK' && <button type="button" onClick={() => rollbackImportBatch(batch)} disabled={!PermissionService.can(currentUser, batch.entityType === 'customers' ? 'ui.customers.list.delete' : 'ui.products.catalog.delete')} className="rounded-lg border border-danger-border px-3 py-2 font-black text-danger disabled:opacity-40">التراجع عن الدفعة</button>}
       </div>)}</div>
     </section>}
   </div>;

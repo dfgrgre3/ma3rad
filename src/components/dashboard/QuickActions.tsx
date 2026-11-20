@@ -17,7 +17,7 @@ export const QuickActions: React.FC = () => {
         <Link
           key={to}
           to={to}
-          className="flex min-h-[72px] min-w-0 items-center gap-2.5 rounded-[2px] border border-[#d9d9d9] bg-white px-3 py-2 hover:border-[#0078d4] hover:bg-[#f2f8fd] dark:border-[#3d3d3d] dark:bg-[#2b2b2b] dark:hover:border-[#0078d4] dark:hover:bg-[#333f47] sm:gap-3 sm:px-3.5"
+          className="flex min-h-[72px] min-w-0 items-center gap-2.5 rounded-[2px] border border-[#d9d9d9] bg-surface px-3 py-2 hover:border-[#0078d4] hover:bg-[#f2f8fd] dark:border-[#3d3d3d] dark:bg-[#2b2b2b] dark:hover:border-[#0078d4] dark:hover:bg-[#333f47] sm:gap-3 sm:px-3.5"
         >
           <span className="flex h-9 w-9 shrink-0 items-center justify-center sm:h-10 sm:w-10">
             <Icon className="h-4 w-4 shrink-0 text-[#0078d4]" aria-hidden="true" />

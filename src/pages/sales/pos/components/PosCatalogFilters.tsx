@@ -46,7 +46,7 @@ export interface PosCatalogFiltersProps {
   stockOf?: (productId: string) => number;
 }
 
-const controlCls = 'h-10 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition';
+const controlCls = 'h-10 px-3 bg-surface-muted border border-line rounded-xl text-xs font-bold text-ink focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition';
 
 export const PosCatalogFilters: React.FC<PosCatalogFiltersProps> = ({
   barcodeInputRef,
@@ -100,13 +100,13 @@ export const PosCatalogFilters: React.FC<PosCatalogFiltersProps> = ({
   ].filter(Boolean).length;
 
   return (
-    <div className="shrink-0 space-y-2 border-b border-slate-200 bg-white px-3 pb-2 pt-2">
+    <div className="shrink-0 space-y-2 border-b border-line bg-surface px-3 pb-2 pt-2">
       {/* ═══ الصف الأول: البحث (مركز العمل) + المخزن + الترتيب ═══ */}
       <div className="flex items-center gap-2">
         <div className="flex-1 min-w-0 relative">
           <form onSubmit={onSearchSubmit} className="relative">
             <label htmlFor="pos-product-search" className="sr-only">بحث عن منتج</label>
-            <Search className="w-5 h-5 absolute right-3.5 top-1/2 -translate-y-1/2 text-sky-600 pointer-events-none" />
+            <Search className="w-5 h-5 absolute right-3.5 top-1/2 -translate-y-1/2 text-primary pointer-events-none" />
             <input
               id="pos-product-search"
               ref={barcodeInputRef}
@@ -115,7 +115,7 @@ export const PosCatalogFilters: React.FC<PosCatalogFiltersProps> = ({
               placeholder="امسح الباركود أو ابحث بالاسم / SKU / الكود الداخلي / المقاس… (F2)"
               value={searchQuery}
               onChange={(e) => { onSearchQueryChange(e.target.value); closeSuggestions(); }}
-              className="w-full h-11 pl-10 pr-11 bg-sky-50/60 border-2 border-sky-100 rounded-2xl text-sm font-bold placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500/40 focus:border-sky-500 transition"
+              className="w-full h-11 pl-10 pr-11 bg-accent-soft/60 border-2 border-accent-border rounded-2xl text-sm font-bold placeholder-muted focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition"
               role="combobox"
               aria-autocomplete="list"
               aria-expanded={suggestionsOpen}
@@ -146,7 +146,7 @@ export const PosCatalogFilters: React.FC<PosCatalogFiltersProps> = ({
                 type="button"
                 aria-label="مسح البحث"
                 onClick={() => { onSearchQueryChange(''); closeSuggestions(); }}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 p-1"
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-muted hover:text-ink p-1"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -164,14 +164,14 @@ export const PosCatalogFilters: React.FC<PosCatalogFiltersProps> = ({
                   onMouseEnter={() => setActiveSuggestionIndex(index)}
                   onMouseDown={(event) => event.preventDefault()}
                   onClick={() => { onSelectSuggestion?.(product); setActiveSuggestionIndex(-1); }}
-                  className={`selection-list__row w-full text-right px-4 py-2.5 text-xs flex items-center justify-between gap-3 last:border-0 ${activeSuggestionIndex === index ? 'bg-sky-50' : ''}`}
+                  className={`selection-list__row w-full text-right px-4 py-2.5 text-xs flex items-center justify-between gap-3 last:border-0 ${activeSuggestionIndex === index ? 'bg-accent-soft' : ''}`}
                 >
                   <span className="min-w-0">
                     <span className="block truncate font-bold">{product.name}</span>
-                    <span className="mt-1 block text-[10px] text-slate-500">
+                    <span className="mt-1 block text-[10px] text-muted">
                       {product.sku || product.barcode || 'بدون SKU'} · {Number(product.sellingPriceM2 || 0).toLocaleString('ar-EG')} ج.م
                     </span>
-                    <span className="mt-0.5 block text-[10px] text-slate-500">المتاح: {formatProductQuantity(stockOf(product.id), product)}</span>
+                    <span className="mt-0.5 block text-[10px] text-muted">المتاح: {formatProductQuantity(stockOf(product.id), product)}</span>
                   </span>
                 </button>
               ))}
@@ -214,14 +214,14 @@ export const PosCatalogFilters: React.FC<PosCatalogFiltersProps> = ({
           title="فلاتر متقدمة (ماركة / فرز / مقاس / لون / متوفر)"
           className={`h-10 flex items-center gap-1.5 px-3 rounded-xl text-xs font-bold border transition ${
             filtersOpen || advancedActiveCount > 0
-              ? 'bg-sky-600 text-white border-sky-600'
-              : 'bg-slate-50 border-slate-200 text-slate-700 hover:border-slate-300'
+              ? 'bg-primary text-white border-primary'
+              : 'bg-surface-muted border-line text-ink hover:border-line-strong'
           }`}
         >
           <ListFilter className="w-4 h-4" />
           <span className="hidden sm:inline">فلاتر</span>
           {advancedActiveCount > 0 && (
-            <span className={`min-w-5 h-5 px-1 rounded-full text-[10px] font-black flex items-center justify-center ${filtersOpen ? 'bg-white text-sky-700' : 'bg-sky-600 text-white'}`}>
+            <span className={`min-w-5 h-5 px-1 rounded-full text-[10px] font-black flex items-center justify-center ${filtersOpen ? 'bg-surface text-primary' : 'bg-primary text-white'}`}>
               {advancedActiveCount}
             </span>
           )}
@@ -231,15 +231,15 @@ export const PosCatalogFilters: React.FC<PosCatalogFiltersProps> = ({
 
       {/* ═══ صف الفلاتر المتقدمة (قابل للطي) ═══ */}
       {filtersOpen && (
-        <div className="flex items-center gap-2 flex-wrap pt-1 border-t border-slate-100">
+        <div className="flex items-center gap-2 flex-wrap pt-1 border-t border-line">
           <button
             type="button"
             aria-pressed={inStockOnly}
             onClick={onToggleInStockOnly}
             className={`flex items-center gap-1.5 h-9 px-3 rounded-xl text-xs font-bold border transition ${
               inStockOnly
-                ? 'bg-emerald-600 text-white border-emerald-600'
-                : 'bg-slate-50 border-slate-200 hover:border-slate-300 text-slate-700'
+                ? 'bg-success text-white border-success'
+                : 'bg-surface-muted border-line hover:border-line-strong text-ink'
             }`}
           >
             <Package className="w-4 h-4" /> المتوفر فقط
@@ -279,7 +279,7 @@ export const PosCatalogFilters: React.FC<PosCatalogFiltersProps> = ({
             <button
               type="button"
               onClick={onOpenCalculator}
-              className="flex items-center gap-1.5 h-9 px-3 bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 border border-amber-500/30 rounded-xl text-xs font-bold transition"
+              className="flex items-center gap-1.5 h-9 px-3 bg-warning/10 hover:bg-warning/20 text-warning border border-warning/30 rounded-xl text-xs font-bold transition"
             >
               <Calculator className="w-4 h-4" /> حاسبة المقايسة
             </button>
@@ -296,8 +296,8 @@ export const PosCatalogFilters: React.FC<PosCatalogFiltersProps> = ({
             onClick={() => onCategoryChange('ALL')}
             className={`shrink-0 h-8 px-3 rounded-lg text-[11px] font-bold border transition ${
               selectedCategory === 'ALL'
-                ? 'bg-sky-600 text-white border-sky-500 shadow-sm'
-                : 'bg-slate-50 border-slate-200 hover:border-slate-300'
+                ? 'bg-primary text-white border-primary shadow-sm'
+                : 'bg-surface-muted border-line hover:border-line-strong'
             }`}
           >
             <Layers className="w-3.5 h-3.5 inline ml-1" />
@@ -311,21 +311,21 @@ export const PosCatalogFilters: React.FC<PosCatalogFiltersProps> = ({
               onClick={() => onCategoryChange(c.id)}
               className={`shrink-0 h-8 px-3 rounded-lg text-[11px] font-bold border transition ${
                 selectedCategory === c.id
-                  ? 'bg-sky-600 text-white border-sky-500 shadow-sm'
-                  : 'bg-slate-50 border-slate-200 hover:border-slate-300'
+                  ? 'bg-primary text-white border-primary shadow-sm'
+                  : 'bg-surface-muted border-line hover:border-line-strong'
               }`}
             >
               {c.name} ({c.productCount})
             </button>
           ))}
         </div>
-        <div className="flex items-center gap-2 shrink-0 text-[11px] text-slate-500">
-          <span className="hidden xs:inline">النتائج: <strong className="text-slate-700">{resultCount}</strong> صنف</span>
+        <div className="flex items-center gap-2 shrink-0 text-[11px] text-muted">
+          <span className="hidden xs:inline">النتائج: <strong className="text-ink">{resultCount}</strong> صنف</span>
           {hasActiveFilters && (
             <button
               type="button"
               onClick={onClearFilters}
-              className="font-bold text-sky-700 hover:text-sky-900 whitespace-nowrap"
+              className="font-bold text-primary hover:text-primary whitespace-nowrap"
             >
               مسح الفلاتر
             </button>

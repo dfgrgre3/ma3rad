@@ -45,11 +45,11 @@
   },
   "support": {
     "profileDefaults": "implemented",
-    "industrySpecificWorkflows": "not-implemented",
-    "industrySpecificReports": "not-implemented",
-    "industrySpecificDocumentTemplates": "not-implemented",
-    "typedCustomFieldStorage": "not-implemented",
-    "studentEnrollmentAndCourseManagement": "not-implemented"
+    "industrySpecificWorkflows": "implemented",
+    "industrySpecificReports": "implemented",
+    "industrySpecificDocumentTemplates": "partially-implemented",
+    "typedCustomFieldStorage": "implemented-for-profile-declared-fields",
+    "studentEnrollmentAndCourseManagement": "implemented"
   },
   "printTemplates": [
     {

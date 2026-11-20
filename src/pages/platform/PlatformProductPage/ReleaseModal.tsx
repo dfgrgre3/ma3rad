@@ -81,9 +81,9 @@ export const ReleaseModal: React.FC<ReleaseModalProps> = ({
       </Field>
 
       {/* Package details */}
-      <div className="sm:col-span-3 rounded-xl border border-slate-200 bg-slate-50/50 p-3 space-y-3">
-        <p className="text-[12px] font-bold text-slate-800 flex items-center gap-1.5">
-          <FileCheck className="h-4 w-4 text-sky-600" /> بيانات ملف التثبيت والتوقيع والـ Checksum
+      <div className="sm:col-span-3 rounded-xl border border-line bg-surface-muted/50 p-3 space-y-3">
+        <p className="text-[12px] font-bold text-ink flex items-center gap-1.5">
+          <FileCheck className="h-4 w-4 text-primary" /> بيانات ملف التثبيت والتوقيع والـ Checksum
         </p>
         <div className="grid gap-2.5 sm:grid-cols-2">
           <Field label="رابط تحميل الحزمة (URL)">
@@ -107,10 +107,10 @@ export const ReleaseModal: React.FC<ReleaseModalProps> = ({
         </div>
       </div>
 
-      <div className="sm:col-span-3 flex items-center justify-between rounded-xl border border-slate-200 px-3 py-2 bg-white">
+      <div className="sm:col-span-3 flex items-center justify-between rounded-xl border border-line px-3 py-2 bg-surface">
         <div>
-          <p className="text-[12px] font-bold text-slate-800">تحديث إلزامي (Mandatory Enforcement)</p>
-          <p className="text-[10px] text-slate-500">منع متابعة العمل على النسخ السابقة حتى إتمام ترقية العميل.</p>
+          <p className="text-[12px] font-bold text-ink">تحديث إلزامي (Mandatory Enforcement)</p>
+          <p className="text-[10px] text-muted">منع متابعة العمل على النسخ السابقة حتى إتمام ترقية العميل.</p>
         </div>
         <Toggle checked={form.isMandatory} onChange={(val) => setForm({ ...form, isMandatory: val })} label="إلزامي" />
       </div>

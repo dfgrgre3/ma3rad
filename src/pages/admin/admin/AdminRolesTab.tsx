@@ -10,7 +10,7 @@ import { useToast } from '../../../components/ui/Toast';
 import type { Role } from '../../../types';
 
 const inputCls =
-  'w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-sky-500/30';
+  'w-full px-3 py-2 bg-surface-muted rounded-xl border border-line text-ink text-xs focus:outline-none focus:ring-2 focus:ring-primary/30';
 
 export const AdminRolesTab: React.FC = () => {
   const toast = useToast();
@@ -263,11 +263,11 @@ export const AdminRolesTab: React.FC = () => {
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-[280px_1fr]">
       {/* Roles list */}
-      <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-3">
+      <div className="rounded-2xl border border-line bg-surface p-3">
         <div className="mb-2 flex items-center justify-between">
-          <h3 className="text-sm font-extrabold text-slate-900 dark:text-slate-100">الأدوار</h3>
+          <h3 className="text-sm font-extrabold text-ink ">الأدوار</h3>
           {canManage && (
-            <button onClick={openCreate} className="flex items-center gap-1 rounded-lg bg-sky-600 px-2.5 py-1.5 text-[11px] font-bold text-white hover:bg-sky-700">
+            <button onClick={openCreate} className="flex items-center gap-1 rounded-lg bg-primary px-2.5 py-1.5 text-[11px] font-bold text-white hover:bg-primary">
               <Plus className="h-3.5 w-3.5" /> جديد
             </button>
           )}
@@ -281,17 +281,17 @@ export const AdminRolesTab: React.FC = () => {
                 key={role.id}
                 onClick={() => selectRole(role)}
                 className={`flex w-full items-center gap-2 rounded-xl px-3 py-2 text-right transition ${
-                  active ? 'bg-sky-600 text-white shadow' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
+                  active ? 'bg-primary text-white shadow' : 'text-ink-secondary hover:bg-surface-sunken dark:hover:bg-primary'
                 }`}
               >
                 <ShieldCheck className="h-4 w-4 shrink-0" />
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-xs font-bold">{role.name}</div>
-                  <div className={`truncate font-mono text-[10px] ${active ? 'text-sky-100' : 'text-slate-400'}`}>
+                  <div className={`truncate font-mono text-[10px] ${active ? 'text-primary' : 'text-muted'}`}>
                     {role.code} · {role.code === 'ADMIN' ? 'الكل' : `${count} صلاحية`}
                   </div>
                 </div>
-                {role.isSystem && <Lock className={`h-3 w-3 ${active ? 'text-sky-100' : 'text-slate-400'}`} />}
+                {role.isSystem && <Lock className={`h-3 w-3 ${active ? 'text-primary' : 'text-muted'}`} />}
               </button>
             );
           })}
@@ -299,18 +299,18 @@ export const AdminRolesTab: React.FC = () => {
       </div>
 
       {/* Permission matrix */}
-      <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
-        <div className="flex flex-col gap-3 border-b border-slate-200 dark:border-slate-700 p-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="rounded-2xl border border-line bg-surface ">
+        <div className="flex flex-col gap-3 border-b border-line p-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h3 className="text-sm font-extrabold text-slate-900 dark:text-slate-100">
+            <h3 className="text-sm font-extrabold text-ink ">
               {selected ? `صلاحيات: ${selected.name}` : 'اختر دوراً'}
             </h3>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400">
+            <p className="text-[11px] text-muted ">
               {isAdminRole
                 ? 'مدير النظام يملك كل الصلاحيات دائماً ولا يمكن تقييده.'
                 : 'حدد ما يستطيع هذا الدور فعله. التغييرات تُطبق على كل مستخدمي الدور.'}
               {selected && !isAdminRole && (
-                <span className="mr-1 font-bold text-sky-600 dark:text-sky-400">
+                <span className="mr-1 font-bold text-primary ">
                   ({selectedCodes.size} من {catalog.length} صلاحية)
                 </span>
               )}
@@ -318,7 +318,7 @@ export const AdminRolesTab: React.FC = () => {
           </div>
           <div className="flex items-center gap-2">
             <div className="relative">
-              <Search className="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+              <Search className="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted" />
               <input
                 aria-label="بحث في الصلاحيات"
                 name="role-search"
@@ -333,9 +333,9 @@ export const AdminRolesTab: React.FC = () => {
                 type="button"
                 onClick={selectAllVisible}
                 title="تحديد كل الصلاحيات في الكتالوج"
-                className="flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                className="flex items-center gap-1.5 rounded-xl border border-line px-3 py-2 text-xs font-bold text-ink-secondary hover:bg-surface-muted dark:hover:bg-primary"
               >
-                <ListChecks className="h-4 w-4 text-emerald-600" /> الكل
+                <ListChecks className="h-4 w-4 text-success" /> الكل
               </button>
             )}
             {canManage && !isAdminRole && (
@@ -343,27 +343,27 @@ export const AdminRolesTab: React.FC = () => {
                 type="button"
                 onClick={clearAllVisible}
                 title="مسح كل الصلاحيات"
-                className="flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                className="flex items-center gap-1.5 rounded-xl border border-line px-3 py-2 text-xs font-bold text-ink-secondary hover:bg-surface-muted dark:hover:bg-primary"
               >
-                <Eraser className="h-4 w-4 text-rose-500" /> مسح
+                <Eraser className="h-4 w-4 text-danger" /> مسح
               </button>
             )}
             {canManage && !isAdminRole && (
               <button
                 onClick={save}
                 disabled={!dirty}
-                className="flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-40"
+                className="flex items-center gap-1.5 rounded-xl bg-success px-4 py-2 text-xs font-bold text-white hover:bg-success disabled:opacity-40"
               >
                 <Save className="h-4 w-4" /> حفظ
               </button>
             )}
             {canManage && selected && !isAdminRole && selected.isSystem === false && (
-              <button onClick={() => openEdit(selected)} className="rounded-xl border border-slate-200 p-2 text-slate-500 hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800" title="تعديل الدور">
+              <button onClick={() => openEdit(selected)} className="rounded-xl border border-line p-2 text-muted hover:bg-surface-sunken dark:hover:bg-primary" title="تعديل الدور">
                 <Pencil className="h-4 w-4" />
               </button>
             )}
             {canManage && selected && !selected.isSystem && (
-              <button onClick={() => remove(selected)} className="rounded-xl border border-rose-200 p-2 text-rose-500 hover:bg-rose-50 dark:border-rose-500/30 dark:hover:bg-rose-500/10" title="حذف الدور">
+              <button onClick={() => remove(selected)} className="rounded-xl border border-danger-border p-2 text-danger hover:bg-danger-soft dark:border-danger/30 dark:hover:bg-danger/10" title="حذف الدور">
                 <Trash2 className="h-4 w-4" />
               </button>
             )}
@@ -378,17 +378,17 @@ export const AdminRolesTab: React.FC = () => {
             const checked = perms.filter((p) => selectedCodes.has(p.code) || isAdminRole).length;
             const open = expanded[module] ?? false;
             return (
-              <div key={module} className="overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700">
+              <div key={module} className="overflow-hidden rounded-xl border border-line ">
                 <button
                   onClick={() => setExpanded((prev) => ({ ...prev, [module]: !open }))}
-                  className="flex w-full items-center gap-2 bg-slate-50 dark:bg-slate-800/70 px-4 py-2.5 text-right text-xs font-extrabold text-slate-700 dark:text-slate-200"
+                  className="flex w-full items-center gap-2 bg-surface-muted dark:bg-primary/70 px-4 py-2.5 text-right text-xs font-extrabold text-ink "
                 >
-                  <ChevronLeft className={`h-3.5 w-3.5 shrink-0 text-slate-400 transition-transform ${open ? '-rotate-90' : ''}`} />
+                  <ChevronLeft className={`h-3.5 w-3.5 shrink-0 text-muted transition-transform ${open ? '-rotate-90' : ''}`} />
                   <span className="flex-1">
                     {moduleLabel(module)}
-                    <span className="mr-1.5 font-mono text-[9px] font-normal text-slate-400">{module}</span>
+                    <span className="mr-1.5 font-mono text-[9px] font-normal text-muted">{module}</span>
                   </span>
-                  <span className="rounded bg-slate-200/70 dark:bg-slate-700 px-1.5 py-0.5 text-[10px] font-bold text-slate-500 dark:text-slate-300">
+                  <span className="rounded bg-surface-sunken/70 px-1.5 py-0.5 text-[10px] font-bold text-muted ">
                     {checked}/{perms.length}
                   </span>
                   {!readOnly && (
@@ -397,7 +397,7 @@ export const AdminRolesTab: React.FC = () => {
                       tabIndex={0}
                       onClick={(e) => { e.stopPropagation(); toggleModule(module); }}
                       onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); toggleModule(module); } }}
-                      className="rounded border border-slate-300 px-2 py-0.5 text-[10px] text-slate-500 hover:bg-slate-100 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700"
+                      className="rounded border border-line-strong px-2 py-0.5 text-[10px] text-muted hover:bg-surface-sunken dark:hover:bg-primary"
                     >
                       الكل
                     </span>
@@ -410,15 +410,15 @@ export const AdminRolesTab: React.FC = () => {
                       const groupOpen = expanded[groupKey] ?? (groups.length === 1 || Boolean(search.trim()));
                       const groupChecked = group.permissions.filter((p) => isAdminRole || selectedCodes.has(p.code)).length;
                       return (
-                        <div key={groupKey} className="overflow-hidden rounded-lg border border-slate-200/80 dark:border-slate-700/80">
+                        <div key={groupKey} className="overflow-hidden rounded-lg border border-line/80 dark:border-line-strong/80">
                           <button
                             onClick={() => setExpanded((prev) => ({ ...prev, [groupKey]: !groupOpen }))}
-                            className="flex w-full items-center gap-2 bg-white px-3 py-2 text-right text-[11px] font-bold text-slate-600 hover:bg-slate-50 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800/60"
+                            className="flex w-full items-center gap-2 bg-surface px-3 py-2 text-right text-[11px] font-bold text-ink-secondary hover:bg-surface-muted dark:hover:bg-primary/60"
                           >
-                            <ChevronDown className={`h-3.5 w-3.5 shrink-0 text-slate-400 transition-transform ${groupOpen ? '' : '-rotate-90'}`} />
-                            <Layers className="h-3.5 w-3.5 shrink-0 text-sky-500" />
+                            <ChevronDown className={`h-3.5 w-3.5 shrink-0 text-muted transition-transform ${groupOpen ? '' : '-rotate-90'}`} />
+                            <Layers className="h-3.5 w-3.5 shrink-0 text-primary" />
                             <span className="flex-1 truncate">{group.name}</span>
-                            <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-500 dark:bg-slate-800 dark:text-slate-300">
+                            <span className="rounded bg-surface-sunken px-1.5 py-0.5 text-[10px] font-bold text-muted ">
                               {groupChecked}/{group.permissions.length}
                             </span>
                             {!readOnly && (
@@ -427,14 +427,14 @@ export const AdminRolesTab: React.FC = () => {
                                 tabIndex={0}
                                 onClick={(e) => { e.stopPropagation(); toggleGroup(module, group.name); }}
                                 onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); toggleGroup(module, group.name); } }}
-                                className="rounded border border-slate-300 px-1.5 py-0.5 text-[10px] text-slate-500 hover:bg-slate-100 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700"
+                                className="rounded border border-line-strong px-1.5 py-0.5 text-[10px] text-muted hover:bg-surface-sunken dark:hover:bg-primary"
                               >
                                 الكل
                               </span>
                             )}
                           </button>
                           {groupOpen && (
-                            <div className="grid grid-cols-1 gap-1 border-t border-slate-100 p-2 dark:border-slate-800 sm:grid-cols-2">
+                            <div className="grid grid-cols-1 gap-1 border-t border-line p-2 sm:grid-cols-2">
                               {group.permissions.map((perm) => {
                                 const isChecked = isAdminRole || selectedCodes.has(perm.code);
                                 return (
@@ -443,8 +443,8 @@ export const AdminRolesTab: React.FC = () => {
                                     htmlFor={`permission-${perm.code}`}
                                     className={`flex cursor-pointer items-start gap-2 rounded-lg border px-3 py-2 text-xs transition ${
                                       isChecked
-                                        ? 'border-emerald-200 bg-emerald-50/60 dark:border-emerald-500/30 dark:bg-emerald-500/10'
-                                        : 'border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900'
+                                        ? 'border-success-border bg-success-soft/60 dark:border-success/30 dark:bg-success/10'
+                                        : 'border-line bg-surface '
                                     } ${readOnly ? 'cursor-not-allowed opacity-80' : ''}`}
                                   >
                                     <input
@@ -453,11 +453,11 @@ export const AdminRolesTab: React.FC = () => {
                                       checked={isChecked}
                                       disabled={readOnly}
                                       onChange={() => toggle(perm.code)}
-                                      className="mt-0.5 h-4 w-4 rounded border-slate-300 text-sky-600"
+                                      className="mt-0.5 h-4 w-4 rounded border-line-strong text-primary"
                                     />
                                     <span className="min-w-0">
-                                      <span className="block font-bold text-slate-800 dark:text-slate-200">{perm.name}</span>
-                                      <span className="block font-mono text-[10px] text-slate-400">{perm.code}</span>
+                                      <span className="block font-bold text-ink ">{perm.name}</span>
+                                      <span className="block font-mono text-[10px] text-muted">{perm.code}</span>
                                     </span>
                                   </label>
                                 );
@@ -477,11 +477,11 @@ export const AdminRolesTab: React.FC = () => {
 
       {/* Amount limits */}
       {selected && canManage && (
-        <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 lg:col-span-2">
+        <div className="rounded-2xl border border-line bg-surface p-4 lg:col-span-2">
           <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h3 className="text-sm font-extrabold text-slate-900 dark:text-slate-100">حدود المبالغ</h3>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400">
+              <h3 className="text-sm font-extrabold text-ink ">حدود المبالغ</h3>
+              <p className="text-[11px] text-muted ">
                 سقف مبلغ لكل عملية مالية — DENY يرفض مباشرة، REQUIRE_APPROVAL ينشئ طلب اعتماد.
               </p>
             </div>
@@ -506,7 +506,7 @@ export const AdminRolesTab: React.FC = () => {
                   ))}
                 </select>
               ) : (
-                <span className="rounded-lg bg-sky-50 px-2.5 py-1.5 font-mono text-[11px] font-bold text-sky-700 dark:bg-sky-500/10 dark:text-sky-300">
+                <span className="rounded-lg bg-accent-soft px-2.5 py-1.5 font-mono text-[11px] font-bold text-primary dark:bg-primary/10 ">
                   {selected.code}
                 </span>
               )}
@@ -529,7 +529,7 @@ export const AdminRolesTab: React.FC = () => {
                     {
                       key: 'exceed', header: 'عند التجاوز',
                       render: (limit: any) => (
-                        <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${limit.onExceed === 'DENY' ? 'bg-rose-50 text-rose-600 dark:bg-rose-500/10 dark:text-rose-300' : 'bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-300'}`}>
+                        <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${limit.onExceed === 'DENY' ? 'bg-danger-soft text-danger dark:bg-danger/10 dark:text-danger' : 'bg-warning-soft text-warning dark:bg-warning/10 dark:text-warning'}`}>
                           {limit.onExceed === 'DENY' ? 'رفض' : 'يتطلب اعتمادًا'}
                         </span>
                       ),
@@ -537,7 +537,7 @@ export const AdminRolesTab: React.FC = () => {
                     {
                       key: 'actions', header: '',
                       render: (limit: any) => (
-                        <button onClick={() => removeLimit(limit)} className="rounded p-1 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10" title="حذف">
+                        <button onClick={() => removeLimit(limit)} className="rounded p-1 text-danger hover:bg-danger-soft dark:hover:bg-danger/10" title="حذف">
                           <Trash2 className="h-3.5 w-3.5" />
                         </button>
                       ),
@@ -547,7 +547,7 @@ export const AdminRolesTab: React.FC = () => {
                 />
               </div>
 
-              <div className="flex flex-wrap items-end gap-2 rounded-xl border border-dashed border-slate-200 p-3 dark:border-slate-700">
+              <div className="flex flex-wrap items-end gap-2 rounded-xl border border-dashed border-line p-3 ">
                 <input
                   value={limitForm.permissionCode}
                   onChange={(e) => setLimitForm((f) => ({ ...f, permissionCode: e.target.value }))}
@@ -582,7 +582,7 @@ export const AdminRolesTab: React.FC = () => {
                 </select>
                 <button
                   onClick={saveLimit}
-                  className="flex items-center gap-1 rounded-xl bg-sky-600 px-3 py-2 text-xs font-bold text-white hover:bg-sky-700"
+                  className="flex items-center gap-1 rounded-xl bg-primary px-3 py-2 text-xs font-bold text-white hover:bg-primary"
                 >
                   <Save className="h-3.5 w-3.5" /> حفظ الحد
                 </button>
@@ -593,14 +593,14 @@ export const AdminRolesTab: React.FC = () => {
       )}
 
       {modal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm">
-          <form onSubmit={submit} className="w-full max-w-md space-y-3 rounded-3xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-6 shadow-2xl">
-            <h3 className="text-base font-extrabold text-slate-900 dark:text-slate-100">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-primary/50 p-4 backdrop-blur-sm">
+          <form onSubmit={submit} className="w-full max-w-md space-y-3 rounded-3xl border border-line bg-surface p-6 shadow-2xl">
+            <h3 className="text-base font-extrabold text-ink ">
               {modal === 'create' ? 'إنشاء دور جديد' : 'تعديل الدور'}
             </h3>
             {modal === 'create' && (
               <div>
-                <label htmlFor="role-code" className="mb-1 block text-xs font-bold text-slate-700 dark:text-slate-300">كود الدور (إنجليزي) *</label>
+                <label htmlFor="role-code" className="mb-1 block text-xs font-bold text-ink ">كود الدور (إنجليزي) *</label>
                 <input
                   id="role-code"
                   name="roleCode"
@@ -614,7 +614,7 @@ export const AdminRolesTab: React.FC = () => {
               </div>
             )}
             <div>
-              <label htmlFor="role-name" className="mb-1 block text-xs font-bold text-slate-700 dark:text-slate-300">اسم الدور *</label>
+              <label htmlFor="role-name" className="mb-1 block text-xs font-bold text-ink ">اسم الدور *</label>
               <input
                 id="role-name"
                 name="roleName"
@@ -626,7 +626,7 @@ export const AdminRolesTab: React.FC = () => {
               />
             </div>
             <div>
-              <label htmlFor="role-description" className="mb-1 block text-xs font-bold text-slate-700 dark:text-slate-300">الوصف</label>
+              <label htmlFor="role-description" className="mb-1 block text-xs font-bold text-ink ">الوصف</label>
               <textarea
                 id="role-description"
                 name="roleDescription"
@@ -637,9 +637,9 @@ export const AdminRolesTab: React.FC = () => {
                 className={inputCls}
               />
             </div>
-            <div className="flex justify-end gap-2 border-t border-slate-100 dark:border-slate-800 pt-3">
-              <button type="button" onClick={() => setModal(null)} className="rounded-xl bg-slate-100 px-4 py-2 text-xs font-bold text-slate-700 dark:bg-slate-800 dark:text-slate-300">إلغاء</button>
-              <button type="submit" className="rounded-xl bg-sky-600 px-5 py-2 text-xs font-bold text-white hover:bg-sky-700">
+            <div className="flex justify-end gap-2 border-t border-line pt-3">
+              <button type="button" onClick={() => setModal(null)} className="rounded-xl bg-surface-sunken px-4 py-2 text-xs font-bold text-ink ">إلغاء</button>
+              <button type="submit" className="rounded-xl bg-primary px-5 py-2 text-xs font-bold text-white hover:bg-primary">
                 {modal === 'create' ? 'إنشاء' : 'حفظ'}
               </button>
             </div>

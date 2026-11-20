@@ -321,18 +321,18 @@ export const PlatformReleasesPage: React.FC = () => {
       />
 
       {error && (
-        <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-lg text-xs font-bold text-rose-300">
+        <div className="p-3 bg-danger/10 border border-danger/20 rounded-lg text-xs font-bold text-danger">
           {error}
         </div>
       )}
 
       {/* Releases Table */}
-      <div className="overflow-hidden rounded-xl border border-slate-800 bg-slate-900/70 shadow-sm">
+      <div className="overflow-hidden rounded-xl border border-line-strong bg-primary/70 shadow-sm">
         {loading ? (
-          <div className="py-16 text-center text-sm font-semibold text-slate-500">جارٍ تحميل الإصدارات...</div>
+          <div className="py-16 text-center text-sm font-semibold text-muted">جارٍ تحميل الإصدارات...</div>
         ) : releases.length === 0 ? (
           <EmptyState
-            icon={<Package className="h-6 w-6 text-slate-500" />}
+            icon={<Package className="h-6 w-6 text-muted" />}
             title="لا توجد حزم أو إصدارات"
             description="أنشئ أول إصدار للنظام لتوزيعه على العملاء والتحكم في دورات التحديث."
           />
@@ -345,19 +345,19 @@ export const PlatformReleasesPage: React.FC = () => {
               minWidth={950}
               dense
               tableClassName="text-xs"
-              rowClassName={() => 'transition-colors hover:bg-slate-800/30'}
+              rowClassName={() => 'transition-colors hover:bg-primary/30'}
               columns={[
                 {
                   key: 'ver', header: 'الإصدار / القناة',
                   render: (rel: any) => (
                     <span className="block">
                       <span className="flex items-center gap-2">
-                        <span className="font-mono text-sm font-bold text-slate-100">{rel.version}</span>
-                        <span className={`rounded px-1.5 py-0.5 text-[9px] font-black ${rel.channel === 'STABLE' ? 'bg-emerald-500/20 text-emerald-300' : rel.channel === 'HOTFIX' ? 'bg-rose-500/20 text-rose-300' : 'bg-amber-500/20 text-amber-300'}`}>
+                        <span className="font-mono text-sm font-bold text-muted">{rel.version}</span>
+                        <span className={`rounded px-1.5 py-0.5 text-[9px] font-black ${rel.channel === 'STABLE' ? 'bg-success/20 text-success' : rel.channel === 'HOTFIX' ? 'bg-danger/20 text-danger' : 'bg-warning/20 text-warning'}`}>
                           {rel.channel}
                         </span>
                       </span>
-                      {rel.notes && <span className="mt-0.5 block text-[11px] text-slate-400">{rel.notes}</span>}
+                      {rel.notes && <span className="mt-0.5 block text-[11px] text-muted">{rel.notes}</span>}
                     </span>
                   ),
                 },
@@ -365,10 +365,10 @@ export const PlatformReleasesPage: React.FC = () => {
                   key: 'status', header: 'الحالة',
                   render: (rel: any) => (
                     <span className="block">
-                      <span className={`inline-flex items-center gap-1 font-bold ${rel.status === 'PUBLISHED' ? 'text-emerald-400' : rel.status === 'DEPRECATED' ? 'text-rose-400' : 'text-slate-400'}`}>
+                      <span className={`inline-flex items-center gap-1 font-bold ${rel.status === 'PUBLISHED' ? 'text-success' : rel.status === 'DEPRECATED' ? 'text-danger' : 'text-muted'}`}>
                         {rel.status === 'PUBLISHED' ? 'منشور (نشط)' : rel.status === 'DEPRECATED' ? 'معطّل/ملغي' : 'مسودة'}
                       </span>
-                      {rel.rollbackVersion && <span className="mt-0.5 block text-[10px] text-amber-400">تراجع إلى: {rel.rollbackVersion}</span>}
+                      {rel.rollbackVersion && <span className="mt-0.5 block text-[10px] text-warning">تراجع إلى: {rel.rollbackVersion}</span>}
                     </span>
                   ),
                 },
@@ -376,14 +376,14 @@ export const PlatformReleasesPage: React.FC = () => {
                   key: 'mandatory', header: 'إجباري / الحد الأدنى',
                   render: (rel: any) => (
                     <span className="block">
-                      <span className="block">{rel.isMandatory ? <span className="font-bold text-rose-400">إجباري</span> : 'اختياري'}</span>
-                      <span className="block text-[10px] text-slate-500">أدنى: {rel.minVersion || 'لا يوجد'}</span>
+                      <span className="block">{rel.isMandatory ? <span className="font-bold text-danger">إجباري</span> : 'اختياري'}</span>
+                      <span className="block text-[10px] text-muted">أدنى: {rel.minVersion || 'لا يوجد'}</span>
                     </span>
                   ),
                 },
                 {
                   key: 'group', header: 'مجموعة التوزيع',
-                  render: (rel: any) => <span className="rounded bg-slate-800 px-2 py-0.5 font-mono text-[10px] text-slate-300">{rel.rolloutGroup}</span>,
+                  render: (rel: any) => <span className="rounded bg-primary px-2 py-0.5 font-mono text-[10px] text-muted">{rel.rolloutGroup}</span>,
                 },
                 {
                   key: 'targets', header: 'نتائج التطبيق (Targets)',
@@ -391,34 +391,34 @@ export const PlatformReleasesPage: React.FC = () => {
                     const summary = rel.targetsSummary || { total: 0, pending: 0, success: 0, failed: 0 };
                     return (
                       <span className="flex items-center gap-2 text-[11px]">
-                        <span className="font-bold text-emerald-400" title="ناجح">{summary.success}✓</span>
-                        <span className="font-bold text-amber-400" title="قيد الانتظار">{summary.pending}⌛</span>
-                        {summary.failed > 0 && <span className="font-bold text-rose-400" title="فشل">{summary.failed}✗</span>}
-                        <span className="text-[10px] text-slate-500">({summary.total} عميل)</span>
+                        <span className="font-bold text-success" title="ناجح">{summary.success}✓</span>
+                        <span className="font-bold text-warning" title="قيد الانتظار">{summary.pending}⌛</span>
+                        {summary.failed > 0 && <span className="font-bold text-danger" title="فشل">{summary.failed}✗</span>}
+                        <span className="text-[10px] text-muted">({summary.total} عميل)</span>
                       </span>
                     );
                   },
                 },
-                { key: 'date', header: 'تاريخ النشر', render: (rel: any) => <span className="text-slate-400">{formatDateTime(rel.createdAt)}</span> },
+                { key: 'date', header: 'تاريخ النشر', render: (rel: any) => <span className="text-muted">{formatDateTime(rel.createdAt)}</span> },
                 {
                   key: 'actions', header: 'إجراءات', align: 'center',
                   render: (rel: any) => (
                     <span className="flex items-center justify-center gap-2">
-                      <button onClick={() => handleOpenTargets(rel)} className="flex items-center gap-1 text-xs text-sky-400 hover:text-sky-300" title="تحديد أو فحص العملاء المستهدفين">
+                      <button onClick={() => handleOpenTargets(rel)} className="flex items-center gap-1 text-xs text-primary hover:text-primary" title="تحديد أو فحص العملاء المستهدفين">
                         <Users className="h-3.5 w-3.5" />
                         العملاء
                       </button>
                       {centralActive && rel.status === 'DRAFT' && canManageReleases && (
-                        <button onClick={() => handlePublish(rel.id)} className="text-xs font-bold text-emerald-400 hover:text-emerald-300" title="نشر الإصدار">
+                        <button onClick={() => handlePublish(rel.id)} className="text-xs font-bold text-success hover:text-success" title="نشر الإصدار">
                           نشر
                         </button>
                       )}
                       {rel.status !== 'DEPRECATED' && canManageReleases && (
                         <>
-                          <button onClick={() => handleDisableRelease(rel.id)} className="text-xs text-rose-400 hover:text-rose-300" title="تعطيل فوري للإصدار">
+                          <button onClick={() => handleDisableRelease(rel.id)} className="text-xs text-danger hover:text-danger" title="تعطيل فوري للإصدار">
                             تعطيل
                           </button>
-                          <button onClick={() => handleRollback(rel)} className="flex items-center gap-1 text-xs text-amber-400 hover:text-amber-300" title="تراجع طارئ">
+                          <button onClick={() => handleRollback(rel)} className="flex items-center gap-1 text-xs text-warning hover:text-warning" title="تراجع طارئ">
                             <RotateCcw className="h-3 w-3" />
                             تراجع
                           </button>
@@ -440,18 +440,18 @@ export const PlatformReleasesPage: React.FC = () => {
         title={`العملاء المستهدفون للإصدار ${activeReleaseForTargets?.version || ''}`}
       >
         <div className="space-y-4 text-right">
-          <p className="text-xs text-slate-400">
+          <p className="text-xs text-muted">
             حدد العملاء الذين سيتم طرح وتطبيق هذا الإصدار عليهم، أو راقب حالة تطبيق التحديث:
           </p>
 
-          <div className="max-h-60 overflow-y-auto space-y-1.5 border border-slate-800 p-2 rounded-lg bg-slate-950/40">
+          <div className="max-h-60 overflow-y-auto space-y-1.5 border border-line-strong p-2 rounded-lg bg-primary/40">
             {tenants.map((t) => {
               const checked = selectedTenantIds.includes(t.id);
               const targetStatus = targets.find((tgt) => tgt.tenantId === t.id);
               return (
                 <label
                   key={t.id}
-                  className="flex items-center justify-between p-2 rounded hover:bg-slate-800/40 cursor-pointer text-xs"
+                  className="flex items-center justify-between p-2 rounded hover:bg-primary/40 cursor-pointer text-xs"
                 >
                   <div className="flex items-center gap-2">
                     <input
@@ -464,20 +464,20 @@ export const PlatformReleasesPage: React.FC = () => {
                           setSelectedTenantIds(selectedTenantIds.filter((id) => id !== t.id));
                         }
                       }}
-                      className="rounded border-slate-700 text-sky-500 focus:ring-sky-500"
+                      className="rounded border-line-strong text-primary focus:ring-primary"
                     />
-                    <span className="font-bold text-slate-200">{t.name}</span>
-                    <span className="font-mono text-[10px] text-slate-500">({t.code})</span>
+                    <span className="font-bold text-muted">{t.name}</span>
+                    <span className="font-mono text-[10px] text-muted">({t.code})</span>
                   </div>
 
                   {targetStatus && (
                     <span
                       className={`text-[10px] font-bold ${
                         targetStatus.status === 'SUCCESS'
-                          ? 'text-emerald-400'
+                          ? 'text-success'
                           : targetStatus.status === 'FAILED'
-                          ? 'text-rose-400'
-                          : 'text-amber-400'
+                          ? 'text-danger'
+                          : 'text-warning'
                       }`}
                     >
                       {targetStatus.status}
@@ -488,8 +488,8 @@ export const PlatformReleasesPage: React.FC = () => {
             })}
           </div>
 
-          <div className="flex justify-between items-center pt-3 border-t border-slate-800">
-            <span className="text-xs text-slate-400">
+          <div className="flex justify-between items-center pt-3 border-t border-line-strong">
+            <span className="text-xs text-muted">
               تم تحديد {selectedTenantIds.length} من أصل {tenants.length} عميل
             </span>
             <div className="flex gap-2">
@@ -513,7 +513,7 @@ export const PlatformReleasesPage: React.FC = () => {
         <div className="space-y-3 text-right">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">رقم الإصدار (SemVer) *</label>
+              <label className="block text-xs font-semibold text-muted mb-1">رقم الإصدار (SemVer) *</label>
               <input
                 type="text"
                 value={releaseForm.version}
@@ -523,7 +523,7 @@ export const PlatformReleasesPage: React.FC = () => {
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">قناة الإصدار</label>
+              <label className="block text-xs font-semibold text-muted mb-1">قناة الإصدار</label>
               <select
                 value={releaseForm.channel}
                 onChange={(e) => setReleaseForm({ ...releaseForm, channel: e.target.value as any })}
@@ -539,7 +539,7 @@ export const PlatformReleasesPage: React.FC = () => {
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">رابط تحميل الحزمة (URL)</label>
+              <label className="block text-xs font-semibold text-muted mb-1">رابط تحميل الحزمة (URL)</label>
               <input
                 type="text"
                 value={releaseForm.fileUrl ?? ''}
@@ -549,7 +549,7 @@ export const PlatformReleasesPage: React.FC = () => {
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">بصمة التحقق SHA256</label>
+              <label className="block text-xs font-semibold text-muted mb-1">بصمة التحقق SHA256</label>
               <input
                 type="text"
                 value={releaseForm.checksumSha256 ?? ''}
@@ -561,7 +561,7 @@ export const PlatformReleasesPage: React.FC = () => {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">ملاحظات الإصدار / التغييرات</label>
+            <label className="block text-xs font-semibold text-muted mb-1">ملاحظات الإصدار / التغييرات</label>
             <textarea
               rows={3}
               value={releaseForm.changelog ?? ''}
@@ -572,18 +572,18 @@ export const PlatformReleasesPage: React.FC = () => {
           </div>
 
           <div>
-            <label className="flex items-center gap-2 cursor-pointer text-xs text-slate-300 mt-1">
+            <label className="flex items-center gap-2 cursor-pointer text-xs text-muted mt-1">
               <input
                 type="checkbox"
                 checked={releaseForm.isMandatory ?? false}
                 onChange={(e) => setReleaseForm({ ...releaseForm, isMandatory: e.target.checked })}
-                className="rounded border-slate-700 text-sky-500 focus:ring-sky-500"
+                className="rounded border-line-strong text-primary focus:ring-primary"
               />
               <span>تحديث إجباري (يمنع العمل على الإصدارات الأقدم)</span>
             </label>
           </div>
 
-          <div className="flex justify-end gap-2 pt-3 border-t border-slate-800">
+          <div className="flex justify-end gap-2 pt-3 border-t border-line-strong">
             <Button variant="secondary" size="sm" onClick={() => setIsUpsertOpen(false)}>
               إلغاء
             </Button>

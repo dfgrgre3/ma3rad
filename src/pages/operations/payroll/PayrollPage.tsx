@@ -208,8 +208,8 @@ export const PayrollPage: React.FC = () => {
   };
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
-      <div className="bg-white border-b border-slate-200 px-6 pt-4">
+    <div className="h-full flex flex-col bg-surface-muted text-ink overflow-hidden">
+      <div className="bg-surface border-b border-line px-6 pt-4">
         <PageHeader
           icon={<Wallet className="h-5 w-5" />}
           title="الرواتب والمسحوبات"
@@ -218,68 +218,68 @@ export const PayrollPage: React.FC = () => {
       </div>
 
       <div className="flex-1 overflow-auto p-6 space-y-4">
-        {error && <div className="px-4 py-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold">{error}</div>}
-        {loading ? <div className="py-16 flex justify-center"><Loader2 className="w-6 h-6 animate-spin text-sky-500" /></div> : (
+        {error && <div className="px-4 py-2.5 rounded-xl bg-danger-soft border border-danger-border text-danger text-xs font-semibold">{error}</div>}
+        {loading ? <div className="py-16 flex justify-center"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div> : (
           <>
-            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-              <div className="px-4 py-3 border-b border-slate-200 bg-slate-50 flex flex-wrap items-center justify-between gap-3">
+            <div className="bg-surface border border-line rounded-xl overflow-hidden">
+              <div className="px-4 py-3 border-b border-line bg-surface-muted flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <h3 className="text-sm font-black flex items-center gap-2"><Users className="w-4 h-4 text-slate-400" /> دورة الرواتب</h3>
-                  <p className="text-[10px] text-slate-500 mt-1">احتساب مستقل للفترة المحددة مع تثبيت تفاصيل الأجر والخصومات</p>
+                  <h3 className="text-sm font-black flex items-center gap-2"><Users className="w-4 h-4 text-muted" /> دورة الرواتب</h3>
+                  <p className="text-[10px] text-muted mt-1">احتساب مستقل للفترة المحددة مع تثبيت تفاصيل الأجر والخصومات</p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <label className="text-xs font-bold text-slate-600">فترة الرواتب
-                    <input type="month" value={period} onChange={(event) => setPeriod(event.target.value)} className="mr-2 rounded-lg border border-slate-200 bg-white px-2 py-1.5 font-mono" />
+                  <label className="text-xs font-bold text-ink-secondary">فترة الرواتب
+                    <input type="month" value={period} onChange={(event) => setPeriod(event.target.value)} className="mr-2 rounded-lg border border-line bg-surface px-2 py-1.5 font-mono" />
                   </label>
-                  {canManagePayroll && <button onClick={calculateRun} disabled={saving || (run !== null && run.status !== 'DRAFT')} className="flex items-center gap-1 rounded-lg bg-slate-800 px-3 py-2 text-xs font-bold text-white disabled:opacity-50">
+                  {canManagePayroll && <button onClick={calculateRun} disabled={saving || (run !== null && run.status !== 'DRAFT')} className="flex items-center gap-1 rounded-lg bg-primary px-3 py-2 text-xs font-bold text-white disabled:opacity-50">
                     <Calculator className="h-3.5 w-3.5" /> {run ? 'إعادة الاحتساب' : 'احتساب الرواتب'}
                   </button>}
-                  {run && <button onClick={exportRun} className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700">
+                  {run && <button onClick={exportRun} className="flex items-center gap-1 rounded-lg border border-line bg-surface px-3 py-2 text-xs font-bold text-ink">
                     <FileDown className="h-3.5 w-3.5" /> تصدير CSV
                   </button>}
-                  {canManagePayroll && <button onClick={() => setTaxOpen(true)} className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700">
+                  {canManagePayroll && <button onClick={() => setTaxOpen(true)} className="flex items-center gap-1 rounded-lg border border-line bg-surface px-3 py-2 text-xs font-bold text-ink">
                     قواعد الضريبة
                   </button>}
-                  {run?.status === 'DRAFT' && canApprovePayroll && <button onClick={approveRun} disabled={saving || run.items.some((item) => item.netAmount < 0)} className="flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white disabled:opacity-50">
+                  {run?.status === 'DRAFT' && canApprovePayroll && <button onClick={approveRun} disabled={saving || run.items.some((item) => item.netAmount < 0)} className="flex items-center gap-1 rounded-lg bg-success px-3 py-2 text-xs font-bold text-white disabled:opacity-50">
                     <CheckCircle2 className="h-3.5 w-3.5" /> اعتماد الكشف
                   </button>}
-                  {run?.status === 'APPROVED' && canApprovePayroll && <button onClick={payRun} disabled={saving} className="flex items-center gap-1 rounded-lg bg-sky-600 px-3 py-2 text-xs font-bold text-white disabled:opacity-50">
+                  {run?.status === 'APPROVED' && canApprovePayroll && <button onClick={payRun} disabled={saving} className="flex items-center gap-1 rounded-lg bg-primary px-3 py-2 text-xs font-bold text-white disabled:opacity-50">
                     <Banknote className="h-3.5 w-3.5" /> صرف جماعي
                   </button>}
-                  {run?.status === 'PAID' && canApprovePayroll && <button onClick={closeRun} disabled={saving} className="flex items-center gap-1 rounded-lg bg-slate-700 px-3 py-2 text-xs font-bold text-white disabled:opacity-50">
+                  {run?.status === 'PAID' && canApprovePayroll && <button onClick={closeRun} disabled={saving} className="flex items-center gap-1 rounded-lg bg-primary px-3 py-2 text-xs font-bold text-white disabled:opacity-50">
                     <LockKeyhole className="h-3.5 w-3.5" /> إغلاق الفترة
                   </button>}
                 </div>
               </div>
               {run ? <>
-                <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 px-4 py-3 text-xs">
-                  <span className="rounded-full bg-sky-50 px-3 py-1 font-bold text-sky-700">الحالة: {RUN_STATUS_LABELS[run.status]}</span>
-                  <span className="text-slate-500">{run.items.length} موظف</span>
-                  <span className="text-slate-500">الضريبة كنسبة من الإجمالي؛ تحويل الدقائق على أساس يوم عمل 8 ساعات.</span>
-                  {run.status === 'DRAFT' && <span className="text-amber-700">يمكن أن تتغير المسودة بعد تعديل الحضور أو الحركات؛ أعد الاحتساب قبل الاعتماد.</span>}
+                <div className="flex flex-wrap items-center gap-2 border-b border-line px-4 py-3 text-xs">
+                  <span className="rounded-full bg-accent-soft px-3 py-1 font-bold text-primary">الحالة: {RUN_STATUS_LABELS[run.status]}</span>
+                  <span className="text-muted">{run.items.length} موظف</span>
+                  <span className="text-muted">الضريبة كنسبة من الإجمالي؛ تحويل الدقائق على أساس يوم عمل 8 ساعات.</span>
+                  {run.status === 'DRAFT' && <span className="text-warning">يمكن أن تتغير المسودة بعد تعديل الحضور أو الحركات؛ أعد الاحتساب قبل الاعتماد.</span>}
                 </div>
-                <div className="grid grid-cols-1 gap-3 border-b border-slate-100 p-4 sm:grid-cols-3">
-                  <div className="rounded-xl bg-slate-50 px-4 py-3"><div className="text-[10px] font-bold text-slate-500">إجمالي الاستحقاقات</div><div className="mt-1 font-black">{fmt(totals.gross)}</div></div>
-                  <div className="rounded-xl bg-rose-50 px-4 py-3"><div className="text-[10px] font-bold text-rose-700">إجمالي الخصومات</div><div className="mt-1 font-black text-rose-700">{fmt(totals.deductions)}</div></div>
-                  <div className="rounded-xl bg-sky-50 px-4 py-3"><div className="text-[10px] font-bold text-sky-700">صافي مستحق الفترة</div><div className="mt-1 font-black text-sky-700">{fmt(totals.net)}</div></div>
+                <div className="grid grid-cols-1 gap-3 border-b border-line p-4 sm:grid-cols-3">
+                  <div className="rounded-xl bg-surface-muted px-4 py-3"><div className="text-[10px] font-bold text-muted">إجمالي الاستحقاقات</div><div className="mt-1 font-black">{fmt(totals.gross)}</div></div>
+                  <div className="rounded-xl bg-danger-soft px-4 py-3"><div className="text-[10px] font-bold text-danger">إجمالي الخصومات</div><div className="mt-1 font-black text-danger">{fmt(totals.deductions)}</div></div>
+                  <div className="rounded-xl bg-accent-soft px-4 py-3"><div className="text-[10px] font-bold text-primary">صافي مستحق الفترة</div><div className="mt-1 font-black text-primary">{fmt(totals.net)}</div></div>
                 </div>
                 {reconciliation && (
-                  <div className="border-b border-slate-100 bg-slate-50/70 px-4 py-3">
+                  <div className="border-b border-line bg-surface-muted/70 px-4 py-3">
                     <div className="flex flex-wrap items-center gap-3 text-xs">
-                      <span className="font-black text-slate-700">مطابقة الصرف:</span>
+                      <span className="font-black text-ink">مطابقة الصرف:</span>
                       <span>المستحق <b className="font-mono">{fmt(reconciliation.expectedTotal)}</b></span>
                       <span>المصروف <b className="font-mono">{fmt(reconciliation.paidTotal)}</b></span>
-                      <span className={reconciliation.isBalanced ? 'font-bold text-emerald-700' : 'font-bold text-rose-700'}>
+                      <span className={reconciliation.isBalanced ? 'font-bold text-success' : 'font-bold text-danger'}>
                         {reconciliation.isBalanced ? 'مطابق' : `فرق ${fmt(reconciliation.difference)}`}
                       </span>
                       {reconciliation.byMethod.map((row) => (
-                        <span key={row.method} className="rounded-full bg-white px-2 py-1 text-[10px] font-bold text-slate-600">
+                        <span key={row.method} className="rounded-full bg-surface px-2 py-1 text-[10px] font-bold text-ink-secondary">
                           {PAYMENT_METHOD_LABELS[row.method]}: {row.count} / {fmt(row.amount)}
                         </span>
                       ))}
                     </div>
                     {reconciliation.items.flatMap((item) => item.issues.map((issue) => (
-                      <div key={`${item.itemId}-${issue}`} className="mt-1 text-[10px] text-amber-700">{item.employeeName}: {issue}</div>
+                      <div key={`${item.itemId}-${issue}`} className="mt-1 text-[10px] text-warning">{item.employeeName}: {issue}</div>
                     )))}
                   </div>
                 )}
@@ -293,24 +293,24 @@ export const PayrollPage: React.FC = () => {
                                       {
                                         key: 'employee', header: 'الموظف',
                                         render: (item) => (
-                                          <span className="font-bold align-top">{item.employeeName}<div className="mt-1 text-[10px] font-normal text-slate-400">{item.expectedWorkdays} يوم عمل مستحق</div></span>
+                                          <span className="font-bold align-top">{item.employeeName}<div className="mt-1 text-[10px] font-normal text-muted">{item.expectedWorkdays} يوم عمل مستحق</div></span>
                                         ),
                                       },
                                       { key: 'base', header: 'الأساسي', render: (item) => <span className="font-mono">{fmt(item.baseAmount)}</span> },
-                                      { key: 'overtime', header: 'الإضافي', render: (item) => <span className="font-mono">{fmt(item.overtimeAmount)}<div className="mt-1 text-[10px] text-slate-400">{item.overtimeMinutes} دقيقة</div></span> },
+                                      { key: 'overtime', header: 'الإضافي', render: (item) => <span className="font-mono">{fmt(item.overtimeAmount)}<div className="mt-1 text-[10px] text-muted">{item.overtimeMinutes} دقيقة</div></span> },
                                       { key: 'bonus', header: 'مكافأة وعمولة', render: (item) => <span className="font-mono">{fmt(item.bonusAmount + item.commissionAmount)}</span> },
                                       { key: 'absence', header: 'غياب / إجازة', render: (item) => <span>{item.absentDays} / {item.unpaidLeaveDays} يوم<div className="mt-1 font-mono">{fmt(item.attendanceDeductionAmount)}</div></span> },
                                       { key: 'late', header: 'تأخير', render: (item) => <span>{item.lateMinutes} دقيقة</span> },
                                       { key: 'deductions', header: 'سلف وخصومات', render: (item) => <span className="font-mono">{fmt(item.advanceAmount + item.manualDeductionAmount)}</span> },
                                       { key: 'tax', header: 'ضريبة', render: (item) => <span className="font-mono">{fmt(item.taxAmount)}</span> },
-                                      { key: 'net', header: 'الصافي', render: (item) => <span className={`font-mono font-black ${item.netAmount < 0 ? 'text-rose-700' : 'text-sky-700'}`}>{fmt(item.netAmount)}</span> },
+                                      { key: 'net', header: 'الصافي', render: (item) => <span className={`font-mono font-black ${item.netAmount < 0 ? 'text-danger' : 'text-primary'}`}>{fmt(item.netAmount)}</span> },
                                       {
                                         key: 'payout', header: 'الصرف',
                                         render: (item) => (
                                           <span>
-                                            <span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-bold text-slate-600">{PAYMENT_METHOD_LABELS[item.paymentMethod] || item.paymentMethod}</span>
-                                            {item.payoutStatus === 'PAID' && <div className="mt-1 text-[10px] font-bold text-emerald-700">مصروف</div>}
-                                            {item.paymentReference && <div className="mt-1 max-w-[130px] truncate font-mono text-[10px] text-slate-400" title={item.paymentReference}>{item.paymentReference}</div>}
+                                            <span className="rounded-full bg-surface-sunken px-2 py-1 text-[10px] font-bold text-ink-secondary">{PAYMENT_METHOD_LABELS[item.paymentMethod] || item.paymentMethod}</span>
+                                            {item.payoutStatus === 'PAID' && <div className="mt-1 text-[10px] font-bold text-success">مصروف</div>}
+                                            {item.paymentReference && <div className="mt-1 max-w-[130px] truncate font-mono text-[10px] text-muted" title={item.paymentReference}>{item.paymentReference}</div>}
                                           </span>
                                         ),
                                       },
@@ -318,10 +318,10 @@ export const PayrollPage: React.FC = () => {
                                         key: 'payslip', header: 'القسيمة / التحذيرات',
                                         render: (item) => (
                                           <span>
-                                            <button onClick={() => printPayslip(item)} className="mb-1 flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1 font-bold text-slate-600">
+                                            <button onClick={() => printPayslip(item)} className="mb-1 flex items-center gap-1 rounded-lg border border-line px-2 py-1 font-bold text-ink-secondary">
                                               <Printer className="h-3 w-3" /> قسيمة
                                             </button>
-                                            {item.warnings.map((warning) => <div key={warning} className="max-w-[220px] text-[10px] text-amber-700">{warning}</div>)}
+                                            {item.warnings.map((warning) => <div key={warning} className="max-w-[220px] text-[10px] text-warning">{warning}</div>)}
                                           </span>
                                         ),
                                       },
@@ -329,33 +329,33 @@ export const PayrollPage: React.FC = () => {
                                     emptyTitle="لا يوجد موظفون مستحقون في هذه الفترة."
                                   />
 
-              </> : <div className="flex flex-col items-center gap-3 p-10 text-center text-sm text-slate-500">
+              </> : <div className="flex flex-col items-center gap-3 p-10 text-center text-sm text-muted">
                 <span>لم يتم احتساب رواتب هذه الفترة بعد.</span>
-                {canManagePayroll && <button onClick={calculateRun} disabled={saving} className="rounded-lg bg-sky-600 px-4 py-2 font-bold text-white disabled:opacity-50"><Calculator className="ml-1 inline h-4 w-4" /> احتساب المسودة</button>}
+                {canManagePayroll && <button onClick={calculateRun} disabled={saving} className="rounded-lg bg-primary px-4 py-2 font-bold text-white disabled:opacity-50"><Calculator className="ml-1 inline h-4 w-4" /> احتساب المسودة</button>}
               </div>}
             </div>
 
-            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-              <div className="px-4 py-3 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
-                <h3 className="text-sm font-black flex items-center gap-2"><Users className="w-4 h-4 text-slate-400" /> حركات إضافية للموظفين</h3>
-                <span className="text-[10px] text-slate-400">{employees.length} موظف</span>
+            <div className="bg-surface border border-line rounded-xl overflow-hidden">
+              <div className="px-4 py-3 border-b border-line bg-surface-muted flex items-center justify-between">
+                <h3 className="text-sm font-black flex items-center gap-2"><Users className="w-4 h-4 text-muted" /> حركات إضافية للموظفين</h3>
+                <span className="text-[10px] text-muted">{employees.length} موظف</span>
               </div>
               <div className="flex flex-wrap gap-2 p-4">
-                {employees.map((employee) => <div key={employee.id} className="flex min-w-[250px] flex-1 items-center justify-between gap-2 rounded-lg border border-slate-100 px-3 py-2">
+                {employees.map((employee) => <div key={employee.id} className="flex min-w-[250px] flex-1 items-center justify-between gap-2 rounded-lg border border-line px-3 py-2">
                   <span className="text-xs font-bold">{employee.name}</span>
                   {canManagePayroll && <div className="flex gap-1">
-                    <button onClick={() => openTx(employee, 'ADVANCE')} className="rounded-lg border border-amber-200 bg-amber-50 px-2 py-1 text-[10px] font-bold text-amber-700">سلفة</button>
-                    <button onClick={() => openTx(employee, 'BONUS')} className="rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-700">مكافأة</button>
-                    <button onClick={() => openTx(employee, 'DEDUCTION')} className="rounded-lg border border-rose-200 bg-rose-50 px-2 py-1 text-[10px] font-bold text-rose-700">خصم</button>
+                    <button onClick={() => openTx(employee, 'ADVANCE')} className="rounded-lg border border-warning-border bg-warning-soft px-2 py-1 text-[10px] font-bold text-warning">سلفة</button>
+                    <button onClick={() => openTx(employee, 'BONUS')} className="rounded-lg border border-success-border bg-success-soft px-2 py-1 text-[10px] font-bold text-success">مكافأة</button>
+                    <button onClick={() => openTx(employee, 'DEDUCTION')} className="rounded-lg border border-danger-border bg-danger-soft px-2 py-1 text-[10px] font-bold text-danger">خصم</button>
                   </div>}
                 </div>)}
               </div>
             </div>
 
-            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-              <div className="px-4 py-3 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
-                <h3 className="text-sm font-black flex items-center gap-2"><Banknote className="w-4 h-4 text-slate-400" /> آخر حركات الرواتب</h3>
-                <span className="text-[10px] text-slate-400">{transactions.length} حركة</span>
+            <div className="bg-surface border border-line rounded-xl overflow-hidden">
+              <div className="px-4 py-3 border-b border-line bg-surface-muted flex items-center justify-between">
+                <h3 className="text-sm font-black flex items-center gap-2"><Banknote className="w-4 h-4 text-muted" /> آخر حركات الرواتب</h3>
+                <span className="text-[10px] text-muted">{transactions.length} حركة</span>
               </div>
               <DataTable
                                 ariaLabel="آخر حركات الرواتب"
@@ -363,12 +363,12 @@ export const PayrollPage: React.FC = () => {
                                 rowKey={(tx) => tx.id}
                                 dense
                                 columns={[
-                                  { key: 'employee', header: 'الموظف', render: (tx) => <span className="font-bold text-slate-700">{tx.employeeName || tx.employeeId}</span> },
+                                  { key: 'employee', header: 'الموظف', render: (tx) => <span className="font-bold text-ink">{tx.employeeName || tx.employeeId}</span> },
                                   { key: 'type', header: 'النوع', render: (tx) => <span className={`text-[10px] px-2 py-1 rounded border font-bold ${TX_COLORS[tx.type]}`}>{TX_LABELS[tx.type]}</span> },
-                                  { key: 'amount', header: 'المبلغ', render: (tx) => <span className="font-mono font-bold text-slate-800">{fmt(Number(tx.amount))}</span> },
-                                  { key: 'date', header: 'التاريخ', render: (tx) => <span className="text-slate-500 font-mono">{tx.date}</span> },
-                                  { key: 'notes', header: 'ملاحظات', render: (tx) => <span className="text-slate-400 text-xs max-w-[240px] truncate block">{tx.notes || '—'}</span> },
-                                  { key: 'actions', header: '', render: (tx) => canManagePayroll ? <button onClick={() => removeTx(tx)} className="p-1.5 rounded-lg text-rose-500 hover:bg-rose-50"><Trash2 className="w-3.5 h-3.5" /></button> : null },
+                                  { key: 'amount', header: 'المبلغ', render: (tx) => <span className="font-mono font-bold text-ink">{fmt(Number(tx.amount))}</span> },
+                                  { key: 'date', header: 'التاريخ', render: (tx) => <span className="text-muted font-mono">{tx.date}</span> },
+                                  { key: 'notes', header: 'ملاحظات', render: (tx) => <span className="text-muted text-xs max-w-[240px] truncate block">{tx.notes || '—'}</span> },
+                                  { key: 'actions', header: '', render: (tx) => canManagePayroll ? <button onClick={() => removeTx(tx)} className="p-1.5 rounded-lg text-danger hover:bg-danger-soft"><Trash2 className="w-3.5 h-3.5" /></button> : null },
                                 ]}
                                 emptyTitle="لا توجد حركات رواتب مسجلة"
                               />

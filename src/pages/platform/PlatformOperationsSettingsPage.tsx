@@ -329,41 +329,41 @@ export const PlatformOperationsSettingsPage: React.FC = () => {
   const getJobStatusBadge = (status: PlatformOpsJobStatus) => {
     switch (status) {
       case 'PENDING':
-        return <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-500/10 text-amber-400 border border-amber-500/20"><Clock className="w-3 h-3" /> قيد الانتظار</span>;
+        return <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-warning/10 text-warning border border-warning/20"><Clock className="w-3 h-3" /> قيد الانتظار</span>;
       case 'RUNNING':
-        return <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-500/10 text-blue-400 border border-blue-500/20"><RefreshCw className="w-3 h-3 animate-spin" /> قيد التشغيل</span>;
+        return <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary border border-primary/20"><RefreshCw className="w-3 h-3 animate-spin" /> قيد التشغيل</span>;
       case 'DONE':
-        return <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"><CheckCircle2 className="w-3 h-3" /> مكتملة</span>;
+        return <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-success/10 text-success border border-success/20"><CheckCircle2 className="w-3 h-3" /> مكتملة</span>;
       case 'FAILED':
-        return <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-rose-500/10 text-rose-400 border border-rose-500/20"><AlertTriangle className="w-3 h-3" /> فشلت</span>;
+        return <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-danger/10 text-danger border border-danger/20"><AlertTriangle className="w-3 h-3" /> فشلت</span>;
       case 'CANCELLED':
-        return <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-zinc-500/10 text-zinc-400 border border-zinc-500/20"><XCircle className="w-3 h-3" /> ملغاة</span>;
+        return <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-line-strong/10 text-muted border border-line-strong/20"><XCircle className="w-3 h-3" /> ملغاة</span>;
     }
   };
 
   const getMaintStatusBadge = (status: PlatformMaintenanceStatus) => {
     switch (status) {
       case 'SCHEDULED':
-        return <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-500/10 text-blue-400 border border-blue-500/20">مجدولة</span>;
+        return <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary border border-primary/20">مجدولة</span>;
       case 'ACTIVE':
-        return <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-500/10 text-amber-400 border border-amber-500/20 animate-pulse">جارية حالياً</span>;
+        return <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-warning/10 text-warning border border-warning/20 animate-pulse">جارية حالياً</span>;
       case 'COMPLETED':
-        return <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">مكتملة</span>;
+        return <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-success/10 text-success border border-success/20">مكتملة</span>;
       case 'CANCELLED':
-        return <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-zinc-500/10 text-zinc-400 border border-zinc-500/20">ملغاة</span>;
+        return <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-line-strong/10 text-muted border border-line-strong/20">ملغاة</span>;
     }
   };
 
   const getApprovalStatusBadge = (status: PlatformOpApprovalStatus) => {
     switch (status) {
       case 'PENDING':
-        return <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-500/10 text-amber-400 border border-amber-500/20">في انتظار الموافقة</span>;
+        return <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-warning/10 text-warning border border-warning/20">في انتظار الموافقة</span>;
       case 'APPROVED':
-        return <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">تمت الموافقة</span>;
+        return <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-success/10 text-success border border-success/20">تمت الموافقة</span>;
       case 'REJECTED':
-        return <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-rose-500/10 text-rose-400 border border-rose-500/20">مرفوضة</span>;
+        return <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-danger/10 text-danger border border-danger/20">مرفوضة</span>;
       case 'CANCELLED':
-        return <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-zinc-500/10 text-zinc-400 border border-zinc-500/20">ملغاة</span>;
+        return <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-line-strong/10 text-muted border border-line-strong/20">ملغاة</span>;
     }
   };
 
@@ -410,13 +410,13 @@ export const PlatformOperationsSettingsPage: React.FC = () => {
       />
 
       {/* Tabs */}
-      <div className="flex border-b border-zinc-800 space-x-1 space-x-reverse overflow-x-auto">
+      <div className="flex border-b border-line-strong space-x-1 space-x-reverse overflow-x-auto">
         <button
           onClick={() => setActiveTab('jobs')}
           className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
             activeTab === 'jobs'
-              ? 'border-emerald-500 text-emerald-400'
-              : 'border-transparent text-zinc-400 hover:text-zinc-200'
+              ? 'border-success text-success'
+              : 'border-transparent text-muted hover:text-muted'
           }`}
         >
           <Activity className="w-4 h-4" />
@@ -426,8 +426,8 @@ export const PlatformOperationsSettingsPage: React.FC = () => {
           onClick={() => setActiveTab('scheduled')}
           className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
             activeTab === 'scheduled'
-              ? 'border-emerald-500 text-emerald-400'
-              : 'border-transparent text-zinc-400 hover:text-zinc-200'
+              ? 'border-success text-success'
+              : 'border-transparent text-muted hover:text-muted'
           }`}
         >
           <Clock className="w-4 h-4" />
@@ -437,8 +437,8 @@ export const PlatformOperationsSettingsPage: React.FC = () => {
           onClick={() => setActiveTab('sync')}
           className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
             activeTab === 'sync'
-              ? 'border-emerald-500 text-emerald-400'
-              : 'border-transparent text-zinc-400 hover:text-zinc-200'
+              ? 'border-success text-success'
+              : 'border-transparent text-muted hover:text-muted'
           }`}
         >
           <Cpu className="w-4 h-4" />
@@ -448,8 +448,8 @@ export const PlatformOperationsSettingsPage: React.FC = () => {
           onClick={() => setActiveTab('approvals')}
           className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
             activeTab === 'approvals'
-              ? 'border-emerald-500 text-emerald-400'
-              : 'border-transparent text-zinc-400 hover:text-zinc-200'
+              ? 'border-success text-success'
+              : 'border-transparent text-muted hover:text-muted'
           }`}
         >
           <ShieldCheck className="w-4 h-4" />
@@ -459,8 +459,8 @@ export const PlatformOperationsSettingsPage: React.FC = () => {
           onClick={() => setActiveTab('maintenance')}
           className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
             activeTab === 'maintenance'
-              ? 'border-emerald-500 text-emerald-400'
-              : 'border-transparent text-zinc-400 hover:text-zinc-200'
+              ? 'border-success text-success'
+              : 'border-transparent text-muted hover:text-muted'
           }`}
         >
           <Calendar className="w-4 h-4" />
@@ -470,8 +470,8 @@ export const PlatformOperationsSettingsPage: React.FC = () => {
           onClick={() => setActiveTab('errors')}
           className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
             activeTab === 'errors'
-              ? 'border-emerald-500 text-emerald-400'
-              : 'border-transparent text-zinc-400 hover:text-zinc-200'
+              ? 'border-success text-success'
+              : 'border-transparent text-muted hover:text-muted'
           }`}
         >
           <AlertTriangle className="w-4 h-4" />
@@ -481,8 +481,8 @@ export const PlatformOperationsSettingsPage: React.FC = () => {
           onClick={() => setActiveTab('usage')}
           className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
             activeTab === 'usage'
-              ? 'border-emerald-500 text-emerald-400'
-              : 'border-transparent text-zinc-400 hover:text-zinc-200'
+              ? 'border-success text-success'
+              : 'border-transparent text-muted hover:text-muted'
           }`}
         >
           <Layers className="w-4 h-4" />
@@ -491,7 +491,7 @@ export const PlatformOperationsSettingsPage: React.FC = () => {
       </div>
 
       {centralActive && (activeTab === 'sync' || activeTab === 'approvals' || activeTab === 'maintenance') && (
-        <div className="rounded-lg border border-amber-800/50 bg-amber-950/20 px-4 py-3 text-xs font-semibold text-amber-300">
+        <div className="rounded-lg border border-warning/50 bg-warning/20 px-4 py-3 text-xs font-semibold text-warning">
           هذا القسم غير متاح في الوضع المركزي بعد — بياناته تُدار على المصدر المحلي فقط.
         </div>
       )}
@@ -501,10 +501,10 @@ export const PlatformOperationsSettingsPage: React.FC = () => {
       {(activeTab === 'jobs' || activeTab === 'scheduled' || activeTab === 'errors') && (
         <div className="space-y-4">
           {/* Filters */}
-          <div className="flex flex-wrap items-center justify-between gap-3 bg-zinc-900/50 p-3 rounded-lg border border-zinc-800">
+          <div className="flex flex-wrap items-center justify-between gap-3 bg-primary/50 p-3 rounded-lg border border-line-strong">
             <div className="flex items-center gap-3 flex-1 min-w-[280px]">
               <div className="relative flex-1">
-                <Search className="w-4 h-4 absolute right-3 top-3 text-zinc-400" />
+                <Search className="w-4 h-4 absolute right-3 top-3 text-muted" />
                 <input
                   type="text"
                   placeholder="بحث بنوع المهمة أو المعرف..."
@@ -540,8 +540,8 @@ export const PlatformOperationsSettingsPage: React.FC = () => {
                 ))}
               </select>
             </div>
-            <div className="text-xs text-zinc-400">
-              إجمالي النتائج: <span className="font-semibold text-zinc-200">{filteredJobs.length}</span>
+            <div className="text-xs text-muted">
+              إجمالي النتائج: <span className="font-semibold text-muted">{filteredJobs.length}</span>
             </div>
           </div>
 
@@ -556,10 +556,10 @@ export const PlatformOperationsSettingsPage: React.FC = () => {
                           key: 'type', header: 'نوع العملية',
                           render: (job) => (
                             <div>
-                              <div className="font-medium text-zinc-200">{job.type}</div>
-                              <div className="text-xs text-zinc-500 font-mono mt-0.5">{job.id.substring(0, 8)}...</div>
+                              <div className="font-medium text-muted">{job.type}</div>
+                              <div className="text-xs text-muted font-mono mt-0.5">{job.id.substring(0, 8)}...</div>
                               {job.errorMessage && (
-                                <div className="text-xs text-rose-400 mt-1 max-w-md truncate" title={job.errorMessage}>
+                                <div className="text-xs text-danger mt-1 max-w-md truncate" title={job.errorMessage}>
                                   خطأ: {job.errorMessage}
                                 </div>
                               )}
@@ -569,18 +569,18 @@ export const PlatformOperationsSettingsPage: React.FC = () => {
                         {
                           key: 'tenant', header: 'العميل المرتبط',
                           render: (job) => job.tenantId ? (
-                            <span className="text-zinc-300">{tenants.find((t) => t.id === job.tenantId)?.name || job.tenantId}</span>
-                          ) : <span className="text-zinc-500 text-xs">نظام عام</span>,
+                            <span className="text-muted">{tenants.find((t) => t.id === job.tenantId)?.name || job.tenantId}</span>
+                          ) : <span className="text-muted text-xs">نظام عام</span>,
                         },
                         { key: 'status', header: 'الحالة', render: (job) => getJobStatusBadge(job.status) },
-                        { key: 'priority', header: 'الأولوية', render: (job) => <span className="text-xs font-semibold px-2 py-0.5 rounded bg-zinc-800 text-zinc-300">{job.priority}</span> },
-                        { key: 'retries', header: 'المحاولات', render: (job) => <span className={`text-xs ${job.retries > 0 ? 'text-amber-400 font-semibold' : 'text-zinc-400'}`}>{job.retries} / {job.maxRetries}</span> },
+                        { key: 'priority', header: 'الأولوية', render: (job) => <span className="text-xs font-semibold px-2 py-0.5 rounded bg-primary text-muted">{job.priority}</span> },
+                        { key: 'retries', header: 'المحاولات', render: (job) => <span className={`text-xs ${job.retries > 0 ? 'text-warning font-semibold' : 'text-muted'}`}>{job.retries} / {job.maxRetries}</span> },
                         {
                           key: 'date', header: 'التاريخ والجدولة',
                           render: (job) => (
-                            <div className="text-xs text-zinc-400">
+                            <div className="text-xs text-muted">
                               <div>أنشئت: {formatDateTime(job.createdAt)}</div>
-                              {job.scheduledAt && <div className="text-blue-400">مجدولة: {formatDateTime(job.scheduledAt)}</div>}
+                              {job.scheduledAt && <div className="text-primary">مجدولة: {formatDateTime(job.scheduledAt)}</div>}
                             </div>
                           ),
                         },
@@ -590,7 +590,7 @@ export const PlatformOperationsSettingsPage: React.FC = () => {
                             <div className="flex items-center justify-end gap-1.5">
                               {canManageOperations && (job.status === 'FAILED' || job.status === 'CANCELLED') && (
                                 <Button variant="secondary" size="sm" onClick={() => handleRetryJob(job.id)} title="إعادة المحاولة فوراً">
-                                  <RotateCcw className="w-3.5 h-3.5 ml-1 text-amber-400" />
+                                  <RotateCcw className="w-3.5 h-3.5 ml-1 text-warning" />
                                   إعادة
                                 </Button>
                               )}
@@ -612,7 +612,7 @@ export const PlatformOperationsSettingsPage: React.FC = () => {
       {/* ─── TAB 3: Sync & Devices ────────────────────────────────────────────────── */}
       {activeTab === 'sync' && (
         <div className="space-y-4">
-          <div className="flex items-center justify-between gap-3 bg-zinc-900/50 p-3 rounded-lg border border-zinc-800">
+          <div className="flex items-center justify-between gap-3 bg-primary/50 p-3 rounded-lg border border-line-strong">
             <div className="flex items-center gap-3">
               <select
                 value={syncStatusFilter}
@@ -625,8 +625,8 @@ export const PlatformOperationsSettingsPage: React.FC = () => {
                 <option value="FAIL">فشلت (FAIL)</option>
               </select>
             </div>
-            <div className="text-xs text-zinc-400">
-              سجلات المزامنة الأخيرة: <span className="font-semibold text-zinc-200">{syncLogs.length}</span>
+            <div className="text-xs text-muted">
+              سجلات المزامنة الأخيرة: <span className="font-semibold text-muted">{syncLogs.length}</span>
             </div>
           </div>
 
@@ -636,33 +636,33 @@ export const PlatformOperationsSettingsPage: React.FC = () => {
                       rowKey={(log) => log.id}
                       emptyTitle="لا توجد سجلات مزامنة حالياً"
                       columns={[
-                        { key: 'type', header: 'نوع المزامنة', render: (log) => <span className="font-medium text-zinc-200">{log.syncType}</span> },
+                        { key: 'type', header: 'نوع المزامنة', render: (log) => <span className="font-medium text-muted">{log.syncType}</span> },
                         {
                           key: 'tenant', header: 'العميل',
                           render: (log) => log.tenantId ? (
-                            <span className="text-zinc-300">{tenants.find((t) => t.id === log.tenantId)?.name || log.tenantId}</span>
-                          ) : <span className="text-zinc-500">—</span>,
+                            <span className="text-muted">{tenants.find((t) => t.id === log.tenantId)?.name || log.tenantId}</span>
+                          ) : <span className="text-muted">—</span>,
                         },
-                        { key: 'device', header: 'الجهاز', render: (log) => <span className="font-mono text-xs text-zinc-400">{log.deviceId ? log.deviceId.substring(0, 10) + '...' : 'الرئيسي'}</span> },
+                        { key: 'device', header: 'الجهاز', render: (log) => <span className="font-mono text-xs text-muted">{log.deviceId ? log.deviceId.substring(0, 10) + '...' : 'الرئيسي'}</span> },
                         {
                           key: 'status', header: 'الحالة',
                           render: (log) => (
                             <>
                               {log.status === 'SUCCESS' && (
-                                <span className="px-2 py-0.5 rounded text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">ناجحة</span>
+                                <span className="px-2 py-0.5 rounded text-xs bg-success/10 text-success border border-success/20">ناجحة</span>
                               )}
                               {log.status === 'PARTIAL' && (
-                                <span className="px-2 py-0.5 rounded text-xs bg-amber-500/10 text-amber-400 border border-amber-500/20">جزئية</span>
+                                <span className="px-2 py-0.5 rounded text-xs bg-warning/10 text-warning border border-warning/20">جزئية</span>
                               )}
                               {log.status === 'FAIL' && (
-                                <span className="px-2 py-0.5 rounded text-xs bg-rose-500/10 text-rose-400 border border-rose-500/20">فشلت</span>
+                                <span className="px-2 py-0.5 rounded text-xs bg-danger/10 text-danger border border-danger/20">فشلت</span>
                               )}
                             </>
                           ),
                         },
-                        { key: 'records', header: 'السجلات المتزامنة', render: (log) => <span className="text-zinc-200 font-semibold">{log.recordsSynced}</span> },
-                        { key: 'date', header: 'التاريخ والوقت', render: (log) => <span className="text-xs text-zinc-400">{formatDateTime(log.createdAt)}</span> },
-                        { key: 'details', header: 'التفاصيل', render: (log) => <span className="text-xs text-zinc-400 max-w-xs truncate block" title={log.errorDetail || ''}>{log.errorDetail || '—'}</span> },
+                        { key: 'records', header: 'السجلات المتزامنة', render: (log) => <span className="text-muted font-semibold">{log.recordsSynced}</span> },
+                        { key: 'date', header: 'التاريخ والوقت', render: (log) => <span className="text-xs text-muted">{formatDateTime(log.createdAt)}</span> },
+                        { key: 'details', header: 'التفاصيل', render: (log) => <span className="text-xs text-muted max-w-xs truncate block" title={log.errorDetail || ''}>{log.errorDetail || '—'}</span> },
                       ]}
                     />
 
@@ -672,11 +672,11 @@ export const PlatformOperationsSettingsPage: React.FC = () => {
       {/* ─── TAB 4: Sensitive Operations Approvals ─────────────────────────────────── */}
       {activeTab === 'approvals' && (
         <div className="space-y-4">
-          <div className="bg-amber-950/20 border border-amber-800/30 p-4 rounded-lg flex items-start gap-3">
-            <ShieldAlert className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
+          <div className="bg-warning/20 border border-warning/30 p-4 rounded-lg flex items-start gap-3">
+            <ShieldAlert className="w-5 h-5 text-warning flex-shrink-0 mt-0.5" />
             <div className="text-sm">
-              <div className="font-semibold text-amber-300">نظام الموافقة الثنائية على العمليات الحساسة</div>
-              <div className="text-amber-200/70 text-xs mt-0.5">
+              <div className="font-semibold text-warning">نظام الموافقة الثنائية على العمليات الحساسة</div>
+              <div className="text-warning/70 text-xs mt-0.5">
                 العمليات مثل حذف بيانات العملاء، ترحيل المخططات، والعمليات المالية تتطلب موافقة صريحة من مسؤول المنصة قبل التنفيذ.
               </div>
             </div>
@@ -688,12 +688,12 @@ export const PlatformOperationsSettingsPage: React.FC = () => {
                       rowKey={(appr) => appr.id}
                       emptyTitle="لا توجد طلبات موافقة معلقة أو مسجلة"
                       columns={[
-                        { key: 'type', header: 'نوع العملية', render: (appr) => <span className="font-medium text-zinc-200">{appr.opType}</span> },
-                        { key: 'requester', header: 'طالب العملية', render: (appr) => <span className="text-xs font-mono text-zinc-400">{appr.requestedBy}</span> },
+                        { key: 'type', header: 'نوع العملية', render: (appr) => <span className="font-medium text-muted">{appr.opType}</span> },
+                        { key: 'requester', header: 'طالب العملية', render: (appr) => <span className="text-xs font-mono text-muted">{appr.requestedBy}</span> },
                         { key: 'status', header: 'الحالة', render: (appr) => getApprovalStatusBadge(appr.status) },
-                        { key: 'date', header: 'تاريخ الطلب', render: (appr) => <span className="text-xs text-zinc-400">{formatDateTime(appr.createdAt)}</span> },
-                        { key: 'approver', header: 'المسؤول / المعتمد', render: (appr) => <span className="text-xs font-mono text-zinc-400">{appr.approvedBy || '—'}</span> },
-                        { key: 'notes', header: 'ملاحظات', render: (appr) => <span className="text-xs text-zinc-400 max-w-xs truncate block">{appr.notes || '—'}</span> },
+                        { key: 'date', header: 'تاريخ الطلب', render: (appr) => <span className="text-xs text-muted">{formatDateTime(appr.createdAt)}</span> },
+                        { key: 'approver', header: 'المسؤول / المعتمد', render: (appr) => <span className="text-xs font-mono text-muted">{appr.approvedBy || '—'}</span> },
+                        { key: 'notes', header: 'ملاحظات', render: (appr) => <span className="text-xs text-muted max-w-xs truncate block">{appr.notes || '—'}</span> },
                         {
                           key: 'decision', header: 'القرار', align: 'end',
                           render: (appr) => appr.status === 'PENDING' && canManageOperations ? (
@@ -720,36 +720,36 @@ export const PlatformOperationsSettingsPage: React.FC = () => {
         <div className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {maintenanceWindows.length === 0 ? (
-              <div className="col-span-full py-12 text-center bg-zinc-900/30 rounded-lg border border-zinc-800">
+              <div className="col-span-full py-12 text-center bg-primary/30 rounded-lg border border-line-strong">
                 <EmptyState title="لا توجد نوافذ صيانة مجدولة حالياً" />
               </div>
             ) : (
               maintenanceWindows.map((mw) => (
-                <div key={mw.id} className="bg-zinc-900/60 p-4 rounded-lg border border-zinc-800 space-y-3">
+                <div key={mw.id} className="bg-primary/60 p-4 rounded-lg border border-line-strong space-y-3">
                   <div className="flex items-start justify-between">
                     <div>
-                      <h4 className="font-semibold text-zinc-100">{mw.title}</h4>
-                      <div className="text-xs text-zinc-500 mt-0.5">أنشئت بواسطة: {mw.createdBy}</div>
+                      <h4 className="font-semibold text-muted">{mw.title}</h4>
+                      <div className="text-xs text-muted mt-0.5">أنشئت بواسطة: {mw.createdBy}</div>
                     </div>
                     {getMaintStatusBadge(mw.status)}
                   </div>
-                  {mw.description && <p className="text-xs text-zinc-400 leading-relaxed">{mw.description}</p>}
-                  <div className="bg-zinc-950 p-2.5 rounded border border-zinc-800/80 text-xs space-y-1 text-zinc-300">
-                    <div>من: <span className="font-semibold text-zinc-100">{formatDateTime(mw.startsAt)}</span></div>
-                    <div>إلى: <span className="font-semibold text-zinc-100">{formatDateTime(mw.endsAt)}</span></div>
+                  {mw.description && <p className="text-xs text-muted leading-relaxed">{mw.description}</p>}
+                  <div className="bg-primary p-2.5 rounded border border-line-strong/80 text-xs space-y-1 text-muted">
+                    <div>من: <span className="font-semibold text-muted">{formatDateTime(mw.startsAt)}</span></div>
+                    <div>إلى: <span className="font-semibold text-muted">{formatDateTime(mw.endsAt)}</span></div>
                   </div>
                   <div>
-                    <div className="text-xs text-zinc-500 mb-1">الخدمات المتأثرة:</div>
+                    <div className="text-xs text-muted mb-1">الخدمات المتأثرة:</div>
                     <div className="flex flex-wrap gap-1">
                       {mw.affectedServices.map((srv, idx) => (
-                        <span key={idx} className="px-2 py-0.5 rounded text-[11px] bg-zinc-800 text-zinc-300 font-mono">
+                        <span key={idx} className="px-2 py-0.5 rounded text-[11px] bg-primary text-muted font-mono">
                           {srv}
                         </span>
                       ))}
                     </div>
                   </div>
                   {mw.status === 'SCHEDULED' && canManageOperations && (
-                    <div className="pt-2 border-t border-zinc-800/60 flex justify-end">
+                    <div className="pt-2 border-t border-line-strong/60 flex justify-end">
                       <Button variant="danger" size="sm" onClick={() => handleCancelMaintenance(mw.id)}>
                         <X className="w-3.5 h-3.5 ml-1" />
                         إلغاء نافذة الصيانة
@@ -767,11 +767,11 @@ export const PlatformOperationsSettingsPage: React.FC = () => {
       {/* Create Job Modal */}
       {newJobModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl max-w-lg w-full p-6 space-y-4">
-            <h3 className="text-lg font-semibold text-zinc-100">إنشاء مهمة تشغيل جديدة</h3>
+          <div className="bg-primary border border-line-strong rounded-xl max-w-lg w-full p-6 space-y-4">
+            <h3 className="text-lg font-semibold text-muted">إنشاء مهمة تشغيل جديدة</h3>
             <form onSubmit={handleCreateJob} className="space-y-4">
               <div>
-                <label className="block text-xs font-medium text-zinc-400 mb-1">نوع العملية</label>
+                <label className="block text-xs font-medium text-muted mb-1">نوع العملية</label>
                 <select
                   value={newJobType}
                   onChange={(e) => setNewJobType(e.target.value)}
@@ -788,7 +788,7 @@ export const PlatformOperationsSettingsPage: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-zinc-400 mb-1">العميل المستهدف (اختياري)</label>
+                <label className="block text-xs font-medium text-muted mb-1">العميل المستهدف (اختياري)</label>
                 <select
                   value={newJobTenantId}
                   onChange={(e) => setNewJobTenantId(e.target.value)}
@@ -804,7 +804,7 @@ export const PlatformOperationsSettingsPage: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-zinc-400 mb-1">الأولوية (1 الأعلى - 10 الأقل)</label>
+                <label className="block text-xs font-medium text-muted mb-1">الأولوية (1 الأعلى - 10 الأقل)</label>
                 <input
                   type="number"
                   min="1"
@@ -815,7 +815,7 @@ export const PlatformOperationsSettingsPage: React.FC = () => {
                 />
               </div>
 
-              <div className="flex justify-end gap-2 pt-3 border-t border-zinc-800">
+              <div className="flex justify-end gap-2 pt-3 border-t border-line-strong">
                 <Button variant="secondary" type="button" onClick={() => setNewJobModalOpen(false)}>
                   إلغاء
                 </Button>
@@ -831,11 +831,11 @@ export const PlatformOperationsSettingsPage: React.FC = () => {
       {/* Create Maintenance Window Modal */}
       {newMaintModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl max-w-lg w-full p-6 space-y-4">
-            <h3 className="text-lg font-semibold text-zinc-100">جدولة أعمال صيانة جديدة</h3>
+          <div className="bg-primary border border-line-strong rounded-xl max-w-lg w-full p-6 space-y-4">
+            <h3 className="text-lg font-semibold text-muted">جدولة أعمال صيانة جديدة</h3>
             <form onSubmit={handleCreateMaintenance} className="space-y-4">
               <div>
-                <label className="block text-xs font-medium text-zinc-400 mb-1">عنوان الصيانة</label>
+                <label className="block text-xs font-medium text-muted mb-1">عنوان الصيانة</label>
                 <input
                   type="text"
                   required
@@ -847,7 +847,7 @@ export const PlatformOperationsSettingsPage: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-zinc-400 mb-1">وصف الصيانة</label>
+                <label className="block text-xs font-medium text-muted mb-1">وصف الصيانة</label>
                 <textarea
                   rows={3}
                   placeholder="تفاصيل التحديث والأثر المتوقع على الخدمة..."
@@ -859,7 +859,7 @@ export const PlatformOperationsSettingsPage: React.FC = () => {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-medium text-zinc-400 mb-1">تاريخ ووقت البدء</label>
+                  <label className="block text-xs font-medium text-muted mb-1">تاريخ ووقت البدء</label>
                   <input
                     type="datetime-local"
                     required
@@ -869,7 +869,7 @@ export const PlatformOperationsSettingsPage: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-zinc-400 mb-1">تاريخ ووقت الانتهاء</label>
+                  <label className="block text-xs font-medium text-muted mb-1">تاريخ ووقت الانتهاء</label>
                   <input
                     type="datetime-local"
                     required
@@ -881,7 +881,7 @@ export const PlatformOperationsSettingsPage: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-zinc-400 mb-1">الخدمات المتأثرة (مفصولة بفاصلة)</label>
+                <label className="block text-xs font-medium text-muted mb-1">الخدمات المتأثرة (مفصولة بفاصلة)</label>
                 <input
                   type="text"
                   value={newMaintServices}
@@ -891,7 +891,7 @@ export const PlatformOperationsSettingsPage: React.FC = () => {
                 />
               </div>
 
-              <div className="flex justify-end gap-2 pt-3 border-t border-zinc-800">
+              <div className="flex justify-end gap-2 pt-3 border-t border-line-strong">
                 <Button variant="secondary" type="button" onClick={() => setNewMaintModalOpen(false)}>
                   إلغاء
                 </Button>
@@ -907,17 +907,17 @@ export const PlatformOperationsSettingsPage: React.FC = () => {
       {/* Approval Confirm Modal */}
       {approvalActionModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl max-w-md w-full p-6 space-y-4">
-            <h3 className="text-lg font-semibold text-zinc-100">
+          <div className="bg-primary border border-line-strong rounded-xl max-w-md w-full p-6 space-y-4">
+            <h3 className="text-lg font-semibold text-muted">
               {approvalActionModal.type === 'approve' ? 'الموافقة على العملية' : 'رفض العملية'}
             </h3>
-            <p className="text-xs text-zinc-400 leading-relaxed">
+            <p className="text-xs text-muted leading-relaxed">
               {approvalActionModal.type === 'approve'
                 ? 'بتأكيد الموافقة، سيتم السماح بتنفيذ العملية الحساسة واعتمادها في سجل العمليات.'
                 : 'برفض العملية، سيتم إلغاؤها نهائياً وإخطار الطالب بالرفض.'}
             </p>
             <div>
-              <label className="block text-xs font-medium text-zinc-400 mb-1">ملاحظات القرار (اختياري)</label>
+              <label className="block text-xs font-medium text-muted mb-1">ملاحظات القرار (اختياري)</label>
               <textarea
                 rows={3}
                 placeholder="أدخل سبب القرار أو أية تعليمات..."
@@ -926,7 +926,7 @@ export const PlatformOperationsSettingsPage: React.FC = () => {
                 className={`w-full ${inputClass}`}
               />
             </div>
-            <div className="flex justify-end gap-2 pt-3 border-t border-zinc-800">
+            <div className="flex justify-end gap-2 pt-3 border-t border-line-strong">
               <Button variant="secondary" type="button" onClick={() => setApprovalActionModal(null)}>
                 إلغاء
               </Button>
@@ -970,21 +970,21 @@ export const PlatformOperationsSettingsPage: React.FC = () => {
                               key: 'tenant', header: 'المنشأة',
                               render: (u) => (
                                 <div>
-                                  <div className="font-semibold text-zinc-200">{u.name}</div>
-                                  <div className="text-[10px] text-zinc-500 font-mono">{u.code}</div>
+                                  <div className="font-semibold text-muted">{u.name}</div>
+                                  <div className="text-[10px] text-muted font-mono">{u.code}</div>
                                 </div>
                               ),
                             },
-                            { key: 'plan', header: 'الخطة', render: (u) => <span className="text-zinc-300">{u.plan_name ?? '—'}</span> },
-                            { key: 'devices', header: 'الأجهزة', render: (u) => <span className="text-zinc-300">{u.devices_active}/{u.devices_total}</span> },
-                            { key: 'users', header: 'المستخدمون', render: (u) => <span className="text-zinc-300">{u.users_active}/{u.users_total}</span> },
-                            { key: 'invoices', header: 'الفواتير', render: (u) => <span className="text-zinc-300">{u.invoices_count}</span> },
-                            { key: 'payments', header: 'المدفوعات', render: (u) => <span className="text-zinc-300">{formatNumber(u.payments_total ?? 0)}</span> },
+                            { key: 'plan', header: 'الخطة', render: (u) => <span className="text-muted">{u.plan_name ?? '—'}</span> },
+                            { key: 'devices', header: 'الأجهزة', render: (u) => <span className="text-muted">{u.devices_active}/{u.devices_total}</span> },
+                            { key: 'users', header: 'المستخدمون', render: (u) => <span className="text-muted">{u.users_active}/{u.users_total}</span> },
+                            { key: 'invoices', header: 'الفواتير', render: (u) => <span className="text-muted">{u.invoices_count}</span> },
+                            { key: 'payments', header: 'المدفوعات', render: (u) => <span className="text-muted">{formatNumber(u.payments_total ?? 0)}</span> },
                             {
                               key: 'tickets', header: 'تذاكر مفتوحة',
-                              render: (u) => <span className={u.open_tickets > 0 ? 'text-amber-400 font-bold' : 'text-zinc-400'}>{u.open_tickets}</span>,
+                              render: (u) => <span className={u.open_tickets > 0 ? 'text-warning font-bold' : 'text-muted'}>{u.open_tickets}</span>,
                             },
-                            { key: 'last', header: 'آخر نشاط', render: (u) => <span className="text-[11px] text-zinc-500">{u.last_activity_at ? formatDateTime(u.last_activity_at) : '—'}</span> },
+                            { key: 'last', header: 'آخر نشاط', render: (u) => <span className="text-[11px] text-muted">{u.last_activity_at ? formatDateTime(u.last_activity_at) : '—'}</span> },
                           ]}
                         />
 

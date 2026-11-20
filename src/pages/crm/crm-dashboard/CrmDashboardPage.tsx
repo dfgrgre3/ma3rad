@@ -52,13 +52,13 @@ interface CrmStats {
 }
 
 const STAGE_CONFIG: Record<LeadStage, { label: string; color: string; bg: string; border: string; dark: string }> = {
-  NEW:         { label: 'جديد',       color: 'text-slate-600',   bg: 'bg-slate-50',   border: 'border-slate-200',  dark: 'bg-slate-400' },
-  CONTACTED:   { label: 'تواصلنا',    color: 'text-sky-700',     bg: 'bg-sky-50',     border: 'border-sky-200',    dark: 'bg-sky-500' },
-  QUALIFIED:   { label: 'مؤهل',       color: 'text-violet-700',  bg: 'bg-violet-50',  border: 'border-violet-200', dark: 'bg-violet-500' },
-  QUOTATION:   { label: 'عرض سعر',    color: 'text-amber-700',   bg: 'bg-amber-50',   border: 'border-amber-200',  dark: 'bg-amber-500' },
-  NEGOTIATION: { label: 'تفاوض',      color: 'text-orange-700',  bg: 'bg-orange-50',  border: 'border-orange-200', dark: 'bg-orange-500' },
-  WON:         { label: 'مكتسب',      color: 'text-emerald-700', bg: 'bg-emerald-50', border: 'border-emerald-200',dark: 'bg-emerald-500' },
-  LOST:        { label: 'خسارة',      color: 'text-rose-700',    bg: 'bg-rose-50',    border: 'border-rose-200',   dark: 'bg-rose-500' },
+  NEW:         { label: 'جديد',       color: 'text-ink-secondary',   bg: 'bg-surface-muted',   border: 'border-line',  dark: 'bg-line-strong' },
+  CONTACTED:   { label: 'تواصلنا',    color: 'text-primary',     bg: 'bg-accent-soft',     border: 'border-accent-border',    dark: 'bg-primary' },
+  QUALIFIED:   { label: 'مؤهل',       color: 'text-primary',  bg: 'bg-accent-soft',  border: 'border-accent-border', dark: 'bg-primary' },
+  QUOTATION:   { label: 'عرض سعر',    color: 'text-warning',   bg: 'bg-warning-soft',   border: 'border-warning-border',  dark: 'bg-warning' },
+  NEGOTIATION: { label: 'تفاوض',      color: 'text-warning',  bg: 'bg-warning-soft',  border: 'border-warning-border', dark: 'bg-warning' },
+  WON:         { label: 'مكتسب',      color: 'text-success', bg: 'bg-success-soft', border: 'border-success-border',dark: 'bg-success' },
+  LOST:        { label: 'خسارة',      color: 'text-danger',    bg: 'bg-danger-soft',    border: 'border-danger-border',   dark: 'bg-danger' },
 };
 
 const SOURCE_LABELS: Record<string, string> = {
@@ -143,10 +143,10 @@ function PipelineFunnel({ stages }: { stages: { stage: LeadStage; count: number;
   const max = Math.max(...stages.map(s => s.count), 1);
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 p-5">
+    <div className="bg-surface rounded-2xl border border-line p-5">
       <div className="flex items-center gap-2 mb-4">
-        <Target className="w-4 h-4 text-violet-500" />
-        <h3 className="text-sm font-black text-slate-900">مسار المبيعات</h3>
+        <Target className="w-4 h-4 text-primary" />
+        <h3 className="text-sm font-black text-ink">مسار المبيعات</h3>
       </div>
       <div className="space-y-2">
         {PIPELINE_STAGES.map(stageId => {
@@ -155,8 +155,8 @@ function PipelineFunnel({ stages }: { stages: { stage: LeadStage; count: number;
           const pct = Math.round((data.count / max) * 100);
           return (
             <div key={stageId} className="flex items-center gap-3">
-              <span className="text-xs font-bold text-slate-500 w-16 text-left shrink-0">{cfg.label}</span>
-              <div className="flex-1 bg-slate-100 rounded-full h-5 overflow-hidden">
+              <span className="text-xs font-bold text-muted w-16 text-left shrink-0">{cfg.label}</span>
+              <div className="flex-1 bg-surface-sunken rounded-full h-5 overflow-hidden">
                 <div
                   className={`h-full rounded-full ${cfg.dark} transition-all duration-700 flex items-center justify-end pr-2`}
                   style={{ width: `${Math.max(pct, data.count > 0 ? 8 : 0)}%` }}
@@ -166,7 +166,7 @@ function PipelineFunnel({ stages }: { stages: { stage: LeadStage; count: number;
                   )}
                 </div>
               </div>
-              <span className="text-xs text-slate-500 w-20 text-left shrink-0">{fmtK(data.value)} ج</span>
+              <span className="text-xs text-muted w-20 text-left shrink-0">{fmtK(data.value)} ج</span>
             </div>
           );
         })}
@@ -177,9 +177,9 @@ function PipelineFunnel({ stages }: { stages: { stage: LeadStage; count: number;
         if (!lost || lost.count === 0) return null;
         const cfg = STAGE_CONFIG['LOST'];
         return (
-          <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between">
+          <div className="mt-3 pt-3 border-t border-line flex items-center justify-between">
             <span className={`text-xs font-bold ${cfg.color}`}>خسائر: {lost.count} فرصة</span>
-            <span className="text-xs text-rose-400">{fmtK(lost.value)} ج</span>
+            <span className="text-xs text-danger">{fmtK(lost.value)} ج</span>
           </div>
         );
       })()}
@@ -190,27 +190,27 @@ function PipelineFunnel({ stages }: { stages: { stage: LeadStage; count: number;
 // ─── Sources Chart ────────────────────────────────────────────────────────────
 function SourcesChart({ sources }: { sources: { source: string; count: number; value: number }[] }) {
   const max = Math.max(...sources.map(s => s.count), 1);
-  const colors = ['bg-sky-500', 'bg-violet-500', 'bg-emerald-500', 'bg-amber-500', 'bg-orange-500', 'bg-pink-500', 'bg-teal-500', 'bg-indigo-500', 'bg-slate-400'];
+  const colors = ['bg-primary', 'bg-primary', 'bg-success', 'bg-warning', 'bg-warning', 'bg-primary', 'bg-success', 'bg-primary', 'bg-line-strong'];
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 p-5">
+    <div className="bg-surface rounded-2xl border border-line p-5">
       <div className="flex items-center gap-2 mb-4">
-        <BarChart3 className="w-4 h-4 text-sky-500" />
-        <h3 className="text-sm font-black text-slate-900">مصادر العملاء المحتملين</h3>
+        <BarChart3 className="w-4 h-4 text-primary" />
+        <h3 className="text-sm font-black text-ink">مصادر العملاء المحتملين</h3>
       </div>
       <div className="space-y-2.5">
         {sources.slice(0, 7).map((s, i) => {
           const pct = Math.round((s.count / max) * 100);
           return (
             <div key={s.source} className="flex items-center gap-3">
-              <span className="text-xs text-slate-600 w-20 shrink-0 font-medium">{SOURCE_LABELS[s.source] || s.source}</span>
-              <div className="flex-1 bg-slate-100 rounded-full h-4 overflow-hidden">
+              <span className="text-xs text-ink-secondary w-20 shrink-0 font-medium">{SOURCE_LABELS[s.source] || s.source}</span>
+              <div className="flex-1 bg-surface-sunken rounded-full h-4 overflow-hidden">
                 <div
                   className={`h-full rounded-full ${colors[i % colors.length]} transition-all duration-700`}
                   style={{ width: `${Math.max(pct, 5)}%` }}
                 />
               </div>
-              <span className="text-xs font-bold text-slate-700 w-6 shrink-0">{s.count}</span>
+              <span className="text-xs font-bold text-ink w-6 shrink-0">{s.count}</span>
             </div>
           );
         })}
@@ -222,13 +222,13 @@ function SourcesChart({ sources }: { sources: { source: string; count: number; v
 // ─── Top Performers ───────────────────────────────────────────────────────────
 function TopPerformers({ performers }: { performers: { name: string; count: number; won: number; value: number }[] }) {
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 p-5">
+    <div className="bg-surface rounded-2xl border border-line p-5">
       <div className="flex items-center gap-2 mb-4">
-        <Award className="w-4 h-4 text-amber-500" />
-        <h3 className="text-sm font-black text-slate-900">أفضل المندوبين</h3>
+        <Award className="w-4 h-4 text-warning" />
+        <h3 className="text-sm font-black text-ink">أفضل المندوبين</h3>
       </div>
       {performers.length === 0 ? (
-        <p className="text-xs text-slate-400 text-center py-6">لا توجد بيانات بعد</p>
+        <p className="text-xs text-muted text-center py-6">لا توجد بيانات بعد</p>
       ) : (
         <div className="space-y-3">
           {performers.map((p, i) => {
@@ -236,20 +236,20 @@ function TopPerformers({ performers }: { performers: { name: string; count: numb
             return (
               <div key={p.name} className="flex items-center gap-3">
                 <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-black shrink-0 ${
-                  i === 0 ? 'bg-amber-100 text-amber-700' : i === 1 ? 'bg-slate-100 text-slate-600' : 'bg-orange-50 text-orange-600'
+                  i === 0 ? 'bg-warning-soft text-warning' : i === 1 ? 'bg-surface-sunken text-ink-secondary' : 'bg-warning-soft text-warning'
                 }`}>
                   {i + 1}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs font-bold text-slate-900 truncate">{p.name}</p>
+                  <p className="text-xs font-bold text-ink truncate">{p.name}</p>
                   <div className="flex items-center gap-2 mt-0.5">
-                    <span className="text-xs text-slate-400">{p.count} فرصة</span>
-                    <span className="text-xs text-emerald-600 font-bold">{rate}% تحويل</span>
+                    <span className="text-xs text-muted">{p.count} فرصة</span>
+                    <span className="text-xs text-success font-bold">{rate}% تحويل</span>
                   </div>
                 </div>
                 <div className="text-left">
-                  <p className="text-xs font-black text-slate-900">{fmtK(p.value)} ج</p>
-                  <p className="text-xs text-emerald-600">{p.won} مكتسب</p>
+                  <p className="text-xs font-black text-ink">{fmtK(p.value)} ج</p>
+                  <p className="text-xs text-success">{p.won} مكتسب</p>
                 </div>
               </div>
             );
@@ -264,21 +264,21 @@ function TopPerformers({ performers }: { performers: { name: string; count: numb
 function RecentLeadsList({ leads }: { leads: Lead[] }) {
   const navigate = useNavigate();
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 p-5">
+    <div className="bg-surface rounded-2xl border border-line p-5">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <Clock className="w-4 h-4 text-slate-500" />
-          <h3 className="text-sm font-black text-slate-900">أحدث العملاء المحتملين</h3>
+          <Clock className="w-4 h-4 text-muted" />
+          <h3 className="text-sm font-black text-ink">أحدث العملاء المحتملين</h3>
         </div>
         <button
           onClick={() => navigate('/crm/leads')}
-          className="text-xs font-bold text-sky-600 hover:text-sky-700 transition flex items-center gap-1"
+          className="text-xs font-bold text-primary hover:text-primary transition flex items-center gap-1"
         >
           الكل <ArrowUpRight className="w-3 h-3" />
         </button>
       </div>
       {leads.length === 0 ? (
-        <p className="text-xs text-slate-400 text-center py-6">لا يوجد عملاء محتملون بعد</p>
+        <p className="text-xs text-muted text-center py-6">لا يوجد عملاء محتملون بعد</p>
       ) : (
         <div className="space-y-2">
           {leads.map(lead => {
@@ -288,27 +288,27 @@ function RecentLeadsList({ leads }: { leads: Lead[] }) {
               <button
                 key={lead.id}
                 type="button"
-                className="flex w-full items-center gap-3 p-2.5 rounded-xl text-right hover:bg-slate-50 transition"
+                className="flex w-full items-center gap-3 p-2.5 rounded-xl text-right hover:bg-surface-muted transition"
                 onClick={() => navigate('/crm/leads')}
               >
                 <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black shrink-0 ${cfg.bg} ${cfg.color} ${cfg.border} border`}>
                   {lead.name[0]}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs font-bold text-slate-900 truncate">{lead.name}</p>
+                  <p className="text-xs font-bold text-ink truncate">{lead.name}</p>
                   <div className="flex items-center gap-1.5 mt-0.5">
                     <span className={`text-xs px-1.5 py-0.5 rounded-full border font-medium ${cfg.bg} ${cfg.color} ${cfg.border}`}>
                       {cfg.label}
                     </span>
                     {isOverdue && (
-                      <span className="text-xs text-rose-500 font-bold flex items-center gap-0.5">
+                      <span className="text-xs text-danger font-bold flex items-center gap-0.5">
                         <AlertCircle className="w-3 h-3" /> متأخر
                       </span>
                     )}
                   </div>
                 </div>
                 <div className="text-left shrink-0">
-                  <p className="text-xs font-black text-slate-700">{fmtK(lead.estimatedValue || 0)} ج</p>
+                  <p className="text-xs font-black text-ink">{fmtK(lead.estimatedValue || 0)} ج</p>
                 </div>
               </button>
             );
@@ -352,22 +352,22 @@ export const CrmDashboardPage: React.FC = () => {
   }, [refreshToken, load]);
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
+    <div className="h-full flex flex-col bg-surface-muted text-ink overflow-hidden">
       {/* Header */}
-      <div className="bg-white border-b border-slate-200 px-6 pt-4 flex-shrink-0">
+      <div className="bg-surface border-b border-line px-6 pt-4 flex-shrink-0">
         <PageHeader
           icon={<Target className="w-5 h-5" />}
           title={pageCopy?.title || 'لوحة تحكم CRM'}
           description={pageCopy?.description || 'مسار المبيعات وإدارة علاقات العملاء'}
           actions={<>
-            <button onClick={() => navigate('/crm/leads')} className="text-xs font-bold text-white bg-pink-600 hover:bg-pink-700 transition px-3 py-2 rounded-lg flex items-center gap-1.5">
+            <button onClick={() => navigate('/crm/leads')} className="text-xs font-bold text-white bg-primary hover:bg-primary transition px-3 py-2 rounded-lg flex items-center gap-1.5">
               <Users className="w-3.5 h-3.5" /> العملاء المحتملون
             </button>
-            <button onClick={() => navigate('/crm/pipeline')} className="text-xs font-bold text-violet-700 bg-violet-50 hover:bg-violet-100 transition px-3 py-2 rounded-lg flex items-center gap-1.5 border border-violet-200">
+            <button onClick={() => navigate('/crm/pipeline')} className="text-xs font-bold text-primary bg-accent-soft hover:bg-accent-soft transition px-3 py-2 rounded-lg flex items-center gap-1.5 border border-accent-border">
               <Target className="w-3.5 h-3.5" /> Pipeline
             </button>
-            <button onClick={load} className="p-2 hover:bg-slate-100 rounded-lg transition" title="تحديث">
-              <RefreshCw className={`w-4 h-4 text-slate-500 ${loading ? 'animate-spin' : ''}`} />
+            <button onClick={load} className="p-2 hover:bg-surface-sunken rounded-lg transition" title="تحديث">
+              <RefreshCw className={`w-4 h-4 text-muted ${loading ? 'animate-spin' : ''}`} />
             </button>
           </>}
         />
@@ -375,7 +375,7 @@ export const CrmDashboardPage: React.FC = () => {
 
       {/* Error */}
       {error && (
-        <div className="mx-6 mt-3 px-4 py-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs font-semibold flex items-center gap-2">
+        <div className="mx-6 mt-3 px-4 py-3 bg-danger-soft border border-danger-border rounded-xl text-danger text-xs font-semibold flex items-center gap-2">
           <AlertCircle className="w-4 h-4 shrink-0" /> {error}
         </div>
       )}
@@ -383,7 +383,7 @@ export const CrmDashboardPage: React.FC = () => {
       {/* Content */}
       {loading ? (
         <div className="flex-1 flex items-center justify-center">
-          <Loader2 className="w-8 h-8 animate-spin text-pink-500" />
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
         </div>
       ) : stats ? (
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
@@ -394,35 +394,35 @@ export const CrmDashboardPage: React.FC = () => {
               label="إجمالي العملاء المحتملين"
               value={fmt(stats.totalLeads)}
               sub={`${stats.newLeads} جديد هذه الفترة`}
-              icon={Users} color="text-sky-600" bg="bg-sky-50"
+              icon={Users} color="text-primary" bg="bg-accent-soft"
             />
             <StatCard
               label="قيمة Pipeline الكلية"
               value={fmtK(stats.totalPipelineValue) + ' ج'}
               sub={`مكتسب: ${fmtK(stats.wonValue)} ج`}
-              icon={Wallet} color="text-emerald-600" bg="bg-emerald-50"
+              icon={Wallet} color="text-success" bg="bg-success-soft"
             />
             <StatCard
               label="معدل التحويل"
               value={stats.conversionRate + '%'}
               sub={`${stats.wonLeads} فرصة مكتسبة`}
-              icon={TrendingUp} color="text-violet-600" bg="bg-violet-50"
+              icon={TrendingUp} color="text-primary" bg="bg-accent-soft"
             />
             <StatCard
               label="متوسط قيمة الصفقة"
               value={fmtK(stats.avgDealSize) + ' ج'}
               sub={`${stats.lostLeads} فرصة ضائعة`}
-              icon={Star} color="text-amber-600" bg="bg-amber-50"
+              icon={Star} color="text-warning" bg="bg-warning-soft"
             />
           </div>
 
           {/* Quick Actions */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             {[
-              { label: 'متابعات متأخرة', value: stats.overdueFollowUps, color: 'text-rose-600 bg-rose-50 border-rose-200', icon: AlertCircle, to: '/crm/leads' },
-              { label: 'أنشطة هذا الأسبوع', value: stats.activitiesThisWeek, color: 'text-sky-600 bg-sky-50 border-sky-200', icon: Activity, to: '/crm/activities' },
-              { label: 'في مرحلة التفاوض', value: stats.leadsPerStage.find(s => s.stage === 'NEGOTIATION')?.count || 0, color: 'text-orange-600 bg-orange-50 border-orange-200', icon: MessageSquare, to: '/crm/pipeline' },
-              { label: 'عروض أسعار مرسلة', value: stats.leadsPerStage.find(s => s.stage === 'QUOTATION')?.count || 0, color: 'text-amber-600 bg-amber-50 border-amber-200', icon: Calendar, to: '/crm/pipeline' },
+              { label: 'متابعات متأخرة', value: stats.overdueFollowUps, color: 'text-danger bg-danger-soft border-danger-border', icon: AlertCircle, to: '/crm/leads' },
+              { label: 'أنشطة هذا الأسبوع', value: stats.activitiesThisWeek, color: 'text-primary bg-accent-soft border-accent-border', icon: Activity, to: '/crm/activities' },
+              { label: 'في مرحلة التفاوض', value: stats.leadsPerStage.find(s => s.stage === 'NEGOTIATION')?.count || 0, color: 'text-warning bg-warning-soft border-warning-border', icon: MessageSquare, to: '/crm/pipeline' },
+              { label: 'عروض أسعار مرسلة', value: stats.leadsPerStage.find(s => s.stage === 'QUOTATION')?.count || 0, color: 'text-warning bg-warning-soft border-warning-border', icon: Calendar, to: '/crm/pipeline' },
             ].map(item => (
               <button
                 key={item.label}
@@ -453,10 +453,10 @@ export const CrmDashboardPage: React.FC = () => {
           {/* Navigation Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             {[
-              { label: 'إدارة العملاء المحتملين', desc: 'إضافة وتتبع وتحديث الفرص', icon: UserCheck, to: '/crm/leads', color: 'from-pink-500 to-rose-600' },
-              { label: 'Pipeline المبيعات', desc: 'عرض كانبان لمراحل البيع', icon: Target, to: '/crm/pipeline', color: 'from-violet-500 to-purple-600' },
-              { label: 'الأنشطة والمتابعة', desc: 'المكالمات والزيارات والمواعيد', icon: Activity, to: '/crm/activities', color: 'from-sky-500 to-blue-600' },
-              { label: 'الحملات التسويقية', desc: 'إدارة الحملات والنتائج', icon: Star, to: '/crm/campaigns', color: 'from-amber-500 to-orange-600' },
+              { label: 'إدارة العملاء المحتملين', desc: 'إضافة وتتبع وتحديث الفرص', icon: UserCheck, to: '/crm/leads', color: 'from-primary to-danger' },
+              { label: 'Pipeline المبيعات', desc: 'عرض كانبان لمراحل البيع', icon: Target, to: '/crm/pipeline', color: 'from-primary to-primary' },
+              { label: 'الأنشطة والمتابعة', desc: 'المكالمات والزيارات والمواعيد', icon: Activity, to: '/crm/activities', color: 'from-primary to-primary' },
+              { label: 'الحملات التسويقية', desc: 'إدارة الحملات والنتائج', icon: Star, to: '/crm/campaigns', color: 'from-warning to-warning' },
             ].map(card => (
               <button
                 key={card.to}

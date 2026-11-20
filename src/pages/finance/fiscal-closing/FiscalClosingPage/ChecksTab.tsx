@@ -14,7 +14,7 @@ interface ChecksTabProps {
 /** Automated closing checks list with optional legacy-reconcile action. */
 export const ChecksTab: FC<ChecksTabProps> = ({ checks, canManage, selectedPeriod, onLegacyReconcile }) => (
   <div className="space-y-2">
-    {checks.length === 0 && <p className="text-sm text-slate-500">لا توجد فحوص متاحة.</p>}
+    {checks.length === 0 && <p className="text-sm text-muted">لا توجد فحوص متاحة.</p>}
     {checks.map((check) => {
       const style = checkStatusStyle(check.status);
       const Icon = style.icon;
@@ -47,7 +47,7 @@ export const ChecksTab: FC<ChecksTabProps> = ({ checks, canManage, selectedPerio
                   const partyType = check.id.includes('customer_subledger') ? 'CUSTOMER' : 'SUPPLIER';
                   onLegacyReconcile(partyType);
                 }}
-                className="mt-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-900 hover:bg-amber-100"
+                className="mt-2 rounded-lg border border-warning bg-warning-soft px-3 py-1.5 text-xs font-bold text-warning hover:bg-warning-soft"
               >
                 تسجيل مطابقة يدوية موثقة
               </button>

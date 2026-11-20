@@ -576,12 +576,12 @@ export class ExecutiveCommandAggregates {
       [from, to, ...scope.params]
     )[0] ?? { count: 0, qty: 0 };
     const wip = this.db.query<{ orders: number; cost: number }>(
-      `SELECT COUNT(DISTINCT o.id) AS orders,
+      `SELECT COUNT(DISTINCT po.id) AS orders,
               COALESCE(SUM(m.planned_qty * p.cost_price / 100.0), 0) AS cost
-       FROM production_orders o
-       JOIN production_order_materials m ON m.order_id = o.id
+       FROM production_orders po
+       JOIN production_order_materials m ON m.order_id = po.id
        JOIN products p ON p.id = m.product_id
-       WHERE o.status IN ('RELEASED', 'IN_PROGRESS') AND ${scope.clause}`,
+       WHERE po.status IN ('RELEASED', 'IN_PROGRESS') AND ${scope.clause}`,
       scope.params
     )[0] ?? { orders: 0, cost: 0 };
     const active = ['PLANNED', 'RELEASED', 'IN_PROGRESS']

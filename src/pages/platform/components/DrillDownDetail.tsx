@@ -32,12 +32,12 @@ const typeLabels = {
 };
 
 const typeColors = {
-  tenant: 'bg-sky-50 text-sky-600',
-  license: 'bg-amber-50 text-amber-600',
-  subscription: 'bg-violet-50 text-violet-600',
-  invoice: 'bg-emerald-50 text-emerald-600',
-  payment: 'bg-indigo-50 text-indigo-600',
-  device: 'bg-slate-50 text-slate-600',
+  tenant: 'bg-accent-soft text-primary',
+  license: 'bg-warning-soft text-warning',
+  subscription: 'bg-accent-soft text-primary',
+  invoice: 'bg-success-soft text-success',
+  payment: 'bg-accent-soft text-primary',
+  device: 'bg-surface-muted text-ink-secondary',
 };
 
 export const DrillDownDetail: React.FC<DrillDownDetailProps> = ({ type, data, onClose, onAction }) => {
@@ -72,16 +72,16 @@ export const DrillDownDetail: React.FC<DrillDownDetailProps> = ({ type, data, on
       </div>
 
       <div className="flex gap-2">
-        <button onClick={() => onAction?.('view', tenant.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-[11.5px] font-semibold text-emerald-700 hover:bg-emerald-100">
+        <button onClick={() => onAction?.('view', tenant.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-success bg-success-soft px-3 py-2 text-[11.5px] font-semibold text-success hover:bg-success-soft">
           <Eye className="h-3.5 w-3.5" /> عرض في لوحة التحكم
         </button>
-        <button onClick={() => onAction?.('edit', tenant.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[11.5px] font-semibold text-slate-700 hover:border-emerald-300 hover:bg-emerald-50">
+        <button onClick={() => onAction?.('edit', tenant.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-2 text-[11.5px] font-semibold text-ink hover:border-success hover:bg-success-soft">
           <Edit className="h-3.5 w-3.5" /> تعديل
         </button>
-        <button onClick={() => onAction?.('activate', tenant.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[11.5px] font-semibold text-slate-700 hover:border-emerald-300 hover:bg-emerald-50">
+        <button onClick={() => onAction?.('activate', tenant.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-2 text-[11.5px] font-semibold text-ink hover:border-success hover:bg-success-soft">
           <KeyRound className="h-3.5 w-3.5" /> إصدار ترخيص
         </button>
-        <button onClick={() => onAction?.('invoice', tenant.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[11.5px] font-semibold text-slate-700 hover:border-emerald-300 hover:bg-emerald-50">
+        <button onClick={() => onAction?.('invoice', tenant.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-2 text-[11.5px] font-semibold text-ink hover:border-success hover:bg-success-soft">
           <Wallet className="h-3.5 w-3.5" /> إنشاء فاتورة
         </button>
       </div>
@@ -109,16 +109,16 @@ export const DrillDownDetail: React.FC<DrillDownDetailProps> = ({ type, data, on
       </div>
 
       <div className="flex gap-2">
-        <button onClick={() => onAction?.('view', license.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-[11.5px] font-semibold text-emerald-700 hover:bg-emerald-100">
+        <button onClick={() => onAction?.('view', license.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-success bg-success-soft px-3 py-2 text-[11.5px] font-semibold text-success hover:bg-success-soft">
           <Eye className="h-3.5 w-3.5" /> عرض في لوحة التحكم
         </button>
-        <button onClick={() => onAction?.('renew', license.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[11.5px] font-semibold text-slate-700 hover:border-emerald-300 hover:bg-emerald-50">
+        <button onClick={() => onAction?.('renew', license.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-2 text-[11.5px] font-semibold text-ink hover:border-success hover:bg-success-soft">
           <RotateCcw className="h-3.5 w-3.5" /> تجديد
         </button>
-        <button onClick={() => onAction?.('activate', license.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[11.5px] font-semibold text-slate-700 hover:border-emerald-300 hover:bg-emerald-50">
+        <button onClick={() => onAction?.('activate', license.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-2 text-[11.5px] font-semibold text-ink hover:border-success hover:bg-success-soft">
           <Cpu className="h-3.5 w-3.5" /> ربط جهاز
         </button>
-        <button onClick={() => onAction?.('deactivate', license.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-[11.5px] font-semibold text-rose-700 hover:bg-rose-100">
+        <button onClick={() => onAction?.('deactivate', license.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-danger-border bg-danger-soft px-3 py-2 text-[11.5px] font-semibold text-danger hover:bg-danger-soft">
           <XCircle className="h-3.5 w-3.5" /> إلغاء التفعيل
         </button>
       </div>
@@ -141,16 +141,16 @@ export const DrillDownDetail: React.FC<DrillDownDetailProps> = ({ type, data, on
       </div>
 
       <div className="flex gap-2">
-        <button onClick={() => onAction?.('view', subscription.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-[11.5px] font-semibold text-emerald-700 hover:bg-emerald-100">
+        <button onClick={() => onAction?.('view', subscription.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-success bg-success-soft px-3 py-2 text-[11.5px] font-semibold text-success hover:bg-success-soft">
           <Eye className="h-3.5 w-3.5" /> عرض في لوحة التحكم
         </button>
-        <button onClick={() => onAction?.('renew', subscription.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[11.5px] font-semibold text-slate-700 hover:border-emerald-300 hover:bg-emerald-50">
+        <button onClick={() => onAction?.('renew', subscription.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-2 text-[11.5px] font-semibold text-ink hover:border-success hover:bg-success-soft">
           <RotateCcw className="h-3.5 w-3.5" /> تجديد
         </button>
-        <button onClick={() => onAction?.('cancel', subscription.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-[11.5px] font-semibold text-rose-700 hover:bg-rose-100">
+        <button onClick={() => onAction?.('cancel', subscription.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-danger-border bg-danger-soft px-3 py-2 text-[11.5px] font-semibold text-danger hover:bg-danger-soft">
           <XCircle className="h-3.5 w-3.5" /> إلغاء
         </button>
-        <button onClick={() => onAction?.('change-plan', subscription.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[11.5px] font-semibold text-slate-700 hover:border-emerald-300 hover:bg-emerald-50">
+        <button onClick={() => onAction?.('change-plan', subscription.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-2 text-[11.5px] font-semibold text-ink hover:border-success hover:bg-success-soft">
           <Package className="h-3.5 w-3.5" /> تغيير الباقة
         </button>
       </div>
@@ -177,7 +177,7 @@ export const DrillDownDetail: React.FC<DrillDownDetailProps> = ({ type, data, on
 
       {invoice.items && invoice.items.length > 0 && (
         <div>
-          <h4 className="mb-2 text-sm font-bold text-slate-700">بنود الفاتورة</h4>
+          <h4 className="mb-2 text-sm font-bold text-ink">بنود الفاتورة</h4>
           <div className="overflow-x-auto">
             <DataTable
             ariaLabel="أصناف الفاتورة"
@@ -185,10 +185,10 @@ export const DrillDownDetail: React.FC<DrillDownDetailProps> = ({ type, data, on
             rowKey={(item: any) => String(item.__i)}
             dense
             columns={[
-              { key: 'desc', header: 'الوصف', render: (item: any) => <span className="text-[12px] font-semibold text-slate-700">{item.description}</span> },
-              { key: 'qty', header: 'الكمية', render: (item: any) => <span className="text-[11px] text-slate-500">{formatNumber(item.quantity)}</span> },
-              { key: 'price', header: 'سعر الوحدة', render: (item: any) => <span className="text-[11px] text-slate-500">{formatMoney(item.unitPrice)}</span> },
-              { key: 'total', header: 'الإجمالي', render: (item: any) => <span className="text-[11px] font-bold text-slate-700">{formatMoney(item.total ?? item.quantity * item.unitPrice)}</span> },
+              { key: 'desc', header: 'الوصف', render: (item: any) => <span className="text-[12px] font-semibold text-ink">{item.description}</span> },
+              { key: 'qty', header: 'الكمية', render: (item: any) => <span className="text-[11px] text-muted">{formatNumber(item.quantity)}</span> },
+              { key: 'price', header: 'سعر الوحدة', render: (item: any) => <span className="text-[11px] text-muted">{formatMoney(item.unitPrice)}</span> },
+              { key: 'total', header: 'الإجمالي', render: (item: any) => <span className="text-[11px] font-bold text-ink">{formatMoney(item.total ?? item.quantity * item.unitPrice)}</span> },
             ]}
           />
           </div>
@@ -196,16 +196,16 @@ export const DrillDownDetail: React.FC<DrillDownDetailProps> = ({ type, data, on
       )}
 
       <div className="flex gap-2">
-        <button onClick={() => onAction?.('view', invoice.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-[11.5px] font-semibold text-emerald-700 hover:bg-emerald-100">
+        <button onClick={() => onAction?.('view', invoice.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-success bg-success-soft px-3 py-2 text-[11.5px] font-semibold text-success hover:bg-success-soft">
           <Eye className="h-3.5 w-3.5" /> عرض في لوحة التحكم
         </button>
-        <button onClick={() => onAction?.('pay', invoice.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-300 bg-emerald-600 px-3 py-2 text-[11.5px] font-semibold text-white hover:bg-emerald-700">
+        <button onClick={() => onAction?.('pay', invoice.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-success bg-success px-3 py-2 text-[11.5px] font-semibold text-white hover:bg-success">
           <CreditCard className="h-3.5 w-3.5" /> تسجيل دفعة
         </button>
-        <button onClick={() => onAction?.('void', invoice.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-[11.5px] font-semibold text-rose-700 hover:bg-rose-100">
+        <button onClick={() => onAction?.('void', invoice.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-danger-border bg-danger-soft px-3 py-2 text-[11.5px] font-semibold text-danger hover:bg-danger-soft">
           <XCircle className="h-3.5 w-3.5" /> إلغاء الفاتورة
         </button>
-        <button onClick={() => onAction?.('export', invoice.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[11.5px] font-semibold text-slate-700 hover:border-emerald-300 hover:bg-emerald-50">
+        <button onClick={() => onAction?.('export', invoice.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-2 text-[11.5px] font-semibold text-ink hover:border-success hover:bg-success-soft">
           <Download className="h-3.5 w-3.5" /> تصدير
         </button>
       </div>
@@ -225,10 +225,10 @@ export const DrillDownDetail: React.FC<DrillDownDetailProps> = ({ type, data, on
       </div>
 
       <div className="flex gap-2">
-        <button onClick={() => onAction?.('view', payment.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-[11.5px] font-semibold text-emerald-700 hover:bg-emerald-100">
+        <button onClick={() => onAction?.('view', payment.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-success bg-success-soft px-3 py-2 text-[11.5px] font-semibold text-success hover:bg-success-soft">
           <Eye className="h-3.5 w-3.5" /> عرض في لوحة التحكم
         </button>
-        <button onClick={() => onAction?.('void', payment.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-[11.5px] font-semibold text-rose-700 hover:bg-rose-100">
+        <button onClick={() => onAction?.('void', payment.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-danger-border bg-danger-soft px-3 py-2 text-[11.5px] font-semibold text-danger hover:bg-danger-soft">
           <XCircle className="h-3.5 w-3.5" /> إلغاء الدفعة
         </button>
       </div>
@@ -248,21 +248,21 @@ export const DrillDownDetail: React.FC<DrillDownDetailProps> = ({ type, data, on
         <MetricCard label="عنوان IP" value={device.ipAddress || '—'} icon={<Wifi className="h-4 w-4" />} />
         <MetricCard label="أول تفعيل" value={formatDate(device.firstActivatedAt)} icon={<CalendarClock className="h-4 w-4" />} />
         <MetricCard label="آخر ظهور" value={formatDateTime(device.lastSeenAt)} icon={<Clock className="h-4 w-4" />} />
-        <MetricCard label="اشتباه استنساخ" value={device.cloneSuspected ? 'نعم ⚠️' : 'لا'} icon={device.cloneSuspected ? <AlertTriangle className="h-4 w-4 text-rose-600" /> : <CheckCircle2 className="h-4 w-4 text-emerald-600" />} />
+        <MetricCard label="اشتباه استنساخ" value={device.cloneSuspected ? 'نعم ⚠️' : 'لا'} icon={device.cloneSuspected ? <AlertTriangle className="h-4 w-4 text-danger" /> : <CheckCircle2 className="h-4 w-4 text-success" />} />
         <MetricCard label="تاريخ الإنشاء" value={formatDate(device.createdAt)} icon={<CalendarClock className="h-4 w-4" />} />
       </div>
 
       <div className="flex gap-2">
-        <button onClick={() => onAction?.('view', device.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-[11.5px] font-semibold text-emerald-700 hover:bg-emerald-100">
+        <button onClick={() => onAction?.('view', device.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-success bg-success-soft px-3 py-2 text-[11.5px] font-semibold text-success hover:bg-success-soft">
           <Eye className="h-3.5 w-3.5" /> عرض في لوحة التحكم
         </button>
-        <button onClick={() => onAction?.('suspend', device.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11.5px] font-semibold text-amber-700 hover:bg-amber-100">
+        <button onClick={() => onAction?.('suspend', device.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-warning-border bg-warning-soft px-3 py-2 text-[11.5px] font-semibold text-warning hover:bg-warning-soft">
           <XCircle className="h-3.5 w-3.5" /> إيقاف
         </button>
-        <button onClick={() => onAction?.('activate', device.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-[11.5px] font-semibold text-emerald-700 hover:bg-emerald-100">
+        <button onClick={() => onAction?.('activate', device.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-success-border bg-success-soft px-3 py-2 text-[11.5px] font-semibold text-success hover:bg-success-soft">
           <CheckCircle2 className="h-3.5 w-3.5" /> تفعيل
         </button>
-        <button onClick={() => onAction?.('reassign', device.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[11.5px] font-semibold text-slate-700 hover:border-emerald-300 hover:bg-emerald-50">
+        <button onClick={() => onAction?.('reassign', device.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-2 text-[11.5px] font-semibold text-ink hover:border-success hover:bg-success-soft">
           <RotateCcw className="h-3.5 w-3.5" /> إعادة تخصيص
         </button>
       </div>
@@ -295,18 +295,18 @@ export const DrillDownDetail: React.FC<DrillDownDetailProps> = ({ type, data, on
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-      <div className="w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-2xl bg-white shadow-xl">
-        <header className="sticky top-0 z-10 flex items-center justify-between gap-4 rounded-t-2xl border-b border-slate-100 bg-white px-4 py-3">
+      <div className="w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-2xl bg-surface shadow-xl">
+        <header className="sticky top-0 z-10 flex items-center justify-between gap-4 rounded-t-2xl border-b border-line bg-surface px-4 py-3">
           <div className="flex items-center gap-3">
             <span className={`flex h-10 w-10 items-center justify-center rounded-xl ${typeColors[type]}`}>
               <Icon className="h-5 w-5" />
             </span>
             <div>
-              <h2 className="text-lg font-bold text-slate-900">{typeLabels[type]}</h2>
-              <p className="text-sm text-slate-500">{getHeaderValue(type, data)}</p>
+              <h2 className="text-lg font-bold text-ink">{typeLabels[type]}</h2>
+              <p className="text-sm text-muted">{getHeaderValue(type, data)}</p>
             </div>
           </div>
-          <button onClick={onClose} className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition">
+          <button onClick={onClose} className="rounded-lg p-2 text-muted hover:bg-surface-sunken hover:text-ink-secondary transition">
             <X className="h-5 w-5" />
           </button>
         </header>

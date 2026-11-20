@@ -81,45 +81,45 @@ export const BusinessTab: React.FC<BusinessTabProps> = ({
 }) => (
   <div className="space-y-5">
     {getProfileFeatures(businessProfile.type).length > 0 && (
-      <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs dark:border-slate-700 dark:bg-slate-800">
-        <span className="font-bold text-slate-500">ميزات النشاط: </span>
+      <div className="rounded-xl border border-line bg-surface-muted p-3 text-xs ">
+        <span className="font-bold text-muted">ميزات النشاط: </span>
         {getProfileFeatures(businessProfile.type).map((f) => (
-          <span key={f} className="ml-2 inline-block rounded-full bg-white px-2 py-0.5 dark:bg-slate-700">{f}</span>
+          <span key={f} className="ml-2 inline-block rounded-full bg-surface px-2 py-0.5 ">{f}</span>
         ))}
       </div>
     )}
     <div>
-      <h3 className="text-sm font-extrabold text-slate-900 dark:text-slate-100">خصص النظام لنشاطك</h3>
-      <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+      <h3 className="text-sm font-extrabold text-ink ">خصص النظام لنشاطك</h3>
+      <p className="mt-1 text-xs text-muted ">
         غيّر نوع النشاط والوحدات الظاهرة في القائمة في أي وقت. إخفاء الوحدة لا يحذف بياناتها.
       </p>
     </div>
     {getProfilePermissionSuggestions(businessProfile.type)?.roles?.length ? (
-      <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs dark:border-slate-700 dark:bg-slate-800">
-        <span className="font-bold text-slate-500">أدوار مقترحة للنشاط: </span>
+      <div className="rounded-xl border border-line bg-surface-muted p-3 text-xs ">
+        <span className="font-bold text-muted">أدوار مقترحة للنشاط: </span>
         {getProfilePermissionSuggestions(businessProfile.type)!.roles.map((r) => (
-          <span key={r.role} className="ml-2 inline-block rounded-full bg-white px-2 py-0.5 dark:bg-slate-700" title={r.permissions.join('، ')}>
-            {r.name || r.role} <span className="text-slate-400">({r.permissions.length})</span>
+          <span key={r.role} className="ml-2 inline-block rounded-full bg-surface px-2 py-0.5 " title={r.permissions.join('، ')}>
+            {r.name || r.role} <span className="text-muted">({r.permissions.length})</span>
           </span>
         ))}
-        <span className="mt-1 block text-[10px] text-slate-400">تُنشأ تلقائيًا كأدوار جاهزة عند حفظ الإعداد.</span>
+        <span className="mt-1 block text-[10px] text-muted">تُنشأ تلقائيًا كأدوار جاهزة عند حفظ الإعداد.</span>
       </div>
     ) : null}
     {getProfilePricingRules(businessProfile.type)?.tiers?.length ? (
-      <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs dark:border-slate-700 dark:bg-slate-800">
-        <span className="font-bold text-slate-500">شرائح تسعير النشاط: </span>
+      <div className="rounded-xl border border-line bg-surface-muted p-3 text-xs ">
+        <span className="font-bold text-muted">شرائح تسعير النشاط: </span>
         {getProfilePricingRules(businessProfile.type)!.tiers.map((tier) => (
-          <span key={tier.id} className="ml-2 inline-block rounded-full bg-white px-2 py-0.5 dark:bg-slate-700">
+          <span key={tier.id} className="ml-2 inline-block rounded-full bg-surface px-2 py-0.5 ">
             {tier.name} {Math.round(tier.factor * 100)}%
           </span>
         ))}
       </div>
     ) : null}
     {getProfileNavigation(businessProfile.type)?.groups?.length ? (
-      <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs dark:border-slate-700 dark:bg-slate-800">
-        <span className="font-bold text-slate-500">navigation النشاط: </span>
+      <div className="rounded-xl border border-line bg-surface-muted p-3 text-xs ">
+        <span className="font-bold text-muted">navigation النشاط: </span>
         {getProfileNavigation(businessProfile.type)!.groups.map((g) => (
-          <span key={g.id} className="ml-2 inline-block rounded-full bg-white px-2 py-0.5 dark:bg-slate-700">{g.label.ar}</span>
+          <span key={g.id} className="ml-2 inline-block rounded-full bg-surface px-2 py-0.5 ">{g.label.ar}</span>
         ))}
       </div>
     ) : null}
@@ -144,11 +144,11 @@ export const BusinessTab: React.FC<BusinessTabProps> = ({
         ))}
       </select>
     </div>
-    <p className="text-[11px] text-slate-500 dark:text-slate-400" aria-live="polite">
+    <p className="text-[11px] text-muted " aria-live="polite">
       {visibleBusinessTypes.length} نشاط متاح. اختيار النشاط هنا لا يحذف أو يحوّل السجلات السابقة.
     </p>
     {visibleBusinessTypes.length === 0 ? (
-      <p className="rounded-lg border border-slate-200 p-4 text-center text-xs text-slate-500">لا توجد أنشطة تطابق البحث.</p>
+      <p className="rounded-lg border border-line p-4 text-center text-xs text-muted">لا توجد أنشطة تطابق البحث.</p>
     ) : (
       <div className="grid max-h-80 grid-cols-1 gap-2 overflow-y-auto sm:grid-cols-2 lg:grid-cols-3">
         {visibleBusinessTypes.map((type) => {
@@ -159,8 +159,8 @@ export const BusinessTab: React.FC<BusinessTabProps> = ({
               key={type.id}
               className={`rounded-xl border p-3 transition ${
                 isPrimary
-                  ? 'border-sky-500 bg-sky-50 ring-1 ring-sky-500 dark:bg-sky-500/10'
-                  : 'border-slate-200 dark:border-slate-700'
+                  ? 'border-primary bg-accent-soft ring-1 ring-primary dark:bg-primary/10'
+                  : 'border-line '
               }`}
             >
               <button
@@ -169,17 +169,17 @@ export const BusinessTab: React.FC<BusinessTabProps> = ({
                 aria-pressed={isPrimary}
                 className="w-full text-right"
               >
-                <span className="mb-1 block text-[9px] font-semibold text-sky-700 dark:text-sky-300">{type.familyLabel}</span>
-                <span className="block text-xs font-bold text-slate-900 dark:text-slate-100">{type.label}</span>
-                <span className="mt-1 block text-[10px] text-slate-500 dark:text-slate-400">{type.description}</span>
+                <span className="mb-1 block text-[9px] font-semibold text-primary ">{type.familyLabel}</span>
+                <span className="block text-xs font-bold text-ink ">{type.label}</span>
+                <span className="mt-1 block text-[10px] text-muted ">{type.description}</span>
               </button>
-              <label className="mt-2 flex items-center gap-2 border-t border-slate-200 pt-2 text-[10px] font-semibold text-slate-600 dark:border-slate-700 dark:text-slate-300">
+              <label className="mt-2 flex items-center gap-2 border-t border-line pt-2 text-[10px] font-semibold text-ink-secondary ">
                 <input
                   type="checkbox"
                   checked={isAdditional}
                   disabled={isPrimary}
                   onChange={(event) => toggleAdditionalActivity(type.id, event.target.checked)}
-                  className="accent-sky-600"
+                  className="accent-primary"
                 />
                 نشاط فرعي
               </label>
@@ -215,15 +215,15 @@ export const BusinessTab: React.FC<BusinessTabProps> = ({
       </Field>
     </div>
     <div>
-      <h4 className="mb-2 text-xs font-bold text-slate-700 dark:text-slate-300">وحدات القياس</h4>
+      <h4 className="mb-2 text-xs font-bold text-ink ">وحدات القياس</h4>
       <div className="grid grid-cols-1  gap-2 sm:grid-cols-3">
         {BUSINESS_UNITS.map((unit) => (
-          <label key={unit.id} className="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-300">
+          <label key={unit.id} className="flex cursor-pointer items-center gap-2 rounded-lg border border-line px-3 py-2 text-xs font-semibold text-ink ">
             <input
               type="checkbox"
               checked={businessConfig.units.includes(unit.id)}
               onChange={() => updateBusinessConfig({ units: businessConfig.units.includes(unit.id) ? businessConfig.units.filter((id) => id !== unit.id) : [...businessConfig.units, unit.id] })}
-              className="accent-sky-600"
+              className="accent-primary"
             />
             {unit.label}
           </label>
@@ -244,10 +244,10 @@ export const BusinessTab: React.FC<BusinessTabProps> = ({
         placeholder="مثال: المقاس، اللون، الموديل"
       />
     </Field>
-    <section className="space-y-3 rounded-xl border border-slate-200 p-4 dark:border-slate-700">
+    <section className="space-y-3 rounded-xl border border-line p-4 ">
       <div>
-        <h4 className="text-xs font-extrabold text-slate-800 dark:text-slate-200">مصطلحات النشاط</h4>
-        <p className="mt-1 text-[10px] text-slate-500 dark:text-slate-400">
+        <h4 className="text-xs font-extrabold text-ink ">مصطلحات النشاط</h4>
+        <p className="mt-1 text-[10px] text-muted ">
           هذه الأسماء للعرض فقط؛ لا تغيّر مفاتيح البيانات أو قواعد العمليات. يسبق تخصيص المنشأة ملف النشاط ثم القيمة الافتراضية.
         </p>
       </div>
@@ -286,17 +286,17 @@ export const BusinessTab: React.FC<BusinessTabProps> = ({
                     <button
                       type="button"
                       onClick={() => updateTermOverride(key, '')}
-                      className="shrink-0 rounded-xl border border-slate-200 px-2 text-[10px] font-bold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                      className="shrink-0 rounded-xl border border-line px-2 text-[10px] font-bold text-ink-secondary hover:bg-surface-muted dark:hover:bg-primary"
                       title="العودة إلى قيمة ملف النشاط"
                     >
                       افتراضي
                     </button>
                   )}
                 </div>
-                <p className="text-[10px] leading-relaxed text-slate-500 dark:text-slate-400">
+                <p className="text-[10px] leading-relaxed text-muted ">
                   {definition.description} المعاينة: <strong>{preview}</strong> · المصدر: {sourceLabel}
                 </p>
-                <code className="block text-[9px] text-slate-400" dir="ltr">{key}</code>
+                <code className="block text-[9px] text-muted" dir="ltr">{key}</code>
               </div>
             </Field>
           );
@@ -307,7 +307,7 @@ export const BusinessTab: React.FC<BusinessTabProps> = ({
       <CompaniesPanel />
     </div>
     <div>
-      <h4 className="mb-2 text-xs font-bold text-slate-700 dark:text-slate-300">وحدات النظام</h4>
+      <h4 className="mb-2 text-xs font-bold text-ink ">وحدات النظام</h4>
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         {BUSINESS_MODULES.map((module) => {
           const definition = getModuleDefinition(module.id);
@@ -316,14 +316,14 @@ export const BusinessTab: React.FC<BusinessTabProps> = ({
             <label
               key={module.id}
               title={definition?.description}
-              className={`flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-300 ${unavailable ? 'cursor-not-allowed opacity-60' : ''}`}
+              className={`flex cursor-pointer items-center gap-2 rounded-lg border border-line px-3 py-2 text-xs font-semibold text-ink ${unavailable ? 'cursor-not-allowed opacity-60' : ''}`}
             >
               <input
                 type="checkbox"
                 checked={businessProfile.enabledModules.includes(module.id)}
                 onChange={() => toggleBusinessModule(module.id)}
                 disabled={unavailable}
-                className="accent-sky-600"
+                className="accent-primary"
               />
               {module.label}
             </label>
@@ -332,23 +332,23 @@ export const BusinessTab: React.FC<BusinessTabProps> = ({
       </div>
     </div>
     {canViewConfigHistory && (
-      <section className="space-y-3 rounded-xl border border-slate-200 p-4 dark:border-slate-700" aria-labelledby="activity-configuration-history">
+      <section className="space-y-3 rounded-xl border border-line p-4 " aria-labelledby="activity-configuration-history">
         <div className="flex items-start gap-2">
-          <History className="mt-0.5 h-4 w-4 shrink-0 text-sky-600" aria-hidden="true" />
+          <History className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
           <div>
-            <h4 id="activity-configuration-history" className="text-xs font-extrabold text-slate-800 dark:text-slate-200">سجل إصدارات التكوين</h4>
-            <p className="mt-1 text-[10px] text-slate-500 dark:text-slate-400">
+            <h4 id="activity-configuration-history" className="text-xs font-extrabold text-ink ">سجل إصدارات التكوين</h4>
+            <p className="mt-1 text-[10px] text-muted ">
               الإصدارات محفوظة كسجل إضافي غير قابل للتعديل. تحميل إصدار يجهزه للمراجعة؛ الحفظ يمر بفحوص الوحدات والاعتمادات المعتادة.
             </p>
           </div>
         </div>
         {configurationHistoryError && (
-          <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-[10px] text-rose-700 dark:border-rose-800 dark:bg-rose-950/30 dark:text-rose-300">
+          <p role="alert" className="rounded-lg border border-danger-border bg-danger-soft px-3 py-2 text-[10px] text-danger dark:bg-danger/30 ">
             تعذر تحميل سجل التكوين: {configurationHistoryError}
           </p>
         )}
         {!configurationHistoryError && configurationVersions.length === 0 && (
-          <p className="rounded-lg border border-slate-200 px-3 py-3 text-center text-[10px] text-slate-500 dark:border-slate-700 dark:text-slate-400">
+          <p className="rounded-lg border border-line px-3 py-3 text-center text-[10px] text-muted ">
             لا توجد إصدارات محفوظة بعد. سيُحفظ إصدار عند إنهاء الإعداد أو حفظ تغيير في النشاط.
           </p>
         )}
@@ -358,12 +358,12 @@ export const BusinessTab: React.FC<BusinessTabProps> = ({
               {configurationVersions.map((version) => {
                 const activity = BUSINESS_TYPES.find((type) => type.id === version.snapshot.businessType);
                 return (
-                  <article key={version.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 px-3 py-2 dark:border-slate-700">
+                  <article key={version.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-line px-3 py-2 ">
                     <div className="min-w-0">
-                      <p className="text-[11px] font-bold text-slate-800 dark:text-slate-100">
+                      <p className="text-[11px] font-bold text-ink ">
                         الإصدار {version.version} · {version.snapshot.businessTypeLabel || activity?.label || version.snapshot.businessType}
                       </p>
-                      <p className="mt-1 text-[9px] text-slate-500 dark:text-slate-400">
+                      <p className="mt-1 text-[9px] text-muted ">
                         {version.reason} · {version.createdByName} · {version.createdAt}
                       </p>
                     </div>
@@ -371,7 +371,7 @@ export const BusinessTab: React.FC<BusinessTabProps> = ({
                       type="button"
                       onClick={() => restoreConfigurationForReview(version)}
                       disabled={readOnly}
-                      className="rounded-lg border border-sky-200 px-2.5 py-1.5 text-[10px] font-bold text-sky-700 hover:bg-sky-50 disabled:opacity-50 dark:border-sky-800 dark:text-sky-300 dark:hover:bg-sky-950/40"
+                      className="rounded-lg border border-accent-border px-2.5 py-1.5 text-[10px] font-bold text-primary hover:bg-accent-soft disabled:opacity-50 dark:hover:bg-primary/40"
                     >
                       تحميل للمراجعة
                     </button>
@@ -380,8 +380,8 @@ export const BusinessTab: React.FC<BusinessTabProps> = ({
               })}
             </div>
             {configurationVersions.length > 1 && (
-              <div className="space-y-2 border-t border-slate-200 pt-3 dark:border-slate-700">
-                <h5 className="text-[11px] font-bold text-slate-700 dark:text-slate-200">مقارنة إصدارين</h5>
+              <div className="space-y-2 border-t border-line pt-3 ">
+                <h5 className="text-[11px] font-bold text-ink ">مقارنة إصدارين</h5>
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                   {[0, 1].map((index) => (
                     <select
@@ -438,10 +438,10 @@ export const BusinessTab: React.FC<BusinessTabProps> = ({
                   return (
                     <div className="space-y-1.5">
                       {comparisonRows.map(([label, firstValue, secondValue]) => (
-                        <div key={label} className={`grid grid-cols-[7rem_minmax(0,1fr)_minmax(0,1fr)] gap-2 rounded-md px-2 py-1.5 text-[9px] ${firstValue === secondValue ? 'bg-slate-50 dark:bg-slate-800/40' : 'bg-amber-50 dark:bg-amber-950/20'}`}>
-                          <span className="font-bold text-slate-600 dark:text-slate-300">{label}</span>
-                          <span className="break-words text-slate-700 dark:text-slate-200">{firstValue}</span>
-                          <span className="break-words text-slate-700 dark:text-slate-200">{secondValue}</span>
+                        <div key={label} className={`grid grid-cols-[7rem_minmax(0,1fr)_minmax(0,1fr)] gap-2 rounded-md px-2 py-1.5 text-[9px] ${firstValue === secondValue ? 'bg-surface-muted dark:bg-primary/40' : 'bg-warning-soft dark:bg-warning/20'}`}>
+                          <span className="font-bold text-ink-secondary ">{label}</span>
+                          <span className="break-words text-ink ">{firstValue}</span>
+                          <span className="break-words text-ink ">{secondValue}</span>
                         </div>
                       ))}
                     </div>

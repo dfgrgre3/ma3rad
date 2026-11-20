@@ -33,7 +33,6 @@ import { usePosInvoicePreview } from './usePosInvoicePreview';
 import { usePosKeyboardShortcuts } from './usePosKeyboardShortcuts';
 import { usePosTotals } from './usePosTotals';
 import { gradeLabel as configuredGradeLabel, setConfiguredGradeLabels } from '../../../../components/products/productFormModel';
-import type { OperationalFieldDefinition } from '../../../../services/domains/products/OperationalFieldService';
 import { EmployeeService } from '../../../../services/domains/hr/EmployeeService';
 
 export function usePosView() {
@@ -46,8 +45,6 @@ export function usePosView() {
   const [productsTotal, setProductsTotal] = useState(0);
   const [productPage, setProductPage] = useState(1);
   const [gradeOptions, setGradeOptions] = useState<ProductGradeOption[]>([]);
-  const [invoiceOperationalFields, setInvoiceOperationalFields] = useState<OperationalFieldDefinition[]>([]);
-  const [invoiceOperationalValues, setInvoiceOperationalValues] = useState<Record<string, string>>({});
   const [categories, setCategories] = useState<CategoryWithCount[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [customerPage, setCustomerPage] = useState(1);
@@ -297,7 +294,6 @@ export function usePosView() {
       const allRegs = cashierService.getAllRegisters();
       const sysSettings = printService.getSettings();
       const configuredGrades = operationalFieldService.getProductGradeOptions();
-      setInvoiceOperationalFields(operationalFieldService.getDefinitions('sales_invoices'));
       setGradeOptions(configuredGrades);
       setConfiguredGradeLabels(configuredGrades);
       const defaultWarehouse = allWhs[0];
@@ -524,11 +520,6 @@ export function usePosView() {
     loyaltyService,
     performedBy: effectiveUser?.id || currentUser?.id || 'usr_admin',
     loadStock,
-    onInvoiceCreated: (invoiceId) => {
-      operationalFieldService.setRecordValues('sales_invoices', invoiceId, invoiceOperationalValues, 'create');
-      setInvoiceOperationalValues({});
-    },
-    validateInvoiceFields: () => operationalFieldService.validateRecordValues('sales_invoices', invoiceOperationalValues, 'create'),
   });
   const { openCustomerDisplay } = usePosCustomerDisplay({
     cart,
@@ -750,7 +741,7 @@ export function usePosView() {
     navigate,
     currentUser, actingUser, setActingUser, effectiveUser,
     products, setProducts, productsTotal, productPage, setProductPage,
-    gradeOptions, invoiceOperationalFields, invoiceOperationalValues, setInvoiceOperationalValues,
+    gradeOptions,
     categories, customers, setCustomers, customersTotal, setCustomersTotal,
     warehouses, registers, activeShift, setActiveShift, settings,
     stockMap, setStockMap, discountedStocks, isDiscountedStocksOpen, setIsDiscountedStocksOpen,

@@ -222,7 +222,7 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
   const setupOptionControl: SetupOptionControlRenderer = (key, title, description) => (
     <label
       htmlFor={`setup-option-${key}`}
-      className="flex cursor-pointer items-start gap-3 rounded-xl border border-sky-200 bg-sky-50 p-3 text-slate-800 dark:border-sky-800 dark:bg-sky-950/30 dark:text-slate-100"
+      className="flex cursor-pointer items-start gap-3 rounded-xl border border-accent-border bg-accent-soft p-3 text-ink dark:bg-primary/30 "
     >
       <input
         id={`setup-option-${key}`}
@@ -230,20 +230,20 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
         checked={options[key]}
         onChange={() => toggleSetupOption(key)}
         disabled={saving}
-        className="mt-0.5 h-4 w-4 shrink-0 accent-sky-600"
+        className="mt-0.5 h-4 w-4 shrink-0 accent-primary"
       />
       <span>
         <span className="block text-xs font-bold">{title}</span>
-        <span className="mt-1 block text-[11px] leading-relaxed text-slate-600 dark:text-slate-300">{description}</span>
+        <span className="mt-1 block text-[11px] leading-relaxed text-ink-secondary ">{description}</span>
       </span>
     </label>
   );
 
   return (
     <div
-      className="flex min-h-dvh w-full items-center justify-center bg-gradient-to-br from-slate-100 via-white to-sky-50 p-2 sm:p-4 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950"
+      className="flex min-h-dvh w-full items-center justify-center bg-gradient-to-br from-line via-white to-primary p-2 sm:p-4 dark:from-ink dark:via-ink dark:to-ink"
     >
-      <div className="flex max-h-[calc(100dvh-1rem)] w-full max-w-4xl flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl shadow-slate-900/10 sm:max-h-[calc(100dvh-2rem)] sm:rounded-2xl dark:border-slate-800 dark:bg-slate-900">
+      <div className="flex max-h-[calc(100dvh-1rem)] w-full max-w-4xl flex-col overflow-hidden rounded-xl border border-line bg-surface shadow-2xl shadow-ink/10 sm:max-h-[calc(100dvh-2rem)] sm:rounded-2xl ">
         {/* Header stays visible while only the step content scrolls. */}
         <SetupWizardHeader step={step} />
 
@@ -252,7 +252,7 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
           className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:px-6 sm:py-5"
         >
           {draftSaveError && (
-            <p role="alert" className="mb-4 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-200">
+            <p role="alert" className="mb-4 rounded-lg border border-warning bg-warning-soft px-3 py-2 text-xs text-warning dark:bg-warning/40 ">
               لم نتمكن من حفظ تقدم الإعداد تلقائيًا. سيظل بإمكانك إعادة المحاولة عند الإنهاء. {draftSaveError}
             </p>
           )}

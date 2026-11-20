@@ -20,15 +20,15 @@ export const typeOptions: Array<{
   icon: typeof ArrowDown;
   color: string;
 }> = [
-  { value: 'INCOME', label: 'إيراد', icon: ArrowDown, color: 'bg-emerald-50 text-emerald-800 border-emerald-200' },
-  { value: 'EXPENSE', label: 'مصروف', icon: ArrowUp, color: 'bg-rose-50 text-rose-800 border-rose-200' },
-  { value: 'CUSTOMER_INVOICE', label: 'فاتورة عميل', icon: ReceiptText, color: 'bg-sky-50 text-sky-800 border-sky-200' },
-  { value: 'SUPPLIER_INVOICE', label: 'فاتورة مورد', icon: FileText, color: 'bg-orange-50 text-orange-800 border-orange-200' },
-  { value: 'PAYROLL', label: 'رواتب', icon: Users, color: 'bg-violet-50 text-violet-800 border-violet-200' },
-  { value: 'INSTALLMENT', label: 'قسط', icon: Landmark, color: 'bg-indigo-50 text-indigo-800 border-indigo-200' },
-  { value: 'TAX', label: 'ضريبة', icon: FileText, color: 'bg-amber-50 text-amber-800 border-amber-200' },
-  { value: 'CHEQUE', label: 'شيك', icon: Banknote, color: 'bg-teal-50 text-teal-800 border-teal-200' },
-  { value: 'SUBSCRIPTION', label: 'اشتراك', icon: RefreshCw, color: 'bg-fuchsia-50 text-fuchsia-800 border-fuchsia-200' },
+  { value: 'INCOME', label: 'إيراد', icon: ArrowDown, color: 'bg-success-soft text-success border-success-border' },
+  { value: 'EXPENSE', label: 'مصروف', icon: ArrowUp, color: 'bg-danger-soft text-danger border-danger-border' },
+  { value: 'CUSTOMER_INVOICE', label: 'فاتورة عميل', icon: ReceiptText, color: 'bg-accent-soft text-primary border-accent-border' },
+  { value: 'SUPPLIER_INVOICE', label: 'فاتورة مورد', icon: FileText, color: 'bg-warning-soft text-warning border-warning-border' },
+  { value: 'PAYROLL', label: 'رواتب', icon: Users, color: 'bg-accent-soft text-primary border-accent-border' },
+  { value: 'INSTALLMENT', label: 'قسط', icon: Landmark, color: 'bg-accent-soft text-primary border-accent-border' },
+  { value: 'TAX', label: 'ضريبة', icon: FileText, color: 'bg-warning-soft text-warning border-warning-border' },
+  { value: 'CHEQUE', label: 'شيك', icon: Banknote, color: 'bg-success-soft text-success border-success-border' },
+  { value: 'SUBSCRIPTION', label: 'اشتراك', icon: RefreshCw, color: 'bg-accent-soft text-primary border-accent-border' },
 ];
 
 export const reportOptions = [
@@ -81,13 +81,13 @@ export function isIncome(event: Pick<FinancialCalendarEvent, 'eventType'>) {
 }
 
 export function eventStatus(event: FinancialCalendarEvent): { label: string; color: string } {
-  if (event.status === 'CANCELLED') return { label: 'ملغي', color: 'bg-slate-100 text-slate-600' };
-  if (event.paidAmount >= event.amount) return { label: isIncome(event) ? 'محصل' : 'مدفوع', color: 'bg-emerald-100 text-emerald-800' };
-  if (event.paidAmount > 0) return { label: isIncome(event) ? 'محصل جزئيًا' : 'مدفوع جزئيًا', color: 'bg-sky-100 text-sky-800' };
+  if (event.status === 'CANCELLED') return { label: 'ملغي', color: 'bg-surface-sunken text-ink-secondary' };
+  if (event.paidAmount >= event.amount) return { label: isIncome(event) ? 'محصل' : 'مدفوع', color: 'bg-success-soft text-success' };
+  if (event.paidAmount > 0) return { label: isIncome(event) ? 'محصل جزئيًا' : 'مدفوع جزئيًا', color: 'bg-accent-soft text-primary' };
   const today = dateString(new Date());
-  if (event.dueDate < today) return { label: 'متأخر', color: 'bg-rose-100 text-rose-800' };
-  if (event.dueDate === today) return { label: 'مستحق اليوم', color: 'bg-amber-100 text-amber-900' };
-  return { label: 'مجدول', color: 'bg-slate-100 text-slate-700' };
+  if (event.dueDate < today) return { label: 'متأخر', color: 'bg-danger-soft text-danger' };
+  if (event.dueDate === today) return { label: 'مستحق اليوم', color: 'bg-warning-soft text-warning' };
+  return { label: 'مجدول', color: 'bg-surface-sunken text-ink' };
 }
 
 export const emptyForm = (date: string): EventFormState => ({

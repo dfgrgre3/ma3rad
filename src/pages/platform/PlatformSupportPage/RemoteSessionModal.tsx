@@ -30,12 +30,12 @@ export const RemoteSessionModal: React.FC<RemoteSessionModalProps> = ({
     title="بدء جلسة وصول عن بُعد"
   >
     <div className="space-y-3.5 text-right">
-      <p className="text-xs text-slate-300">
+      <p className="text-xs text-muted">
         سيتم إبلاغ العميل ببدء الجلسة. يجب الحصول على موافقة العميل خطيًا قبل البدء. تُسجَّل كل الجلسات في سجل التدقيق الأمني للمنصة.
       </p>
 
       <div>
-        <label className="block text-xs font-semibold text-slate-300 mb-1">اسم الفني / المسؤول</label>
+        <label className="block text-xs font-semibold text-muted mb-1">اسم الفني / المسؤول</label>
         <input
           type="text"
           value={technicianName}
@@ -45,7 +45,7 @@ export const RemoteSessionModal: React.FC<RemoteSessionModalProps> = ({
       </div>
 
       <div>
-        <label className="block text-xs font-semibold text-slate-300 mb-1">مدة الجلسة (بالدقائق)</label>
+        <label className="block text-xs font-semibold text-muted mb-1">مدة الجلسة (بالدقائق)</label>
         <input
           type="number"
           value={sessionDuration}
@@ -56,7 +56,7 @@ export const RemoteSessionModal: React.FC<RemoteSessionModalProps> = ({
         />
       </div>
 
-      <div className="flex justify-end gap-2 pt-3 border-t border-slate-800">
+      <div className="flex justify-end gap-2 pt-3 border-t border-line-strong">
         <Button variant="secondary" size="sm" onClick={onClose}>
           إلغاء
         </Button>

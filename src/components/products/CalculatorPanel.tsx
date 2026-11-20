@@ -114,7 +114,7 @@ export const CalculatorPanel: React.FC<{ onClose?: () => void; floating?: boolea
     : '\u00a0';
 
   return (
-    <section className={`rounded-2xl border border-slate-200 bg-slate-50 p-4 text-slate-900 shadow-2xl dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 ${floating ? '' : 'mx-auto w-full max-w-4xl'}`} aria-label="الآلة الحاسبة"
+    <section className={`rounded-2xl border border-line bg-surface-muted p-4 text-ink shadow-2xl ${floating ? '' : 'mx-auto w-full max-w-4xl'}`} aria-label="الآلة الحاسبة"
       style={floating ? { position: 'relative', boxSizing: 'border-box', width: maximized ? 'calc(100vw - 2rem)' : `${size.width}px`, height: maximized ? 'calc(100vh - 2rem)' : minimized ? 'auto' : `${size.height}px`, maxWidth: 'calc(100vw - 2rem)', maxHeight: 'calc(100vh - 2rem)', minWidth: '17rem', minHeight: minimized ? undefined : '20rem', overflow: 'auto', transform: maximized ? undefined : `translate(${offset.x}px, ${offset.y}px)` } : undefined}
       onPointerMove={floating ? (event) => {
         const resize = resizeStart.current;
@@ -137,19 +137,19 @@ export const CalculatorPanel: React.FC<{ onClose?: () => void; floating?: boolea
       <div className={`mb-4 flex items-center gap-2 rounded-lg ${floating ? 'cursor-move select-none' : ''}`}
         onPointerDown={floating ? (event) => { if ((event.target as HTMLElement).closest('button')) return; dragStart.current = { x: event.clientX, y: event.clientY, offsetX: offset.x, offsetY: offset.y }; event.currentTarget.setPointerCapture(event.pointerId); } : undefined}
         title={floating ? 'اسحب لتحريك الآلة الحاسبة' : undefined}>
-        <Calculator className="h-5 w-5 shrink-0 text-indigo-600" /><h2 className="font-bold">آلة حاسبة</h2>{floating && <span className="mr-auto" />}
-        {floating && <button onClick={() => { setMinimized((value) => !value); setMaximized(false); }} className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800" aria-label={minimized ? 'استعادة الآلة الحاسبة' : 'تصغير الآلة الحاسبة'} title={minimized ? 'استعادة' : 'تصغير'}>{minimized ? <Maximize2 className="h-4 w-4" /> : <Minus className="h-4 w-4" />}</button>}
-        {floating && <button onClick={() => { setMaximized((value) => !value); setMinimized(false); }} className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800" aria-label={maximized ? 'استعادة حجم الآلة الحاسبة' : 'تكبير الآلة الحاسبة'} title={maximized ? 'استعادة الحجم' : 'تكبير'}>{maximized ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}</button>}
-        {onClose && <button onClick={onClose} className="rounded-lg px-2 py-1 text-xs font-semibold text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800" aria-label="إغلاق الآلة الحاسبة">إغلاق</button>}
+        <Calculator className="h-5 w-5 shrink-0 text-primary" /><h2 className="font-bold">آلة حاسبة</h2>{floating && <span className="mr-auto" />}
+        {floating && <button onClick={() => { setMinimized((value) => !value); setMaximized(false); }} className="rounded-lg p-1.5 text-muted hover:bg-surface-sunken dark:hover:bg-primary" aria-label={minimized ? 'استعادة الآلة الحاسبة' : 'تصغير الآلة الحاسبة'} title={minimized ? 'استعادة' : 'تصغير'}>{minimized ? <Maximize2 className="h-4 w-4" /> : <Minus className="h-4 w-4" />}</button>}
+        {floating && <button onClick={() => { setMaximized((value) => !value); setMinimized(false); }} className="rounded-lg p-1.5 text-muted hover:bg-surface-sunken dark:hover:bg-primary" aria-label={maximized ? 'استعادة حجم الآلة الحاسبة' : 'تكبير الآلة الحاسبة'} title={maximized ? 'استعادة الحجم' : 'تكبير'}>{maximized ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}</button>}
+        {onClose && <button onClick={onClose} className="rounded-lg px-2 py-1 text-xs font-semibold text-muted hover:bg-surface-sunken dark:hover:bg-primary" aria-label="إغلاق الآلة الحاسبة">إغلاق</button>}
       </div>
       {!minimized && <>
-        <div className="mb-2 rounded-xl bg-slate-100 px-4 py-3 text-left dark:bg-slate-800" dir="ltr">
-          <div className="min-h-4 truncate text-xs text-slate-500" aria-hidden="true">{pendingExpression}</div>
+        <div className="mb-2 rounded-xl bg-surface-sunken px-4 py-3 text-left " dir="ltr">
+          <div className="min-h-4 truncate text-xs text-muted" aria-hidden="true">{pendingExpression}</div>
           <div className="min-h-10 truncate text-3xl font-bold tabular-nums" aria-live="polite" aria-atomic="true">{display}</div>
         </div>
-        <p className="mb-3 text-left text-[10px] text-slate-400">لوحة المفاتيح: الأرقام · إدخال للحساب · مسافة للخلف للحذف · هروب للمسح</p>
+        <p className="mb-3 text-left text-[10px] text-muted">لوحة المفاتيح: الأرقام · إدخال للحساب · مسافة للخلف للحذف · هروب للمسح</p>
         <div className="grid grid-cols-1 sm:grid-cols-4 gap-1" dir="ltr">
-          {keys.map(({ key, label = key, kind = 'number' }) => <button key={key} onClick={() => press(key)} aria-label={label} className={`min-h-14 rounded-lg border border-slate-200 px-2 py-3 text-xl font-medium transition hover:bg-slate-100 active:bg-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:border-slate-700 dark:hover:bg-slate-800 ${key === '0' ? 'col-span-2' : ''} ${kind === 'equals' ? 'bg-sky-600 text-white hover:bg-sky-700 active:bg-sky-800' : kind === 'operator' ? 'bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-100' : 'bg-white text-slate-900 dark:bg-slate-800 dark:text-slate-100'}`}>{key}</button>)}
+          {keys.map(({ key, label = key, kind = 'number' }) => <button key={key} onClick={() => press(key)} aria-label={label} className={`min-h-14 rounded-lg border border-line px-2 py-3 text-xl font-medium transition hover:bg-surface-sunken active:bg-surface-sunken focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary dark:hover:bg-primary ${key === '0' ? 'col-span-2' : ''} ${kind === 'equals' ? 'bg-primary text-white hover:bg-primary active:bg-primary' : kind === 'operator' ? 'bg-surface-sunken text-ink dark:bg-primary dark:text-muted' : 'bg-surface text-ink dark:bg-primary dark:text-muted'}`}>{key}</button>)}
         </div>
       </>}
       {floating && !maximized && !minimized && (['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw'] as const).map((edge) => {

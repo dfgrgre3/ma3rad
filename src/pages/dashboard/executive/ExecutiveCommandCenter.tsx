@@ -36,7 +36,7 @@ interface PanelProps {
 }
 
 const Panel: React.FC<PanelProps> = ({ title, subtitle, actionLabel, onAction, className = '', children }) => (
-  <section className={`min-w-0 rounded-[2px] border border-[#d9d9d9] bg-white dark:border-[#3d3d3d] dark:bg-[#2b2b2b] ${className}`}>
+  <section className={`min-w-0 rounded-[2px] border border-[#d9d9d9] bg-surface dark:border-[#3d3d3d] dark:bg-[#2b2b2b] ${className}`}>
     <header className="flex items-center justify-between gap-2 border-b border-[#d9d9d9] px-3 py-2.5 dark:border-[#3d3d3d]">
       <div className="min-w-0">
         <h3 className="truncate text-[12px] font-extrabold text-[#1b1b1b] dark:text-[#f0f0f0]">{title}</h3>
@@ -94,10 +94,10 @@ export const ExecutiveCommandCenter: React.FC = () => {
 
   if (!data) {
     return (
-      <div className="rounded-xl border border-rose-200 bg-rose-50 p-6 text-center dark:border-rose-900 dark:bg-rose-950/30" role="alert">
-        <AlertTriangle className="mx-auto mb-2 h-6 w-6 text-rose-500" />
-        <p className="text-xs font-bold text-rose-800 dark:text-rose-200">{error || 'تعذر تحميل لوحة القيادة.'}</p>
-        <button type="button" onClick={() => void refresh()} className="mt-3 rounded bg-rose-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-rose-700">
+      <div className="rounded-xl border border-danger-border bg-danger-soft p-6 text-center dark:bg-danger/30" role="alert">
+        <AlertTriangle className="mx-auto mb-2 h-6 w-6 text-danger" />
+        <p className="text-xs font-bold text-danger ">{error || 'تعذر تحميل لوحة القيادة.'}</p>
+        <button type="button" onClick={() => void refresh()} className="mt-3 rounded bg-danger px-3 py-1.5 text-xs font-bold text-white hover:bg-danger">
           إعادة المحاولة
         </button>
       </div>
@@ -131,7 +131,7 @@ export const ExecutiveCommandCenter: React.FC = () => {
               className={`min-h-8 flex-1 rounded-[2px] border px-2.5 py-1.5 text-[10px] font-bold transition-colors sm:flex-none ${
                 range === item.id
                   ? 'border-[#0078d4] bg-[#0078d4] text-white'
-                  : 'border-[#d9d9d9] bg-white text-[#4d4d4d] hover:bg-[#f0f6fc] dark:border-[#4a4a4a] dark:bg-[#2b2b2b] dark:text-[#c8c8c8] dark:hover:bg-[#30363b]'
+                  : 'border-[#d9d9d9] bg-surface text-[#4d4d4d] hover:bg-[#f0f6fc] dark:border-[#4a4a4a] dark:bg-[#2b2b2b] dark:text-[#c8c8c8] dark:hover:bg-[#30363b]'
               }`}
             >
               {item.label}
@@ -141,7 +141,7 @@ export const ExecutiveCommandCenter: React.FC = () => {
             type="button"
             onClick={() => void refresh()}
             disabled={loading}
-            className="inline-flex min-h-8 items-center gap-1.5 rounded-[2px] border border-[#d9d9d9] bg-white px-2.5 py-1.5 text-[10px] font-bold text-[#4d4d4d] hover:bg-[#f0f6fc] disabled:opacity-50 dark:border-[#4a4a4a] dark:bg-[#2b2b2b] dark:text-[#c8c8c8] dark:hover:bg-[#30363b]"
+            className="inline-flex min-h-8 items-center gap-1.5 rounded-[2px] border border-[#d9d9d9] bg-surface px-2.5 py-1.5 text-[10px] font-bold text-[#4d4d4d] hover:bg-[#f0f6fc] disabled:opacity-50 dark:border-[#4a4a4a] dark:bg-[#2b2b2b] dark:text-[#c8c8c8] dark:hover:bg-[#30363b]"
           >
             <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
             تحديث
@@ -150,7 +150,7 @@ export const ExecutiveCommandCenter: React.FC = () => {
       />
 
       {error && (
-        <div role="alert" className="flex items-center justify-between gap-3 rounded-[2px] border border-rose-200 bg-rose-50 px-3 py-2 text-[11px] font-semibold text-rose-700 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-300">
+        <div role="alert" className="flex items-center justify-between gap-3 rounded-[2px] border border-danger-border bg-danger-soft px-3 py-2 text-[11px] font-semibold text-danger dark:bg-danger/40 ">
           <span className="flex min-w-0 items-center gap-1.5"><AlertTriangle className="h-3.5 w-3.5 shrink-0" />{error}</span>
           <button type="button" className="shrink-0 underline" onClick={() => void refresh()}>إعادة المحاولة</button>
         </div>
@@ -158,26 +158,26 @@ export const ExecutiveCommandCenter: React.FC = () => {
 
       {/* Alerts strip */}
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-        <button type="button" onClick={open('overdueInvoices')} className="flex items-center justify-between gap-2 rounded-[2px] border border-rose-200 bg-rose-50 px-3 py-2 text-right transition hover:border-rose-400 dark:border-rose-900 dark:bg-rose-950/30">
-          <span className="flex items-center gap-2 text-[11px] font-bold text-rose-700 dark:text-rose-300">
+        <button type="button" onClick={open('overdueInvoices')} className="flex items-center justify-between gap-2 rounded-[2px] border border-danger-border bg-danger-soft px-3 py-2 text-right transition hover:border-danger dark:bg-danger/30">
+          <span className="flex items-center gap-2 text-[11px] font-bold text-danger ">
             <AlertTriangle className="h-4 w-4" />
             {receivables.overdueCount > 0 ? `${commandFormatters.count(receivables.overdueCount)} فاتورة متأخرة` : 'لا توجد فواتير متأخرة'}
           </span>
-          <span className="tabular-nums text-[11px] font-black text-rose-700 dark:text-rose-300">{shortMoney(receivables.overdueTotal)}</span>
+          <span className="tabular-nums text-[11px] font-black text-danger ">{shortMoney(receivables.overdueTotal)}</span>
         </button>
-        <button type="button" onClick={open('lowStock')} className="flex items-center justify-between gap-2 rounded-[2px] border border-amber-200 bg-amber-50 px-3 py-2 text-right transition hover:border-amber-400 dark:border-amber-900 dark:bg-amber-950/30">
-          <span className="flex items-center gap-2 text-[11px] font-bold text-amber-800 dark:text-amber-300">
+        <button type="button" onClick={open('lowStock')} className="flex items-center justify-between gap-2 rounded-[2px] border border-warning-border bg-warning-soft px-3 py-2 text-right transition hover:border-warning dark:bg-warning/30">
+          <span className="flex items-center gap-2 text-[11px] font-bold text-warning ">
             <Package className="h-4 w-4" />
             {inventory.lowStockCount > 0 ? `${commandFormatters.count(inventory.lowStockCount)} صنف عند حد الطلب` : 'المخزون بمستوى آمن'}
           </span>
-          <span className="tabular-nums text-[11px] font-black text-amber-800 dark:text-amber-300">{commandFormatters.count(inventory.outOfStockCount)} نفد</span>
+          <span className="tabular-nums text-[11px] font-black text-warning ">{commandFormatters.count(inventory.outOfStockCount)} نفد</span>
         </button>
-        <button type="button" onClick={open('slowMoving')} className="flex items-center justify-between gap-2 rounded-[2px] border border-slate-200 bg-slate-50 px-3 py-2 text-right transition hover:border-slate-400 dark:border-slate-700 dark:bg-slate-800/50">
-          <span className="flex items-center gap-2 text-[11px] font-bold text-slate-700 dark:text-slate-300">
+        <button type="button" onClick={open('slowMoving')} className="flex items-center justify-between gap-2 rounded-[2px] border border-line bg-surface-muted px-3 py-2 text-right transition hover:border-line-strong dark:bg-primary/50">
+          <span className="flex items-center gap-2 text-[11px] font-bold text-ink ">
             <TrendingDown className="h-4 w-4" />
             {data.slowMoving.length > 0 ? `${commandFormatters.count(data.slowMoving.length)} صنف راكد` : 'لا توجد أصناف راكدة'}
           </span>
-          <span className="tabular-nums text-[11px] font-black text-slate-700 dark:text-slate-300">{shortMoney(slowMovingValue)}</span>
+          <span className="tabular-nums text-[11px] font-black text-ink ">{shortMoney(slowMovingValue)}</span>
         </button>
       </div>
 
@@ -514,14 +514,14 @@ export const ExecutiveCommandCenter: React.FC = () => {
             <div className="space-y-1.5">
               {data.slowMoving.slice(0, 5).map((product) => (
                 <button key={product.productId} type="button" onClick={open('slowMoving')} className="flex w-full items-center gap-2 border-b border-[#f0f0f0] py-1.5 text-right last:border-0 dark:border-[#3d3d3d]">
-                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-[2px] bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-300"><Package className="h-3.5 w-3.5" /></span>
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-[2px] bg-warning-soft text-warning dark:bg-warning/40 "><Package className="h-3.5 w-3.5" /></span>
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-[11px] font-bold text-[#1b1b1b] dark:text-[#f0f0f0]">{product.name}</span>
                     <span className="block text-[9px] text-[#767676] dark:text-[#a6a6a6]">
                       رصيد {commandFormatters.numberAr(product.stockQty)} · {product.lastSaleDate ? `آخر بيع ${product.lastSaleDate}` : 'لم يُبع مطلقًا'}
                     </span>
                   </span>
-                  <span className="shrink-0 tabular-nums text-[11px] font-black text-amber-700 dark:text-amber-300">{commandFormatters.money(product.stockValue)}</span>
+                  <span className="shrink-0 tabular-nums text-[11px] font-black text-warning ">{commandFormatters.money(product.stockValue)}</span>
                 </button>
               ))}
             </div>
@@ -533,17 +533,17 @@ export const ExecutiveCommandCenter: React.FC = () => {
       <div className="grid min-w-0 grid-cols-1 gap-3 lg:grid-cols-3">
         <Panel className="lg:col-span-2" title="مؤشرات التدفق النقدي" subtitle="التحصيلات مقابل المصروفات والمدفوعات" actionLabel="تفاصيل التدفق" onAction={open('cashFlow')}>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-            <button type="button" onClick={open('cashInflow')} className="rounded-[2px] border border-emerald-200 bg-emerald-50 p-2.5 text-right dark:border-emerald-900 dark:bg-emerald-950/30">
-              <div className="flex items-center gap-1.5 text-[10px] font-bold text-emerald-700 dark:text-emerald-300"><TrendingUp className="h-3.5 w-3.5" />التدفق الداخل</div>
-              <div className="mt-1 truncate text-sm font-black tabular-nums text-emerald-700 dark:text-emerald-300">{commandFormatters.money(cashFlow.inflow)}</div>
+            <button type="button" onClick={open('cashInflow')} className="rounded-[2px] border border-success-border bg-success-soft p-2.5 text-right dark:bg-success/30">
+              <div className="flex items-center gap-1.5 text-[10px] font-bold text-success "><TrendingUp className="h-3.5 w-3.5" />التدفق الداخل</div>
+              <div className="mt-1 truncate text-sm font-black tabular-nums text-success ">{commandFormatters.money(cashFlow.inflow)}</div>
             </button>
-            <button type="button" onClick={open('cashOutflow')} className="rounded-[2px] border border-rose-200 bg-rose-50 p-2.5 text-right dark:border-rose-900 dark:bg-rose-950/30">
-              <div className="flex items-center gap-1.5 text-[10px] font-bold text-rose-700 dark:text-rose-300"><TrendingDown className="h-3.5 w-3.5" />التدفق الخارج</div>
-              <div className="mt-1 truncate text-sm font-black tabular-nums text-rose-700 dark:text-rose-300">{commandFormatters.money(cashFlow.outflow)}</div>
+            <button type="button" onClick={open('cashOutflow')} className="rounded-[2px] border border-danger-border bg-danger-soft p-2.5 text-right dark:bg-danger/30">
+              <div className="flex items-center gap-1.5 text-[10px] font-bold text-danger "><TrendingDown className="h-3.5 w-3.5" />التدفق الخارج</div>
+              <div className="mt-1 truncate text-sm font-black tabular-nums text-danger ">{commandFormatters.money(cashFlow.outflow)}</div>
             </button>
-            <button type="button" onClick={open('cashFlow')} className={`rounded-[2px] border p-2.5 text-right ${cashFlow.net >= 0 ? 'border-emerald-200 bg-emerald-50 dark:border-emerald-900 dark:bg-emerald-950/30' : 'border-rose-200 bg-rose-50 dark:border-rose-900 dark:bg-rose-950/30'}`}>
+            <button type="button" onClick={open('cashFlow')} className={`rounded-[2px] border p-2.5 text-right ${cashFlow.net >= 0 ? 'border-success-border bg-success-soft dark:border-success dark:bg-success/30' : 'border-danger-border bg-danger-soft dark:border-danger dark:bg-danger/30'}`}>
               <div className="flex items-center gap-1.5 text-[10px] font-bold text-[#4d4d4d] dark:text-[#c8c8c8]"><Activity className="h-3.5 w-3.5" />الصافي</div>
-              <div className={`mt-1 truncate text-sm font-black tabular-nums ${cashFlow.net >= 0 ? 'text-emerald-700 dark:text-emerald-300' : 'text-rose-700 dark:text-rose-300'}`}>{commandFormatters.money(cashFlow.net)}</div>
+              <div className={`mt-1 truncate text-sm font-black tabular-nums ${cashFlow.net >= 0 ? 'text-success dark:text-success' : 'text-danger dark:text-danger'}`}>{commandFormatters.money(cashFlow.net)}</div>
             </button>
           </div>
           <div className="mt-3 grid grid-cols-1 gap-1.5 sm:grid-cols-3">
@@ -565,7 +565,7 @@ export const ExecutiveCommandCenter: React.FC = () => {
         <Panel title="تنبيهات تحتاج متابعة" subtitle="فواتير متأخرة ونواقص مخزون" actionLabel="كل التنبيهات" onAction={open('overdueInvoices')}>
           <div className="space-y-2">
             <div>
-              <div className="mb-1 flex items-center justify-between text-[10px] font-bold text-rose-700 dark:text-rose-300">
+              <div className="mb-1 flex items-center justify-between text-[10px] font-bold text-danger ">
                 <span>فواتير متأخرة</span>
                 <span>{commandFormatters.count(receivables.overdueCount)}</span>
               </div>
@@ -575,14 +575,14 @@ export const ExecutiveCommandCenter: React.FC = () => {
                 <button key={invoice.id} type="button" onClick={open('overdueInvoices')} className="flex w-full items-center justify-between gap-2 border-b border-[#f0f0f0] py-1 text-right last:border-0 dark:border-[#3d3d3d]">
                   <span className="min-w-0">
                     <span className="block truncate text-[10px] font-bold text-[#1b1b1b] dark:text-[#f0f0f0]">{invoice.invoiceNumber} · {invoice.customer}</span>
-                    <span className="block text-[9px] text-rose-600 dark:text-rose-300">متأخرة {commandFormatters.count(invoice.daysOverdue)} يوم</span>
+                    <span className="block text-[9px] text-danger ">متأخرة {commandFormatters.count(invoice.daysOverdue)} يوم</span>
                   </span>
-                  <span className="shrink-0 tabular-nums text-[10px] font-black text-rose-700 dark:text-rose-300">{shortMoney(invoice.remaining)}</span>
+                  <span className="shrink-0 tabular-nums text-[10px] font-black text-danger ">{shortMoney(invoice.remaining)}</span>
                 </button>
               ))}
             </div>
             <div className="border-t border-[#d9d9d9] pt-2 dark:border-[#3d3d3d]">
-              <div className="mb-1 flex items-center justify-between text-[10px] font-bold text-amber-700 dark:text-amber-300">
+              <div className="mb-1 flex items-center justify-between text-[10px] font-bold text-warning ">
                 <span>نواقص المخزون</span>
                 <span>{commandFormatters.count(inventory.lowStockCount)}</span>
               </div>
@@ -594,7 +594,7 @@ export const ExecutiveCommandCenter: React.FC = () => {
                     <span className="block truncate text-[10px] font-bold text-[#1b1b1b] dark:text-[#f0f0f0]">{item.name}</span>
                     <span className="block truncate text-[9px] text-[#767676] dark:text-[#a6a6a6]">{item.warehouse}</span>
                   </span>
-                  <span className={`shrink-0 tabular-nums text-[10px] font-black ${item.quantity <= 0 ? 'text-rose-700 dark:text-rose-300' : 'text-amber-700 dark:text-amber-300'}`}>
+                  <span className={`shrink-0 tabular-nums text-[10px] font-black ${item.quantity <= 0 ? 'text-danger dark:text-danger' : 'text-warning dark:text-warning'}`}>
                     {item.quantity <= 0 ? 'نفد' : `${commandFormatters.numberAr(item.quantity)} / ${commandFormatters.numberAr(item.minLevel)}`}
                   </span>
                 </button>

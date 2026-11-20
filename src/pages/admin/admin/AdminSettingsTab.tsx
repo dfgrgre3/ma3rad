@@ -87,8 +87,8 @@ export const AdminSettingsTab: React.FC<AdminSettingsTabProps> = ({ initialTab, 
               onClick={() => changeTab(item.id)}
               className={`flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-bold transition ${
                 active
-                  ? 'bg-sky-600 text-white shadow-lg shadow-sky-600/20'
-                  : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
+                  ? 'bg-primary text-white shadow-lg shadow-primary/20'
+                  : 'bg-surface border border-line text-ink-secondary hover:bg-surface-muted dark:hover:bg-primary'
               }`}
             >
               <Icon className="h-4 w-4" /> {item.label}
@@ -96,20 +96,20 @@ export const AdminSettingsTab: React.FC<AdminSettingsTabProps> = ({ initialTab, 
           );
         })}
         <div className="mr-auto flex items-center gap-2">
-          <button onClick={resetDefaults} className="flex items-center gap-1.5 rounded-xl border border-slate-200 dark:border-slate-700 px-3 py-2 text-xs font-bold text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800">
+          <button onClick={resetDefaults} className="flex items-center gap-1.5 rounded-xl border border-line px-3 py-2 text-xs font-bold text-muted hover:bg-surface-sunken dark:hover:bg-primary">
             <RotateCcw className="h-3.5 w-3.5" /> استرجاع
           </button>
           <button
             onClick={save}
             disabled={readOnly || !dirty}
-            className="flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-40"
+            className="flex items-center gap-1.5 rounded-xl bg-success px-4 py-2 text-xs font-bold text-white hover:bg-success disabled:opacity-40"
           >
             <Save className="h-4 w-4" /> حفظ التغييرات
           </button>
         </div>
       </div>
 
-      <fieldset disabled={readOnly && tab !== 'backup'} className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5">
+      <fieldset disabled={readOnly && tab !== 'backup'} className="rounded-2xl border border-line bg-surface p-5">
         {tab === 'general' && (
           <GeneralTab settings={settings} set={set} />
         )}
@@ -220,7 +220,7 @@ export const AdminSettingsTab: React.FC<AdminSettingsTabProps> = ({ initialTab, 
       </fieldset>
 
       {readOnly && tab !== 'backup' && (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-bold text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
+        <div className="rounded-xl border border-warning-border bg-warning-soft px-4 py-3 text-xs font-bold text-warning dark:border-warning/30 dark:bg-warning/10 ">
           لا تملك صلاحية تعديل الإعدادات (settings.update). الحقول للعرض فقط.
         </div>
       )}

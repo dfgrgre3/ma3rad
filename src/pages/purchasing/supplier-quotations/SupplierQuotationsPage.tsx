@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { DataTable } from '../../../components/ui/DataTable';
 import { PageHeader } from '../../../components/ui/PageHeader';
+import { useBusinessTerm } from '../../../hooks/domains/config/useBusinessTerm';
 import {
   Plus, Search, TrendingDown, Clock, ShieldCheck, DollarSign, Building2,
   X, Award, FileSpreadsheet,
@@ -22,13 +23,14 @@ import { formatProductQuantity, getProductUnitLabel } from '../../../utils/produ
 const fmt = (n: number) => new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 2 }).format(Number(n) || 0) + ' ج.م';
 
 const STATUS_BADGES: Record<string, { label: string; color: string }> = {
-  OPEN: { label: 'مفتوح لتلقي العروض', color: 'bg-sky-50 text-sky-700 border-sky-200' },
-  EVALUATING: { label: 'قيد المقارنة والتقييم', color: 'bg-amber-50 text-amber-700 border-amber-200' },
-  AWARDED: { label: 'تمت الترسية', color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-  CANCELLED: { label: 'ملغي', color: 'bg-slate-100 text-slate-500 border-slate-200' },
+  OPEN: { label: 'مفتوح لتلقي العروض', color: 'bg-accent-soft text-primary border-accent-border' },
+  EVALUATING: { label: 'قيد المقارنة والتقييم', color: 'bg-warning-soft text-warning border-warning-border' },
+  AWARDED: { label: 'تمت الترسية', color: 'bg-success-soft text-success border-success-border' },
+  CANCELLED: { label: 'ملغي', color: 'bg-surface-sunken text-muted border-line' },
 };
 
 export const SupplierQuotationsPage: React.FC = () => {
+  const newRfqLabel = useBusinessTerm('actions.newRfq');
   const service = useMemo(() => new ProcurementService(), []);
   const toast = useToast();
   const canCreate = PermissionService.can(AuthService.getCurrentUser(), 'ui.purchases.quotations.create');
@@ -202,9 +204,9 @@ export const SupplierQuotationsPage: React.FC = () => {
   };
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
+    <div className="h-full flex flex-col bg-surface-muted text-ink overflow-hidden">
       {/* Header */}
-      <div className="bg-white px-6 pt-4">
+      <div className="bg-surface px-6 pt-4">
         <PageHeader
           icon={<FileSpreadsheet className="w-5 h-5" />}
           title="طلب عروض أسعار الموردين ومقارنة العروض (RFQ)"
@@ -212,29 +214,29 @@ export const SupplierQuotationsPage: React.FC = () => {
           actions={canCreate && (
             <button
               onClick={handleOpenNewRfq}
-              className="flex items-center gap-2 px-4 py-2.5 bg-orange-600 hover:bg-orange-700 text-white rounded-xl text-sm font-bold shadow-md shadow-orange-600/20 transition shrink-0"
+              className="flex items-center gap-2 px-4 py-2.5 bg-warning hover:bg-warning text-white rounded-xl text-sm font-bold shadow-md shadow-warning/20 transition shrink-0"
             >
-              <Plus className="w-4 h-4" /> طلب عروض أسعار جديد (RFQ)
+              <Plus className="w-4 h-4" /> {newRfqLabel} (RFQ)
             </button>
           )}
         />
       </div>
 
       {/* Filter bar */}
-      <div className="p-4 bg-white border-b border-slate-200 flex flex-wrap gap-3 items-center">
+      <div className="p-4 bg-surface border-b border-line flex flex-wrap gap-3 items-center">
         <div className="relative flex-1 min-w-[240px]">
-          <Search className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <Search className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="بحث برقم الطلب أو الملاحظات..."
-            className="w-full pl-4 pr-10 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-orange-400"
+            className="w-full pl-4 pr-10 py-2.5 bg-surface border border-line rounded-xl text-sm focus:outline-none focus:border-warning"
           />
         </div>
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          className="px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold"
+          className="px-3 py-2.5 bg-surface-muted border border-line rounded-xl text-xs font-bold"
         >
           <option value="ALL">جميع الحالات</option>
           <option value="OPEN">مفتوح لتلقي العروض</option>
@@ -242,7 +244,7 @@ export const SupplierQuotationsPage: React.FC = () => {
           <option value="AWARDED">تمت الترسية</option>
           <option value="CANCELLED">ملغي</option>
         </select>
-        <button onClick={loadData} className="px-4 py-2.5 border border-slate-200 rounded-xl text-xs font-bold bg-slate-50 hover:bg-slate-100">
+        <button onClick={loadData} className="px-4 py-2.5 border border-line rounded-xl text-xs font-bold bg-surface-muted hover:bg-surface-sunken">
           تحديث
         </button>
       </div>
@@ -250,64 +252,64 @@ export const SupplierQuotationsPage: React.FC = () => {
       {/* Main Content Area */}
       <div className="flex-1 overflow-hidden flex flex-col lg:flex-row">
         {/* RFQ List */}
-        <div className="w-full lg:w-1/3 border-l border-slate-200 overflow-y-auto p-4 space-y-3">
-          <div className="text-xs font-black text-slate-400 px-1 mb-2">طلبات عروض الأسعار النشطة ({rfqs.length})</div>
+        <div className="w-full lg:w-1/3 border-l border-line overflow-y-auto p-4 space-y-3">
+          <div className="text-xs font-black text-muted px-1 mb-2">طلبات عروض الأسعار النشطة ({rfqs.length})</div>
           {rfqs.map((r) => {
             const isSelected = selectedRfq?.id === r.id;
-            const badge = STATUS_BADGES[r.status] || { label: r.status, color: 'bg-slate-100' };
+            const badge = STATUS_BADGES[r.status] || { label: r.status, color: 'bg-surface-sunken' };
             return (
               <div
                 key={r.id}
                 onClick={() => openRfqDetails(r.id)}
                 className={`p-4 rounded-2xl border transition cursor-pointer ${
                   isSelected
-                    ? 'bg-orange-50/50 border-orange-300 ring-2 ring-orange-400/20 shadow-sm'
-                    : 'bg-white border-slate-200 hover:border-slate-300 hover:shadow-sm'
+                    ? 'bg-warning-soft/50 border-warning ring-2 ring-warning/20 shadow-sm'
+                    : 'bg-surface border-line hover:border-line-strong hover:shadow-sm'
                 }`}
               >
                 <div className="flex items-center justify-between gap-2 mb-1.5">
-                  <span className="font-black text-sm text-slate-900">{r.rfqNumber}</span>
+                  <span className="font-black text-sm text-ink">{r.rfqNumber}</span>
                   <span className={`text-[11px] font-bold px-2 py-0.5 rounded-md border ${badge.color}`}>{badge.label}</span>
                 </div>
-                <div className="text-xs text-slate-500 mb-2">
+                <div className="text-xs text-muted mb-2">
                   التاريخ: {r.date} {r.dueDate ? `· مهلة التقديم: ${r.dueDate}` : ''}
                 </div>
-                <div className="flex items-center justify-between text-xs font-semibold text-slate-600 bg-slate-50 p-2 rounded-xl">
+                <div className="flex items-center justify-between text-xs font-semibold text-ink-secondary bg-surface-muted p-2 rounded-xl">
                   <span>الأصناف المطلوبة: {r.itemsCount || 0}</span>
-                  <span className="text-orange-700 font-bold">العروض المستلمة: {r.quotationsCount || 0}</span>
+                  <span className="text-warning font-bold">العروض المستلمة: {r.quotationsCount || 0}</span>
                 </div>
               </div>
             );
           })}
           {!rfqs.length && !loading && (
-            <div className="p-8 text-center text-slate-400 border border-dashed border-slate-200 rounded-2xl text-xs">
+            <div className="p-8 text-center text-muted border border-dashed border-line rounded-2xl text-xs">
               لا توجد طلبات عروض أسعار مسجلة
             </div>
           )}
         </div>
 
         {/* Selected RFQ & Comparison Panel */}
-        <div className="flex-1 overflow-y-auto p-6 bg-slate-50">
+        <div className="flex-1 overflow-y-auto p-6 bg-surface-muted">
           {selectedRfq ? (
             <div className="space-y-6">
               {/* RFQ Header Box */}
-              <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+              <div className="bg-surface rounded-2xl border border-line p-5 shadow-sm">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-line">
                   <div>
                     <div className="flex items-center gap-3">
-                      <h2 className="text-lg font-black text-slate-900">{selectedRfq.rfqNumber}</h2>
+                      <h2 className="text-lg font-black text-ink">{selectedRfq.rfqNumber}</h2>
                       <span className={`text-xs font-bold px-2.5 py-1 rounded-lg border ${STATUS_BADGES[selectedRfq.status]?.color}`}>
                         {STATUS_BADGES[selectedRfq.status]?.label}
                       </span>
                     </div>
-                    <p className="text-xs text-slate-500 mt-1">
+                    <p className="text-xs text-muted mt-1">
                       تم الإنشاء بواسطة: {selectedRfq.createdByName || 'المسؤول'} في {selectedRfq.date} {selectedRfq.dueDate ? `· أقصى موعد لتلقي العروض: ${selectedRfq.dueDate}` : ''}
                     </p>
                   </div>
                   {canCreate && selectedRfq.status !== 'AWARDED' && selectedRfq.status !== 'CANCELLED' && (
                     <button
                       onClick={handleOpenAddQuote}
-                      className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-md shadow-emerald-600/20 transition"
+                      className="flex items-center gap-2 px-4 py-2 bg-success hover:bg-success text-white rounded-xl text-xs font-bold shadow-md shadow-success/20 transition"
                     >
                       <Plus className="w-4 h-4" /> تسجيل عرض سعر مورد جديد
                     </button>
@@ -316,13 +318,13 @@ export const SupplierQuotationsPage: React.FC = () => {
 
                 {/* Items required */}
                 <div className="mt-4">
-                  <h3 className="text-xs font-black text-slate-700 mb-2">الأصناف والكميات المطلوبة للمقارنة:</h3>
+                  <h3 className="text-xs font-black text-ink mb-2">الأصناف والكميات المطلوبة للمقارنة:</h3>
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                     {selectedRfq.items.map((it) => (
-                      <div key={it.id} className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
-                        <div className="font-bold text-xs text-slate-900">{it.productName}</div>
-                        <div className="text-xs text-slate-500 mt-0.5">{it.categoryName || 'تشطيبات وسيراميك'}</div>
-                        <div className="mt-2 text-xs font-black text-orange-600">الكمية المطلوبة: {formatProductQuantity(it.quantityM2, it)}</div>
+                      <div key={it.id} className="p-3 bg-surface-muted border border-line rounded-xl">
+                        <div className="font-bold text-xs text-ink">{it.productName}</div>
+                        <div className="text-xs text-muted mt-0.5">{it.categoryName || 'تشطيبات وسيراميك'}</div>
+                        <div className="mt-2 text-xs font-black text-warning">الكمية المطلوبة: {formatProductQuantity(it.quantityM2, it)}</div>
                       </div>
                     ))}
                   </div>
@@ -330,13 +332,13 @@ export const SupplierQuotationsPage: React.FC = () => {
               </div>
 
               {/* Quotations Comparison Matrix */}
-              <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+              <div className="bg-surface rounded-2xl border border-line p-5 shadow-sm">
                 <div className="flex items-center justify-between mb-4">
                   <div>
-                    <h3 className="text-sm font-black text-slate-900">مصفوفة مقارنة عروض الأسعار التنافسية</h3>
-                    <p className="text-xs text-slate-500">مقارنة السعر الإجمالي، مدة التوريد، شروط الدفع وجودة الفرز</p>
+                    <h3 className="text-sm font-black text-ink">مصفوفة مقارنة عروض الأسعار التنافسية</h3>
+                    <p className="text-xs text-muted">مقارنة السعر الإجمالي، مدة التوريد، شروط الدفع وجودة الفرز</p>
                   </div>
-                  <div className="text-xs font-bold text-slate-500">
+                  <div className="text-xs font-bold text-muted">
                     عدد العروض المقدمة: {selectedRfq.quotations.length}
                   </div>
                 </div>
@@ -353,54 +355,54 @@ export const SupplierQuotationsPage: React.FC = () => {
                             key={q.id}
                             className={`p-4 rounded-2xl border transition relative flex flex-col justify-between ${
                               isAccepted
-                                ? 'bg-emerald-50/50 border-emerald-300 ring-2 ring-emerald-500/20'
+                                ? 'bg-success-soft/50 border-success ring-2 ring-success/20'
                                 : isCheapest
-                                  ? 'bg-sky-50/40 border-sky-300'
-                                  : 'bg-white border-slate-200'
+                                  ? 'bg-accent-soft/40 border-accent-border'
+                                  : 'bg-surface border-line'
                             }`}
                           >
                             {isAccepted && (
-                              <div className="absolute top-3 left-3 bg-emerald-600 text-white text-[10px] font-black px-2 py-0.5 rounded-md flex items-center gap-1 shadow-sm">
+                              <div className="absolute top-3 left-3 bg-success text-white text-[10px] font-black px-2 py-0.5 rounded-md flex items-center gap-1 shadow-sm">
                                 <Award className="w-3 h-3" /> تم الترسية
                               </div>
                             )}
                             {isCheapest && !isAccepted && (
-                              <div className="absolute top-3 left-3 bg-sky-600 text-white text-[10px] font-black px-2 py-0.5 rounded-md flex items-center gap-1 shadow-sm">
+                              <div className="absolute top-3 left-3 bg-primary text-white text-[10px] font-black px-2 py-0.5 rounded-md flex items-center gap-1 shadow-sm">
                                 <TrendingDown className="w-3 h-3" /> أقل سعر
                               </div>
                             )}
 
                             <div>
                               <div className="flex items-center gap-2 mb-1">
-                                <Building2 className="w-4 h-4 text-slate-600" />
-                                <span className="font-black text-sm text-slate-900">{q.supplierName}</span>
+                                <Building2 className="w-4 h-4 text-ink-secondary" />
+                                <span className="font-black text-sm text-ink">{q.supplierName}</span>
                               </div>
-                              <div className="text-xs text-slate-500 mb-3">عرض رقم {q.quotationNumber} · هاتف: {q.supplierPhone || '—'}</div>
+                              <div className="text-xs text-muted mb-3">عرض رقم {q.quotationNumber} · هاتف: {q.supplierPhone || '—'}</div>
 
                               {/* Price Highlight */}
-                              <div className="p-3 bg-white border border-slate-200 rounded-xl mb-3 text-center">
-                                <div className="text-xs text-slate-500 font-semibold">إجمالي قيمة العرض</div>
-                                <div className="text-lg font-black text-orange-600">{fmt(q.totalAmount)}</div>
+                              <div className="p-3 bg-surface border border-line rounded-xl mb-3 text-center">
+                                <div className="text-xs text-muted font-semibold">إجمالي قيمة العرض</div>
+                                <div className="text-lg font-black text-warning">{fmt(q.totalAmount)}</div>
                               </div>
 
                               {/* Attributes */}
-                              <div className="space-y-1.5 text-xs text-slate-600 mb-4">
-                                <div className="flex justify-between border-b border-slate-100 pb-1">
-                                  <span className="flex items-center gap-1 text-slate-500"><Clock className="w-3.5 h-3.5"/> موعد التوريد:</span>
-                                  <span className="font-bold text-slate-900">{q.deliveryDays} يوم عمل</span>
+                              <div className="space-y-1.5 text-xs text-ink-secondary mb-4">
+                                <div className="flex justify-between border-b border-line pb-1">
+                                  <span className="flex items-center gap-1 text-muted"><Clock className="w-3.5 h-3.5"/> موعد التوريد:</span>
+                                  <span className="font-bold text-ink">{q.deliveryDays} يوم عمل</span>
                                 </div>
-                                <div className="flex justify-between border-b border-slate-100 pb-1">
-                                  <span className="flex items-center gap-1 text-slate-500"><DollarSign className="w-3.5 h-3.5"/> شروط الدفع:</span>
-                                  <span className="font-bold text-slate-900">{q.paymentTerms}</span>
+                                <div className="flex justify-between border-b border-line pb-1">
+                                  <span className="flex items-center gap-1 text-muted"><DollarSign className="w-3.5 h-3.5"/> شروط الدفع:</span>
+                                  <span className="font-bold text-ink">{q.paymentTerms}</span>
                                 </div>
-                                <div className="flex justify-between border-b border-slate-100 pb-1">
-                                  <span className="flex items-center gap-1 text-slate-500"><ShieldCheck className="w-3.5 h-3.5"/> تقييم الجودة/الفرز:</span>
-                                  <span className="font-bold text-slate-900">{q.qualityRating}</span>
+                                <div className="flex justify-between border-b border-line pb-1">
+                                  <span className="flex items-center gap-1 text-muted"><ShieldCheck className="w-3.5 h-3.5"/> تقييم الجودة/الفرز:</span>
+                                  <span className="font-bold text-ink">{q.qualityRating}</span>
                                 </div>
                               </div>
 
                               {/* Item prices table */}
-                              <div className="border border-slate-100 rounded-xl overflow-hidden mb-4 text-xs">
+                              <div className="border border-line rounded-xl overflow-hidden mb-4 text-xs">
                                 <DataTable
                                   ariaLabel="أصناف عرض السعر"
                                   rows={q.items || []}
@@ -408,8 +410,8 @@ export const SupplierQuotationsPage: React.FC = () => {
                                   dense
                                   columns={[
                                     { key: 'product', header: 'الصنف', render: (it: any) => <span className="font-medium">{it.productName}</span> },
-                                    { key: 'price', header: 'سعر الوحدة', render: (it: any) => <span className="font-bold text-slate-900">{fmt(it.unitCost)} / {getProductUnitLabel(it)}</span> },
-                                    { key: 'total', header: 'الإجمالي', render: (it: any) => <span className="font-black text-orange-600">{fmt(it.totalCost)}</span> },
+                                    { key: 'price', header: 'سعر الوحدة', render: (it: any) => <span className="font-bold text-ink">{fmt(it.unitCost)} / {getProductUnitLabel(it)}</span> },
+                                    { key: 'total', header: 'الإجمالي', render: (it: any) => <span className="font-black text-warning">{fmt(it.totalCost)}</span> },
                                   ]}
                                 />
                               </div>
@@ -419,7 +421,7 @@ export const SupplierQuotationsPage: React.FC = () => {
                             {selectedRfq.status !== 'AWARDED' && canApprove && (
                               <button
                                 onClick={() => handleAwardQuotation(q)}
-                                className="w-full mt-2 py-2.5 bg-orange-600 hover:bg-orange-700 text-white rounded-xl text-xs font-black flex items-center justify-center gap-2 shadow-sm transition"
+                                className="w-full mt-2 py-2.5 bg-warning hover:bg-warning text-white rounded-xl text-xs font-black flex items-center justify-center gap-2 shadow-sm transition"
                               >
                                 <Award className="w-4 h-4" /> ترسية العرض وإنشاء أمر شراء
                               </button>
@@ -430,17 +432,17 @@ export const SupplierQuotationsPage: React.FC = () => {
                     </div>
                   </div>
                 ) : (
-                  <div className="p-12 text-center text-slate-400 border border-dashed border-slate-200 rounded-2xl text-xs">
+                  <div className="p-12 text-center text-muted border border-dashed border-line rounded-2xl text-xs">
                     لم يتم تسجيل أي عروض أسعار من الموردين لهذا الطلب حتى الآن. اضغط "تسجيل عرض سعر مورد جديد" للبدء.
                   </div>
                 )}
               </div>
             </div>
           ) : (
-            <div className="h-full flex flex-col items-center justify-center text-center p-8 text-slate-400">
-              <FileSpreadsheet className="w-16 h-16 stroke-[1.2] text-slate-300 mb-3" />
-              <h3 className="text-sm font-bold text-slate-600">اختر طلب عروض أسعار من القائمة للمعاينة والمقارنة</h3>
-              <p className="text-xs text-slate-400 mt-1 max-w-sm">
+            <div className="h-full flex flex-col items-center justify-center text-center p-8 text-muted">
+              <FileSpreadsheet className="w-16 h-16 stroke-[1.2] text-muted mb-3" />
+              <h3 className="text-sm font-bold text-ink-secondary">اختر طلب عروض أسعار من القائمة للمعاينة والمقارنة</h3>
+              <p className="text-xs text-muted mt-1 max-w-sm">
                 يمكنك مقارنة عروض الأسعار التنافسية المقدمة من مختلف الموردين والمصانع وترسية العرض الأنسب مباشرة.
               </p>
             </div>
@@ -450,16 +452,16 @@ export const SupplierQuotationsPage: React.FC = () => {
 
       {/* Modal: Create New RFQ */}
       {newRfqModal && (
-        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
-          <section className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
-              <h2 className="text-base font-black text-slate-900">إنشاء طلب عروض أسعار جديد (RFQ)</h2>
-              <button onClick={() => setNewRfqModal(false)} className="p-1.5 rounded-lg hover:bg-slate-100"><X className="w-5 h-5 text-slate-400" /></button>
+        <div className="fixed inset-0 z-50 bg-primary/40 backdrop-blur-sm flex items-center justify-center p-4">
+          <section className="bg-surface rounded-2xl shadow-2xl max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-4 border-b border-line">
+              <h2 className="text-base font-black text-ink">إنشاء طلب عروض أسعار جديد (RFQ)</h2>
+              <button onClick={() => setNewRfqModal(false)} className="p-1.5 rounded-lg hover:bg-surface-sunken"><X className="w-5 h-5 text-muted" /></button>
             </div>
             <form onSubmit={handleCreateRfq} className="mt-4 space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label htmlFor="rfq-due-date" className="block text-xs font-bold text-slate-700 mb-1">تاريخ أقصى موعد لتلقي العروض (Due Date)</label>
+                  <label htmlFor="rfq-due-date" className="block text-xs font-bold text-ink mb-1">تاريخ أقصى موعد لتلقي العروض (Due Date)</label>
                   <input
                     id="rfq-due-date"
                     type="date"
@@ -469,7 +471,7 @@ export const SupplierQuotationsPage: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label htmlFor="rfq-notes" className="block text-xs font-bold text-slate-700 mb-1">ملاحظات أو مواصفات خاصة للتوريد</label>
+                  <label htmlFor="rfq-notes" className="block text-xs font-bold text-ink mb-1">ملاحظات أو مواصفات خاصة للتوريد</label>
                   <input
                     id="rfq-notes"
                     type="text"
@@ -484,18 +486,18 @@ export const SupplierQuotationsPage: React.FC = () => {
               {/* Items */}
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <div className="text-xs font-black text-slate-800">الأصناف المطلوبة لعروض الأسعار</div>
+                  <div className="text-xs font-black text-ink">الأصناف المطلوبة لعروض الأسعار</div>
                   <button
                     type="button"
                     onClick={() => setRfqLines([...rfqLines, { productId: '', quantityM2: 100, notes: '' }])}
-                    className="text-xs text-orange-600 font-bold hover:underline"
+                    className="text-xs text-warning font-bold hover:underline"
                   >
                     + إضافة صنف آخر
                   </button>
                 </div>
                 <div className="space-y-2">
                   {rfqLines.map((line, idx) => (
-                    <div key={idx} className="flex gap-2 items-center border border-slate-200 rounded-xl p-2.5 bg-slate-50">
+                    <div key={idx} className="flex gap-2 items-center border border-line rounded-xl p-2.5 bg-surface-muted">
                       <ProductPicker
                         aria-label={`الصنف ${idx + 1}`}
                         value={line.productId}
@@ -521,14 +523,14 @@ export const SupplierQuotationsPage: React.FC = () => {
                           updated[idx].quantityM2 = Number(e.target.value);
                           setRfqLines(updated);
                         }}
-                        className="w-24 bg-white border rounded-lg px-2.5 py-1.5 text-xs text-center font-bold"
+                        className="w-24 bg-surface border rounded-lg px-2.5 py-1.5 text-xs text-center font-bold"
                         required
                       />
                       {rfqLines.length > 1 && (
                         <button
                           type="button"
                           onClick={() => setRfqLines(rfqLines.filter((_, i) => i !== idx))}
-                          className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg"
+                          className="p-1.5 text-danger hover:bg-danger-soft rounded-lg"
                         >
                           <X className="w-4 h-4" />
                         </button>
@@ -538,11 +540,11 @@ export const SupplierQuotationsPage: React.FC = () => {
                 </div>
               </div>
 
-              <div className="flex justify-end gap-2 pt-4 border-t border-slate-100">
-                <button type="button" onClick={() => setNewRfqModal(false)} className="px-4 py-2 bg-slate-100 rounded-xl text-xs font-bold text-slate-700">
+              <div className="flex justify-end gap-2 pt-4 border-t border-line">
+                <button type="button" onClick={() => setNewRfqModal(false)} className="px-4 py-2 bg-surface-sunken rounded-xl text-xs font-bold text-ink">
                   إلغاء
                 </button>
-                <button type="submit" className="px-5 py-2 bg-orange-600 text-white rounded-xl text-xs font-black shadow-md shadow-orange-600/20">
+                <button type="submit" className="px-5 py-2 bg-warning text-white rounded-xl text-xs font-black shadow-md shadow-warning/20">
                   حفظ وطرح طلب العروض
                 </button>
               </div>
@@ -553,25 +555,25 @@ export const SupplierQuotationsPage: React.FC = () => {
 
       {/* Modal: Add Supplier Quotation */}
       {quoteModal && selectedRfq && (
-        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
-          <section className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+        <div className="fixed inset-0 z-50 bg-primary/40 backdrop-blur-sm flex items-center justify-center p-4">
+          <section className="bg-surface rounded-2xl shadow-2xl max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-4 border-b border-line">
               <div>
-                <h2 className="text-base font-black text-slate-900">تسجيل عرض سعر مورد لـ {selectedRfq.rfqNumber}</h2>
-                <p className="text-xs text-slate-500">إدخال الأسعار وشروط الدفع المقترحة من المصنع/المورد للمقارنة</p>
+                <h2 className="text-base font-black text-ink">تسجيل عرض سعر مورد لـ {selectedRfq.rfqNumber}</h2>
+                <p className="text-xs text-muted">إدخال الأسعار وشروط الدفع المقترحة من المصنع/المورد للمقارنة</p>
               </div>
-              <button onClick={() => setQuoteModal(false)} className="p-1.5 rounded-lg hover:bg-slate-100"><X className="w-5 h-5 text-slate-400" /></button>
+              <button onClick={() => setQuoteModal(false)} className="p-1.5 rounded-lg hover:bg-surface-sunken"><X className="w-5 h-5 text-muted" /></button>
             </div>
             <form onSubmit={handleSubmitQuote} className="mt-4 space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label htmlFor="quote-supplier" className="block text-xs font-bold text-slate-700 mb-1">المورد / المصنع المقدم للعرض</label>
+                  <label htmlFor="quote-supplier" className="block text-xs font-bold text-ink mb-1">المورد / المصنع المقدم للعرض</label>
                   <select
                     id="quote-supplier"
                     value={selectedSupplierId}
                     onChange={(e) => setSelectedSupplierId(e.target.value)}
                     required
-                    className="w-full px-3 py-2 border rounded-xl text-xs font-bold bg-white"
+                    className="w-full px-3 py-2 border rounded-xl text-xs font-bold bg-surface"
                   >
                     {suppliers.map((s) => (
                       <option key={s.id} value={s.id}>{s.name} ({s.companyName || 'شركة'})</option>
@@ -579,7 +581,7 @@ export const SupplierQuotationsPage: React.FC = () => {
                   </select>
                 </div>
                 <div>
-                  <label htmlFor="quote-number" className="block text-xs font-bold text-slate-700 mb-1">رقم عرض سعر المورد</label>
+                  <label htmlFor="quote-number" className="block text-xs font-bold text-ink mb-1">رقم عرض سعر المورد</label>
                   <input
                     id="quote-number"
                     type="text"
@@ -590,7 +592,7 @@ export const SupplierQuotationsPage: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label htmlFor="quote-delivery-days" className="block text-xs font-bold text-slate-700 mb-1">مدة التوريد (أيام عمل)</label>
+                  <label htmlFor="quote-delivery-days" className="block text-xs font-bold text-ink mb-1">مدة التوريد (أيام عمل)</label>
                   <input
                     id="quote-delivery-days"
                     type="number"
@@ -601,7 +603,7 @@ export const SupplierQuotationsPage: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label htmlFor="quote-payment-terms" className="block text-xs font-bold text-slate-700 mb-1">شروط الدفع المقترحة</label>
+                  <label htmlFor="quote-payment-terms" className="block text-xs font-bold text-ink mb-1">شروط الدفع المقترحة</label>
                   <input
                     id="quote-payment-terms"
                     type="text"
@@ -612,7 +614,7 @@ export const SupplierQuotationsPage: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label htmlFor="quote-quality-rating" className="block text-xs font-bold text-slate-700 mb-1">درجة الجودة والفرز</label>
+                  <label htmlFor="quote-quality-rating" className="block text-xs font-bold text-ink mb-1">درجة الجودة والفرز</label>
                   <input
                     id="quote-quality-rating"
                     type="text"
@@ -623,7 +625,7 @@ export const SupplierQuotationsPage: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label htmlFor="quote-valid-until" className="block text-xs font-bold text-slate-700 mb-1">صلاحية العرض حتى تاريخ</label>
+                  <label htmlFor="quote-valid-until" className="block text-xs font-bold text-ink mb-1">صلاحية العرض حتى تاريخ</label>
                   <input
                     id="quote-valid-until"
                     type="date"
@@ -636,11 +638,11 @@ export const SupplierQuotationsPage: React.FC = () => {
 
               {/* Price per item */}
               <div className="pt-2">
-                <div className="block text-xs font-black text-slate-800 mb-2">أسعار الأصناف في هذا العرض:</div>
+                <div className="block text-xs font-black text-ink mb-2">أسعار الأصناف في هذا العرض:</div>
                 <div className="space-y-2">
                   {quoteItems.map((qi, idx) => (
-                    <div key={qi.productId} className="flex items-center justify-between p-3 border rounded-xl bg-slate-50 text-xs">
-                      <div className="font-bold text-slate-900">{qi.productName} <span className="text-slate-500 font-normal">({formatProductQuantity(qi.quantityM2, qi)})</span></div>
+                    <div key={qi.productId} className="flex items-center justify-between p-3 border rounded-xl bg-surface-muted text-xs">
+                      <div className="font-bold text-ink">{qi.productName} <span className="text-muted font-normal">({formatProductQuantity(qi.quantityM2, qi)})</span></div>
                       <div className="flex items-center gap-2">
                         <span>السعر / {getProductUnitLabel(qi)}:</span>
                         <input
@@ -653,24 +655,24 @@ export const SupplierQuotationsPage: React.FC = () => {
                             updated[idx].unitCost = Number(e.target.value);
                             setQuoteItems(updated);
                           }}
-                          className="w-28 px-2 py-1 bg-white border rounded-lg text-center font-bold text-orange-600"
+                          className="w-28 px-2 py-1 bg-surface border rounded-lg text-center font-bold text-warning"
                         />
                         <span>ج.م</span>
                       </div>
                     </div>
                   ))}
                 </div>
-                <div className="mt-3 p-3 bg-orange-50 rounded-xl text-xs font-bold text-orange-900 flex justify-between">
+                <div className="mt-3 p-3 bg-warning-soft rounded-xl text-xs font-bold text-warning flex justify-between">
                   <span>إجمالي قيمة هذا العرض:</span>
                   <span>{fmt(quoteItems.reduce((s, it) => s + it.quantityM2 * it.unitCost, 0))}</span>
                 </div>
               </div>
 
-              <div className="flex justify-end gap-2 pt-4 border-t border-slate-100">
-                <button type="button" onClick={() => setQuoteModal(false)} className="px-4 py-2 bg-slate-100 rounded-xl text-xs font-bold text-slate-700">
+              <div className="flex justify-end gap-2 pt-4 border-t border-line">
+                <button type="button" onClick={() => setQuoteModal(false)} className="px-4 py-2 bg-surface-sunken rounded-xl text-xs font-bold text-ink">
                   إلغاء
                 </button>
-                <button type="submit" className="px-5 py-2 bg-emerald-600 text-white rounded-xl text-xs font-black shadow-md shadow-emerald-600/20">
+                <button type="submit" className="px-5 py-2 bg-success text-white rounded-xl text-xs font-black shadow-md shadow-success/20">
                   حفظ وإدراج العرض للمقارنة
                 </button>
               </div>

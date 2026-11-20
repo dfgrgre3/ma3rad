@@ -11,11 +11,11 @@ export const AdminDataTable: React.FC<Props> = ({ rows, columns }) => (
     tableClassName="text-[11px]"
     columns={columns.map((column) => ({
       key: column,
-      header: <span className="font-mono font-bold text-slate-600 dark:text-slate-300">{column}</span>,
+      header: <span className="font-mono font-bold text-ink-secondary ">{column}</span>,
       headerClassName: 'whitespace-nowrap',
       render: (row: { __row: Record<string, unknown> }) =>
-        row.__row[column] == null ? <span className="text-slate-300">فارغ</span> : String(row.__row[column]),
-      className: 'max-w-[220px] truncate whitespace-nowrap font-mono text-slate-600 dark:text-slate-400',
+        row.__row[column] == null ? <span className="text-muted">فارغ</span> : String(row.__row[column]),
+      className: 'max-w-[220px] truncate whitespace-nowrap font-mono text-ink-secondary ',
     }))}
   />
 );

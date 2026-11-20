@@ -44,8 +44,8 @@ export const RollbackModal: React.FC<RollbackModalProps> = ({
     }
   >
     <div className="space-y-3">
-      <div className="flex items-start gap-3 rounded-xl border border-rose-200 bg-rose-50 p-3 text-rose-800">
-        <ShieldAlert className="h-5 w-5 shrink-0 mt-0.5 text-rose-600" />
+      <div className="flex items-start gap-3 rounded-xl border border-danger-border bg-danger-soft p-3 text-danger">
+        <ShieldAlert className="h-5 w-5 shrink-0 mt-0.5 text-danger" />
         <div className="text-[11.5px] leading-relaxed">
           <p className="font-bold">تحذير أمان عالي:</p>
           سيؤدي هذا الإجراء إلى إيقاف الإصدار <span className="font-mono font-bold">v{release?.version}</span> فوراً

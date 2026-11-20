@@ -14,7 +14,7 @@ export const EventButton: React.FC<{
     <button
       type="button"
       onClick={() => onOpen(event)}
-      className={`w-full rounded-lg border p-2 text-right transition hover:-translate-y-0.5 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-700 focus-visible:ring-offset-1 ${type.color} ${compact ? 'mb-1' : ''}`}
+      className={`w-full rounded-lg border p-2 text-right transition hover:-translate-y-0.5 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1 ${type.color} ${compact ? 'mb-1' : ''}`}
     >
       <span className="flex items-start gap-1.5">
         <Icon className="mt-0.5 h-3.5 w-3.5 shrink-0" />

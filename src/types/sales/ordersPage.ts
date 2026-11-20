@@ -5,14 +5,14 @@ import { ACTIVITY_ORDER_STATUS_LABELS, ACTIVITY_ORDER_ACTION_LABELS } from '../.
 export const PAGE_SIZE = 15;
 
 export const STATUS_LABELS: Record<OrderStatus, { label: string; color: string }> = {
-  PENDING: { label: 'بانتظار التأكيد', color: 'bg-slate-100 text-slate-600 border-slate-200' },
-  CONFIRMED: { label: 'مؤكد', color: 'bg-violet-50 text-violet-600 border-violet-200' },
-  PROCESSING: { label: 'قيد التجهيز', color: 'bg-sky-50 text-sky-600 border-sky-200' },
-  PARTIAL: { label: 'تسليم جزئي', color: 'bg-amber-50 text-amber-600 border-amber-200' },
-  READY: { label: 'جاهز', color: 'bg-cyan-50 text-cyan-600 border-cyan-200' },
-  ON_HOLD: { label: 'معلّق', color: 'bg-orange-50 text-orange-600 border-orange-200' },
-  COMPLETED: { label: 'تم التسليم / مفوتر', color: 'bg-emerald-50 text-emerald-600 border-emerald-200' },
-  CANCELLED: { label: 'ملغي', color: 'bg-rose-50 text-rose-600 border-rose-200' },
+  PENDING: { label: 'بانتظار التأكيد', color: 'bg-surface-sunken text-ink-secondary border-line' },
+  CONFIRMED: { label: 'مؤكد', color: 'bg-accent-soft text-primary border-accent-border' },
+  PROCESSING: { label: 'قيد التجهيز', color: 'bg-accent-soft text-primary border-accent-border' },
+  PARTIAL: { label: 'تسليم جزئي', color: 'bg-warning-soft text-warning border-warning-border' },
+  READY: { label: 'جاهز', color: 'bg-accent-soft text-primary border-accent-border' },
+  ON_HOLD: { label: 'معلّق', color: 'bg-warning-soft text-warning border-warning-border' },
+  COMPLETED: { label: 'تم التسليم / مفوتر', color: 'bg-success-soft text-success border-success-border' },
+  CANCELLED: { label: 'ملغي', color: 'bg-danger-soft text-danger border-danger-border' },
 };
 
 /** Status chip text resolved for the active business activity. */

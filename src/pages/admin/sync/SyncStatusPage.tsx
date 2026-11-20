@@ -27,8 +27,8 @@ export const SyncStatusPage: React.FC = () => {
   const isOwner = user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN';
 
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-slate-50 text-slate-900">
-      <div className="border-b border-slate-200 bg-white px-6 pt-4">
+    <div className="flex h-full flex-col overflow-hidden bg-surface-muted text-ink">
+      <div className="border-b border-line bg-surface px-6 pt-4">
         <PageHeader
           icon={<Activity className="h-5 w-5" />}
           title="مركز مزامنة الفروع والحسابات"
@@ -37,7 +37,7 @@ export const SyncStatusPage: React.FC = () => {
             <button
               type="button"
               onClick={() => setRefreshToken((value) => value + 1)}
-              className="flex items-center gap-2 self-start rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 sm:self-auto"
+              className="flex items-center gap-2 self-start rounded-xl border border-line bg-surface px-4 py-2 text-sm font-semibold text-ink transition hover:bg-surface-muted sm:self-auto"
             >
               <RefreshCw className="h-4 w-4" /> تحديث الكل
             </button>
@@ -45,7 +45,7 @@ export const SyncStatusPage: React.FC = () => {
         />
       </div>
 
-      <div className="border-b border-slate-200 bg-white px-4">
+      <div className="border-b border-line bg-surface px-4">
         <div className="flex gap-1 overflow-x-auto">
           {TABS.map((item) => (
             <button
@@ -54,8 +54,8 @@ export const SyncStatusPage: React.FC = () => {
               onClick={() => setTab(item.key)}
               className={`flex items-center gap-2 whitespace-nowrap border-b-2 px-4 py-3 text-xs font-bold transition ${
                 tab === item.key
-                  ? 'border-indigo-600 text-indigo-700'
-                  : 'border-transparent text-slate-500 hover:text-slate-700'
+                  ? 'border-primary text-primary'
+                  : 'border-transparent text-muted hover:text-ink'
               }`}
             >
               {item.icon}
@@ -69,7 +69,7 @@ export const SyncStatusPage: React.FC = () => {
         {tab === 'status' && <SyncStatusPanel refreshToken={refreshToken} />}
         {tab === 'links' && (canManage
           ? <AccountLinksPanel />
-          : <div className="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-center text-sm text-amber-800">إدارة الحسابات المرتبطة متاحة لصاحب النشاط فقط.</div>)}
+          : <div className="rounded-2xl border border-warning-border bg-warning-soft p-6 text-center text-sm text-warning">إدارة الحسابات المرتبطة متاحة لصاحب النشاط فقط.</div>)}
         {tab === 'approvals' && (
           <SyncChangeApprovalsPanel
             canDecide={isOwner}

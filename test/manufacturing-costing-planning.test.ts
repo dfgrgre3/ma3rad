@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseManager } from '../src/database/repositories/databaseManager.ts';
 import { AuthService } from '../src/services/domains/auth/AuthService.ts';
+import { BranchAccessService } from '../src/services/domains/auth/BranchAccessService.ts';
 import { PermissionService } from '../src/services/domains/auth/PermissionService.ts';
 import { ProductService } from '../src/services/domains/products/ProductService.ts';
 import { ManufacturingService } from '../src/services/domains/manufacturing/ManufacturingService.ts';
@@ -465,14 +466,16 @@ test('material shortages report remaining need vs available stock', async () => 
   assert.equal(row?.availableQty, 5);
   assert.equal(row?.deficitQty, 7);
 
-  // Consuming materials shrinks the remaining requirement.
+  // Consuming materials shrinks the remaining requirement AND decrements
+  // on-hand stock (issuance is a real stock movement now).
   service.releaseOrder(order.id);
   service.startOrder(order.id);
   service.consumeMaterial(order.materials[0].id, 4);
   shortages = service.getMaterialShortages();
   row = shortages.find((entry) => entry.orderId === order.id);
   assert.equal(row?.requiredQty, 8);
-  assert.equal(row?.deficitQty, 3);
+  assert.equal(row?.availableQty, 1);
+  assert.equal(row?.deficitQty, 7);
 
   // Completing the order removes it from the shortage list entirely.
   db.run(
@@ -643,4 +646,301 @@ test('executive command centre exposes manufacturing KPIs and drilldown', async 
   const drilldown = executiveCommandService.getDrilldown('manufacturing', 'month');
   assert.equal(drilldown.key, 'manufacturing');
   assert.ok(drilldown.rows.some((row) => row.orderNumber === order.orderNumber));
+});
+
+test('production schedule queues operations per work center capacity', async () => {
+  await boot();
+  const service = new ManufacturingService();
+
+  const product = createProduct('Sched good');
+  const bom = service.createBom({
+    productId: product,
+    name: 'Sched BOM',
+    items: [{ componentProductId: createProduct('Sched component'), quantity: 1 }],
+  });
+  service.activateBom(bom.id);
+  // 1 hour/day capacity → each 60-minute operation occupies one day.
+  const wc = service.createWorkCenter({ code: 'WC-SCHED', name: 'Sched WC', capacityPerDay: 1 });
+
+  const early = service.createProductionOrder({
+    productId: product, bomId: bom.id, quantity: 1, dueDate: '2099-01-01',
+    operations: [{ workCenterId: wc.id, plannedMinutes: 60 }],
+  });
+  const late = service.createProductionOrder({
+    productId: product, bomId: bom.id, quantity: 1, dueDate: '2099-01-05',
+    operations: [{ workCenterId: wc.id, plannedMinutes: 60 }],
+  });
+
+  const schedule = service.getProductionSchedule().filter((row) => row.workCenterId === wc.id);
+  assert.equal(schedule.length, 2);
+  assert.equal(schedule[0].orderNumber, early.orderNumber, 'earlier due date queues first');
+  assert.equal(schedule[0].queuePosition, 1);
+  assert.equal(schedule[1].orderNumber, late.orderNumber);
+  assert.equal(schedule[1].queuePosition, 2);
+  assert.ok(schedule[0].estimatedFinishDate < schedule[1].estimatedStartDate,
+    'second operation starts after the first finishes given daily capacity');
+});
+
+test('production issue and receipt post automatic WIP ledger transfers', async () => {
+  await boot();
+  const db = DatabaseManager.getInstance();
+  const service = new ManufacturingService();
+
+  const product = createProduct('Ledger good');
+  const component = createProduct('Ledger component');
+  setCostPrice(component, 10);
+  setCostPrice(product, 30);
+  const bom = service.createBom({
+    productId: product,
+    name: 'Ledger BOM',
+    items: [{ componentProductId: component, quantity: 2 }],
+  });
+  service.activateBom(bom.id);
+
+  const order = service.createProductionOrder({ productId: product, bomId: bom.id, quantity: 2 });
+  db.run(
+    `INSERT OR REPLACE INTO warehouse_stock (id, warehouse_id, product_id, quantity_m2)
+     VALUES ('ws_mfgle_component', 'wh_main', ?, 10)`,
+    [component]
+  );
+  service.releaseOrder(order.id);
+  service.startOrder(order.id);
+  service.completeOrder(order.id);
+
+  const issueEntries = db.query<{ id: string }>(
+    `SELECT id FROM journal_entries WHERE reference_type = 'PRODUCTION_ISSUE'`
+  );
+  assert.ok(issueEntries.length >= 1, 'material issue must post Dr 1205 / Cr 1104');
+  const issueLines = db.query<{ accountCode: string; debit: number; credit: number }>(
+    `SELECT coa.code AS accountCode, jel.debit, jel.credit
+     FROM journal_entry_lines jel JOIN chart_of_accounts coa ON coa.id = jel.account_id
+     WHERE jel.entry_id = ?`,
+    [issueEntries[0].id]
+  );
+  assert.ok(issueLines.some((l) => l.accountCode === '1205' && Number(l.debit) > 0), 'WIP debited');
+  assert.ok(issueLines.some((l) => l.accountCode === '1104' && Number(l.credit) > 0), 'inventory credited');
+
+  const receiptEntries = db.query<{ id: string }>(
+    `SELECT id FROM journal_entries WHERE reference_type = 'PRODUCTION_RECEIPT'`
+  );
+  assert.ok(receiptEntries.length >= 1, 'production receipt must post Dr 1104 / Cr 1205');
+  const receiptLines = db.query<{ accountCode: string; debit: number; credit: number }>(
+    `SELECT coa.code AS accountCode, jel.debit, jel.credit
+     FROM journal_entry_lines jel JOIN chart_of_accounts coa ON coa.id = jel.account_id
+     WHERE jel.entry_id = ?`,
+    [receiptEntries[0].id]
+  );
+  assert.ok(receiptLines.some((l) => l.accountCode === '1104' && Number(l.debit) > 0), 'finished goods debited');
+  assert.ok(receiptLines.some((l) => l.accountCode === '1205' && Number(l.credit) > 0), 'WIP credited');
+});
+
+test('order cost exposes standard cost, labor split and variance', async () => {
+  await boot();
+  const db = DatabaseManager.getInstance();
+  const service = new ManufacturingService();
+
+  const product = createProduct('Variance good');
+  const component = createProduct('Variance component');
+  setCostPrice(component, 10);
+  const bom = service.createBom({
+    productId: product,
+    name: 'Variance BOM',
+    items: [{ componentProductId: component, quantity: 2 }],
+  });
+  service.activateBom(bom.id);
+
+  const wc = service.createWorkCenter({ code: 'WC-VAR', name: 'Variance line', costPerHour: 120, overheadPerHour: 60, capacityPerDay: 8 });
+  const order = service.createProductionOrder({
+    productId: product, bomId: bom.id, quantity: 3,
+    operations: [{ workCenterId: wc.id, plannedMinutes: 60 }],
+  });
+  db.run(
+    `INSERT OR REPLACE INTO warehouse_stock (id, warehouse_id, product_id, quantity_m2)
+     VALUES ('ws_mfgvar_component', 'wh_main', ?, 10)`,
+    [component]
+  );
+  service.releaseOrder(order.id);
+  service.startOrder(order.id);
+  service.completeOperation(order.operations[0].id, 30);
+  service.completeOrder(order.id);
+
+  const cost = service.getProductionOrderCost(order.id);
+  // Labor split: 30 actual min × 120/h = 60 direct; × 60/h = 30 overhead.
+  assert.equal(cost.directLaborCost, 60);
+  assert.equal(cost.overheadCost, 30);
+  assert.equal(cost.laborCost, 90);
+  // Standard: planned materials 3×2×10 = 60 + planned labor 60min × 180/h = 180 → 240.
+  assert.equal(cost.standardCost, 240);
+  assert.equal(cost.costVariance, cost.totalCost - 240);
+  assert.equal(typeof cost.variancePercent, 'number');
+});
+
+test('MPS entries feed the weekly time-phased MRP', async () => {
+  await boot();
+  const service = new ManufacturingService();
+
+  const product = createProduct('MPS good');
+  const component = createProduct('MPS component');
+  setCostPrice(component, 5);
+  const bom = service.createBom({
+    productId: product,
+    name: 'MPS BOM',
+    items: [{ componentProductId: component, quantity: 4 }],
+  });
+  service.activateBom(bom.id);
+
+  const entry = service.createMpsEntry({
+    productId: product,
+    quantity: 5,
+    needDate: '2099-06-15',
+  });
+  assert.equal(entry.status, 'OPEN');
+  assert.equal(entry.bomId, bom.id, 'active BOM should be resolved automatically');
+  assert.ok(entry.warehouseId);
+
+  const plan = service.getTimePhasedMrp(8);
+  assert.ok(plan.mpsEntries.some((row) => row.id === entry.id));
+  const withMps = plan.buckets.filter((bucket) => bucket.mpsPlanned.some((row: any) => row.entryId === entry.id));
+  assert.equal(withMps.length, 1, 'MPS demand lands in exactly one weekly bucket');
+  assert.equal(withMps[0].mpsPlanned[0].quantity, 5);
+
+  // 5 units × 4 components = 20 needed; no stock → a purchase need in that week.
+  const needBuckets = plan.buckets.filter((bucket) =>
+    bucket.materialNeeds.some((row: any) => row.componentProductId === component && row.suggestedQty > 0)
+  );
+  assert.equal(needBuckets.length, 1);
+  assert.equal(needBuckets[0].materialNeeds.find((row: any) => row.componentProductId === component)?.suggestedQty, 20);
+
+  service.cancelMpsEntry(entry.id);
+  assert.equal(service.getMpsEntries().find((row) => row.id === entry.id)?.status, 'CANCELLED');
+  const after = service.getTimePhasedMrp(8);
+  assert.ok(!after.buckets.some((bucket) => bucket.mpsPlanned.some((row: any) => row.entryId === entry.id)));
+});
+
+test('lot genealogy traces finished batches back to suppliers', async () => {
+  await boot();
+  const db = DatabaseManager.getInstance();
+  const service = new ManufacturingService();
+
+  const product = createProduct('Trace good');
+  const component = createProduct('Trace component');
+  setCostPrice(component, 10);
+  const bom = service.createBom({
+    productId: product,
+    name: 'Trace BOM',
+    items: [{ componentProductId: component, quantity: 2 }],
+  });
+  service.activateBom(bom.id);
+
+  // FIFO costing with a supplier-tagged cost layer for the component.
+  db.run(`INSERT OR REPLACE INTO system_settings (key, value) VALUES ('costingMethod', 'FIFO')`);
+  db.run(`INSERT OR REPLACE INTO suppliers (id, code, name, phone) VALUES ('sup_trace', 'SUP-T', 'Trace Supplier', '0500000000')`);
+  db.run(
+    `INSERT OR REPLACE INTO warehouse_stock (id, warehouse_id, product_id, quantity_m2)
+     VALUES ('ws_mfgtrace_component', 'wh_main', ?, 10)`,
+    [component]
+  );
+  db.run(
+    `INSERT INTO inventory_cost_layers
+       (id, product_id, warehouse_id, source_type, source_id, received_at,
+        quantity_received, quantity_remaining, unit_cost, goods_receipt_id, purchase_invoice_id, supplier_id)
+     VALUES ('icl_trace', ?, 'wh_main', 'PURCHASE', 'pur_trace', '2026-01-01',
+             10, 10, 1000, 'grn_trace', 'pur_trace', 'sup_trace')`,
+    [component]
+  );
+
+  const order = service.createProductionOrder({ productId: product, bomId: bom.id, quantity: 2 });
+  service.releaseOrder(order.id);
+  service.startOrder(order.id);
+  service.completeOrder(order.id);
+
+  const trace = service.getOrderTraceability(order.id);
+  assert.equal(trace.orderNumber, order.orderNumber);
+  assert.equal(trace.producedBatches.length, 1);
+  const material = trace.materials.find((row) => row.componentProductId === component);
+  assert.ok(material, 'issued component must appear in genealogy');
+  assert.equal(material.supplierId, 'sup_trace');
+  assert.equal(material.supplierName, 'Trace Supplier');
+  assert.equal(material.goodsReceiptId, 'grn_trace');
+  assert.equal(material.producedBatchId, trace.producedBatches[0].id);
+
+  // Backward: the GRN resolves to the finished batch and its order.
+  const backward = service.getMaterialTraceability({ goodsReceiptId: 'grn_trace' });
+  assert.equal(backward.length, 1);
+  assert.equal(backward[0].componentProductId, component);
+  assert.equal(backward[0].supplierName, 'Trace Supplier');
+  assert.equal(backward[0].producedBatches[0].batchId, trace.producedBatches[0].id);
+  assert.equal(backward[0].producedBatches[0].orderNumber, order.orderNumber);
+});
+
+test('HSE module records incidents, permits and inspections with branch scoping', async () => {
+  await boot();
+  const service = new ManufacturingService();
+
+  const incident = service.createHseIncident({
+    incidentDate: '2026-02-01', incidentType: 'INJURY', severity: 'MODERATE',
+    description: 'جرح في خط القص', lostTimeHours: 4,
+  });
+  assert.equal(incident.status, 'OPEN');
+  assert.ok(service.getHseIncidents().some((row) => row.id === incident.id));
+  const investigated = service.updateHseIncidentStatus(incident.id, 'INVESTIGATING', 'تحقق السلامة');
+  assert.equal(investigated.status, 'INVESTIGATING');
+
+  const day = (offset: number) => {
+    const d = new Date(); d.setDate(d.getDate() + offset); return d.toISOString().slice(0, 10);
+  };
+  const permit = service.createHsePermit({
+    title: 'لحام خزان', permitType: 'HOT_WORK',
+    validFrom: day(1), validTo: day(5),
+  });
+  assert.equal(permit.status, 'REQUESTED');
+  assert.ok(permit.permitNumber.startsWith('HSE-'));
+  const active = service.approveHsePermit(permit.id, 'معدات إطفاء جاهزة');
+  assert.equal(active.status, 'ACTIVE');
+  const alerts = service.getHsePermitAlerts(30);
+  assert.ok(alerts.expiring.some((row) => row.id === permit.id));
+  service.cancelHsePermit(permit.id);
+  assert.equal(service.getHsePermits().find((row) => row.id === permit.id)?.status, 'CANCELLED');
+
+  const inspection = service.createHseInspection({
+    inspectionDate: '2026-02-05', area: 'المستودع الرئيسي', inspectionType: 'FIRE', result: 'PASS',
+  });
+  assert.equal(inspection.result, 'PASS');
+  assert.ok(service.getHseInspections().some((row) => row.id === inspection.id));
+
+  assert.throws(() => service.createHsePermit({ title: 'x', validFrom: '2026-03-01', validTo: '2026-02-01' }), /بعد البداية/);
+});
+
+test('production lines group work centers within the same branch', async () => {
+  await boot();
+  const db = DatabaseManager.getInstance();
+  const service = new ManufacturingService();
+
+  const branchId = db.query<{ id: string }>(`SELECT id FROM branches WHERE is_main = 1 LIMIT 1`)[0].id;
+  const line = service.createProductionLine({ code: 'LINE-A', name: 'خط القص', branchId });
+  assert.equal(line.branchId, branchId);
+  assert.equal(service.getProductionLines(branchId).some((row) => row.id === line.id), true);
+
+  const wc = service.createWorkCenter({ code: 'WC-LINE', name: 'قص', branchId, productionLineId: line.id });
+  assert.equal(wc.productionLineId, line.id);
+  assert.equal(service.getWorkCenters().find((row) => row.id === wc.id)?.productionLineName, 'خط القص');
+  assert.equal(service.getProductionLines(branchId).find((row) => row.id === line.id)?.workCentersCount, 1);
+
+  // A line from another branch cannot be assigned.
+  db.run(`INSERT OR REPLACE INTO branches (id, code, name, is_main, is_active) VALUES ('br_other_line', 'BR2', 'فرع آخر', 0, 1)`);
+  const access = new BranchAccessService();
+  const actor = AuthService.getCurrentUser()!;
+  access.setCurrentBranchId('br_other_line', actor);
+  const otherLine = service.createProductionLine({ code: 'LINE-B', name: 'خط آخر', branchId: 'br_other_line' });
+  access.setCurrentBranchId(branchId, actor);
+  assert.throws(
+    () => service.createWorkCenter({ code: 'WC-BAD', name: 'bad', branchId, productionLineId: otherLine.id }),
+    /نفس فرع/
+  );
+  assert.throws(
+    () => service.updateWorkCenter(wc.id, { productionLineId: otherLine.id }),
+    /نفس فرع/
+  );
+  // Clearing the assignment works.
+  assert.equal(service.updateWorkCenter(wc.id, { productionLineId: null }).productionLineId, null);
 });

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useIdempotencyKey } from '../../../hooks/shared/useIdempotencyKey';
-import { useActivityPageCopy } from '../../../hooks/domains/config/useBusinessTerm';
+import { useActivityPageCopy, useBusinessTerm } from '../../../hooks/domains/config/useBusinessTerm';
 import { useLocation } from 'react-router-dom';
 import {
   RotateCcw, Plus, Search, Calendar, Printer, Loader2, X, AlertTriangle, Eye,
@@ -84,6 +84,7 @@ export const ReturnsPage: React.FC = () => {
   const canRefund = PermissionService.can(AuthService.getCurrentUser(), 'ui.returns.returns.create');
   const canApproveReturn = PermissionService.can(AuthService.getCurrentUser(), 'ui.returns.returns.approve');
   const pageCopy = useActivityPageCopy('returns');
+  const newReturnLabel = useBusinessTerm('actions.newReturn');
   const [showHistoricalReconciliation, setShowHistoricalReconciliation] = useState(false);
 
   const [docPreview, setDocPreview] = useState<{
@@ -378,22 +379,22 @@ export const ReturnsPage: React.FC = () => {
   };
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
-      <div className="bg-white border-b border-slate-200 px-6 pt-4">
+    <div className="h-full flex flex-col bg-surface-muted text-ink overflow-hidden">
+      <div className="bg-surface border-b border-line px-6 pt-4">
         <PageHeader
           icon={<RotateCcw className="w-5 h-5" />}
           title={pageCopy?.title || 'مرتجع مبيعات المعرض'}
           description={pageCopy?.description || 'تسجيل المرتجعات، إرجاع البضاعة للمخزن، وتحديث الأثر المالي ورصيد العميل'}
           actions={<>
-            <button onClick={() => doExport('excel')} className="flex items-center gap-1.5 px-3 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold"><FileSpreadsheet className="w-4 h-4 text-emerald-600" /> جدول بيانات</button>
-            <button onClick={() => doExport('pdf')} className="flex items-center gap-1.5 px-3 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold"><FileDown className="w-4 h-4 text-rose-600" /> مستند</button>
+            <button onClick={() => doExport('excel')} className="flex items-center gap-1.5 px-3 py-2 bg-surface border border-line hover:bg-surface-muted text-ink rounded-xl text-xs font-bold"><FileSpreadsheet className="w-4 h-4 text-success" /> جدول بيانات</button>
+            <button onClick={() => doExport('pdf')} className="flex items-center gap-1.5 px-3 py-2 bg-surface border border-line hover:bg-surface-muted text-ink rounded-xl text-xs font-bold"><FileDown className="w-4 h-4 text-danger" /> مستند</button>
             {canRefund && (
-              <button onClick={() => openModal()} className="flex items-center gap-2 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-sm font-bold transition"><Plus className="w-4 h-4" /> تسجيل مرتجع</button>
+              <button onClick={() => openModal()} className="flex items-center gap-2 px-4 py-2 bg-danger hover:bg-danger text-white rounded-xl text-sm font-bold transition"><Plus className="w-4 h-4" /> {newReturnLabel}</button>
             )}
             {canApproveReturn && (
               <button
                 onClick={() => setShowHistoricalReconciliation((value) => !value)}
-                className="flex items-center gap-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-2 text-xs font-bold text-amber-800 hover:bg-amber-100"
+                className="flex items-center gap-2 rounded-xl border border-warning bg-warning-soft px-4 py-2 text-xs font-bold text-warning hover:bg-warning-soft"
               >
                 مراجعة التسويات التاريخية
               </button>
@@ -402,28 +403,28 @@ export const ReturnsPage: React.FC = () => {
         />
       </div>
 
-      <div className="p-4 bg-white border-b border-slate-200 space-y-3">
+      <div className="p-4 bg-surface border-b border-line space-y-3">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
-          <Stat label="إجمالي المرتجعات" value={String(stats?.count ?? 0)} icon={RotateCcw} tone="text-slate-700 bg-slate-50 border-slate-200" />
-          <Stat label="صافي المرتجعات قبل الضريبة" value={fmt(stats?.totalAmount ?? 0)} icon={TrendingDown} tone="text-rose-700 bg-rose-50 border-rose-200" />
-          <Stat label="ضريبة المرتجعات المسجلة" value={fmt(stats?.taxAmount ?? 0)} icon={TrendingDown} tone="text-orange-700 bg-orange-50 border-orange-200" />
-          <Stat label="الإجمالي بحسب الضريبة المسجلة" value={fmt(stats?.grossAmount ?? 0)} icon={TrendingDown} tone="text-rose-700 bg-rose-50 border-rose-200" />
-          <Stat label="استُردت نقداً (شامل الضريبة)" value={fmt(stats?.cashRefunded ?? 0)} icon={Banknote} tone="text-amber-700 bg-amber-50 border-amber-200" />
-          <Stat label="على الرصيد (شامل الضريبة)" value={fmt(stats?.creditedToBalance ?? 0)} icon={Wallet} tone="text-sky-700 bg-sky-50 border-sky-200" />
-          <Stat label="مرتجعات اليوم (صافي / ضريبة / شامل)" value={`${stats?.todayCount ?? 0} • ${fmt(stats?.todayAmount ?? 0)} / ${fmt(stats?.todayTaxAmount ?? 0)} / ${fmt(stats?.todayGrossAmount ?? 0)}`} icon={CheckCircle2} tone="text-emerald-700 bg-emerald-50 border-emerald-200" />
+          <Stat label="إجمالي المرتجعات" value={String(stats?.count ?? 0)} icon={RotateCcw} tone="text-ink bg-surface-muted border-line" />
+          <Stat label="صافي المرتجعات قبل الضريبة" value={fmt(stats?.totalAmount ?? 0)} icon={TrendingDown} tone="text-danger bg-danger-soft border-danger-border" />
+          <Stat label="ضريبة المرتجعات المسجلة" value={fmt(stats?.taxAmount ?? 0)} icon={TrendingDown} tone="text-warning bg-warning-soft border-warning-border" />
+          <Stat label="الإجمالي بحسب الضريبة المسجلة" value={fmt(stats?.grossAmount ?? 0)} icon={TrendingDown} tone="text-danger bg-danger-soft border-danger-border" />
+          <Stat label="استُردت نقداً (شامل الضريبة)" value={fmt(stats?.cashRefunded ?? 0)} icon={Banknote} tone="text-warning bg-warning-soft border-warning-border" />
+          <Stat label="على الرصيد (شامل الضريبة)" value={fmt(stats?.creditedToBalance ?? 0)} icon={Wallet} tone="text-primary bg-accent-soft border-accent-border" />
+          <Stat label="مرتجعات اليوم (صافي / ضريبة / شامل)" value={`${stats?.todayCount ?? 0} • ${fmt(stats?.todayAmount ?? 0)} / ${fmt(stats?.todayTaxAmount ?? 0)} / ${fmt(stats?.todayGrossAmount ?? 0)}`} icon={CheckCircle2} tone="text-success bg-success-soft border-success-border" />
         </div>
         {!!stats?.returnsWithoutRecordedTax && (
-          <p className="text-[11px] font-semibold text-amber-700">
+          <p className="text-[11px] font-semibold text-warning">
             ضريبة {stats.returnsWithoutRecordedTax} مرتجعًا تاريخيًا غير مسجلة صراحةً؛ الإجماليات أعلاه لا تستنتجها تلقائيًا. راجع التسوية التاريخية قبل المطابقة.
           </p>
         )}
 
         {topReasons.length > 0 && (
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-[10px] font-bold text-slate-400">أكثر أسباب الإرجاع:</span>
+            <span className="text-[10px] font-bold text-muted">أكثر أسباب الإرجاع:</span>
             {topReasons.map((r) => (
-              <span key={r.reason} className="text-[10px] font-bold px-2 py-1 rounded-lg bg-rose-50 border border-rose-200 text-rose-700">
-                {r.reason} <span className="text-rose-400">×{r.count}</span> — صافي {fmt(r.amount)}
+              <span key={r.reason} className="text-[10px] font-bold px-2 py-1 rounded-lg bg-danger-soft border border-danger-border text-danger">
+                {r.reason} <span className="text-danger">×{r.count}</span> — صافي {fmt(r.amount)}
               </span>
             ))}
           </div>
@@ -431,49 +432,49 @@ export const ReturnsPage: React.FC = () => {
 
         <div className="flex flex-col xl:flex-row gap-2">
           <div className="relative flex-1">
-            <Search className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="بحث برقم المرتجع أو العميل أو الفاتورة..." className="w-full pl-4 pr-10 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:border-rose-400" />
+            <Search className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
+            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="بحث برقم المرتجع أو العميل أو الفاتورة..." className="w-full pl-4 pr-10 py-2 bg-surface-muted border border-line rounded-xl text-xs font-medium focus:outline-none focus:border-danger" />
           </div>
           <OperationalFieldsFilter fields={operationalFields} values={fieldFilters} onChange={setFieldFilters} />
           <div className="flex flex-wrap items-center gap-2">
-            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2 py-1.5">
-              <Calendar className="w-3.5 h-3.5 text-slate-400" />
+            <div className="flex items-center gap-1.5 bg-surface-muted border border-line rounded-xl px-2 py-1.5">
+              <Calendar className="w-3.5 h-3.5 text-muted" />
               <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="bg-transparent text-[11px] font-bold outline-none" />
-              <span className="text-slate-300">—</span>
+              <span className="text-muted">—</span>
               <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="bg-transparent text-[11px] font-bold outline-none" />
             </div>
-            <button onClick={load} className="p-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-600 hover:bg-slate-100" title="تحديث"><RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /></button>
+            <button onClick={load} className="p-2 bg-surface-muted border border-line rounded-xl text-ink-secondary hover:bg-surface-sunken" title="تحديث"><RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /></button>
           </div>
         </div>
       </div>
 
       <div className="flex-1 overflow-y-auto p-4">
         {showHistoricalReconciliation && canApproveReturn && <HistoricalReturnReconciliationPanel />}
-        {error && <div className="mb-3 px-4 py-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold">{error}</div>}
-        {loading ? <div className="py-16 flex justify-center"><Loader2 className="w-7 h-7 animate-spin text-rose-500" /></div> : (
+        {error && <div className="mb-3 px-4 py-2.5 rounded-xl bg-danger-soft border border-danger-border text-danger text-xs font-semibold">{error}</div>}
+        {loading ? <div className="py-16 flex justify-center"><Loader2 className="w-7 h-7 animate-spin text-danger" /></div> : (
           <>
-            <div className="bg-white border border-slate-200 rounded-2xl overflow-x-auto shadow-sm">
+            <div className="bg-surface border border-line rounded-2xl overflow-x-auto shadow-sm">
               <DataTable
                             ariaLabel="المرتجعات"
                             rows={pageItems}
                             rowKey={(r) => r.id}
                             minWidth={820}
                             columns={[
-                              { key: 'num', header: 'رقم المرتجع', render: (r) => <span className="font-mono font-bold text-rose-600">{r.returnNumber}</span> },
-                              { key: 'invoice', header: 'الفاتورة الأصلية', render: (r) => <span className="font-mono text-slate-700">{r.invoiceNumber || r.originalInvoiceNumber}</span> },
-                              { key: 'customer', header: 'العميل', render: (r) => <span className="font-bold text-slate-800">{r.customerName}</span> },
-                              { key: 'date', header: 'التاريخ', render: (r) => <span className="inline-flex items-center gap-1 text-slate-600"><Calendar className="w-3 h-3" />{r.date || '—'}</span> },
-                              { key: 'reason', header: 'السبب', render: (r) => <span className="text-slate-500 max-w-[200px] truncate block">{r.reason}</span> },
-                              { key: 'net', header: 'صافي قبل الضريبة', render: (r) => <span className="font-black text-rose-600">{fmt(r.totalAmount)}</span> },
-                              { key: 'tax', header: 'الضريبة', render: (r) => <span className="text-orange-700">{r.returnTaxAmount == null ? 'غير مسجلة' : fmt(r.returnTaxAmount)}</span> },
-                              { key: 'gross', header: 'الإجمالي شامل الضريبة', render: (r) => <span className="font-bold text-rose-700">{r.returnTaxAmount == null ? 'غير معلوم' : fmt(Number(r.totalAmount) + Number(r.returnTaxAmount))}</span> },
+                              { key: 'num', header: 'رقم المرتجع', render: (r) => <span className="font-mono font-bold text-danger">{r.returnNumber}</span> },
+                              { key: 'invoice', header: 'الفاتورة الأصلية', render: (r) => <span className="font-mono text-ink">{r.invoiceNumber || r.originalInvoiceNumber}</span> },
+                              { key: 'customer', header: 'العميل', render: (r) => <span className="font-bold text-ink">{r.customerName}</span> },
+                              { key: 'date', header: 'التاريخ', render: (r) => <span className="inline-flex items-center gap-1 text-ink-secondary"><Calendar className="w-3 h-3" />{r.date || '—'}</span> },
+                              { key: 'reason', header: 'السبب', render: (r) => <span className="text-muted max-w-[200px] truncate block">{r.reason}</span> },
+                              { key: 'net', header: 'صافي قبل الضريبة', render: (r) => <span className="font-black text-danger">{fmt(r.totalAmount)}</span> },
+                              { key: 'tax', header: 'الضريبة', render: (r) => <span className="text-warning">{r.returnTaxAmount == null ? 'غير مسجلة' : fmt(r.returnTaxAmount)}</span> },
+                              { key: 'gross', header: 'الإجمالي شامل الضريبة', render: (r) => <span className="font-bold text-danger">{r.returnTaxAmount == null ? 'غير معلوم' : fmt(Number(r.totalAmount) + Number(r.returnTaxAmount))}</span> },
                               {
                                 key: 'refund', header: 'نقدي / رصيد',
                                 render: (r) => (
-                                  <div className="text-[10px] text-slate-500">
+                                  <div className="text-[10px] text-muted">
                                     <div>نقدي: {fmt(r.refundedAmount)}</div>
                                     <div>على الرصيد: {fmt(r.remainingToBalance)}</div>
-                                    <div className="text-[9px] font-bold text-sky-600 mt-0.5">{REFUND_LABEL[r.refundMethod || 'CASH'] || r.refundMethod || 'نقدي'}</div>
+                                    <div className="text-[9px] font-bold text-primary mt-0.5">{REFUND_LABEL[r.refundMethod || 'CASH'] || r.refundMethod || 'نقدي'}</div>
                                   </div>
                                 ),
                               },
@@ -481,7 +482,7 @@ export const ReturnsPage: React.FC = () => {
                                 key: `op-${field.id}`, header: field.name,
                                 render: (r: (typeof pageItems)[number]) => {
                                   const raw = valuesByReturn[r.id]?.[field.id] || '';
-                                  return <span className="text-slate-600">{field.values.find((option) => option.value === raw)?.label || raw || '—'}</span>;
+                                  return <span className="text-ink-secondary">{field.values.find((option) => option.value === raw)?.label || raw || '—'}</span>;
                                 },
                               })),
                               {
@@ -500,12 +501,12 @@ export const ReturnsPage: React.FC = () => {
             </div>
 
             {returns.length > PAGE_SIZE && (
-              <div className="flex items-center justify-between mt-4 text-xs text-slate-500">
+              <div className="flex items-center justify-between mt-4 text-xs text-muted">
                 <span>{(page - 1) * PAGE_SIZE + 1} — {Math.min(page * PAGE_SIZE, returns.length)} من {returns.length}</span>
                 <div className="flex items-center gap-1">
-                  <button disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))} className="p-1.5 rounded-lg border border-slate-200 bg-white disabled:opacity-40"><ChevronRight className="w-4 h-4" /></button>
+                  <button disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))} className="p-1.5 rounded-lg border border-line bg-surface disabled:opacity-40"><ChevronRight className="w-4 h-4" /></button>
                   <span className="px-3 font-bold">{page} / {totalPages}</span>
-                  <button disabled={page >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))} className="p-1.5 rounded-lg border border-slate-200 bg-white disabled:opacity-40"><ChevronLeft className="w-4 h-4" /></button>
+                  <button disabled={page >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))} className="p-1.5 rounded-lg border border-line bg-surface disabled:opacity-40"><ChevronLeft className="w-4 h-4" /></button>
                 </div>
               </div>
             )}
@@ -516,13 +517,13 @@ export const ReturnsPage: React.FC = () => {
       {modalOpen && (
         <Modal onClose={() => setModalOpen(false)} wide>
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-base font-black text-slate-900 flex items-center gap-2"><RotateCcw className="w-5 h-5 text-rose-600" /> تسجيل مرتجع جديد</h3>
-            <button onClick={() => { setModalOpen(false); setExchangeMode(false); setNewItems([]); }} className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100"><X className="w-4 h-4" /></button>
+            <h3 className="text-base font-black text-ink flex items-center gap-2"><RotateCcw className="w-5 h-5 text-danger" /> {newReturnLabel}</h3>
+            <button onClick={() => { setModalOpen(false); setExchangeMode(false); setNewItems([]); }} className="p-1.5 rounded-lg text-muted hover:bg-surface-sunken"><X className="w-4 h-4" /></button>
           </div>
           <form onSubmit={submit} className="space-y-3 text-xs">
             <div>
-              <label className="font-bold text-slate-700 block mb-1">الفاتورة الأصلية *</label>
-              <select required value={invoiceId} onChange={(e) => pickInvoice(e.target.value)} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold">
+              <label className="font-bold text-ink block mb-1">الفاتورة الأصلية *</label>
+              <select required value={invoiceId} onChange={(e) => pickInvoice(e.target.value)} className="w-full px-3 py-2 bg-surface-muted rounded-xl border border-line font-bold">
                 <option value="">— اختر الفاتورة —</option>
                 {invoices.map((i) => <option key={i.id} value={i.id}>{i.invoiceNumber} — {i.customerName} — {fmt(i.totalAmount)}</option>)}
               </select>
@@ -530,11 +531,11 @@ export const ReturnsPage: React.FC = () => {
             <OperationalFieldsForm fields={operationalFields} values={operationalFieldValues} onChange={setOperationalFieldValues} title="بيانات إضافية للمرتجع" />
 
             {invoiceInfo && lines.length === 0 && (
-              <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-[11px] text-amber-800 flex items-center gap-2"><PackageX className="w-4 h-4" /> لا توجد كميات متاحة للإرجاع من هذه الفاتورة (تم إرجاع كل الكميات سابقاً).</div>
+              <div className="bg-warning-soft border border-warning-border rounded-xl p-3 text-[11px] text-warning flex items-center gap-2"><PackageX className="w-4 h-4" /> لا توجد كميات متاحة للإرجاع من هذه الفاتورة (تم إرجاع كل الكميات سابقاً).</div>
             )}
 
             {lines.length > 0 && (
-              <div className="border border-slate-200 rounded-xl overflow-hidden">
+              <div className="border border-line rounded-xl overflow-hidden">
                 <DataTable
                                 ariaLabel="أصناف الإرجاع"
                                 rows={lines}
@@ -544,17 +545,17 @@ export const ReturnsPage: React.FC = () => {
                                   {
                                     key: 'product', header: 'الصنف',
                                     render: (l) => (
-                                      <span className="font-semibold text-slate-800">
+                                      <span className="font-semibold text-ink">
                                         {l.productName}
-                                        <div className="text-[9px] text-slate-400 font-normal">{l.size} • {l.grade}</div>
-                                        <div className={`text-[9px] font-bold ${l.specialStockId ? 'text-amber-700' : 'text-sky-700'}`}>{l.specialStockId ? `مخزون مخفض • ${l.specialNumber || l.specialStockId}` : 'مخزون عادي'}</div>
+                                        <div className="text-[9px] text-muted font-normal">{l.size} • {l.grade}</div>
+                                        <div className={`text-[9px] font-bold ${l.specialStockId ? 'text-warning' : 'text-primary'}`}>{l.specialStockId ? `مخزون مخفض • ${l.specialNumber || l.specialStockId}` : 'مخزون عادي'}</div>
                                       </span>
                                     ),
                                   },
                                   { key: 'sold', header: 'المباع', render: (l) => <span className="font-mono">{formatProductQuantity(l.soldM2, l)}</span> },
-                                  { key: 'prev', header: 'مُرجع سابقاً', render: (l) => <span className="font-mono text-slate-500">{formatProductQuantity(l.returnedM2, l)}</span> },
-                                  { key: 'avail', header: 'القابل للإرجاع', render: (l) => <span className="font-mono font-bold text-emerald-600">{formatProductQuantity(l.returnableM2, l)}</span> },
-                                  { key: 'price', header: 'سعر الوحدة', render: (l) => <span className="font-mono">{round2(pricePerUnit(l.unitPrice, l.entryUnit, l))} <span className="text-[9px] text-slate-400">/{getUomLabel(l.entryUnit, l)}</span></span> },
+                                  { key: 'prev', header: 'مُرجع سابقاً', render: (l) => <span className="font-mono text-muted">{formatProductQuantity(l.returnedM2, l)}</span> },
+                                  { key: 'avail', header: 'القابل للإرجاع', render: (l) => <span className="font-mono font-bold text-success">{formatProductQuantity(l.returnableM2, l)}</span> },
+                                  { key: 'price', header: 'سعر الوحدة', render: (l) => <span className="font-mono">{round2(pricePerUnit(l.unitPrice, l.entryUnit, l))} <span className="text-[9px] text-muted">/{getUomLabel(l.entryUnit, l)}</span></span> },
                                   {
                                     key: 'qty', header: 'كمية الإرجاع',
                                     render: (l, idx) => (
@@ -567,14 +568,14 @@ export const ReturnsPage: React.FC = () => {
                                             step={isWholeUnit(l.entryUnit, l) ? 1 : 0.01}
                                             value={l.quantityM2 > 0 ? entryQuantity(l) : ''}
                                             onChange={(e) => setEntryQuantity(idx, Number.parseFloat(e.target.value))}
-                                            className="w-full px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg font-mono"
+                                            className="w-full px-2 py-1 bg-surface-muted border border-line rounded-lg font-mono"
                                             aria-label={`كمية الإرجاع ${getUomLabel(l.entryUnit, l)}`}
                                           />
                                           {getSellableUnits(l).length > 1 && (
                                             <select
                                               value={l.entryUnit}
                                               onChange={(e) => setLine(idx, { entryUnit: e.target.value })}
-                                              className="px-1 py-1 bg-white border border-slate-200 rounded-lg text-[10px] font-bold"
+                                              className="px-1 py-1 bg-surface border border-line rounded-lg text-[10px] font-bold"
                                               aria-label={`وحدة الإرجاع للصنف ${l.productName}`}
                                             >
                                               {getSellableUnits(l).map((unit) => (
@@ -584,18 +585,18 @@ export const ReturnsPage: React.FC = () => {
                                           )}
                                         </div>
                                         {l.entryUnit !== (l.baseUnit || 'M2') && l.quantityM2 > 0 && (
-                                          <div className="text-[9px] text-slate-400 mt-1 font-normal">
+                                          <div className="text-[9px] text-muted mt-1 font-normal">
                                             = {formatProductQuantity(l.quantityM2, l)}
                                           </div>
                                         )}
                                       </div>
                                     ),
                                   },
-                                  { key: 'reason', header: 'السبب', render: (l, idx) => <input list="return-reasons" value={l.reason} onChange={(e) => setLine(idx, { reason: e.target.value })} placeholder="كسر / عيب..." className="w-full px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg" /> },
+                                  { key: 'reason', header: 'السبب', render: (l, idx) => <input list="return-reasons" value={l.reason} onChange={(e) => setLine(idx, { reason: e.target.value })} placeholder="كسر / عيب..." className="w-full px-2 py-1 bg-surface-muted border border-line rounded-lg" /> },
                                   {
                                     key: 'disposition', header: 'مصير المرتجع',
                                     render: (l, idx) => (
-                                      <select value={l.disposition} onChange={(e) => setLine(idx, { disposition: e.target.value as ReturnLine['disposition'] })} className="w-full px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-[10px] font-bold">
+                                      <select value={l.disposition} onChange={(e) => setLine(idx, { disposition: e.target.value as ReturnLine['disposition'] })} className="w-full px-2 py-1 bg-surface-muted border border-line rounded-lg text-[10px] font-bold">
                                         <option value="RESTOCK">إعادة للمخزون</option>
                                         {l.specialStockId && <option value="SPECIAL_STOCK">إعادة للمخزون الخاص</option>}
                                         <option value="QUARANTINE">حجر / فحص</option>
@@ -603,29 +604,29 @@ export const ReturnsPage: React.FC = () => {
                                       </select>
                                     ),
                                   },
-                                  { key: 'total', header: 'الإجمالي', render: (l, idx) => <span className="font-bold text-rose-600">{fmt(lineReturnTotals[idx] || 0)}</span> },
+                                  { key: 'total', header: 'الإجمالي', render: (l, idx) => <span className="font-bold text-danger">{fmt(lineReturnTotals[idx] || 0)}</span> },
                                 ]}
                               />
 
               </div>
             )}
 
-            <div className="flex items-center gap-2 bg-sky-50 border border-sky-200 rounded-xl px-3 py-2">
+            <div className="flex items-center gap-2 bg-accent-soft border border-accent-border rounded-xl px-3 py-2">
               <input type="checkbox" id="exchange-mode" checked={exchangeMode} onChange={(e) => { setExchangeMode(e.target.checked); if (!e.target.checked) setNewItems([]); }} />
-              <label htmlFor="exchange-mode" className="text-xs font-bold text-sky-700 cursor-pointer">استبدال (Exchange): إضافة أصناف بديلة — المرتجع يُسجل كرصيد دائن للعميل</label>
+              <label htmlFor="exchange-mode" className="text-xs font-bold text-primary cursor-pointer">استبدال (Exchange): إضافة أصناف بديلة — المرتجع يُسجل كرصيد دائن للعميل</label>
             </div>
 
             {exchangeMode && (
-              <div className="border border-sky-200 rounded-xl p-3 space-y-2 bg-sky-50/50">
+              <div className="border border-accent-border rounded-xl p-3 space-y-2 bg-accent-soft/50">
                 <div className="flex gap-2">
-                  <input value={newSearch} onChange={(e) => setNewSearch(e.target.value)} placeholder="بحث عن صنف بديل..." className="flex-1 px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs" />
-                  <input type="number" min={1} step={1} value={newQty} onChange={(e) => setNewQty(Number.parseFloat(e.target.value) || 1)} className="w-20 px-2 py-2 bg-white border border-slate-200 rounded-xl text-xs" placeholder="كمية" />
+                  <input value={newSearch} onChange={(e) => setNewSearch(e.target.value)} placeholder="بحث عن صنف بديل..." className="flex-1 px-3 py-2 bg-surface border border-line rounded-xl text-xs" />
+                  <input type="number" min={1} step={1} value={newQty} onChange={(e) => setNewQty(Number.parseFloat(e.target.value) || 1)} className="w-20 px-2 py-2 bg-surface border border-line rounded-xl text-xs" placeholder="كمية" />
                 </div>
                 {newResults.length > 0 && (
-                  <div className="bg-white border border-slate-200 rounded-xl max-h-40 overflow-y-auto">
+                  <div className="bg-surface border border-line rounded-xl max-h-40 overflow-y-auto">
                     {newResults.map((p) => (
-                      <button key={p.id} type="button" onClick={() => { setSelectedNewProduct(p); setNewSearch(p.name); setNewResults([]); }} className="w-full text-right px-3 py-2 hover:bg-sky-50 text-xs border-b border-slate-100 last:border-0">
-                        <span className="font-bold">{p.name}</span> <span className="text-slate-400">— {p.sku} — {fmt(Number(p.sellingPriceM2 || 0))}</span>
+                      <button key={p.id} type="button" onClick={() => { setSelectedNewProduct(p); setNewSearch(p.name); setNewResults([]); }} className="w-full text-right px-3 py-2 hover:bg-accent-soft text-xs border-b border-line last:border-0">
+                        <span className="font-bold">{p.name}</span> <span className="text-muted">— {p.sku} — {fmt(Number(p.sellingPriceM2 || 0))}</span>
                       </button>
                     ))}
                   </div>
@@ -638,7 +639,7 @@ export const ReturnsPage: React.FC = () => {
                     setSelectedNewProduct(null);
                     setNewSearch('');
                     setNewQty(1);
-                  }} className="px-3 py-1.5 bg-sky-600 text-white font-bold rounded-lg text-xs">إضافة للقائمة</button>
+                  }} className="px-3 py-1.5 bg-primary text-white font-bold rounded-lg text-xs">إضافة للقائمة</button>
                 )}
                 {newItems.length > 0 && (
                   <DataTable
@@ -652,7 +653,7 @@ export const ReturnsPage: React.FC = () => {
                                       { key: 'price', header: 'السعر', align: 'end', render: (n) => <span className="font-bold">{fmt(n.quantityM2 * n.unitPrice)}</span> },
                                       {
                                         key: 'actions', header: '', align: 'end',
-                                        render: (n, i) => <button type="button" onClick={() => setNewItems((prev) => prev.filter((_, j) => j !== i))} className="text-rose-600 hover:text-rose-800"><X className="w-3 h-3" /></button>,
+                                        render: (n, i) => <button type="button" onClick={() => setNewItems((prev) => prev.filter((_, j) => j !== i))} className="text-danger hover:text-danger"><X className="w-3 h-3" /></button>,
                                       },
                                     ]}
                                   />
@@ -664,24 +665,24 @@ export const ReturnsPage: React.FC = () => {
             {!exchangeMode && (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <div>
-                <label className="font-bold text-slate-700 block mb-1">طريقة التعويض</label>
-                <select value={refundMethod} onChange={(e) => setRefundMethod(e.target.value as RefundMethod)} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold">
+                <label className="font-bold text-ink block mb-1">طريقة التعويض</label>
+                <select value={refundMethod} onChange={(e) => setRefundMethod(e.target.value as RefundMethod)} className="w-full px-3 py-2 bg-surface-muted border border-line rounded-xl font-bold">
                   {REFUND_METHODS.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
                 </select>
               </div>
               {refundMethod === 'BANK_TRANSFER' && (
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">الحساب البنكي الذي سيصدر منه الرد *</label>
-                  <select required value={refundBankAccountId} onChange={(event) => setRefundBankAccountId(event.target.value)} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold">
+                  <label className="font-bold text-ink block mb-1">الحساب البنكي الذي سيصدر منه الرد *</label>
+                  <select required value={refundBankAccountId} onChange={(event) => setRefundBankAccountId(event.target.value)} className="w-full px-3 py-2 bg-surface-muted border border-line rounded-xl font-bold">
                     <option value="">اختر الحساب البنكي</option>
                     {bankAccounts.map((account) => <option key={account.id} value={account.id}>{account.accountName} — {account.bankName}</option>)}
                   </select>
-                  {bankAccounts.length === 0 && <p className="mt-1 text-xs text-rose-600">لا توجد حسابات بنكية متاحة؛ اختر طريقة أخرى.</p>}
+                  {bankAccounts.length === 0 && <p className="mt-1 text-xs text-danger">لا توجد حسابات بنكية متاحة؛ اختر طريقة أخرى.</p>}
                 </div>
               )}
-              <div className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-[10px] text-slate-500 self-end">
-                نقدي: <b className="text-amber-600">{fmt(refundPreview.cash)}</b> • على الرصيد: <b className="text-sky-600">{fmt(refundPreview.balance)}</b>
-                <div className="mt-0.5 text-[9px] text-slate-400">يُحسب الاسترداد النقدي من الجزء المسدد فقط، والباقي يُسجل كرصيد دائن للعميل.</div>
+              <div className="bg-surface-muted border border-line rounded-xl px-3 py-2 text-[10px] text-muted self-end">
+                نقدي: <b className="text-warning">{fmt(refundPreview.cash)}</b> • على الرصيد: <b className="text-primary">{fmt(refundPreview.balance)}</b>
+                <div className="mt-0.5 text-[9px] text-muted">يُحسب الاسترداد النقدي من الجزء المسدد فقط، والباقي يُسجل كرصيد دائن للعميل.</div>
               </div>
             </div>
             )}
@@ -689,14 +690,14 @@ export const ReturnsPage: React.FC = () => {
               {RETURN_REASONS.map((reason) => <option key={reason} value={reason} />)}
             </datalist>
 
-            <div className="flex items-center justify-between bg-rose-50 border border-rose-200 rounded-xl px-4 py-3">
-              <span className="text-xs font-bold text-rose-700 flex items-center gap-1"><AlertTriangle className="w-4 h-4" /> الإجمالي قبل الضريبة + الضريبة = شامل الضريبة</span>
-              <span className="text-lg font-black text-rose-600">{fmt(total)} + {fmt(returnTax)} = {fmt(totalIncludingTax)}</span>
+            <div className="flex items-center justify-between bg-danger-soft border border-danger-border rounded-xl px-4 py-3">
+              <span className="text-xs font-bold text-danger flex items-center gap-1"><AlertTriangle className="w-4 h-4" /> الإجمالي قبل الضريبة + الضريبة = شامل الضريبة</span>
+              <span className="text-lg font-black text-danger">{fmt(total)} + {fmt(returnTax)} = {fmt(totalIncludingTax)}</span>
             </div>
 
-            <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
-              <button type="button" onClick={() => { setModalOpen(false); setExchangeMode(false); setNewItems([]); }} className="px-4 py-2 bg-slate-100 text-slate-700 font-bold rounded-xl">إلغاء</button>
-              <button type="submit" disabled={saving} className="px-5 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl flex items-center gap-2">{saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />} <FileText className="w-3.5 h-3.5" /> {exchangeMode ? 'اعتماد الاستبدال' : 'اعتماد المرتجع'}</button>
+            <div className="flex justify-end gap-2 pt-3 border-t border-line">
+              <button type="button" onClick={() => { setModalOpen(false); setExchangeMode(false); setNewItems([]); }} className="px-4 py-2 bg-surface-sunken text-ink font-bold rounded-xl">إلغاء</button>
+              <button type="submit" disabled={saving} className="px-5 py-2 bg-danger hover:bg-danger text-white font-bold rounded-xl flex items-center gap-2">{saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />} <FileText className="w-3.5 h-3.5" /> {exchangeMode ? 'اعتماد الاستبدال' : 'اعتماد المرتجع'}</button>
             </div>
           </form>
         </Modal>
@@ -706,10 +707,10 @@ export const ReturnsPage: React.FC = () => {
         <Modal onClose={() => setDetail(null)} wide>
           <div className="flex items-start justify-between mb-4">
             <div>
-              <h3 className="text-base font-black text-slate-900">مرتجع {detail.returnNumber}</h3>
-              <p className="text-[11px] text-slate-500 mt-1">الفاتورة الأصلية: {detail.invoiceNumber || detail.originalInvoiceNumber} • {detail.date}</p>
+              <h3 className="text-base font-black text-ink">مرتجع {detail.returnNumber}</h3>
+              <p className="text-[11px] text-muted mt-1">الفاتورة الأصلية: {detail.invoiceNumber || detail.originalInvoiceNumber} • {detail.date}</p>
             </div>
-            <button onClick={() => setDetail(null)} className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100"><X className="w-4 h-4" /></button>
+            <button onClick={() => setDetail(null)} className="p-1.5 rounded-lg text-muted hover:bg-surface-sunken"><X className="w-4 h-4" /></button>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-4 gap-3 mb-4">
             <Info label="العميل" value={detail.customerName || '—'} />
@@ -719,7 +720,7 @@ export const ReturnsPage: React.FC = () => {
             <Info label="نقدي / رصيد" value={`${fmt(detail.refundedAmount)} / ${fmt(detail.remainingToBalance)}`} />
             <Info label="طريقة التعويض" value={REFUND_LABEL[detail.refundMethod || 'CASH'] || 'نقدي'} />
           </div>
-          {detail.reason && <div className="bg-rose-50 border border-rose-200 rounded-xl p-3 text-[11px] text-rose-800 mb-4"><b>سبب الإرجاع:</b> {detail.reason}</div>}
+          {detail.reason && <div className="bg-danger-soft border border-danger-border rounded-xl p-3 text-[11px] text-danger mb-4"><b>سبب الإرجاع:</b> {detail.reason}</div>}
           <div className="mb-4 space-y-2">
             <OperationalFieldsSummary fields={operationalFields} values={fieldService.getRecordValues('sales_returns', detail.id)} />
             <OperationalFieldsRecordEditor recordLabel={detail.returnNumber} fields={operationalFields} initialValues={fieldService.getRecordValues('sales_returns', detail.id)} canEdit={canRefund} onSave={(values) => {
@@ -727,7 +728,7 @@ export const ReturnsPage: React.FC = () => {
               setValuesByReturn((previous) => ({ ...previous, [detail.id]: values }));
             }} />
           </div>
-          <div className="border border-slate-200 rounded-xl overflow-x-auto mb-4">
+          <div className="border border-line rounded-xl overflow-x-auto mb-4">
             <DataTable
                           ariaLabel="أصناف المرتجع"
                           rows={detail.items || []}
@@ -738,9 +739,9 @@ export const ReturnsPage: React.FC = () => {
                             {
                               key: 'product', header: 'الصنف',
                               render: (i) => (
-                                <span className="font-bold text-slate-800">
+                                <span className="font-bold text-ink">
                                   {i.productName}
-                                  <div className="text-[9px] text-slate-400 font-normal">{i.grade}</div>
+                                  <div className="text-[9px] text-muted font-normal">{i.grade}</div>
                                 </span>
                               ),
                             },
@@ -752,8 +753,8 @@ export const ReturnsPage: React.FC = () => {
                         />
 
           </div>
-          <div className="flex justify-end pt-3 border-t border-slate-100">
-            <button onClick={() => printService.printSalesReturn(detail)} className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold flex items-center gap-1.5"><Printer className="w-3.5 h-3.5" /> طباعة المرتجع</button>
+          <div className="flex justify-end pt-3 border-t border-line">
+            <button onClick={() => printService.printSalesReturn(detail)} className="px-3 py-2 bg-surface-sunken hover:bg-surface-sunken text-ink rounded-xl text-xs font-bold flex items-center gap-1.5"><Printer className="w-3.5 h-3.5" /> طباعة المرتجع</button>
           </div>
         </Modal>
       )}
@@ -780,19 +781,19 @@ const Stat: React.FC<{ label: string; value: string; icon: React.ElementType; to
 );
 
 const Btn: React.FC<{ onClick: () => void; tone: 'slate'; children: React.ReactNode }> = ({ onClick, tone, children }) => {
-  const styles: Record<string, string> = { slate: 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200' };
+  const styles: Record<string, string> = { slate: 'bg-surface-sunken hover:bg-surface-sunken text-ink border-line' };
   return <button onClick={onClick} className={`px-3 py-1.5 border rounded-xl text-xs font-bold flex items-center gap-1.5 transition ${styles[tone]}`}>{children}</button>;
 };
 
 const Modal: React.FC<{ children: React.ReactNode; onClose: () => void; wide?: boolean }> = ({ children, onClose, wide }) => (
-  <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-    <div className={`bg-white rounded-2xl border border-slate-200 shadow-2xl w-full ${wide ? 'max-w-5xl' : 'max-w-lg'} p-6 max-h-[92vh] overflow-y-auto`}>{children}</div>
+  <div className="fixed inset-0 bg-primary/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+    <div className={`bg-surface rounded-2xl border border-line shadow-2xl w-full ${wide ? 'max-w-5xl' : 'max-w-lg'} p-6 max-h-[92vh] overflow-y-auto`}>{children}</div>
   </div>
 );
 
 const Info: React.FC<{ label: string; value: string }> = ({ label, value }) => (
-  <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
-    <div className="text-[10px] font-bold text-slate-400">{label}</div>
-    <div className="text-xs font-black text-slate-800 mt-0.5">{value}</div>
+  <div className="bg-surface-muted border border-line rounded-xl p-3">
+    <div className="text-[10px] font-bold text-muted">{label}</div>
+    <div className="text-xs font-black text-ink mt-0.5">{value}</div>
   </div>
 );

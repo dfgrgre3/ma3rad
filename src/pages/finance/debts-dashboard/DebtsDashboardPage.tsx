@@ -388,9 +388,9 @@ export const DebtsDashboardPage: React.FC = () => {
 
   return (
     <div
-      className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden"
+      className="h-full flex flex-col bg-surface-muted text-ink overflow-hidden"
     >
-      <div className="bg-white px-6 pt-4">
+      <div className="bg-surface px-6 pt-4">
         <PageHeader
           icon={<Banknote className="h-5 w-5" />}
           title="الديون والذمم المالية"
@@ -416,13 +416,13 @@ export const DebtsDashboardPage: React.FC = () => {
 
       <div className="flex-1 overflow-y-auto p-4">
         {error && (
-          <div className="mb-3 px-4 py-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold">
+          <div className="mb-3 px-4 py-2.5 rounded-xl bg-danger-soft border border-danger-border text-danger text-xs font-semibold">
             {error}
           </div>
         )}
         {loading ? (
           <div className="py-16 flex justify-center">
-            <Loader2 className="w-6 h-6 animate-spin text-rose-500" />
+            <Loader2 className="w-6 h-6 animate-spin text-danger" />
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -449,7 +449,7 @@ export const DebtsDashboardPage: React.FC = () => {
               />
             ))}
             {filtered.length === 0 && (
-              <div className="col-span-full py-16 text-center text-slate-400 border-2 border-dashed border-slate-200 rounded-2xl bg-white">
+              <div className="col-span-full py-16 text-center text-muted border-2 border-dashed border-line rounded-2xl bg-surface">
                 لا توجد مديونيات مستحقة
               </div>
             )}

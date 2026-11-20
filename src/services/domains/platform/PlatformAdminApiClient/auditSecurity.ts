@@ -24,6 +24,9 @@ export interface AuditSecurityApi {
   listApiKeys(this: PlatformAdminApiCore): Promise<any[]>;
   createApiKey(this: PlatformAdminApiCore, input: { name: string; scopes?: string[]; expiresInDays?: number }): Promise<any>;
   revokeApiKey(this: PlatformAdminApiCore, id: string): Promise<any>;
+  listIpBans(this: PlatformAdminApiCore, filters?: { activeOnly?: boolean }): Promise<any[]>;
+  banIp(this: PlatformAdminApiCore, input: { ipAddress: string; reason?: string; expiresAt?: string }): Promise<any>;
+  liftIpBan(this: PlatformAdminApiCore, id: string): Promise<any>;
 }
 
 export function createAuditSecurityApi(): AuditSecurityApi {
@@ -172,6 +175,33 @@ export function createAuditSecurityApi(): AuditSecurityApi {
       const envelope = await this.requestEnvelope<any>({
         path: `/api/v1/admin/security/api-keys/${encodeURIComponent(id)}`,
         method: 'DELETE',
+      });
+      if (envelope.success === false) throw new CentralApiError({ status: 0, envelope });
+      return envelope.data;
+    },
+
+    // ── IP Bans ────────────────────────────────────────────────────────────
+    async listIpBans(this: PlatformAdminApiCore, filters: { activeOnly?: boolean } = {}) {
+      const qs = filters.activeOnly ? '?active=1' : '';
+      const envelope = await this.requestEnvelope<any[]>({ path: `/api/v1/admin/security/ip-bans${qs}`, method: 'GET' });
+      if (envelope.success === false) throw new CentralApiError({ status: 0, envelope });
+      return Array.isArray(envelope.data) ? envelope.data : [];
+    },
+
+    async banIp(this: PlatformAdminApiCore, input: { ipAddress: string; reason?: string; expiresAt?: string }) {
+      const envelope = await this.requestEnvelope<any>({
+        path: '/api/v1/admin/security/ip-bans',
+        method: 'POST',
+        body: input,
+      });
+      if (envelope.success === false) throw new CentralApiError({ status: 0, envelope });
+      return envelope.data;
+    },
+
+    async liftIpBan(this: PlatformAdminApiCore, id: string) {
+      const envelope = await this.requestEnvelope<any>({
+        path: `/api/v1/admin/security/ip-bans/${encodeURIComponent(id)}/lift`,
+        method: 'POST',
       });
       if (envelope.success === false) throw new CentralApiError({ status: 0, envelope });
       return envelope.data;

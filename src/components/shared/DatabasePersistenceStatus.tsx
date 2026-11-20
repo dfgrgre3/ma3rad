@@ -62,7 +62,7 @@ export const DatabasePersistenceStatus: React.FC = () => {
       <div
         role="status"
         aria-live="polite"
-        className="fixed left-1/2 top-4 z-[100] -translate-x-1/2 rounded-full border border-emerald-200 bg-white/95 px-3 py-1.5 text-[11px] font-bold text-emerald-700 shadow-lg"
+        className="fixed left-1/2 top-4 z-[100] -translate-x-1/2 rounded-full border border-success-border bg-surface/95 px-3 py-1.5 text-[11px] font-bold text-success shadow-lg"
       >
         تم حفظ البيانات
       </div>
@@ -73,7 +73,7 @@ export const DatabasePersistenceStatus: React.FC = () => {
       <div
         role="status"
         aria-live="polite"
-        className="fixed left-1/2 top-4 z-[100] -translate-x-1/2 rounded-full border border-amber-200 bg-white/95 px-3 py-1.5 text-[11px] font-bold text-amber-700 shadow-lg"
+        className="fixed left-1/2 top-4 z-[100] -translate-x-1/2 rounded-full border border-warning-border bg-surface/95 px-3 py-1.5 text-[11px] font-bold text-warning shadow-lg"
       >
         جارٍ حفظ التغييرات…
       </div>
@@ -84,7 +84,7 @@ export const DatabasePersistenceStatus: React.FC = () => {
       <div
         role="alert"
         aria-live="polite"
-        className="fixed left-1/2 top-4 z-[100] -translate-x-1/2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-xs font-bold text-amber-800 shadow-xl"
+        className="fixed left-1/2 top-4 z-[100] -translate-x-1/2 rounded-xl border border-warning bg-warning-soft px-4 py-3 text-xs font-bold text-warning shadow-xl"
       >
         تُحفظ البيانات في تخزين المتصفح غير المشفر. استخدم تطبيق سطح المكتب لحماية قاعدة البيانات المحلية.
       </div>

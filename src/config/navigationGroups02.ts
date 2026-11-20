@@ -2,7 +2,7 @@ import {
   Activity, BadgeDollarSign, BarChart3, Bell, Boxes, Briefcase, Building2, Calendar, CalendarDays, Car,
   CheckSquare, Clock3, Cpu, CreditCard, Download, Factory, FileSignature, FileSpreadsheet, FileText,
   Gift, GraduationCap, HardHat, Landmark, Lock, Network, RefreshCw, Settings, ShieldAlert, ShieldCheck,
-  ShoppingCart, SlidersHorizontal, Sparkles, Star, Trash2, Truck, UserPlus, UserRound, Wallet, Warehouse,
+  ShoppingCart, SlidersHorizontal, Sparkles, Star, Trash2, Truck, UserPlus, UserRound, Wallet, Warehouse, Wrench,
 } from 'lucide-react';
 import type { NavGroupDef } from '../types/config/navigation';
 import { DATA_IMPORT_ACCESS_PERMISSIONS } from './routePermissions';
@@ -12,7 +12,7 @@ export const NAV_GROUPS_02: NavGroupDef[] = [
     id: 'operations',
     label: 'إدارة المنشأة والعمليات',
     icon: Building2,
-    color: 'text-slate-500',
+    color: 'text-muted',
     perm: 'operations.view',
     items: [
       { label: 'لوحة الأسطول والتوصيل', to: '/fleet/dashboard', icon: Truck, perm: 'deliveries.view' },
@@ -24,13 +24,14 @@ export const NAV_GROUPS_02: NavGroupDef[] = [
       { label: 'السائقون', to: '/drivers', icon: UserRound, perm: 'drivers.view' },
       { label: 'المركبات', to: '/vehicles', icon: Car, perm: 'vehicles.view' },
       { label: 'التصنيع', to: '/manufacturing', icon: Factory, perm: 'manufacturing.view' },
+      { label: 'ورشة صيانة السيارات', to: '/workshop', icon: Wrench, perm: 'operations.view' },
     ],
   },
   {
     id: 'hr',
     label: 'إدارة الموارد البشرية',
     icon: HardHat,
-    color: 'text-amber-600',
+    color: 'text-warning',
     items: [
       { label: 'تنبيهات الموارد البشرية', to: '/hr/alerts', icon: Bell, perm: 'employees.view' },
       { label: 'كشوف المرتبات', to: '/employees/payroll/payslips', icon: FileText, perm: 'employees.payroll.view' },
@@ -61,7 +62,7 @@ export const NAV_GROUPS_02: NavGroupDef[] = [
     id: 'reports',
     label: 'التقارير والتحليلات',
     icon: BarChart3,
-    color: 'text-teal-600',
+    color: 'text-success',
     perm: 'reports.view',
     items: [
       { label: 'مركز التقارير', to: '/reports', icon: BarChart3, perm: 'reports.view' },
@@ -78,7 +79,7 @@ export const NAV_GROUPS_02: NavGroupDef[] = [
     id: 'documents',
     label: 'المستندات والموافقات',
     icon: FileText,
-    color: 'text-indigo-600',
+    color: 'text-primary',
     anyPerms: ['documents.view', 'contracts.view', 'approvals.view'],
     items: [
       { label: 'صندوق الموافقات', to: '/approvals', icon: CheckSquare, perm: 'approvals.view' },
@@ -90,7 +91,7 @@ export const NAV_GROUPS_02: NavGroupDef[] = [
     id: 'system',
     label: 'إدارة النظام',
     icon: Settings,
-    color: 'text-slate-500',
+    color: 'text-muted',
     anyPerms: ['settings.view', ...DATA_IMPORT_ACCESS_PERMISSIONS],
     items: [
       { label: 'مركز التحكم', to: '/admin', icon: SlidersHorizontal, highlight: true, anyPerms: ['admin.view', 'users.view'] },

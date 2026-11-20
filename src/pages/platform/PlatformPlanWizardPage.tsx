@@ -160,22 +160,22 @@ const StepIndicator: React.FC<{ step: number }> = ({ step }) => (
         const active = index === step;
         return (
           <React.Fragment key={item.key}>
-            {index > 0 && <span className={`h-px flex-1 ${index <= step ? 'bg-emerald-500' : 'bg-slate-200'}`} />}
+            {index > 0 && <span className={`h-px flex-1 ${index <= step ? 'bg-success' : 'bg-surface-sunken'}`} />}
             <li className="flex items-center gap-2">
               <span
                 className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-[11px] font-black transition ${
                   done
-                    ? 'border-emerald-500 bg-emerald-600 text-white'
+                    ? 'border-success bg-success text-white'
                     : active
-                      ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
-                      : 'border-slate-200 bg-slate-50 text-slate-400'
+                      ? 'border-success bg-success-soft text-success'
+                      : 'border-line bg-surface-muted text-muted'
                 }`}
                 title={item.label}
                 aria-current={active ? 'step' : undefined}
               >
                 {done ? <Check className="h-4 w-4" /> : index + 1}
               </span>
-              <span className={`hidden text-[11px] font-semibold lg:inline ${active ? 'text-emerald-700' : done ? 'text-slate-600' : 'text-slate-400'}`}>
+              <span className={`hidden text-[11px] font-semibold lg:inline ${active ? 'text-success' : done ? 'text-ink-secondary' : 'text-muted'}`}>
                 {item.label}
               </span>
             </li>
@@ -184,8 +184,8 @@ const StepIndicator: React.FC<{ step: number }> = ({ step }) => (
       })}
     </ol>
     <div className="mt-2 flex items-center justify-between lg:hidden">
-      <span className="text-[12px] font-bold text-slate-700">الخطوة {step + 1} من {WIZARD_STEPS.length}</span>
-      <span className="text-[11px] font-semibold text-emerald-700">{WIZARD_STEPS[step].label}</span>
+      <span className="text-[12px] font-bold text-ink">الخطوة {step + 1} من {WIZARD_STEPS.length}</span>
+      <span className="text-[11px] font-semibold text-success">{WIZARD_STEPS[step].label}</span>
     </div>
   </div>
 );
@@ -297,7 +297,7 @@ const PagePickerModal: React.FC<PagePickerModalProps> = ({ open, onClose, title,
     <Modal open={open} onClose={onClose} title={title} description="اختر صفحات موقع المستخدمين التي تملكها هذه الميزة — تُخفى عن الباقات التي لا تشملها." size="xl">
       <div className="mb-3 flex items-center gap-2">
         <div className="relative flex-1">
-          <Search className="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+          <Search className="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted" />
           <input
             className={`${inputClass} pr-9`}
             placeholder="ابحث عن صفحة بالاسم أو المسار..."
@@ -305,7 +305,7 @@ const PagePickerModal: React.FC<PagePickerModalProps> = ({ open, onClose, title,
             onChange={(event) => setSearch(event.target.value)}
           />
         </div>
-        <span className="shrink-0 rounded-full bg-emerald-50 px-2.5 py-1 text-[10.5px] font-bold text-emerald-700">
+        <span className="shrink-0 rounded-full bg-success-soft px-2.5 py-1 text-[10.5px] font-bold text-success">
           {selected.size} صفحة مختارة
         </span>
       </div>
@@ -316,37 +316,37 @@ const PagePickerModal: React.FC<PagePickerModalProps> = ({ open, onClose, title,
         {filteredGroups.map((group) => {
           const selectedInGroup = group.pages.filter((page) => selected.has(page.path)).length;
           return (
-            <div key={group.id} className="rounded-xl border border-slate-200">
+            <div key={group.id} className="rounded-xl border border-line">
               <button
                 type="button"
                 onClick={() => toggleGroup(group)}
-                className="flex w-full items-center justify-between gap-2 border-b border-slate-100 bg-slate-50 px-3 py-2 text-right"
+                className="flex w-full items-center justify-between gap-2 border-b border-line bg-surface-muted px-3 py-2 text-right"
               >
-                <span className="text-[12px] font-black text-slate-800">
+                <span className="text-[12px] font-black text-ink">
                   {group.label}
-                  <span className="mr-2 text-[10px] font-semibold text-slate-400">
+                  <span className="mr-2 text-[10px] font-semibold text-muted">
                     {selectedInGroup}/{group.pages.length}
                   </span>
                 </span>
-                <span className="text-[10px] font-bold text-emerald-700">{selectedInGroup === group.pages.length ? 'إلغاء الكل' : 'تحديد الكل'}</span>
+                <span className="text-[10px] font-bold text-success">{selectedInGroup === group.pages.length ? 'إلغاء الكل' : 'تحديد الكل'}</span>
               </button>
               <div className="grid gap-1 p-2 sm:grid-cols-2">
                 {group.pages.map((page) => (
                   <label
                     key={page.path}
                     className={`flex cursor-pointer items-center justify-between gap-2 rounded-lg border px-2.5 py-1.5 transition ${
-                      selected.has(page.path) ? 'border-emerald-200 bg-emerald-50/50' : 'border-slate-100 hover:bg-slate-50'
+                      selected.has(page.path) ? 'border-success-border bg-success-soft/50' : 'border-line hover:bg-surface-muted'
                     }`}
                   >
                     <span className="min-w-0">
-                      <span className="block truncate text-[11.5px] font-semibold text-slate-700">{page.label}</span>
-                      <span className="block truncate font-mono text-[9.5px] text-slate-400" dir="ltr">{page.path}</span>
+                      <span className="block truncate text-[11.5px] font-semibold text-ink">{page.label}</span>
+                      <span className="block truncate font-mono text-[9.5px] text-muted" dir="ltr">{page.path}</span>
                     </span>
                     <input
                       type="checkbox"
                       checked={selected.has(page.path)}
                       onChange={() => toggle(page.path)}
-                      className="h-3.5 w-3.5 shrink-0 accent-emerald-600"
+                      className="h-3.5 w-3.5 shrink-0 accent-success"
                     />
                   </label>
                 ))}
@@ -355,8 +355,8 @@ const PagePickerModal: React.FC<PagePickerModalProps> = ({ open, onClose, title,
           );
         })}
       </div>
-      <div className="mt-3 flex items-center justify-between rounded-xl border border-slate-200 px-3 py-2">
-        <p className="text-[10.5px] text-slate-500">يمكنك إسناد نفس الصفحة لأكثر من ميزة — الإخفاء يجري إذا لم تكن أي ميزة مالكة مفعّلة.</p>
+      <div className="mt-3 flex items-center justify-between rounded-xl border border-line px-3 py-2">
+        <p className="text-[10.5px] text-muted">يمكنك إسناد نفس الصفحة لأكثر من ميزة — الإخفاء يجري إذا لم تكن أي ميزة مالكة مفعّلة.</p>
         <Button variant="primary" size="sm" onClick={onClose}>تم</Button>
       </div>
     </Modal>
@@ -731,13 +731,13 @@ export const PlatformPlanWizardPage: React.FC = () => {
       <StepIndicator step={step} />
 
       {error && (
-        <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-2.5 text-xs font-semibold text-rose-700">
+        <div role="alert" className="rounded-lg border border-danger-border bg-danger-soft px-4 py-2.5 text-xs font-semibold text-danger">
           {error}
         </div>
       )}
 
       {loading ? (
-        <div className="rounded-xl border border-slate-200 bg-white py-16 text-center text-sm font-semibold text-slate-500 shadow-sm">
+        <div className="rounded-xl border border-line bg-surface py-16 text-center text-sm font-semibold text-muted shadow-sm">
           جارٍ تحميل كتالوج الخطط والصفحات...
         </div>
       ) : (
@@ -745,8 +745,8 @@ export const PlatformPlanWizardPage: React.FC = () => {
           {/* ─── Step 0: Plan selection ─── */}
           {step === 0 && (
             <div className="space-y-3">
-              <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-                <p className="text-[12px] font-semibold text-slate-600">
+              <div className="flex items-center justify-between rounded-xl border border-line bg-surface px-4 py-3 shadow-sm">
+                <p className="text-[12px] font-semibold text-ink-secondary">
                   اختر الباقة التي تريد بناء صفحاتها ومميزاتها — الخطوات التالية تعدّل محتواها فقط، لا أسعارها.
                 </p>
                 {canManagePlans && (
@@ -757,7 +757,7 @@ export const PlatformPlanWizardPage: React.FC = () => {
               </div>
 
               {plans.length === 0 ? (
-                <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
+                <div className="rounded-xl border border-line bg-surface shadow-sm">
                   <EmptyState icon={<Layers3 className="h-5 w-5" />} title="لا توجد خطط" description="أنشئ خطة اشتراك أولاً من صفحة خطط الاشتراك." />
                 </div>
               ) : (
@@ -770,24 +770,24 @@ export const PlatformPlanWizardPage: React.FC = () => {
                         type="button"
                         onClick={() => void selectPlan(plan)}
                         className={`rounded-xl border p-4 text-right shadow-sm transition ${
-                          active ? 'border-emerald-400 bg-emerald-50/50 ring-1 ring-emerald-300' : 'border-slate-200 bg-white hover:border-slate-300'
+                          active ? 'border-success bg-success-soft/50 ring-1 ring-success' : 'border-line bg-surface hover:border-line-strong'
                         }`}
                       >
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0">
-                            <p className="flex items-center gap-1.5 truncate text-[13px] font-black text-slate-900">
+                            <p className="flex items-center gap-1.5 truncate text-[13px] font-black text-ink">
                               {plan.name}
-                              {plan.isDefault && <Star className="h-3.5 w-3.5 shrink-0 fill-amber-400 text-amber-400" />}
+                              {plan.isDefault && <Star className="h-3.5 w-3.5 shrink-0 fill-warning text-warning" />}
                             </p>
-                            <p className="mt-0.5 font-mono text-[10px] text-slate-400" dir="ltr">{plan.code}</p>
+                            <p className="mt-0.5 font-mono text-[10px] text-muted" dir="ltr">{plan.code}</p>
                           </div>
                           <StatusBadge value={plan.isActive ? 'ACTIVE' : 'CANCELLED'} label={plan.isActive ? 'نشطة' : 'معطلة'} />
                         </div>
-                        <p className="mt-2 text-[16px] font-black text-slate-900">{formatMoney(plan.price, plan.currency)}</p>
-                        <p className="mt-2 flex flex-wrap gap-1 text-[10px] font-semibold text-slate-500">
-                          <span className="rounded-full bg-slate-100 px-2 py-0.5">{plan.includedModules.length} وحدة</span>
-                          <span className="rounded-full bg-slate-100 px-2 py-0.5">{plan.features.length} ميزة</span>
-                          <span className="rounded-full bg-slate-100 px-2 py-0.5">{plan.subscriberCount} مشترك</span>
+                        <p className="mt-2 text-[16px] font-black text-ink">{formatMoney(plan.price, plan.currency)}</p>
+                        <p className="mt-2 flex flex-wrap gap-1 text-[10px] font-semibold text-muted">
+                          <span className="rounded-full bg-surface-sunken px-2 py-0.5">{plan.includedModules.length} وحدة</span>
+                          <span className="rounded-full bg-surface-sunken px-2 py-0.5">{plan.features.length} ميزة</span>
+                          <span className="rounded-full bg-surface-sunken px-2 py-0.5">{plan.subscriberCount} مشترك</span>
                         </p>
                       </button>
                     );
@@ -800,11 +800,11 @@ export const PlatformPlanWizardPage: React.FC = () => {
           {/* ─── Step 1: Modules & their pages ─── */}
           {step === 1 && selectedPlan && (
             <div className="space-y-3">
-              <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-                <p className="text-[12px] font-semibold text-slate-600">
-                  الباقة الحالية: <span className="font-black text-slate-900">{selectedPlan.name}</span> — فعّل الوحدات التي تشملها الباقة، وكل وحدة تعرض صفحاتها داخل تطبيق العميل.
+              <div className="flex items-center justify-between rounded-xl border border-line bg-surface px-4 py-3 shadow-sm">
+                <p className="text-[12px] font-semibold text-ink-secondary">
+                  الباقة الحالية: <span className="font-black text-ink">{selectedPlan.name}</span> — فعّل الوحدات التي تشملها الباقة، وكل وحدة تعرض صفحاتها داخل تطبيق العميل.
                 </p>
-                <span className="shrink-0 rounded-full bg-emerald-50 px-2.5 py-1 text-[10.5px] font-bold text-emerald-700">
+                <span className="shrink-0 rounded-full bg-success-soft px-2.5 py-1 text-[10.5px] font-bold text-success">
                   {moduleDraft.size}/{modules.length} وحدة مفعّلة
                 </span>
               </div>
@@ -818,17 +818,17 @@ export const PlatformPlanWizardPage: React.FC = () => {
                     return (
                       <details
                         key={module.id || module.code}
-                        className={`group rounded-xl border transition ${checked ? 'border-emerald-200 bg-emerald-50/30' : 'border-slate-200 bg-white opacity-80'}`}
+                        className={`group rounded-xl border transition ${checked ? 'border-success-border bg-success-soft/30' : 'border-line bg-surface opacity-80'}`}
                       >
                         <summary className="flex cursor-pointer list-none items-start justify-between gap-2 p-3 [&::-webkit-details-marker]:hidden">
                           <div className="min-w-0">
-                            <p className="flex flex-wrap items-center gap-1.5 text-[12.5px] font-bold text-slate-800">
+                            <p className="flex flex-wrap items-center gap-1.5 text-[12.5px] font-bold text-ink">
                               {module.name}
-                              <span className="font-mono text-[9.5px] font-normal text-slate-400" dir="ltr">{module.code}</span>
-                              {!module.isEnabled && <span className="rounded-full bg-rose-50 px-1.5 py-0.5 text-[9px] font-bold text-rose-600">الوحدة معطلة globally</span>}
+                              <span className="font-mono text-[9.5px] font-normal text-muted" dir="ltr">{module.code}</span>
+                              {!module.isEnabled && <span className="rounded-full bg-danger-soft px-1.5 py-0.5 text-[9px] font-bold text-danger">الوحدة معطلة globally</span>}
                             </p>
-                            <p className="mt-0.5 text-[10.5px] text-slate-500">{module.description || 'بدون وصف'}</p>
-                            <p className="mt-1 text-[10px] font-semibold text-slate-400">
+                            <p className="mt-0.5 text-[10.5px] text-muted">{module.description || 'بدون وصف'}</p>
+                            <p className="mt-1 text-[10px] font-semibold text-muted">
                               {ownedPages.length > 0 ? `${ownedPages.length} صفحة في التطبيق` : 'لا صفحات مرتبطة'}
                             </p>
                           </div>
@@ -848,15 +848,15 @@ export const PlatformPlanWizardPage: React.FC = () => {
                           </span>
                         </summary>
                         {ownedPages.length > 0 && (
-                          <div className="border-t border-slate-100 px-3 py-2">
-                            <p className="mb-1.5 text-[10px] font-bold text-slate-400">صفحات هذه الوحدة في موقع المستخدمين:</p>
+                          <div className="border-t border-line px-3 py-2">
+                            <p className="mb-1.5 text-[10px] font-bold text-muted">صفحات هذه الوحدة في موقع المستخدمين:</p>
                             <div className="flex flex-wrap gap-1">
                               {ownedPages.map((page) => (
                                 <span
                                   key={page.path}
                                   title={page.path}
                                   className={`rounded-full px-2 py-0.5 text-[9.5px] font-semibold ${
-                                    hiddenDraft.has(page.path) ? 'bg-rose-50 text-rose-500 line-through' : 'bg-slate-100 text-slate-600'
+                                    hiddenDraft.has(page.path) ? 'bg-danger-soft text-danger line-through' : 'bg-surface-sunken text-ink-secondary'
                                   }`}
                                 >
                                   {page.label}
@@ -876,13 +876,13 @@ export const PlatformPlanWizardPage: React.FC = () => {
           {/* ─── Step 2: Features ─── */}
           {step === 2 && selectedPlan && (
             <div className="space-y-3">
-              <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-                <p className="text-[12px] font-semibold text-slate-600">
-                  أضف مميزات جديدة أو عدّل صفحاتها، وفعّل ما تشمله باقة <span className="font-black text-slate-900">{selectedPlan.name}</span>.
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line bg-surface px-4 py-3 shadow-sm">
+                <p className="text-[12px] font-semibold text-ink-secondary">
+                  أضف مميزات جديدة أو عدّل صفحاتها، وفعّل ما تشمله باقة <span className="font-black text-ink">{selectedPlan.name}</span>.
                 </p>
                 <div className="flex items-center gap-2">
                   <div className="relative">
-                    <Search className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+                    <Search className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted" />
                     <input
                       className={`${inputClass} w-44 py-1.5 pr-8 text-[11.5px]`}
                       placeholder="بحث في المميزات..."
@@ -899,7 +899,7 @@ export const PlatformPlanWizardPage: React.FC = () => {
               </div>
 
               {filteredFeatures.length === 0 ? (
-                <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
+                <div className="rounded-xl border border-line bg-surface shadow-sm">
                   <EmptyState icon={<Sparkles className="h-5 w-5" />} title="لا توجد مميزات" description="أنشئ ميزة جديدة لربطها بصفحات محددة من موقع المستخدمين." />
                 </div>
               ) : (
@@ -910,34 +910,34 @@ export const PlatformPlanWizardPage: React.FC = () => {
                       <article
                         key={feature.id}
                         className={`flex flex-wrap items-center gap-3 rounded-xl border p-3 shadow-sm transition ${
-                          inPlan ? 'border-emerald-200 bg-emerald-50/30' : 'border-slate-200 bg-white'
+                          inPlan ? 'border-success-border bg-success-soft/30' : 'border-line bg-surface'
                         }`}
                       >
                         <div className="min-w-0 flex-1">
-                          <p className="flex flex-wrap items-center gap-1.5 text-[12.5px] font-bold text-slate-800">
+                          <p className="flex flex-wrap items-center gap-1.5 text-[12.5px] font-bold text-ink">
                             {feature.name}
-                            <span className="font-mono text-[9.5px] font-normal text-slate-400" dir="ltr">{feature.code}</span>
+                            <span className="font-mono text-[9.5px] font-normal text-muted" dir="ltr">{feature.code}</span>
                             {feature.category && (
-                              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[9.5px] font-semibold text-slate-500">{feature.category}</span>
+                              <span className="rounded-full bg-surface-sunken px-2 py-0.5 text-[9.5px] font-semibold text-muted">{feature.category}</span>
                             )}
                           </p>
-                          <p className="mt-0.5 text-[10.5px] text-slate-500">
+                          <p className="mt-0.5 text-[10.5px] text-muted">
                             {feature.description || 'بدون وصف'} — تملك {feature.pagePaths.length} صفحة
                             {feature.minPlanTier ? ` — حد أدنى: ${feature.minPlanTier}` : ''}
                           </p>
                           {feature.pagePaths.length > 0 && (
                             <div className="mt-1 flex flex-wrap gap-1">
                               {feature.pagePaths.slice(0, 5).map((path) => (
-                                <span key={path} className="rounded-full bg-sky-50 px-2 py-0.5 font-mono text-[9px] text-sky-700" dir="ltr">{path}</span>
+                                <span key={path} className="rounded-full bg-accent-soft px-2 py-0.5 font-mono text-[9px] text-primary" dir="ltr">{path}</span>
                               ))}
                               {feature.pagePaths.length > 5 && (
-                                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[9px] font-semibold text-slate-500">+{feature.pagePaths.length - 5}</span>
+                                <span className="rounded-full bg-surface-sunken px-2 py-0.5 text-[9px] font-semibold text-muted">+{feature.pagePaths.length - 5}</span>
                               )}
                             </div>
                           )}
                         </div>
                         <div className="flex items-center gap-3">
-                          <label className="flex items-center gap-1.5 text-[10.5px] font-bold text-slate-600">
+                          <label className="flex items-center gap-1.5 text-[10.5px] font-bold text-ink-secondary">
                             <input
                               type="checkbox"
                               checked={inPlan}
@@ -950,7 +950,7 @@ export const PlatformPlanWizardPage: React.FC = () => {
                                   return next;
                                 })
                               }
-                              className="h-4 w-4 accent-emerald-600 disabled:opacity-40"
+                              className="h-4 w-4 accent-success disabled:opacity-40"
                             />
                             ضمن الخطة
                           </label>
@@ -965,7 +965,7 @@ export const PlatformPlanWizardPage: React.FC = () => {
                               <button
                                 type="button"
                                 onClick={() => openFeatureForm(feature)}
-                                className="rounded p-1.5 text-slate-500 hover:bg-sky-50 hover:text-sky-700"
+                                className="rounded p-1.5 text-muted hover:bg-accent-soft hover:text-primary"
                                 title="تعديل الميزة وصفحاتها"
                               >
                                 <Pencil className="h-3.5 w-3.5" />
@@ -973,7 +973,7 @@ export const PlatformPlanWizardPage: React.FC = () => {
                               <button
                                 type="button"
                                 onClick={() => setDeleteTarget(feature)}
-                                className="rounded p-1.5 text-slate-500 hover:bg-rose-50 hover:text-rose-700"
+                                className="rounded p-1.5 text-muted hover:bg-danger-soft hover:text-danger"
                                 title="حذف الميزة"
                               >
                                 <Trash2 className="h-3.5 w-3.5" />
@@ -992,19 +992,19 @@ export const PlatformPlanWizardPage: React.FC = () => {
           {/* ─── Step 3: Page visibility per plan ─── */}
           {step === 3 && selectedPlan && (
             <div className="space-y-3">
-              <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-                <p className="text-[12px] font-semibold text-slate-600">
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line bg-surface px-4 py-3 shadow-sm">
+                <p className="text-[12px] font-semibold text-ink-secondary">
                   كل صفحات موقع المستخدمين ({allPages.length}) — بدّل أي صفحة لإخفائها عن مشتركي باقة{' '}
-                  <span className="font-black text-slate-900">{selectedPlan.name}</span>.
+                  <span className="font-black text-ink">{selectedPlan.name}</span>.
                 </p>
                 <div className="flex items-center gap-2 text-[10.5px] font-bold">
-                  <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-emerald-700">{visiblePageCount} ظاهرة</span>
-                  <span className="rounded-full bg-rose-50 px-2.5 py-1 text-rose-600">{hiddenDraft.size} مخفية</span>
+                  <span className="rounded-full bg-success-soft px-2.5 py-1 text-success">{visiblePageCount} ظاهرة</span>
+                  <span className="rounded-full bg-danger-soft px-2.5 py-1 text-danger">{hiddenDraft.size} مخفية</span>
                   {hiddenDraft.size > 0 && (
                     <button
                       type="button"
                       onClick={() => setHiddenDraft(new Set())}
-                      className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-600 hover:bg-slate-200"
+                      className="rounded-full bg-surface-sunken px-2.5 py-1 text-ink-secondary hover:bg-surface-sunken"
                     >
                       إظهار الكل
                     </button>
@@ -1013,13 +1013,13 @@ export const PlatformPlanWizardPage: React.FC = () => {
               </div>
 
               {!draftLoaded ? (
-                <div className="rounded-xl border border-slate-200 bg-white py-10 text-center text-sm font-semibold text-slate-500">جارٍ تحميل إعدادات الصفحات...</div>
+                <div className="rounded-xl border border-line bg-surface py-10 text-center text-sm font-semibold text-muted">جارٍ تحميل إعدادات الصفحات...</div>
               ) : (
                 pageGroups.map((group) => (
-                  <div key={group.id} className="rounded-xl border border-slate-200 bg-white shadow-sm">
-                    <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50 px-4 py-2">
-                      <p className="text-[12px] font-black text-slate-800">{group.label}</p>
-                      <span className="text-[10px] font-semibold text-slate-400">
+                  <div key={group.id} className="rounded-xl border border-line bg-surface shadow-sm">
+                    <div className="flex items-center justify-between border-b border-line bg-surface-muted px-4 py-2">
+                      <p className="text-[12px] font-black text-ink">{group.label}</p>
+                      <span className="text-[10px] font-semibold text-muted">
                         {group.pages.filter((page) => hiddenDraft.has(page.path)).length}/{group.pages.length} مخفية
                       </span>
                     </div>
@@ -1030,14 +1030,14 @@ export const PlatformPlanWizardPage: React.FC = () => {
                           <label
                             key={page.path}
                             className={`flex cursor-pointer items-center justify-between gap-2 rounded-lg border px-2.5 py-1.5 transition ${
-                              hidden ? 'border-rose-200 bg-rose-50/40' : 'border-slate-100 hover:bg-slate-50'
+                              hidden ? 'border-danger-border bg-danger-soft/40' : 'border-line hover:bg-surface-muted'
                             }`}
                           >
                             <span className="min-w-0">
-                              <span className={`block truncate text-[11.5px] font-semibold ${hidden ? 'text-rose-500 line-through' : 'text-slate-700'}`}>
+                              <span className={`block truncate text-[11.5px] font-semibold ${hidden ? 'text-danger line-through' : 'text-ink'}`}>
                                 {page.label}
                               </span>
-                              <span className="block truncate font-mono text-[9.5px] text-slate-400" dir="ltr">{page.path}</span>
+                              <span className="block truncate font-mono text-[9.5px] text-muted" dir="ltr">{page.path}</span>
                             </span>
                             <input
                               type="checkbox"
@@ -1051,7 +1051,7 @@ export const PlatformPlanWizardPage: React.FC = () => {
                                   return next;
                                 })
                               }
-                              className="h-3.5 w-3.5 shrink-0 accent-emerald-600 disabled:opacity-40"
+                              className="h-3.5 w-3.5 shrink-0 accent-success disabled:opacity-40"
                               aria-label={`إظهار ${page.label}`}
                             />
                           </label>
@@ -1061,7 +1061,7 @@ export const PlatformPlanWizardPage: React.FC = () => {
                   </div>
                 ))
               )}
-              <p className="text-[11px] font-semibold text-slate-400">
+              <p className="text-[11px] font-semibold text-muted">
                 ملاحظة: إخفاء الصفحات يُطبَّق عبر إعدادات الخطة في التكوين الموقّع الذي تستهلكه تطبيقات العملاء — الصفحات المخفية لا تظهر في القوائم ولا يمكن فتحها مباشرة.
               </p>
             </div>
@@ -1071,41 +1071,41 @@ export const PlatformPlanWizardPage: React.FC = () => {
           {step === 4 && selectedPlan && (
             <div className="space-y-3">
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                  <p className="text-[10.5px] font-bold text-slate-500">الباقة</p>
-                  <p className="mt-1 text-[14px] font-black text-slate-900">{selectedPlan.name}</p>
-                  <p className="font-mono text-[10px] text-slate-400" dir="ltr">{selectedPlan.code}</p>
+                <div className="rounded-xl border border-line bg-surface p-4 shadow-sm">
+                  <p className="text-[10.5px] font-bold text-muted">الباقة</p>
+                  <p className="mt-1 text-[14px] font-black text-ink">{selectedPlan.name}</p>
+                  <p className="font-mono text-[10px] text-muted" dir="ltr">{selectedPlan.code}</p>
                 </div>
-                <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                  <p className="text-[10.5px] font-bold text-slate-500">الوحدات المشمولة</p>
-                  <p className="mt-1 text-[20px] font-black text-emerald-700">{moduleDraft.size}</p>
-                  <p className="text-[10px] text-slate-400">من أصل {modules.length} وحدة</p>
+                <div className="rounded-xl border border-line bg-surface p-4 shadow-sm">
+                  <p className="text-[10.5px] font-bold text-muted">الوحدات المشمولة</p>
+                  <p className="mt-1 text-[20px] font-black text-success">{moduleDraft.size}</p>
+                  <p className="text-[10px] text-muted">من أصل {modules.length} وحدة</p>
                 </div>
-                <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                  <p className="text-[10.5px] font-bold text-slate-500">المميزات المشمولة</p>
-                  <p className="mt-1 text-[20px] font-black text-sky-700">{featureDraft.size}</p>
-                  <p className="text-[10px] text-slate-400">من أصل {features.length} ميزة</p>
+                <div className="rounded-xl border border-line bg-surface p-4 shadow-sm">
+                  <p className="text-[10.5px] font-bold text-muted">المميزات المشمولة</p>
+                  <p className="mt-1 text-[20px] font-black text-primary">{featureDraft.size}</p>
+                  <p className="text-[10px] text-muted">من أصل {features.length} ميزة</p>
                 </div>
-                <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                  <p className="text-[10.5px] font-bold text-slate-500">صفحات موقع المستخدمين</p>
-                  <p className="mt-1 text-[20px] font-black text-slate-900">{visiblePageCount}<span className="text-[12px] font-bold text-slate-400"> / {allPages.length}</span></p>
-                  <p className="text-[10px] text-rose-500">{hiddenDraft.size} مخفية عن الباقة</p>
+                <div className="rounded-xl border border-line bg-surface p-4 shadow-sm">
+                  <p className="text-[10.5px] font-bold text-muted">صفحات موقع المستخدمين</p>
+                  <p className="mt-1 text-[20px] font-black text-ink">{visiblePageCount}<span className="text-[12px] font-bold text-muted"> / {allPages.length}</span></p>
+                  <p className="text-[10px] text-danger">{hiddenDraft.size} مخفية عن الباقة</p>
                 </div>
               </div>
 
-              <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                <p className="mb-2 text-[12px] font-black text-slate-800">الصفحات المخفية عن هذه الباقة ({hiddenDraft.size})</p>
+              <div className="rounded-xl border border-line bg-surface p-4 shadow-sm">
+                <p className="mb-2 text-[12px] font-black text-ink">الصفحات المخفية عن هذه الباقة ({hiddenDraft.size})</p>
                 {hiddenDraft.size === 0 ? (
-                  <p className="text-[11.5px] text-slate-500">لا توجد صفحات مخفية — كل صفحات الموقع متاحة لمشتركي الباقة (ضمن حدود الوحدات المفعّلة).</p>
+                  <p className="text-[11.5px] text-muted">لا توجد صفحات مخفية — كل صفحات الموقع متاحة لمشتركي الباقة (ضمن حدود الوحدات المفعّلة).</p>
                 ) : (
                   <div className="flex flex-wrap gap-1.5">
                     {[...hiddenDraft].slice(0, 12).map((path) => (
-                      <span key={path} className="rounded-full bg-rose-50 px-2.5 py-1 font-mono text-[10px] text-rose-600" dir="ltr">
+                      <span key={path} className="rounded-full bg-danger-soft px-2.5 py-1 font-mono text-[10px] text-danger" dir="ltr">
                         {path}
                       </span>
                     ))}
                     {hiddenDraft.size > 12 && (
-                      <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-bold text-slate-500">+{hiddenDraft.size - 12}</span>
+                      <span className="rounded-full bg-surface-sunken px-2.5 py-1 text-[10px] font-bold text-muted">+{hiddenDraft.size - 12}</span>
                     )}
                   </div>
                 )}
@@ -1118,13 +1118,13 @@ export const PlatformPlanWizardPage: React.FC = () => {
 
       {/* ─── Footer navigation ─── */}
       {!loading && selectedPlan && (
-        <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+        <div className="flex items-center justify-between rounded-xl border border-line bg-surface px-4 py-3 shadow-sm">
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="sm" onClick={resetDrafts} disabled={applying} leadingIcon={<RotateCcw className="h-3.5 w-3.5" />}>
               استعادة افتراضيات الباقة
             </Button>
             {planChanged && step < 4 && (
-              <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-bold text-amber-700">توجد تغييرات غير مطبقة</span>
+              <span className="rounded-full bg-warning-soft px-2.5 py-1 text-[10px] font-bold text-warning">توجد تغييرات غير مطبقة</span>
             )}
           </div>
           <div className="flex items-center gap-2">
@@ -1248,24 +1248,24 @@ export const PlatformPlanWizardPage: React.FC = () => {
           </Field>
         </div>
 
-        <div className="mt-3 rounded-xl border border-slate-200 p-3">
+        <div className="mt-3 rounded-xl border border-line p-3">
           <div className="mb-2 flex items-center justify-between">
-            <p className="text-[12px] font-bold text-slate-800">الصفحات التي تملكها الميزة</p>
+            <p className="text-[12px] font-bold text-ink">الصفحات التي تملكها الميزة</p>
             <Button variant="secondary" size="sm" onClick={() => setPagePickerOpen(true)} leadingIcon={<MonitorSmartphone className="h-3.5 w-3.5" />}>
               اختيار الصفحات ({featureForm.pagePaths.length})
             </Button>
           </div>
           {featureForm.pagePaths.length === 0 ? (
-            <p className="text-[11px] text-slate-400">لم تُسنَد صفحات بعد — الميزة سارية على مستوى القدرات فقط.</p>
+            <p className="text-[11px] text-muted">لم تُسنَد صفحات بعد — الميزة سارية على مستوى القدرات فقط.</p>
           ) : (
             <div className="flex flex-wrap gap-1">
               {featureForm.pagePaths.map((path) => (
-                <span key={path} className="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2 py-0.5 font-mono text-[10px] text-sky-700" dir="ltr">
+                <span key={path} className="inline-flex items-center gap-1 rounded-full bg-accent-soft px-2 py-0.5 font-mono text-[10px] text-primary" dir="ltr">
                   {path}
                   <button
                     type="button"
                     onClick={() => setFeatureForm({ ...featureForm, pagePaths: featureForm.pagePaths.filter((item) => item !== path) })}
-                    className="text-sky-400 hover:text-rose-600"
+                    className="text-primary hover:text-danger"
                     aria-label={`إزالة ${path}`}
                   >
                     <X className="h-3 w-3" />
@@ -1276,10 +1276,10 @@ export const PlatformPlanWizardPage: React.FC = () => {
           )}
         </div>
 
-        <div className="mt-3 flex items-center justify-between rounded-xl border border-slate-200 px-3 py-2">
+        <div className="mt-3 flex items-center justify-between rounded-xl border border-line px-3 py-2">
           <div>
-            <p className="text-[12px] font-bold text-slate-800">حالات الميزة</p>
-            <p className="text-[10.5px] text-slate-500">بيئة الاختبار تحصرها على مجموعات التجربة قبل الإطلاق.</p>
+            <p className="text-[12px] font-bold text-ink">حالات الميزة</p>
+            <p className="text-[10.5px] text-muted">بيئة الاختبار تحصرها على مجموعات التجربة قبل الإطلاق.</p>
           </div>
           <div className="flex items-center gap-4">
             <Toggle checked={featureForm.isStagingOnly} onChange={(val) => setFeatureForm({ ...featureForm, isStagingOnly: val })} label="Staging" />
@@ -1313,7 +1313,7 @@ export const PlatformPlanWizardPage: React.FC = () => {
         }
       >
         {deleteTarget && (
-          <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-[12px] font-semibold text-rose-700">
+          <div className="rounded-xl border border-danger-border bg-danger-soft p-3 text-[12px] font-semibold text-danger">
             تحذير: لا يمكن التراجع عن هذا الإجراء. الصفحات التي كانت مملوكة لهذه الميزة ستصبح متاحة حسب قواعد الإخفاء الأخرى.
           </div>
         )}

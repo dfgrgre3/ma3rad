@@ -39,7 +39,7 @@ import {
 export interface BusinessProfileDashboardKpi {
   id: string;
   label: { ar: string; en: string };
-  source: 'sales' | 'inventory' | 'finance' | 'customers' | 'manufacturing' | 'restaurant';
+  source: 'sales' | 'inventory' | 'finance' | 'customers' | 'manufacturing' | 'restaurant' | 'projects';
   format?: 'number' | 'currency' | 'm2' | 'percent';
 }
 
@@ -293,7 +293,7 @@ function validateBusinessProfile(value: unknown): BusinessProfile {
     for (const kpi of kpis) {
       if (!kpi || typeof kpi.id !== 'string' || !kpi.id.trim()
         || !kpi.label?.ar?.trim() || !kpi.label?.en?.trim()
-        || !['sales', 'inventory', 'finance', 'customers', 'manufacturing', 'restaurant'].includes(kpi.source)) {
+        || !['sales', 'inventory', 'finance', 'customers', 'manufacturing', 'restaurant', 'projects'].includes(kpi.source)) {
         fail('dashboard KPI is invalid.');
       }
     }

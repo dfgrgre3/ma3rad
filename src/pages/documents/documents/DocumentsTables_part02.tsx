@@ -5,7 +5,7 @@ import { CONTRACT_STATUS_LABEL, CONTRACT_STATUS_STYLE, PARTY_LABEL } from './doc
 import type { ContractsTableProps } from './DocumentsTables_part01';
 
 export const ContractsTable: React.FC<ContractsTableProps> = ({ contracts, can, onActivate, onRenew, onTerminate }) => (
-<div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden">
+<div className="bg-surface border border-line rounded-2xl overflow-hidden">
   <DataTable
     ariaLabel="العقود"
     rows={contracts}
@@ -19,15 +19,15 @@ export const ContractsTable: React.FC<ContractsTableProps> = ({ contracts, can, 
         render: (contract) => (
           <span>
             <span className="font-bold">{contract.title}</span>
-            {contract.documentTitle && <span className="mt-0.5 flex items-center gap-1 text-[10px] font-normal text-slate-400"><Paperclip className="w-3 h-3" />{contract.documentTitle}</span>}
+            {contract.documentTitle && <span className="mt-0.5 flex items-center gap-1 text-[10px] font-normal text-muted"><Paperclip className="w-3 h-3" />{contract.documentTitle}</span>}
           </span>
         ),
       },
       {
         key: 'party', header: 'الطرف',
-        render: (contract) => <span>{contract.partyName}<span className="block text-[10px] text-slate-400">{PARTY_LABEL[contract.partyType]}</span></span>,
+        render: (contract) => <span>{contract.partyName}<span className="block text-[10px] text-muted">{PARTY_LABEL[contract.partyType]}</span></span>,
       },
-      { key: 'period', header: 'الفترة', render: (contract) => <span className="text-slate-500">{contract.startDate} → {contract.endDate}</span> },
+      { key: 'period', header: 'الفترة', render: (contract) => <span className="text-muted">{contract.startDate} → {contract.endDate}</span> },
       { key: 'value', header: 'القيمة', render: (contract) => <span className="font-mono">{contract.value.toLocaleString()} {contract.currency}</span> },
       {
         key: 'status', header: 'الحالة',
@@ -37,7 +37,7 @@ export const ContractsTable: React.FC<ContractsTableProps> = ({ contracts, can, 
               {CONTRACT_STATUS_LABEL[contract.effectiveStatus]}
             </span>
             {contract.effectiveStatus === 'EXPIRING' && contract.daysToExpiry !== null && (
-              <span className="mt-1 block text-[10px] text-orange-500">{contract.daysToExpiry} يوم</span>
+              <span className="mt-1 block text-[10px] text-warning">{contract.daysToExpiry} يوم</span>
             )}
           </span>
         ),
@@ -47,13 +47,13 @@ export const ContractsTable: React.FC<ContractsTableProps> = ({ contracts, can, 
         render: (contract) => (
           <div className="flex flex-wrap gap-1">
             {contract.status === 'DRAFT' && can('contracts.update') && (
-              <button onClick={() => onActivate(contract)} className="rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-700">تفعيل</button>
+              <button onClick={() => onActivate(contract)} className="rounded-lg border border-success-border bg-success-soft px-2 py-1 text-[10px] font-bold text-success">تفعيل</button>
             )}
             {contract.status !== 'TERMINATED' && can('contracts.update') && (
-              <button onClick={() => onRenew(contract)} className="rounded-lg border border-sky-200 bg-sky-50 px-2 py-1 text-[10px] font-bold text-sky-700">تجديد</button>
+              <button onClick={() => onRenew(contract)} className="rounded-lg border border-accent-border bg-accent-soft px-2 py-1 text-[10px] font-bold text-primary">تجديد</button>
             )}
             {contract.status === 'ACTIVE' && can('contracts.terminate') && (
-              <button onClick={() => onTerminate(contract)} className="rounded-lg border border-rose-200 bg-rose-50 px-2 py-1 text-[10px] font-bold text-rose-700">فسخ</button>
+              <button onClick={() => onTerminate(contract)} className="rounded-lg border border-danger-border bg-danger-soft px-2 py-1 text-[10px] font-bold text-danger">فسخ</button>
             )}
           </div>
         ),

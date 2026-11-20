@@ -173,8 +173,8 @@ export const PlatformLayout: React.FC<PlatformLayoutProps> = ({ currentUser, onL
         className={({ isActive }) =>
           `flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] font-semibold transition-colors ${
             isActive
-              ? 'bg-emerald-500/15 text-emerald-300'
-              : 'text-slate-300 hover:bg-white/5 hover:text-white'
+              ? 'bg-success/15 text-success'
+              : 'text-muted hover:bg-surface/5 hover:text-white'
           }`
         }
       >
@@ -189,7 +189,7 @@ export const PlatformLayout: React.FC<PlatformLayoutProps> = ({ currentUser, onL
       {visibleNavGroups.map((group, groupIndex) => (
         <div key={group.label ?? `group-${groupIndex}`} className={groupIndex > 0 ? 'mt-3' : ''}>
           {group.label && (
-            <p className="mb-1.5 px-3 text-[10px] font-black uppercase tracking-wider text-slate-500">
+            <p className="mb-1.5 px-3 text-[10px] font-black uppercase tracking-wider text-muted">
               {group.label}
             </p>
           )}
@@ -202,17 +202,17 @@ export const PlatformLayout: React.FC<PlatformLayoutProps> = ({ currentUser, onL
   );
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-slate-100 text-slate-900">
+    <div className="flex h-screen w-screen overflow-hidden bg-surface-sunken text-ink">
       {currentUser.mustChangePassword && <PlatformStaffForcePasswordChange currentUser={currentUser} />}
       {/* Sidebar */}
-      <aside className="hidden w-[262px] shrink-0 flex-col bg-slate-950 lg:flex">
+      <aside className="hidden w-[262px] shrink-0 flex-col bg-primary lg:flex">
         <div className="flex items-center gap-3 border-b border-white/10 px-5 py-5">
-          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-400 to-teal-600 text-lg font-black text-white shadow-lg">
+          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-success to-success text-lg font-black text-white shadow-lg">
             س
           </span>
           <div className="min-w-0">
             <p className="truncate text-sm font-bold text-white">سيراميسي</p>
-            <p className="text-[11px] font-medium text-emerald-300">منصة مالك النظام</p>
+            <p className="text-[11px] font-medium text-success">منصة مالك النظام</p>
           </div>
         </div>
         {nav}
@@ -221,24 +221,24 @@ export const PlatformLayout: React.FC<PlatformLayoutProps> = ({ currentUser, onL
             type="button"
             onClick={() => navigate('/dashboard')}
             title="الانتقال إلى التطبيق الرئيسي (موقع المستخدمين)"
-            className="mb-2 flex w-full items-center justify-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/15 px-3 py-2 text-xs font-bold text-emerald-300 transition hover:bg-emerald-500/25 hover:text-emerald-200"
+            className="mb-2 flex w-full items-center justify-center gap-2 rounded-lg border border-success/30 bg-success/15 px-3 py-2 text-xs font-bold text-success transition hover:bg-success/25 hover:text-success"
           >
             <Globe className="h-4 w-4" />
             موقع المستخدمين
           </button>
-          <div className="mb-2 flex items-center gap-2 rounded-lg bg-white/5 px-3 py-2">
-            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-300">
+          <div className="mb-2 flex items-center gap-2 rounded-lg bg-surface/5 px-3 py-2">
+            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-success/20 text-success">
               <ShieldCheck className="h-4 w-4" />
             </span>
             <div className="min-w-0">
               <p className="truncate text-xs font-bold text-white">{currentUser.fullName}</p>
-              <p className="truncate text-[10px] text-slate-400">مالك المنصة</p>
+              <p className="truncate text-[10px] text-muted">مالك المنصة</p>
             </div>
           </div>
           <button
             type="button"
             onClick={onLogout}
-            className="flex w-full items-center justify-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-xs font-semibold text-slate-300 transition hover:bg-rose-500/10 hover:text-rose-300"
+            className="flex w-full items-center justify-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-xs font-semibold text-muted transition hover:bg-danger/10 hover:text-danger"
           >
             <LogOut className="h-3.5 w-3.5" />
             تسجيل الخروج
@@ -250,10 +250,10 @@ export const PlatformLayout: React.FC<PlatformLayoutProps> = ({ currentUser, onL
       {mobileOpen && (
         <div className="fixed inset-0 z-50 lg:hidden">
           <button type="button" aria-label="إغلاق" className="absolute inset-0 bg-black/50" onClick={() => setMobileOpen(false)} />
-          <div className="absolute inset-y-0 right-0 flex w-[280px] flex-col bg-slate-950 shadow-2xl">
+          <div className="absolute inset-y-0 right-0 flex w-[280px] flex-col bg-primary shadow-2xl">
             <div className="flex items-center justify-between border-b border-white/10 px-4 py-4">
               <span className="text-sm font-bold text-white">قائمة المنصة</span>
-              <button type="button" onClick={() => setMobileOpen(false)} className="text-slate-300" aria-label="إغلاق">
+              <button type="button" onClick={() => setMobileOpen(false)} className="text-muted" aria-label="إغلاق">
                 <X className="h-5 w-5" />
               </button>
             </div>
@@ -262,7 +262,7 @@ export const PlatformLayout: React.FC<PlatformLayoutProps> = ({ currentUser, onL
               <button
                 type="button"
                 onClick={() => { setMobileOpen(false); navigate('/dashboard'); }}
-                className="mb-2 flex w-full items-center justify-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/15 px-3 py-2 text-xs font-bold text-emerald-300 transition hover:bg-emerald-500/25"
+                className="mb-2 flex w-full items-center justify-center gap-2 rounded-lg border border-success/30 bg-success/15 px-3 py-2 text-xs font-bold text-success transition hover:bg-success/25"
               >
                 <Globe className="h-4 w-4" />
                 موقع المستخدمين
@@ -270,7 +270,7 @@ export const PlatformLayout: React.FC<PlatformLayoutProps> = ({ currentUser, onL
               <button
                 type="button"
                 onClick={onLogout}
-                className="flex w-full items-center justify-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-xs font-semibold text-slate-300"
+                className="flex w-full items-center justify-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-xs font-semibold text-muted"
               >
                 <LogOut className="h-3.5 w-3.5" />
                 تسجيل الخروج
@@ -282,19 +282,19 @@ export const PlatformLayout: React.FC<PlatformLayoutProps> = ({ currentUser, onL
 
       {/* Main */}
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex h-16 shrink-0 items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 md:px-6">
+        <header className="flex h-16 shrink-0 items-center justify-between gap-3 border-b border-line bg-surface px-4 md:px-6">
           <div className="flex min-w-0 items-center gap-3">
             <button
               type="button"
               onClick={() => setMobileOpen(true)}
-              className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-600 lg:hidden"
+              className="flex h-9 w-9 items-center justify-center rounded-lg border border-line text-ink-secondary lg:hidden"
               aria-label="فتح القائمة"
             >
               <Menu className="h-4 w-4" />
             </button>
             <div className="min-w-0">
-              <h1 className="truncate text-[15px] font-black text-slate-900">{currentTitle}</h1>
-              <p className="text-[11px] text-slate-500">تحكم كامل في المنتج والعملاء والتراخيص والمبيعات</p>
+              <h1 className="truncate text-[15px] font-black text-ink">{currentTitle}</h1>
+              <p className="text-[11px] text-muted">تحكم كامل في المنتج والعملاء والتراخيص والمبيعات</p>
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-2">
@@ -303,15 +303,15 @@ export const PlatformLayout: React.FC<PlatformLayoutProps> = ({ currentUser, onL
               onClick={() => navigate('/dashboard')}
               title="الانتقال إلى التطبيق الرئيسي (موقع المستخدمين)"
               aria-label="الانتقال إلى موقع المستخدمين"
-              className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-2.5 py-1.5 text-[11.5px] font-bold text-white transition hover:bg-emerald-700"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-success px-2.5 py-1.5 text-[11.5px] font-bold text-white transition hover:bg-success"
             >
               <Globe className="h-4 w-4" aria-hidden="true" />
               <span className="hidden sm:inline">موقع المستخدمين</span>
             </button>
-            <span className="hidden rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-700 sm:inline-flex">
+            <span className="hidden rounded-full border border-success-border bg-success-soft px-2.5 py-1 text-[11px] font-bold text-success sm:inline-flex">
               جلسة مالك المنصة
             </span>
-            <span className="hidden text-[11px] font-semibold text-slate-500 md:inline">
+            <span className="hidden text-[11px] font-semibold text-muted md:inline">
               {new Intl.DateTimeFormat('ar-EG', { weekday: 'long', day: 'numeric', month: 'long' }).format(new Date())}
             </span>
           </div>

@@ -19,11 +19,11 @@ import { OperationalFieldsRecordEditor } from '../../../components/products/Oper
 
 import { useToast } from '../../../components/ui/Toast';
 const STATUS: Record<ProjectStatus, { label: string; color: string }> = {
-  PLANNED: { label: 'قيد التخطيط', color: 'text-amber-700 bg-amber-50 border-amber-200' },
-  ACTIVE: { label: 'جاري التنفيذ', color: 'text-sky-700 bg-sky-50 border-sky-200' },
-  ON_HOLD: { label: 'متوقف', color: 'text-orange-700 bg-orange-50 border-orange-200' },
-  COMPLETED: { label: 'مكتمل', color: 'text-emerald-700 bg-emerald-50 border-emerald-200' },
-  CANCELLED: { label: 'ملغي', color: 'text-rose-700 bg-rose-50 border-rose-200' },
+  PLANNED: { label: 'قيد التخطيط', color: 'text-warning bg-warning-soft border-warning-border' },
+  ACTIVE: { label: 'جاري التنفيذ', color: 'text-primary bg-accent-soft border-accent-border' },
+  ON_HOLD: { label: 'متوقف', color: 'text-warning bg-warning-soft border-warning-border' },
+  COMPLETED: { label: 'مكتمل', color: 'text-success bg-success-soft border-success-border' },
+  CANCELLED: { label: 'ملغي', color: 'text-danger bg-danger-soft border-danger-border' },
 };
 
 const UNIT_TYPES: Record<string, string> = {
@@ -140,15 +140,15 @@ export const ProjectDetailPage: React.FC = () => {
   };
 
   if (loading) {
-    return <div className="h-full flex items-center justify-center bg-slate-50"><Loader2 className="w-7 h-7 animate-spin text-sky-500" /></div>;
+    return <div className="h-full flex items-center justify-center bg-surface-muted"><Loader2 className="w-7 h-7 animate-spin text-primary" /></div>;
   }
 
   if (error || !project) {
     return (
-      <div className="h-full flex flex-col items-center justify-center gap-3 bg-slate-50">
-        <Boxes className="w-12 h-12 text-slate-300" />
-        <p className="text-sm text-slate-600">{error || 'المشروع غير موجود.'}</p>
-        <button onClick={() => navigate('/projects')} className="px-4 py-2 bg-sky-600 text-white rounded-xl text-sm font-bold">العودة للمشاريع</button>
+      <div className="h-full flex flex-col items-center justify-center gap-3 bg-surface-muted">
+        <Boxes className="w-12 h-12 text-muted" />
+        <p className="text-sm text-ink-secondary">{error || 'المشروع غير موجود.'}</p>
+        <button onClick={() => navigate('/projects')} className="px-4 py-2 bg-primary text-white rounded-xl text-sm font-bold">العودة للمشاريع</button>
       </div>
     );
   }
@@ -158,26 +158,26 @@ export const ProjectDetailPage: React.FC = () => {
   const deliveredTotal = products.reduce((s, p) => s + p.deliveredQuantityM2 * p.agreedPriceM2, 0);
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
-      <div className="bg-white border-b border-slate-200 px-6 py-4">
+    <div className="h-full flex flex-col bg-surface-muted text-ink overflow-hidden">
+      <div className="bg-surface border-b border-line px-6 py-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
-            <button onClick={() => navigate('/projects')} className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 transition shrink-0" title="رجوع">
+            <button onClick={() => navigate('/projects')} className="p-2 rounded-lg text-muted hover:bg-surface-sunken transition shrink-0" title="رجوع">
               <ArrowRight className="w-4 h-4" />
             </button>
-            <div className="w-11 h-11 rounded-xl bg-violet-50 border border-violet-200 flex items-center justify-center shrink-0">
-              <Building2 className="w-5 h-5 text-violet-600" />
+            <div className="w-11 h-11 rounded-xl bg-accent-soft border border-accent-border flex items-center justify-center shrink-0">
+              <Building2 className="w-5 h-5 text-primary" />
             </div>
             <div className="min-w-0">
-              <h1 className="text-base font-black text-slate-900 truncate">{project.name}</h1>
-              <div className="mt-1 text-[11px] font-bold text-sky-700">{projectsLabel} · {businessProfileLabel}</div>
-              <p className="text-xs text-slate-500 font-mono">{project.code} • {project.customerName}</p>
+              <h1 className="text-base font-black text-ink truncate">{project.name}</h1>
+              <div className="mt-1 text-[11px] font-bold text-primary">{projectsLabel} · {businessProfileLabel}</div>
+              <p className="text-xs text-muted font-mono">{project.code} • {project.customerName}</p>
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <span className={`text-[11px] px-3 py-1.5 rounded-lg font-bold border ${st.color}`}>{st.label}</span>
             {canUpdate && (
-              <select value={project.status} onChange={(e) => changeStatus(e.target.value as ProjectStatus)} className="px-3 py-1.5 text-xs font-bold bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-sky-400">
+              <select value={project.status} onChange={(e) => changeStatus(e.target.value as ProjectStatus)} className="px-3 py-1.5 text-xs font-bold bg-surface border border-line rounded-lg focus:outline-none focus:border-primary">
                 {Object.entries(STATUS).map(([key, s]) => <option key={key} value={key}>{s.label}</option>)}
               </select>
             )}
@@ -187,19 +187,19 @@ export const ProjectDetailPage: React.FC = () => {
 
       <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
         {[
-          { label: 'قيمة العقد', value: fmt(project.contractValue), icon: Wallet, color: 'text-emerald-600 bg-emerald-50' },
-          { label: 'إجمالي المبيعات', value: fmt(project.totalSold), icon: DollarSign, color: 'text-sky-600 bg-sky-50' },
-          { label: 'المسدد', value: fmt(project.totalPaid), icon: CheckCircle2, color: 'text-teal-600 bg-teal-50' },
-          { label: 'المتبقي', value: fmt(project.outstandingAmount), icon: Activity, color: 'text-rose-600 bg-rose-50' },
-          { label: 'التقدم', value: `${project.progress || 0}%`, icon: Boxes, color: 'text-violet-600 bg-violet-50' },
+          { label: 'قيمة العقد', value: fmt(project.contractValue), icon: Wallet, color: 'text-success bg-success-soft' },
+          { label: 'إجمالي المبيعات', value: fmt(project.totalSold), icon: DollarSign, color: 'text-primary bg-accent-soft' },
+          { label: 'المسدد', value: fmt(project.totalPaid), icon: CheckCircle2, color: 'text-success bg-success-soft' },
+          { label: 'المتبقي', value: fmt(project.outstandingAmount), icon: Activity, color: 'text-danger bg-danger-soft' },
+          { label: 'التقدم', value: `${project.progress || 0}%`, icon: Boxes, color: 'text-primary bg-accent-soft' },
         ].map((card) => {
           const Icon = card.icon;
           return (
-            <div key={card.label} className="bg-white rounded-xl border border-slate-200 p-3.5 flex items-center gap-2.5">
+            <div key={card.label} className="bg-surface rounded-xl border border-line p-3.5 flex items-center gap-2.5">
               <div className={`w-9 h-9 rounded-lg ${card.color} flex items-center justify-center shrink-0`}><Icon className="w-4 h-4" /></div>
               <div className="min-w-0">
-                <p className="text-[10px] text-slate-500 font-bold">{card.label}</p>
-                <p className="text-sm font-black text-slate-900 truncate">{card.value}</p>
+                <p className="text-[10px] text-muted font-bold">{card.label}</p>
+                <p className="text-sm font-black text-ink truncate">{card.value}</p>
               </div>
             </div>
           );
@@ -207,18 +207,18 @@ export const ProjectDetailPage: React.FC = () => {
       </div>
 
       <div className="px-4">
-        <div className="bg-white rounded-xl border border-slate-200 p-3">
-          <div className="flex items-center justify-between text-[10px] text-slate-500 mb-1.5">
+        <div className="bg-surface rounded-xl border border-line p-3">
+          <div className="flex items-center justify-between text-[10px] text-muted mb-1.5">
             <span>نسبة الإنجاز (الوحدات المسلّمة)</span>
-            <span className="font-bold text-slate-900">{project.progress || 0}%</span>
+            <span className="font-bold text-ink">{project.progress || 0}%</span>
           </div>
-          <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-            <div className={`h-full rounded-full transition-all ${(project.progress || 0) === 100 ? 'bg-emerald-500' : 'bg-sky-500'}`} style={{ width: `${project.progress || 0}%` }} />
+          <div className="h-2 bg-surface-sunken rounded-full overflow-hidden">
+            <div className={`h-full rounded-full transition-all ${(project.progress || 0) === 100 ? 'bg-success' : 'bg-primary'}`} style={{ width: `${project.progress || 0}%` }} />
           </div>
         </div>
       </div>
 
-      <div className="px-4 mt-3 flex gap-1 border-b border-slate-200">
+      <div className="px-4 mt-3 flex gap-1 border-b border-line">
         {[
           { key: 'units', label: `الوحدات (${units.length})` },
           { key: 'products', label: `بنود المنتجات (${products.length})` },
@@ -228,7 +228,7 @@ export const ProjectDetailPage: React.FC = () => {
           <button
             key={t.key}
             onClick={() => setTab(t.key as any)}
-            className={`px-4 py-2 text-xs font-bold rounded-t-lg transition ${tab === t.key ? 'bg-white border border-slate-200 border-b-white text-sky-600 -mb-px' : 'text-slate-500 hover:text-slate-700'}`}
+            className={`px-4 py-2 text-xs font-bold rounded-t-lg transition ${tab === t.key ? 'bg-surface border border-line border-b-white text-primary -mb-px' : 'text-muted hover:text-ink'}`}
           >
             {t.label}
           </button>
@@ -238,7 +238,7 @@ export const ProjectDetailPage: React.FC = () => {
       <div className="flex-1 overflow-y-auto p-4">
         {tab === 'units' && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <div className="lg:col-span-2 bg-white rounded-xl border border-slate-200 overflow-hidden">
+            <div className="lg:col-span-2 bg-surface rounded-xl border border-line overflow-hidden">
               <DataTable
               ariaLabel="وحدات المشروع"
               rows={units}
@@ -249,18 +249,18 @@ export const ProjectDetailPage: React.FC = () => {
                 {
                   key: 'name', header: 'الوحدة',
                   render: (u) => (
-                    <span className="font-bold text-slate-800">
+                    <span className="font-bold text-ink">
                       {u.name}
-                      {u.parentId && <span className="text-[10px] text-slate-400"> (تابعة)</span>}
+                      {u.parentId && <span className="text-[10px] text-muted"> (تابعة)</span>}
                     </span>
                   ),
                 },
-                { key: 'type', header: 'النوع', render: (u) => <span className="text-slate-500">{UNIT_TYPES[u.unitType]}</span> },
-                { key: 'area', header: 'المساحة', render: (u) => <span className="font-mono text-slate-600">{u.areaM2} م²</span> },
+                { key: 'type', header: 'النوع', render: (u) => <span className="text-muted">{UNIT_TYPES[u.unitType]}</span> },
+                { key: 'area', header: 'المساحة', render: (u) => <span className="font-mono text-ink-secondary">{u.areaM2} م²</span> },
                 {
                   key: 'status', header: 'الحالة',
                   render: (u) => canUpdate ? (
-                    <select value={u.status} onChange={(e) => setUnitStatus(u, e.target.value as any)} className={`text-[10px] font-bold px-2 py-1 rounded-lg border focus:outline-none ${u.status === 'DELIVERED' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : u.status === 'IN_PROGRESS' ? 'bg-sky-50 text-sky-700 border-sky-200' : 'bg-slate-50 text-slate-600 border-slate-200'}`}>
+                    <select value={u.status} onChange={(e) => setUnitStatus(u, e.target.value as any)} className={`text-[10px] font-bold px-2 py-1 rounded-lg border focus:outline-none ${u.status === 'DELIVERED' ? 'bg-success-soft text-success border-success-border' : u.status === 'IN_PROGRESS' ? 'bg-accent-soft text-primary border-accent-border' : 'bg-surface-muted text-ink-secondary border-line'}`}>
                       <option value="PENDING">بالانتظار</option>
                       <option value="IN_PROGRESS">جاري</option>
                       <option value="DELIVERED">تم التسليم</option>
@@ -272,7 +272,7 @@ export const ProjectDetailPage: React.FC = () => {
                 {
                   key: 'actions', header: '',
                   render: (u) => canUpdate ? (
-                    <button onClick={() => removeUnit(u)} className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition" title="حذف">
+                    <button onClick={() => removeUnit(u)} className="p-1.5 rounded-lg text-muted hover:text-danger hover:bg-danger-soft transition" title="حذف">
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   ) : null,
@@ -283,32 +283,32 @@ export const ProjectDetailPage: React.FC = () => {
             </div>
 
             {canUpdate && (
-              <form onSubmit={addUnit} className="bg-white rounded-xl border border-slate-200 p-4 space-y-3 text-xs h-fit">
-                <h3 className="font-black text-slate-900 flex items-center gap-1.5"><Plus className="w-4 h-4 text-violet-600" /> إضافة وحدة</h3>
+              <form onSubmit={addUnit} className="bg-surface rounded-xl border border-line p-4 space-y-3 text-xs h-fit">
+                <h3 className="font-black text-ink flex items-center gap-1.5"><Plus className="w-4 h-4 text-primary" /> إضافة وحدة</h3>
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">الاسم *</label>
-                  <input required value={unitForm.name} onChange={(e) => setUnitForm({ ...unitForm, name: e.target.value })} placeholder="مثال: شقة 101" className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200" />
+                  <label className="font-bold text-ink block mb-1">الاسم *</label>
+                  <input required value={unitForm.name} onChange={(e) => setUnitForm({ ...unitForm, name: e.target.value })} placeholder="مثال: شقة 101" className="w-full px-3 py-2 bg-surface-muted rounded-xl border border-line" />
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <div>
-                    <label className="font-bold text-slate-700 block mb-1">النوع</label>
-                    <select value={unitForm.unitType} onChange={(e) => setUnitForm({ ...unitForm, unitType: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold">
+                    <label className="font-bold text-ink block mb-1">النوع</label>
+                    <select value={unitForm.unitType} onChange={(e) => setUnitForm({ ...unitForm, unitType: e.target.value })} className="w-full px-3 py-2 bg-surface-muted rounded-xl border border-line font-bold">
                       {Object.entries(UNIT_TYPES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                     </select>
                   </div>
                   <div>
-                    <label className="font-bold text-slate-700 block mb-1">المساحة (م²)</label>
-                    <input type="number" min="0" step="0.01" value={unitForm.areaM2} onChange={(e) => setUnitForm({ ...unitForm, areaM2: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-mono" />
+                    <label className="font-bold text-ink block mb-1">المساحة (م²)</label>
+                    <input type="number" min="0" step="0.01" value={unitForm.areaM2} onChange={(e) => setUnitForm({ ...unitForm, areaM2: e.target.value })} className="w-full px-3 py-2 bg-surface-muted rounded-xl border border-line font-mono" />
                   </div>
                 </div>
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">تابعة لـ</label>
-                  <select value={unitForm.parentId} onChange={(e) => setUnitForm({ ...unitForm, parentId: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold">
+                  <label className="font-bold text-ink block mb-1">تابعة لـ</label>
+                  <select value={unitForm.parentId} onChange={(e) => setUnitForm({ ...unitForm, parentId: e.target.value })} className="w-full px-3 py-2 bg-surface-muted rounded-xl border border-line font-bold">
                     <option value="">بدون (مستوى أول)</option>
                     {units.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
                   </select>
                 </div>
-                <button type="submit" disabled={saving} className="w-full py-2 bg-violet-600 hover:bg-violet-700 disabled:opacity-60 text-white font-bold rounded-xl flex items-center justify-center gap-2">
+                <button type="submit" disabled={saving} className="w-full py-2 bg-primary hover:bg-primary disabled:opacity-60 text-white font-bold rounded-xl flex items-center justify-center gap-2">
                   {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />} إضافة
                 </button>
               </form>
@@ -318,7 +318,7 @@ export const ProjectDetailPage: React.FC = () => {
 
         {tab === 'products' && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <div className="lg:col-span-2 bg-white rounded-xl border border-slate-200 overflow-hidden">
+            <div className="lg:col-span-2 bg-surface rounded-xl border border-line overflow-hidden">
               <DataTable
               ariaLabel="منتجات المشروع"
               rows={products}
@@ -326,8 +326,8 @@ export const ProjectDetailPage: React.FC = () => {
               dense
               tableClassName="text-xs"
               columns={[
-                { key: 'product', header: 'المنتج', render: (p) => <span className="font-bold text-slate-800">{p.productName}</span> },
-                { key: 'unit', header: 'الوحدة', render: (p) => <span className="text-slate-500">{p.unitName || '—'}</span> },
+                { key: 'product', header: 'المنتج', render: (p) => <span className="font-bold text-ink">{p.productName}</span> },
+                { key: 'unit', header: 'الوحدة', render: (p) => <span className="text-muted">{p.unitName || '—'}</span> },
                 { key: 'planned', header: 'المخطط (م²)', render: (p) => <span className="font-mono">{p.plannedQuantityM2}</span> },
                 {
                   key: 'delivered', header: 'المسلّم (م²)',
@@ -340,16 +340,16 @@ export const ProjectDetailPage: React.FC = () => {
                           try { service.updateProjectProduct(p.id, { deliveredQuantityM2: v }); load(); } catch (err: any) { toast.error(err?.message); }
                         }
                       }}
-                      className="w-20 px-2 py-1 bg-white border border-slate-200 rounded-lg font-mono"
+                      className="w-20 px-2 py-1 bg-surface border border-line rounded-lg font-mono"
                     />
                   ) : p.deliveredQuantityM2,
                 },
                 { key: 'price', header: 'السعر/م²', render: (p) => <span className="font-mono">{fmt(p.agreedPriceM2)}</span> },
-                { key: 'total', header: 'الإجمالي', render: (p) => <span className="font-bold text-sky-600">{fmt(p.plannedQuantityM2 * p.agreedPriceM2)}</span> },
+                { key: 'total', header: 'الإجمالي', render: (p) => <span className="font-bold text-primary">{fmt(p.plannedQuantityM2 * p.agreedPriceM2)}</span> },
                 {
                   key: 'actions', header: '',
                   render: (p) => canUpdate ? (
-                    <button onClick={() => removeProduct(p)} className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition" title="حذف">
+                    <button onClick={() => removeProduct(p)} className="p-1.5 rounded-lg text-muted hover:text-danger hover:bg-danger-soft transition" title="حذف">
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   ) : null,
@@ -358,21 +358,21 @@ export const ProjectDetailPage: React.FC = () => {
               emptyTitle="لا توجد بنود منتجات"
             />
             {products.length > 0 && (
-              <div className="bg-slate-50 border-t border-slate-200 px-3 py-2 text-xs flex items-center justify-between">
-                <span className="font-bold text-slate-600">الإجمالي المخطط / المسلّم</span>
+              <div className="bg-surface-muted border-t border-line px-3 py-2 text-xs flex items-center justify-between">
+                <span className="font-bold text-ink-secondary">الإجمالي المخطط / المسلّم</span>
                 <span className="flex gap-6">
-                  <span className="font-black text-slate-900">{fmt(plannedTotal)}</span>
-                  <span className="font-bold text-emerald-600">{fmt(deliveredTotal)}</span>
+                  <span className="font-black text-ink">{fmt(plannedTotal)}</span>
+                  <span className="font-bold text-success">{fmt(deliveredTotal)}</span>
                 </span>
               </div>
             )}
             </div>
 
             {canUpdate && (
-              <form onSubmit={addProduct} className="bg-white rounded-xl border border-slate-200 p-4 space-y-3 text-xs h-fit">
-                <h3 className="font-black text-slate-900 flex items-center gap-1.5"><Package className="w-4 h-4 text-sky-600" /> إضافة بند منتج</h3>
+              <form onSubmit={addProduct} className="bg-surface rounded-xl border border-line p-4 space-y-3 text-xs h-fit">
+                <h3 className="font-black text-ink flex items-center gap-1.5"><Package className="w-4 h-4 text-primary" /> إضافة بند منتج</h3>
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">المنتج *</label>
+                  <label className="font-bold text-ink block mb-1">المنتج *</label>
                   <ProductPicker
                     required
                     value={productForm.productId}
@@ -383,23 +383,23 @@ export const ProjectDetailPage: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">الوحدة</label>
-                  <select value={productForm.unitId} onChange={(e) => setProductForm({ ...productForm, unitId: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold">
+                  <label className="font-bold text-ink block mb-1">الوحدة</label>
+                  <select value={productForm.unitId} onChange={(e) => setProductForm({ ...productForm, unitId: e.target.value })} className="w-full px-3 py-2 bg-surface-muted rounded-xl border border-line font-bold">
                     <option value="">بدون تحديد</option>
                     {units.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
                   </select>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <div>
-                    <label className="font-bold text-slate-700 block mb-1">الكمية (م²) *</label>
-                    <input type="number" required min="0.01" step="0.01" value={productForm.plannedQuantityM2} onChange={(e) => setProductForm({ ...productForm, plannedQuantityM2: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-mono" />
+                    <label className="font-bold text-ink block mb-1">الكمية (م²) *</label>
+                    <input type="number" required min="0.01" step="0.01" value={productForm.plannedQuantityM2} onChange={(e) => setProductForm({ ...productForm, plannedQuantityM2: e.target.value })} className="w-full px-3 py-2 bg-surface-muted rounded-xl border border-line font-mono" />
                   </div>
                   <div>
-                    <label className="font-bold text-slate-700 block mb-1">السعر/م²</label>
-                    <input type="number" min="0" step="0.01" value={productForm.agreedPriceM2} onChange={(e) => setProductForm({ ...productForm, agreedPriceM2: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-mono" />
+                    <label className="font-bold text-ink block mb-1">السعر/م²</label>
+                    <input type="number" min="0" step="0.01" value={productForm.agreedPriceM2} onChange={(e) => setProductForm({ ...productForm, agreedPriceM2: e.target.value })} className="w-full px-3 py-2 bg-surface-muted rounded-xl border border-line font-mono" />
                   </div>
                 </div>
-                <button type="submit" disabled={saving} className="w-full py-2 bg-sky-600 hover:bg-sky-700 disabled:opacity-60 text-white font-bold rounded-xl flex items-center justify-center gap-2">
+                <button type="submit" disabled={saving} className="w-full py-2 bg-primary hover:bg-primary disabled:opacity-60 text-white font-bold rounded-xl flex items-center justify-center gap-2">
                   {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />} إضافة
                 </button>
               </form>
@@ -413,7 +413,7 @@ export const ProjectDetailPage: React.FC = () => {
 
         {tab === 'info' && (
           <div className="space-y-4">
-          <div className="bg-white rounded-xl border border-slate-200 p-5 grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 text-sm">
+          <div className="bg-surface rounded-xl border border-line p-5 grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 text-sm">
             {[
               { label: 'كود المشروع', value: project.code, icon: Boxes },
               { label: 'العميل', value: project.customerName || '—', icon: User },
@@ -432,11 +432,11 @@ export const ProjectDetailPage: React.FC = () => {
             ].map((row) => {
               const Icon = row.icon;
               return (
-                <div key={row.label} className="flex items-start gap-3 border-b border-slate-100 pb-3">
-                  <Icon className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" />
+                <div key={row.label} className="flex items-start gap-3 border-b border-line pb-3">
+                  <Icon className="w-4 h-4 text-muted mt-0.5 shrink-0" />
                   <div>
-                    <p className="text-[10px] text-slate-500 font-bold">{row.label}</p>
-                    <p className="text-sm font-semibold text-slate-800">{row.value}</p>
+                    <p className="text-[10px] text-muted font-bold">{row.label}</p>
+                    <p className="text-sm font-semibold text-ink">{row.value}</p>
                   </div>
                 </div>
               );

@@ -167,9 +167,9 @@ export const BankReconciliationPage: React.FC = () => {
   };
 
   return (
-    <div className="p-3 lg:p-4 bg-slate-50 min-h-0 text-slate-900 space-y-4">
+    <div className="p-3 lg:p-4 bg-surface-muted min-h-0 text-ink space-y-4">
       {/* Header */}
-      <div className="bg-white px-5 py-3 rounded-2xl border border-slate-200 shadow-sm">
+      <div className="bg-surface px-5 py-3 rounded-2xl border border-line shadow-sm">
         <PageHeader
           icon={<Scale className="h-5 w-5" />}
           title="مطابقة كشف الحساب البنكي والصناديق"
@@ -177,7 +177,7 @@ export const BankReconciliationPage: React.FC = () => {
           actions={<>
             <button
               onClick={loadData}
-              className="p-2.5 text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-xl transition"
+              className="p-2.5 text-ink-secondary hover:text-ink bg-surface-sunken hover:bg-surface-sunken rounded-xl transition"
               title="تحديث البيانات"
             >
               <RefreshCw className="w-4 h-4" />
@@ -185,7 +185,7 @@ export const BankReconciliationPage: React.FC = () => {
             {canManageAccounts && (
               <button
                 onClick={() => setShowBankModal(true)}
-                className="flex items-center gap-1.5 px-4 py-2.5 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-xs font-semibold transition"
+                className="flex items-center gap-1.5 px-4 py-2.5 bg-primary hover:bg-primary text-white rounded-xl text-xs font-semibold transition"
               >
                 <Plus className="w-4 h-4" />
                 <span>حساب بنكي جديد</span>
@@ -197,12 +197,12 @@ export const BankReconciliationPage: React.FC = () => {
 
       {/* Control Strip */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white p-4 rounded-xl border border-slate-200">
-          <label className="block text-xs font-medium text-slate-500 mb-1">الحساب البنكي</label>
+        <div className="bg-surface p-4 rounded-xl border border-line">
+          <label className="block text-xs font-medium text-muted mb-1">الحساب البنكي</label>
           <select
             value={selectedBankId}
             onChange={(e) => setSelectedBankId(e.target.value)}
-            className="w-full text-xs font-bold border border-slate-200 rounded-lg p-2 bg-slate-50"
+            className="w-full text-xs font-bold border border-line rounded-lg p-2 bg-surface-muted"
           >
             {bankAccounts.map((b) => (
               <option key={b.id} value={b.id}>
@@ -210,61 +210,61 @@ export const BankReconciliationPage: React.FC = () => {
               </option>
             ))}
           </select>
-          <span className="text-[11px] text-slate-400 mt-1 block">رقم الحساب: {activeBank?.accountNumber}</span>
+          <span className="text-[11px] text-muted mt-1 block">رقم الحساب: {activeBank?.accountNumber}</span>
         </div>
 
-        <div className="bg-white p-4 rounded-xl border border-slate-200">
-          <label className="block text-xs font-medium text-slate-500 mb-1">تاريخ كشف الحساب</label>
+        <div className="bg-surface p-4 rounded-xl border border-line">
+          <label className="block text-xs font-medium text-muted mb-1">تاريخ كشف الحساب</label>
           <input
             type="date"
             value={statementDate}
             onChange={(e) => setStatementDate(e.target.value)}
-            className="w-full text-xs font-semibold border border-slate-200 rounded-lg p-2"
+            className="w-full text-xs font-semibold border border-line rounded-lg p-2"
           />
-          <span className="text-[11px] text-slate-400 mt-1 block">تاريخ إقفال كشف البنك الوارد</span>
+          <span className="text-[11px] text-muted mt-1 block">تاريخ إقفال كشف البنك الوارد</span>
         </div>
 
-        <div className="bg-white p-4 rounded-xl border border-slate-200">
-          <label className="block text-xs font-medium text-slate-500 mb-1">رصيد كشف الحساب الخارجي</label>
+        <div className="bg-surface p-4 rounded-xl border border-line">
+          <label className="block text-xs font-medium text-muted mb-1">رصيد كشف الحساب الخارجي</label>
           <input
             type="number"
             step="0.01"
             value={statementBalance}
             onChange={(e) => setStatementBalance(e.target.value)}
-            className="w-full text-sm font-bold font-mono border border-slate-200 rounded-lg p-2 bg-sky-50 text-sky-900"
+            className="w-full text-sm font-bold font-mono border border-line rounded-lg p-2 bg-accent-soft text-primary"
           />
-          <span className="text-[11px] text-slate-400 mt-1 block">المسجل في الورقة أو الملف الوارد من البنك</span>
+          <span className="text-[11px] text-muted mt-1 block">المسجل في الورقة أو الملف الوارد من البنك</span>
         </div>
 
-        <div className="bg-white p-4 rounded-xl border border-slate-200">
+        <div className="bg-surface p-4 rounded-xl border border-line">
           <div className="flex items-center justify-between mb-1">
-            <span className="text-xs text-slate-500">فارق المطابقة</span>
+            <span className="text-xs text-muted">فارق المطابقة</span>
             {Math.abs(variance) < 0.01 ? (
-              <span className="text-[11px] bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded font-bold">متطابق تماماً</span>
+              <span className="text-[11px] bg-success-soft text-success px-2 py-0.5 rounded font-bold">متطابق تماماً</span>
             ) : (
-              <span className="text-[11px] bg-rose-50 text-rose-700 px-2 py-0.5 rounded font-bold">يوجد فارق</span>
+              <span className="text-[11px] bg-danger-soft text-danger px-2 py-0.5 rounded font-bold">يوجد فارق</span>
             )}
           </div>
-          <div className={`text-lg font-black font-mono ${Math.abs(variance) < 0.01 ? 'text-emerald-600' : 'text-rose-600'}`}>
+          <div className={`text-lg font-black font-mono ${Math.abs(variance) < 0.01 ? 'text-success' : 'text-danger'}`}>
             {variance.toLocaleString('ar-EG', { minimumFractionDigits: 2 })} {activeBank?.currency}
           </div>
-          <span className="text-[10px] text-slate-400 mt-1 block">رصيد الدفاتر الحالي: {bookBalance.toLocaleString()} {activeBank?.currency}</span>
+          <span className="text-[10px] text-muted mt-1 block">رصيد الدفاتر الحالي: {bookBalance.toLocaleString()} {activeBank?.currency}</span>
         </div>
       </div>
 
       {/* Main Reconciliation Workspace */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left 2 Cols: Unreconciled Transactions Grid */}
-        <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
-          <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+        <div className="lg:col-span-2 bg-surface rounded-2xl border border-line shadow-sm overflow-hidden flex flex-col">
+          <div className="p-4 border-b border-line flex items-center justify-between bg-surface-muted/50">
             <div>
-              <h2 className="text-sm font-bold text-slate-800">حركات الحساب في الدفاتر المحاسبية</h2>
-              <p className="text-xs text-slate-500">حدد الحركات الظاهرة في كشف الحساب لمطابقتها</p>
+              <h2 className="text-sm font-bold text-ink">حركات الحساب في الدفاتر المحاسبية</h2>
+              <p className="text-xs text-muted">حدد الحركات الظاهرة في كشف الحساب لمطابقتها</p>
             </div>
             {canManage && (
               <button
                 onClick={toggleAllCleared}
-                className="text-xs font-semibold px-3 py-1.5 bg-slate-200 hover:bg-slate-300 rounded-lg transition"
+                className="text-xs font-semibold px-3 py-1.5 bg-surface-sunken hover:bg-surface-sunken rounded-lg transition"
               >
                 {clearedIds.size === unreconciledItems.length ? 'إلغاء تحديد الكل' : 'تحديد كل الحركات'}
               </button>
@@ -273,12 +273,12 @@ export const BankReconciliationPage: React.FC = () => {
 
           <div className="flex-1 overflow-auto max-h-[480px]">
             {loading ? (
-              <div className="p-12 flex justify-center text-slate-400">
-                <Loader2 className="w-6 h-6 animate-spin text-sky-500 ml-2" />
+              <div className="p-12 flex justify-center text-muted">
+                <Loader2 className="w-6 h-6 animate-spin text-primary ml-2" />
                 <span>جاري قراءة سجلات الدفاتر...</span>
               </div>
             ) : unreconciledItems.length === 0 ? (
-              <div className="p-12 text-center text-slate-400 text-xs">
+              <div className="p-12 text-center text-muted text-xs">
                 لا توجد حركات غير مطابقة لهذا الحساب حتى تاريخ {statementDate}.
               </div>
             ) : (
@@ -292,7 +292,7 @@ export const BankReconciliationPage: React.FC = () => {
                 tableClassName="text-xs"
                 rowClassName={(item: any) => {
                   const isChecked = clearedIds.has(item.id);
-                  return `${isChecked ? 'bg-sky-50/60 font-semibold' : ''} ${canManage ? 'hover:bg-slate-50' : ''}`;
+                  return `${isChecked ? 'bg-accent-soft/60 font-semibold' : ''} ${canManage ? 'hover:bg-surface-muted' : ''}`;
                 }}
                 columns={[
                   {
@@ -306,20 +306,20 @@ export const BankReconciliationPage: React.FC = () => {
                           disabled={!canManage}
                           onChange={() => {}}
                           onClick={(e) => e.stopPropagation()}
-                          className={`w-4 h-4 rounded text-sky-600 focus:ring-sky-500 ${canManage ? 'cursor-pointer' : 'cursor-not-allowed'}`}
+                          className={`w-4 h-4 rounded text-primary focus:ring-primary ${canManage ? 'cursor-pointer' : 'cursor-not-allowed'}`}
                         />
                       );
                     },
                   },
-                  { key: 'date', header: 'التاريخ', render: (item: any) => <span className="font-mono text-slate-600">{item.date}</span> },
-                  { key: 'ref', header: 'رقم المرجع / القيد', render: (item: any) => <span className="font-mono font-bold text-slate-700">{item.reference}</span> },
-                  { key: 'desc', header: 'البيان', render: (item: any) => <span className="text-slate-800">{item.description}</span> },
+                  { key: 'date', header: 'التاريخ', render: (item: any) => <span className="font-mono text-ink-secondary">{item.date}</span> },
+                  { key: 'ref', header: 'رقم المرجع / القيد', render: (item: any) => <span className="font-mono font-bold text-ink">{item.reference}</span> },
+                  { key: 'desc', header: 'البيان', render: (item: any) => <span className="text-ink">{item.description}</span> },
                   {
                     key: 'amount', header: 'المبلغ', align: 'end',
                     render: (item: any) => {
                       const isDeposit = item.type === 'DEPOSIT';
                       return (
-                        <span className={`font-mono font-bold ${isDeposit ? 'text-emerald-600' : 'text-slate-800'}`}>
+                        <span className={`font-mono font-bold ${isDeposit ? 'text-success' : 'text-ink'}`}>
                           {isDeposit ? '+' : '-'}{item.amount.toLocaleString('ar-EG', { minimumFractionDigits: 2 })}
                         </span>
                       );
@@ -330,52 +330,52 @@ export const BankReconciliationPage: React.FC = () => {
             )}
           </div>
 
-          <div className="p-3 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-xs text-slate-600">
+          <div className="p-3 bg-surface-muted border-t border-line flex items-center justify-between text-xs text-ink-secondary">
             <span>تم تحديد {clearedIds.size} من أصل {unreconciledItems.length} حركة</span>
             <div className="flex gap-4 font-mono font-bold">
-              <span className="text-emerald-700">إيداعات: +{clearedDeposits.toLocaleString()}</span>
-              <span className="text-slate-700">مسحوبات: -{clearedWithdrawals.toLocaleString()}</span>
+              <span className="text-success">إيداعات: +{clearedDeposits.toLocaleString()}</span>
+              <span className="text-ink">مسحوبات: -{clearedWithdrawals.toLocaleString()}</span>
             </div>
           </div>
         </div>
 
         {/* Right Col: Reconciliation Summary & Finalize */}
         <div className="space-y-4">
-          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-            <h3 className="text-sm font-bold text-slate-800 border-b border-slate-100 pb-2">ملخص مذكرة التسوية البنكية</h3>
+          <div className="bg-surface p-5 rounded-2xl border border-line shadow-sm space-y-4">
+            <h3 className="text-sm font-bold text-ink border-b border-line pb-2">ملخص مذكرة التسوية البنكية</h3>
 
             <div className="space-y-2 text-xs">
-              <div className="flex justify-between py-1 border-b border-slate-100">
-                <span className="text-slate-500">رصيد كشف الحساب الخارجي:</span>
+              <div className="flex justify-between py-1 border-b border-line">
+                <span className="text-muted">رصيد كشف الحساب الخارجي:</span>
                 <span className="font-bold font-mono">{numStatementBalance.toLocaleString()} {activeBank?.currency}</span>
               </div>
-              <div className="flex justify-between py-1 border-b border-slate-100">
-                <span className="text-slate-500">إيداعات تمت مطابقتها:</span>
-                <span className="font-bold font-mono text-emerald-600">+{clearedDeposits.toLocaleString()}</span>
+              <div className="flex justify-between py-1 border-b border-line">
+                <span className="text-muted">إيداعات تمت مطابقتها:</span>
+                <span className="font-bold font-mono text-success">+{clearedDeposits.toLocaleString()}</span>
               </div>
-              <div className="flex justify-between py-1 border-b border-slate-100">
-                <span className="text-slate-500">مسحوبات وشيكات تمت مطابقتها:</span>
-                <span className="font-bold font-mono text-rose-600">-{clearedWithdrawals.toLocaleString()}</span>
+              <div className="flex justify-between py-1 border-b border-line">
+                <span className="text-muted">مسحوبات وشيكات تمت مطابقتها:</span>
+                <span className="font-bold font-mono text-danger">-{clearedWithdrawals.toLocaleString()}</span>
               </div>
-              <div className="flex justify-between py-1 border-b border-slate-100">
-                <span className="text-slate-500">رصيد الدفاتر المحاسبية:</span>
-                <span className="font-bold font-mono text-slate-800">{bookBalance.toLocaleString()} {activeBank?.currency}</span>
+              <div className="flex justify-between py-1 border-b border-line">
+                <span className="text-muted">رصيد الدفاتر المحاسبية:</span>
+                <span className="font-bold font-mono text-ink">{bookBalance.toLocaleString()} {activeBank?.currency}</span>
               </div>
-              <div className="flex justify-between py-2 font-bold text-sm bg-slate-50 p-2 rounded-lg">
+              <div className="flex justify-between py-2 font-bold text-sm bg-surface-muted p-2 rounded-lg">
                 <span>الفارق المتبقي:</span>
-                <span className={Math.abs(variance) < 0.01 ? 'text-emerald-600 font-mono' : 'text-rose-600 font-mono'}>
+                <span className={Math.abs(variance) < 0.01 ? 'text-success font-mono' : 'text-danger font-mono'}>
                   {variance.toLocaleString()} {activeBank?.currency}
                 </span>
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">ملاحظات محضر المطابقة</label>
+              <label className="block text-xs font-medium text-ink mb-1">ملاحظات محضر المطابقة</label>
               <textarea
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 placeholder="تطابق كامل لكشف حساب شهر..."
-                className="w-full text-xs border border-slate-200 rounded-xl p-2.5 h-20"
+                className="w-full text-xs border border-line rounded-xl p-2.5 h-20"
               />
             </div>
 
@@ -383,7 +383,7 @@ export const BankReconciliationPage: React.FC = () => {
               <button
                 onClick={handleReconcile}
                 disabled={saving}
-                className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-sm transition disabled:opacity-50"
+                className="w-full py-2.5 bg-success hover:bg-success text-white rounded-xl text-xs font-bold shadow-sm transition disabled:opacity-50"
               >
                 {saving ? 'جاري حفظ المطابقة...' : 'حفظ واعتماد المطابقة البنكية'}
               </button>
@@ -391,19 +391,19 @@ export const BankReconciliationPage: React.FC = () => {
           </div>
 
           {/* Past Reconciliations History */}
-          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3">
-            <h4 className="text-xs font-bold text-slate-800">محاضر المطابقة السابقة</h4>
+          <div className="bg-surface p-4 rounded-2xl border border-line shadow-sm space-y-3">
+            <h4 className="text-xs font-bold text-ink">محاضر المطابقة السابقة</h4>
             {historyReconciliations.length === 0 ? (
-              <p className="text-[11px] text-slate-400">لا توجد محاضر مطابقة سابقة لهذا الحساب.</p>
+              <p className="text-[11px] text-muted">لا توجد محاضر مطابقة سابقة لهذا الحساب.</p>
             ) : (
               <div className="space-y-2 max-h-48 overflow-auto">
                 {historyReconciliations.map((h) => (
-                  <div key={h.id} className="text-xs p-2 bg-slate-50 rounded-lg border border-slate-100 flex items-center justify-between">
+                  <div key={h.id} className="text-xs p-2 bg-surface-muted rounded-lg border border-line flex items-center justify-between">
                     <div>
-                      <span className="font-bold block text-slate-800">{h.reconciliationNumber}</span>
-                      <span className="text-[10px] text-slate-400">بتاريخ {h.statementDate} - بواسطة {h.reconciledByName}</span>
+                      <span className="font-bold block text-ink">{h.reconciliationNumber}</span>
+                      <span className="text-[10px] text-muted">بتاريخ {h.statementDate} - بواسطة {h.reconciledByName}</span>
                     </div>
-                    <span className="text-[10px] px-2 py-0.5 rounded font-bold bg-emerald-100 text-emerald-800">
+                    <span className="text-[10px] px-2 py-0.5 rounded font-bold bg-success-soft text-success">
                       معتمد
                     </span>
                   </div>
@@ -417,38 +417,38 @@ export const BankReconciliationPage: React.FC = () => {
       {/* Modal: New Bank Account */}
       {canManageAccounts && showBankModal && (
         <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl border border-slate-200">
-            <h3 className="text-base font-bold text-slate-800 mb-4">إضافة حساب بنكي جديد</h3>
+          <div className="bg-surface rounded-2xl p-6 w-full max-w-md shadow-2xl border border-line">
+            <h3 className="text-base font-bold text-ink mb-4">إضافة حساب بنكي جديد</h3>
             <form onSubmit={handleCreateBank} className="space-y-3 text-xs">
               <div>
-                <label className="block text-slate-600 mb-1 font-medium">اسم الحساب (للعرض والتمييز)</label>
+                <label className="block text-ink-secondary mb-1 font-medium">اسم الحساب (للعرض والتمييز)</label>
                 <input
                   type="text"
                   required
                   placeholder="مثال: البنك الأهلي - جاري رئيسي"
                   value={bankForm.accountName}
                   onChange={(e) => setBankForm({ ...bankForm, accountName: e.target.value })}
-                  className="w-full border border-slate-200 rounded-xl p-2"
+                  className="w-full border border-line rounded-xl p-2"
                 />
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-slate-600 mb-1 font-medium">اسم البنك</label>
+                  <label className="block text-ink-secondary mb-1 font-medium">اسم البنك</label>
                   <input
                     type="text"
                     required
                     placeholder="البنك الأهلي المصري"
                     value={bankForm.bankName}
                     onChange={(e) => setBankForm({ ...bankForm, bankName: e.target.value })}
-                    className="w-full border border-slate-200 rounded-xl p-2"
+                    className="w-full border border-line rounded-xl p-2"
                   />
                 </div>
                 <div>
-                  <label className="block text-slate-600 mb-1 font-medium">العملة</label>
+                  <label className="block text-ink-secondary mb-1 font-medium">العملة</label>
                   <select
                     value={bankForm.currency}
                     onChange={(e) => setBankForm({ ...bankForm, currency: e.target.value })}
-                    className="w-full border border-slate-200 rounded-xl p-2 bg-slate-50 font-bold"
+                    className="w-full border border-line rounded-xl p-2 bg-surface-muted font-bold"
                   >
                     <option value="EGP">EGP - جنيه مصري</option>
                     <option value="SAR">SAR - ريال سعودي</option>
@@ -458,32 +458,32 @@ export const BankReconciliationPage: React.FC = () => {
                 </div>
               </div>
               <div>
-                <label className="block text-slate-600 mb-1 font-medium">رقم الحساب</label>
+                <label className="block text-ink-secondary mb-1 font-medium">رقم الحساب</label>
                 <input
                   type="text"
                   required
                   value={bankForm.accountNumber}
                   onChange={(e) => setBankForm({ ...bankForm, accountNumber: e.target.value })}
-                  className="w-full border border-slate-200 rounded-xl p-2 font-mono"
+                  className="w-full border border-line rounded-xl p-2 font-mono"
                 />
               </div>
               <div>
-                <label className="block text-slate-600 mb-1 font-medium">رقم الآيبان (IBAN) - اختياري</label>
+                <label className="block text-ink-secondary mb-1 font-medium">رقم الآيبان (IBAN) - اختياري</label>
                 <input
                   type="text"
                   value={bankForm.iban}
                   onChange={(e) => setBankForm({ ...bankForm, iban: e.target.value })}
-                  className="w-full border border-slate-200 rounded-xl p-2 font-mono"
+                  className="w-full border border-line rounded-xl p-2 font-mono"
                 />
               </div>
               <div>
-                <label className="block text-slate-600 mb-1 font-medium">الرصيد الافتتاحي</label>
+                <label className="block text-ink-secondary mb-1 font-medium">الرصيد الافتتاحي</label>
                 <input
                   type="number"
                   step="0.01"
                   value={bankForm.openingBalance}
                   onChange={(e) => setBankForm({ ...bankForm, openingBalance: e.target.value })}
-                  className="w-full border border-slate-200 rounded-xl p-2 font-mono font-bold"
+                  className="w-full border border-line rounded-xl p-2 font-mono font-bold"
                 />
               </div>
 
@@ -491,13 +491,13 @@ export const BankReconciliationPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setShowBankModal(false)}
-                  className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-xl font-medium"
+                  className="px-4 py-2 text-ink-secondary hover:bg-surface-sunken rounded-xl font-medium"
                 >
                   إلغاء
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-sky-600 text-white rounded-xl font-semibold hover:bg-sky-700 shadow-sm"
+                  className="px-5 py-2 bg-primary text-white rounded-xl font-semibold hover:bg-primary shadow-sm"
                 >
                   حفظ الحساب
                 </button>

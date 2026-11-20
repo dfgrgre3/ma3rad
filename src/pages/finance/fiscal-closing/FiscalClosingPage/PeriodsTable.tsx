@@ -28,25 +28,25 @@ export const PeriodsTable: FC<PeriodsTableProps> = ({
   onRequestReopen,
   onLockPeriod,
 }) => (
-  <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-    <div className="flex flex-col gap-2 border-b border-slate-100 p-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+  <section className="overflow-hidden rounded-2xl border border-line bg-surface shadow-sm">
+    <div className="flex flex-col gap-2 border-b border-line p-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
       <div>
-        <h2 className="font-bold text-slate-800">حالة الأشهر والإقفالات</h2>
-        <p className="mt-1 text-xs text-slate-500">حدد الشهر لمراجعة الفحوص والمهام والتسويات.</p>
+        <h2 className="font-bold text-ink">حالة الأشهر والإقفالات</h2>
+        <p className="mt-1 text-xs text-muted">حدد الشهر لمراجعة الفحوص والمهام والتسويات.</p>
       </div>
       <div className="flex flex-wrap gap-2 text-xs">
-        <span className="rounded-full border border-sky-200 bg-sky-50 px-2.5 py-1 font-semibold text-sky-800">مفتوحة</span>
-        <span className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 font-semibold text-amber-800">قيد المراجعة</span>
-        <span className="rounded-full border border-violet-200 bg-violet-50 px-2.5 py-1 font-semibold text-violet-800">بانتظار الاعتماد</span>
-        <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 font-semibold text-emerald-800">مقفلة</span>
-        <span className="rounded-full border border-rose-200 bg-rose-50 px-2.5 py-1 font-semibold text-rose-800">مؤمّنة</span>
+        <span className="rounded-full border border-accent-border bg-accent-soft px-2.5 py-1 font-semibold text-primary">مفتوحة</span>
+        <span className="rounded-full border border-warning-border bg-warning-soft px-2.5 py-1 font-semibold text-warning">قيد المراجعة</span>
+        <span className="rounded-full border border-accent-border bg-accent-soft px-2.5 py-1 font-semibold text-primary">بانتظار الاعتماد</span>
+        <span className="rounded-full border border-success-border bg-success-soft px-2.5 py-1 font-semibold text-success">مقفلة</span>
+        <span className="rounded-full border border-danger-border bg-danger-soft px-2.5 py-1 font-semibold text-danger">مؤمّنة</span>
       </div>
     </div>
 
     {loading ? (
-      <div className="p-12 text-center text-sm text-slate-500">جاري تحميل الفترات المالية...</div>
+      <div className="p-12 text-center text-sm text-muted">جاري تحميل الفترات المالية...</div>
     ) : periods.length === 0 ? (
-      <div className="p-10 text-center text-sm text-slate-500">لا توجد فترات مسجلة لهذه السنة المالية.</div>
+      <div className="p-10 text-center text-sm text-muted">لا توجد فترات مسجلة لهذه السنة المالية.</div>
     ) : (
       <div className="overflow-x-auto">
         <DataTable
@@ -54,19 +54,19 @@ export const PeriodsTable: FC<PeriodsTableProps> = ({
           rows={periods}
           rowKey={(period) => period.id}
           onRowClick={onSelectPeriod}
-          rowClassName={(period) => selectedPeriodId === period.id ? 'bg-cyan-50/70' : 'hover:bg-slate-50'}
+          rowClassName={(period) => selectedPeriodId === period.id ? 'bg-accent-soft/70' : 'hover:bg-surface-muted'}
           columns={[
             {
               key: 'period', header: 'الشهر / الفترة',
               render: (period) => (
-                <span className="font-bold text-slate-800">
+                <span className="font-bold text-ink">
                   {period.name}
-                  <span className="mr-2 text-xs font-medium text-slate-400">#{period.periodNumber}</span>
+                  <span className="mr-2 text-xs font-medium text-muted">#{period.periodNumber}</span>
                 </span>
               ),
             },
-            { key: 'start', header: 'بداية الفترة', render: (period) => <span className="text-slate-600">{formatDate(period.startDate)}</span> },
-            { key: 'end', header: 'نهاية الفترة', render: (period) => <span className="text-slate-600">{formatDate(period.endDate)}</span> },
+            { key: 'start', header: 'بداية الفترة', render: (period) => <span className="text-ink-secondary">{formatDate(period.startDate)}</span> },
+            { key: 'end', header: 'نهاية الفترة', render: (period) => <span className="text-ink-secondary">{formatDate(period.endDate)}</span> },
             {
               key: 'status', header: 'الحالة',
               render: (period) => {
@@ -90,7 +90,7 @@ export const PeriodsTable: FC<PeriodsTableProps> = ({
                       <button
                         type="button"
                         onClick={(event) => { event.stopPropagation(); onOpenCloseChecklist(period); }}
-                        className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-bold text-white hover:bg-slate-700"
+                        className="rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-white hover:bg-primary"
                       >
                         فحص وإقفال
                       </button>
@@ -99,7 +99,7 @@ export const PeriodsTable: FC<PeriodsTableProps> = ({
                       <button
                         type="button"
                         onClick={(event) => { event.stopPropagation(); onRequestReopen(period); }}
-                        className="rounded-lg bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-800 hover:bg-amber-100"
+                        className="rounded-lg bg-warning-soft px-3 py-1.5 text-xs font-bold text-warning hover:bg-warning-soft"
                       >
                         إعادة فتح
                       </button>
@@ -108,7 +108,7 @@ export const PeriodsTable: FC<PeriodsTableProps> = ({
                       <button
                         type="button"
                         onClick={(event) => { event.stopPropagation(); onLockPeriod(period); }}
-                        className="rounded-lg bg-rose-50 px-3 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-100"
+                        className="rounded-lg bg-danger-soft px-3 py-1.5 text-xs font-bold text-danger hover:bg-danger-soft"
                       >
                         تأمين
                       </button>

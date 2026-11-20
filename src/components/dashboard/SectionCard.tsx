@@ -47,7 +47,7 @@ export const SectionCard: React.FC<SectionCardProps> = ({ id, title, subtitle, i
         )}
       </div>
 
-      <div className="dashboard-embedded-scope min-w-0 p-2.5 sm:p-4 [&>div]:!h-auto [&>div]:!overflow-visible [&>main]:!h-auto [&>main]:!overflow-visible [&>div]:!p-0 [&>main]:!p-0 [&>div]:!bg-transparent [&>main]:!bg-transparent [&_header]:!hidden [&_h1]:!hidden [&_.border-b.border-slate-200.px-6.py-4]:!hidden">
+      <div className="dashboard-embedded-scope min-w-0 p-2.5 sm:p-4 [&>div]:!h-auto [&>div]:!overflow-visible [&>main]:!h-auto [&>main]:!overflow-visible [&>div]:!p-0 [&>main]:!p-0 [&>div]:!bg-transparent [&>main]:!bg-transparent [&_header]:!hidden [&_h1]:!hidden [&_.border-b.border-line.px-6.py-4]:!hidden">
         {children}
       </div>
     </section>

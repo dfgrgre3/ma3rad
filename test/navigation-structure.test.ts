@@ -62,6 +62,7 @@ const expectedOperationsPaths = [
   '/drivers',
   '/vehicles',
   '/manufacturing',
+  '/workshop',
 ];
 
 test('navigation has the required 12 sections and no duplicate destinations', () => {

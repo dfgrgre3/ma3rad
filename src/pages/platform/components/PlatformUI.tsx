@@ -55,11 +55,11 @@ const TONE_MAP: Record<string, string> = {
 };
 
 const BADGE_CLASS: Record<string, string> = {
-  success: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-800',
-  warning: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-800',
-  danger: 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-900/30 dark:text-rose-300 dark:border-rose-800',
-  primary: 'bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-900/30 dark:text-sky-300 dark:border-sky-800',
-  neutral: 'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700',
+  success: 'bg-success-soft text-success border-success-border dark:bg-success/30 ',
+  warning: 'bg-warning-soft text-warning border-warning-border dark:bg-warning/30 ',
+  danger: 'bg-danger-soft text-danger border-danger-border dark:bg-danger/30 ',
+  primary: 'bg-accent-soft text-primary border-accent-border dark:bg-primary/30 ',
+  neutral: 'bg-surface-sunken text-ink-secondary border-line ',
 };
 
 export const StatusBadge: React.FC<{ value: string; label?: string }> = ({ value, label }) => {
@@ -85,22 +85,22 @@ export const Toggle: React.FC<{
     disabled={disabled}
     onClick={() => onChange(!checked)}
     className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors disabled:opacity-50 ${
-      checked ? 'bg-emerald-600' : 'bg-slate-300'
+      checked ? 'bg-success' : 'bg-surface-sunken'
     }`}
   >
     <span
-      className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${
-        checked ? '-translate-x-4' : '-translate-x-0.5'
-      }`}
+      className={`inline-block h-3.5 w-3.5 transform rounded-full bg-surface shadow transition-transform ${
+ checked ? '-translate-x-4' : '-translate-x-0.5'
+ }`}
     />
   </button>
 );
 
 export const EmptyState: React.FC<{ icon?: React.ReactNode; title: string; description?: string }> = ({ icon, title, description }) => (
   <div className="flex flex-col items-center justify-center gap-2 px-4 py-10 text-center">
-    {icon && <span className="flex h-11 w-11 items-center justify-center rounded-full bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400">{icon}</span>}
-    <p className="text-sm font-bold text-slate-700 dark:text-slate-200">{title}</p>
-    {description && <p className="max-w-md text-xs leading-6 text-slate-500 dark:text-slate-400">{description}</p>}
+    {icon && <span className="flex h-11 w-11 items-center justify-center rounded-full bg-surface-sunken text-muted ">{icon}</span>}
+    <p className="text-sm font-bold text-ink ">{title}</p>
+    {description && <p className="max-w-md text-xs leading-6 text-muted ">{description}</p>}
   </div>
 );
 
@@ -108,16 +108,16 @@ export const Field: React.FC<{ label: string; hint?: string; required?: boolean;
   label, hint, required, children, className = '',
 }) => (
   <label className={`block ${className}`}>
-    <span className="mb-1 block text-[11.5px] font-semibold text-slate-700">
-      {label} {required && <span className="text-rose-500">*</span>}
+    <span className="mb-1 block text-[11.5px] font-semibold text-ink">
+      {label} {required && <span className="text-danger">*</span>}
     </span>
     {children}
-    {hint && <span className="mt-1 block text-[10.5px] text-slate-500">{hint}</span>}
+    {hint && <span className="mt-1 block text-[10.5px] text-muted">{hint}</span>}
   </label>
 );
 
 export const inputClass =
-  'win-input w-full text-[12.5px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 dark:bg-slate-800 dark:text-slate-100 dark:border-slate-600';
+  'win-input w-full text-[12.5px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-success/40 dark:bg-primary dark:text-muted dark:border-line-strong';
 
 export function downloadCsv(filename: string, rows: Array<Array<string | number | null | undefined>>): void {
   const escape = (cell: string | number | null | undefined) => {

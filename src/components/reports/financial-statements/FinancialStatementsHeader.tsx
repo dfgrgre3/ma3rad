@@ -49,7 +49,7 @@ export function FinancialStatementsHeader({
   const availableTabs = visibleTabs ? tabs.filter(([key]) => visibleTabs.includes(key as FinancialStatementsTab)) : tabs;
   return (
     <>
-      <div className="bg-white border-b border-slate-200 px-6 pt-4">
+      <div className="bg-surface border-b border-line px-6 pt-4">
         <PageHeader
           icon={<Scale className="w-5 h-5" />}
           title="القوائم المالية"
@@ -61,7 +61,7 @@ export function FinancialStatementsHeader({
                 aria-label="تاريخ الميزانية"
                 value={asOf}
                 onChange={(event) => onAsOfChange(event.target.value)}
-                className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold"
+                className="px-3 py-2 bg-surface-muted border border-line rounded-xl text-xs font-bold"
               />
             )}
             {(tab === 'cash' || tab === 'ledger' || tab === 'subledger' || tab === 'income') && (
@@ -71,14 +71,14 @@ export function FinancialStatementsHeader({
                   aria-label="من تاريخ"
                   value={from}
                   onChange={(event) => onFromChange(event.target.value)}
-                  className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold"
+                  className="px-3 py-2 bg-surface-muted border border-line rounded-xl text-xs font-bold"
                 />
                 <input
                   type="date"
                   aria-label="إلى تاريخ"
                   value={to}
                   onChange={(event) => onToChange(event.target.value)}
-                  className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold"
+                  className="px-3 py-2 bg-surface-muted border border-line rounded-xl text-xs font-bold"
                 />
               </>
             )}
@@ -88,7 +88,7 @@ export function FinancialStatementsHeader({
                   value={agingType}
                   aria-label="نوع أعمار الديون"
                   onChange={(event) => onAgingTypeChange(event.target.value === 'supplier' ? 'supplier' : 'customer')}
-                  className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold"
+                  className="px-3 py-2 bg-surface-muted border border-line rounded-xl text-xs font-bold"
                 >
                   <option value="customer">العملاء</option>
                   <option value="supplier">الموردون</option>
@@ -98,26 +98,26 @@ export function FinancialStatementsHeader({
                   aria-label="تاريخ أعمار الديون"
                   value={asOf}
                   onChange={(event) => onAsOfChange(event.target.value)}
-                  className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold"
+                  className="px-3 py-2 bg-surface-muted border border-line rounded-xl text-xs font-bold"
                 />
               </>
             )}
-            <button onClick={onRefresh} aria-label="تحديث القوائم المالية" className="p-2 rounded-xl border border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100" title="تحديث">
+            <button onClick={onRefresh} aria-label="تحديث القوائم المالية" className="p-2 rounded-xl border border-line bg-surface-muted text-ink-secondary hover:bg-surface-sunken" title="تحديث">
               <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             </button>
-            <button onClick={onExport} aria-label="تصدير إلى جدول بيانات" disabled={!onExport} className="flex items-center gap-2 px-3 py-2 rounded-xl bg-teal-600 text-white text-xs font-bold disabled:opacity-40">
+            <button onClick={onExport} aria-label="تصدير إلى جدول بيانات" disabled={!onExport} className="flex items-center gap-2 px-3 py-2 rounded-xl bg-success text-white text-xs font-bold disabled:opacity-40">
               <FileSpreadsheet className="w-4 h-4" /> جدول بيانات
             </button>
           </>}
         />
       </div>
 
-      <div className="bg-white border-b border-slate-200 px-6 flex items-center gap-1 overflow-x-auto">
+      <div className="bg-surface border-b border-line px-6 flex items-center gap-1 overflow-x-auto">
         {availableTabs.map(([key, label, Icon]) => (
           <button
             key={key}
             onClick={() => onTabChange(key)}
-            className={`flex items-center gap-2 px-4 py-3 text-xs font-bold border-b-2 whitespace-nowrap transition ${tab === key ? 'border-teal-600 text-teal-700' : 'border-transparent text-slate-500 hover:text-slate-800'}`}
+            className={`flex items-center gap-2 px-4 py-3 text-xs font-bold border-b-2 whitespace-nowrap transition ${tab === key ? 'border-success text-success' : 'border-transparent text-muted hover:text-ink'}`}
           >
             <Icon className="w-4 h-4" /> {label}
           </button>

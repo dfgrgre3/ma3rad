@@ -45,8 +45,8 @@ interface EmployeeFormModalProps {
   onDeactivateJobTitle: () => void;
 }
 
-const fieldClass = 'w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-500/10 disabled:cursor-not-allowed disabled:bg-slate-100';
-const labelClass = 'mb-1.5 block text-xs font-bold text-slate-600';
+const fieldClass = 'w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-ink outline-none transition focus:border-warning focus:ring-2 focus:ring-warning/10 disabled:cursor-not-allowed disabled:bg-surface-sunken';
+const labelClass = 'mb-1.5 block text-xs font-bold text-ink-secondary';
 
 export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
   open,
@@ -76,25 +76,25 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-primary/45 p-4 backdrop-blur-sm">
       <section
         role="dialog"
         aria-modal="true"
         aria-labelledby="employee-form-title"
-        className="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl"
+        className="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-2xl"
       >
-        <header className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-5 py-4 sm:px-6">
+        <header className="flex items-center justify-between border-b border-line bg-surface-muted px-5 py-4 sm:px-6">
           <div>
-            <h2 id="employee-form-title" className="text-base font-black text-slate-900">
+            <h2 id="employee-form-title" className="text-base font-black text-ink">
               {editingEmployee ? 'تعديل بيانات العامل / الموظف' : 'إضافة عامل / موظف جديد'}
             </h2>
-            <p className="mt-1 text-xs text-slate-500">تُستخدم البيانات في سجل الموظفين والدوام والرواتب.</p>
+            <p className="mt-1 text-xs text-muted">تُستخدم البيانات في سجل الموظفين والدوام والرواتب.</p>
           </div>
           <button
             type="button"
             onClick={onClose}
             disabled={isSaving}
-            className="rounded-lg px-3 py-2 text-xs font-bold text-slate-500 transition hover:bg-slate-200 hover:text-slate-900 disabled:opacity-50"
+            className="rounded-lg px-3 py-2 text-xs font-bold text-muted transition hover:bg-surface-sunken hover:text-ink disabled:opacity-50"
           >
             إغلاق
           </button>
@@ -115,7 +115,7 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
                 placeholder="مثال: أحمد محمد علي"
               />
               {editingEmployee?.code && (
-                <span className="mt-1 block font-mono text-[11px] text-slate-500">كود الموظف: {editingEmployee.code}</span>
+                <span className="mt-1 block font-mono text-[11px] text-muted">كود الموظف: {editingEmployee.code}</span>
               )}
             </label>
 
@@ -203,8 +203,8 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
             </label>
           </div>
 
-          <section className="mt-5 rounded-xl border border-slate-200 bg-slate-50/70 p-4">
-            <h3 className="mb-3 text-xs font-black text-slate-700">البيانات الوظيفية والهيكل التنظيمي</h3>
+          <section className="mt-5 rounded-xl border border-line bg-surface-muted/70 p-4">
+            <h3 className="mb-3 text-xs font-black text-ink">البيانات الوظيفية والهيكل التنظيمي</h3>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <label>
                 <span className={labelClass}>المسمى الوظيفي *</span>
@@ -216,9 +216,9 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
                   {jobTitles.map((jobTitle) => <option key={jobTitle.id} value={jobTitle.title} />)}
                 </datalist>
                 <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1">
-                  <button type="button" className="text-[11px] font-bold text-sky-700" onClick={onCreateJobTitle}>+ إضافة مسمى</button>
-                  <button type="button" className="text-[11px] font-bold text-slate-600" onClick={onUpdateJobTitle}>تعديل المحفوظ</button>
-                  <button type="button" className="text-[11px] font-bold text-rose-700" onClick={onDeactivateJobTitle}>تعطيل المحفوظ</button>
+                  <button type="button" className="text-[11px] font-bold text-primary" onClick={onCreateJobTitle}>+ إضافة مسمى</button>
+                  <button type="button" className="text-[11px] font-bold text-ink-secondary" onClick={onUpdateJobTitle}>تعديل المحفوظ</button>
+                  <button type="button" className="text-[11px] font-bold text-danger" onClick={onDeactivateJobTitle}>تعطيل المحفوظ</button>
                 </div>
               </label>
               <label>
@@ -233,9 +233,9 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
                   {departments.map((department) => <option key={department.id} value={department.id}>{department.name}</option>)}
                 </select>
                 <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1">
-                  <button type="button" className="text-[11px] font-bold text-sky-700" onClick={onCreateDepartment}>+ إضافة قسم</button>
-                  <button type="button" className="text-[11px] font-bold text-slate-600" onClick={onUpdateDepartment}>تعديل المحدد</button>
-                  <button type="button" className="text-[11px] font-bold text-rose-700" onClick={onDeactivateDepartment}>تعطيل المحدد</button>
+                  <button type="button" className="text-[11px] font-bold text-primary" onClick={onCreateDepartment}>+ إضافة قسم</button>
+                  <button type="button" className="text-[11px] font-bold text-ink-secondary" onClick={onUpdateDepartment}>تعديل المحدد</button>
+                  <button type="button" className="text-[11px] font-bold text-danger" onClick={onDeactivateDepartment}>تعطيل المحدد</button>
                 </div>
               </label>
               <label>
@@ -275,7 +275,7 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
               <label>
                 <span className={labelClass}>الحالة الوظيفية *</span>
                 {['RESIGNED', 'TERMINATED'].includes(form.status) ? (
-                  <p className={`${fieldClass} bg-slate-100`}>
+                  <p className={`${fieldClass} bg-surface-sunken`}>
                     {form.status === 'RESIGNED' ? 'مستقيل' : 'منتهية خدمته'} — تُدار الحالة من دورة إنهاء الخدمة
                   </p>
                 ) : (
@@ -301,12 +301,12 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
               </label>
             </div>
             {editingEmployee?.terminatedAt && (
-              <p className="mt-3 text-xs text-slate-500">تاريخ انتهاء الخدمة: {editingEmployee.terminatedAt} (يُدار من دورة إنهاء العقد)</p>
+              <p className="mt-3 text-xs text-muted">تاريخ انتهاء الخدمة: {editingEmployee.terminatedAt} (يُدار من دورة إنهاء العقد)</p>
             )}
           </section>
 
-          <section className="mt-5 rounded-xl border border-slate-200 bg-slate-50/70 p-4">
-            <h3 className="mb-3 text-xs font-black text-slate-700">بيانات المندوب / المبيعات</h3>
+          <section className="mt-5 rounded-xl border border-line bg-surface-muted/70 p-4">
+            <h3 className="mb-3 text-xs font-black text-ink">بيانات المندوب / المبيعات</h3>
             <label className="flex items-center gap-2">
               <input
                 type="checkbox"
@@ -317,9 +317,9 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
                   isSalesRep: e.target.checked,
                   additionalBranchIds: e.target.checked ? prev.additionalBranchIds : [],
                 }))}
-                className="h-4 w-4 rounded border-slate-300 text-orange-600"
+                className="h-4 w-4 rounded border-line-strong text-warning"
               />
-              <span className="text-sm font-bold text-slate-700">مندوب مبيعات</span>
+              <span className="text-sm font-bold text-ink">مندوب مبيعات</span>
             </label>
             {form.isSalesRep && (
               <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -348,16 +348,16 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
                 </label>
                 <div className="sm:col-span-2">
                   <span className={labelClass}>فروع إضافية يخدمها المندوب</span>
-                  <p className="mb-2 text-[11px] text-slate-500">
+                  <p className="mb-2 text-[11px] text-muted">
                     الفرع الرئيسي: «{branches.find((b) => b.id === form.branchId)?.name || '—'}» — يمكن اختيار المندوب في أي فرع، وهذه الفروع تُستخدم للتنظيم والتقارير.
                   </p>
-                  <div className="grid grid-cols-1 gap-1.5 rounded-lg border border-slate-200 bg-white p-3 sm:grid-cols-2">
+                  <div className="grid grid-cols-1 gap-1.5 rounded-lg border border-line bg-surface p-3 sm:grid-cols-2">
                     {repBranches
                       .filter((branch) => branch.id !== form.branchId)
                       .map((branch) => {
                         const checked = form.additionalBranchIds.includes(branch.id);
                         return (
-                          <label key={branch.id} className="flex items-center gap-2 text-xs font-bold text-slate-700">
+                          <label key={branch.id} className="flex items-center gap-2 text-xs font-bold text-ink">
                             <input
                               type="checkbox"
                               checked={checked}
@@ -368,14 +368,14 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
                                   ? [...prev.additionalBranchIds, branch.id]
                                   : prev.additionalBranchIds.filter((id) => id !== branch.id),
                               }))}
-                              className="h-4 w-4 rounded border-slate-300 text-orange-600"
+                              className="h-4 w-4 rounded border-line-strong text-warning"
                             />
                             {branch.name}
                           </label>
                         );
                       })}
                     {!repBranches.some((branch) => branch.id !== form.branchId) && (
-                      <span className="text-[11px] text-slate-400">لا توجد فروع إضافية متاحة ضمن صلاحياتك.</span>
+                      <span className="text-[11px] text-muted">لا توجد فروع إضافية متاحة ضمن صلاحياتك.</span>
                     )}
                   </div>
                 </div>
@@ -383,8 +383,8 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
             )}
           </section>
 
-          <section className="mt-5 rounded-xl border border-slate-200 bg-slate-50/70 p-4">
-            <h3 className="mb-3 text-xs font-black text-slate-700">بيانات الأجر والتعيين</h3>
+          <section className="mt-5 rounded-xl border border-line bg-surface-muted/70 p-4">
+            <h3 className="mb-3 text-xs font-black text-ink">بيانات الأجر والتعيين</h3>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <label>
                 <span className={labelClass}>الراتب / الأجر الأساسي *</span>
@@ -458,7 +458,7 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
               <label className="flex items-center gap-2">
                 <input type="checkbox" checked={form.taxExempt}
                   onChange={(e) => onFormChange((prev) => ({ ...prev, taxExempt: e.target.checked }))}
-                  className="h-4 w-4 rounded border-slate-300 text-sky-600" />
+                  className="h-4 w-4 rounded border-line-strong text-primary" />
                 <span className={labelClass}>معفى من الضريبة</span>
               </label>
               <label><span className={labelClass}>إعفاء شهري إضافي</span>
@@ -472,8 +472,8 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
             </div>
           </section>
 
-          <section className="mt-5 rounded-xl border border-slate-200 bg-slate-50/70 p-4">
-            <h3 className="mb-3 text-xs font-black text-slate-700">المؤهل والخبرات</h3>
+          <section className="mt-5 rounded-xl border border-line bg-surface-muted/70 p-4">
+            <h3 className="mb-3 text-xs font-black text-ink">المؤهل والخبرات</h3>
             <div className="grid gap-4 sm:grid-cols-2">
               <label><span className={labelClass}>المؤهل الدراسي</span>
                 <textarea rows={2} maxLength={1000} value={form.education}
@@ -484,7 +484,7 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
                   onChange={(e) => onFormChange((prev) => ({ ...prev, previousExperience: e.target.value }))}
                   className={`${fieldClass} resize-y`} /></label>
             </div>
-            <p className="mt-2 text-[11px] text-slate-500">أضف الهوية والشهادات والمستندات الرسمية من وحدة مستندات الموظفين.</p>
+            <p className="mt-2 text-[11px] text-muted">أضف الهوية والشهادات والمستندات الرسمية من وحدة مستندات الموظفين.</p>
           </section>
           <div className="mt-4"><OperationalFieldsForm fields={operationalFields} values={operationalFieldValues} onChange={onOperationalFieldValuesChange} title="بيانات إضافية للموظف" /></div>
 
@@ -501,29 +501,29 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
           </label>
 
           {!branches.length && (
-            <p role="alert" className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-800">
+            <p role="alert" className="mt-4 rounded-lg border border-warning-border bg-warning-soft px-3 py-2 text-xs font-bold text-warning">
               لا يمكن حفظ الموظف قبل اختيار فرع نشط متاح.
             </p>
           )}
           {error && (
-            <p role="alert" className="mt-4 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700">
+            <p role="alert" className="mt-4 rounded-lg border border-danger-border bg-danger-soft px-3 py-2 text-xs font-bold text-danger">
               {error}
             </p>
           )}
 
-          <footer className="mt-5 flex justify-end gap-2 border-t border-slate-100 pt-4">
+          <footer className="mt-5 flex justify-end gap-2 border-t border-line pt-4">
             <button
               type="button"
               onClick={onClose}
               disabled={isSaving}
-              className="rounded-lg border border-slate-200 px-4 py-2.5 text-xs font-bold text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
+              className="rounded-lg border border-line px-4 py-2.5 text-xs font-bold text-ink-secondary transition hover:bg-surface-muted disabled:opacity-50"
             >
               إلغاء
             </button>
             <button
               type="submit"
               disabled={isSaving || !branches.length}
-              className="rounded-lg bg-orange-700 px-5 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-orange-800 disabled:cursor-not-allowed disabled:opacity-60"
+              className="rounded-lg bg-warning px-5 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-warning disabled:cursor-not-allowed disabled:opacity-60"
             >
               {isSaving ? 'جارٍ الحفظ...' : editingEmployee ? 'حفظ التغييرات' : 'إضافة الموظف'}
             </button>

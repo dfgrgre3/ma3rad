@@ -31,12 +31,12 @@ export const OperationsShiftsPage: FC = () => {
   return (
     <div className="p-6 space-y-6 overflow-y-auto h-full relative">
       {notice && (
-        <div className="fixed top-6 left-6 z-[60] px-4 py-3 rounded-xl shadow-2xl bg-emerald-600 text-white flex items-center gap-2">
+        <div className="fixed top-6 left-6 z-[60] px-4 py-3 rounded-xl shadow-2xl bg-success text-white flex items-center gap-2">
           <CheckCircle2 className="w-5 h-5" /> <span className="text-sm font-bold">{notice}</span>
         </div>
       )}
       {error && (
-        <div className="fixed top-6 left-6 z-[60] px-4 py-3 rounded-xl shadow-2xl bg-rose-600 text-white flex items-center gap-2">
+        <div className="fixed top-6 left-6 z-[60] px-4 py-3 rounded-xl shadow-2xl bg-danger text-white flex items-center gap-2">
           <AlertTriangle className="w-5 h-5" /> <span className="text-sm font-bold">{error}</span>
         </div>
       )}
@@ -49,14 +49,14 @@ export const OperationsShiftsPage: FC = () => {
           <button
             type="button"
             onClick={loadAll}
-            className="px-4 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 text-sm font-bold flex items-center gap-2 hover:bg-slate-50"
+            className="px-4 py-2 rounded-xl border border-line bg-surface text-ink text-sm font-bold flex items-center gap-2 hover:bg-surface-muted"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /> تحديث
           </button>
         }
       />
 
-      <div className="flex gap-2 bg-slate-100 p-1 rounded-xl w-fit">
+      <div className="flex gap-2 bg-surface-sunken p-1 rounded-xl w-fit">
         {([
           ['board', 'لوحة الورديات', CalendarClock],
           ['schedule', 'الجدولة والموارد', Users],
@@ -73,7 +73,7 @@ export const OperationsShiftsPage: FC = () => {
               if (id === 'reports') setReport(service.getShiftReport(reportFrom, reportTo));
             }}
             className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 ${
-              tab === id ? 'bg-white text-teal-700 shadow-sm' : 'text-slate-500'
+              tab === id ? 'bg-surface text-success shadow-sm' : 'text-muted'
             }`}
           >
             <Icon className="w-4 h-4" /> {label}
@@ -87,8 +87,8 @@ export const OperationsShiftsPage: FC = () => {
       {tab === 'reports' && <ReportsTab state={state} />}
 
       {loading && (
-        <div className="fixed inset-0 bg-white/60 backdrop-blur-sm z-50 flex items-center justify-center">
-          <Loader2 className="w-8 h-8 animate-spin text-teal-600" />
+        <div className="fixed inset-0 bg-surface/60 backdrop-blur-sm z-50 flex items-center justify-center">
+          <Loader2 className="w-8 h-8 animate-spin text-success" />
         </div>
       )}
     </div>

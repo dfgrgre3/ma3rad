@@ -23,7 +23,7 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ open, onClose, form, s
   >
     <div className="space-y-3.5 text-right">
       <div>
-        <label className="block text-xs font-semibold text-slate-300 mb-1">اسم المفتاح / الوصف *</label>
+        <label className="block text-xs font-semibold text-muted mb-1">اسم المفتاح / الوصف *</label>
         <input
           type="text"
           value={form.name}
@@ -34,7 +34,7 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ open, onClose, form, s
       </div>
 
       <div>
-        <label className="block text-xs font-semibold text-slate-300 mb-1">العميل المرتبط (المستأجر) *</label>
+        <label className="block text-xs font-semibold text-muted mb-1">العميل المرتبط (المستأجر) *</label>
         <select
           value={form.tenantId}
           onChange={(e) => setForm({ ...form, tenantId: e.target.value })}
@@ -49,8 +49,8 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ open, onClose, form, s
       </div>
 
       <div>
-        <label className="block text-xs font-semibold text-slate-300 mb-1">نطاقات الصلاحية (Scopes)</label>
-        <div className="grid grid-cols-2 gap-2 text-xs text-slate-300 mt-1">
+        <label className="block text-xs font-semibold text-muted mb-1">نطاقات الصلاحية (Scopes)</label>
+        <div className="grid grid-cols-2 gap-2 text-xs text-muted mt-1">
           {[
             { id: 'read', label: 'قراءة البيانات (read)' },
             { id: 'write', label: 'كتابة وتعديل (write)' },
@@ -61,7 +61,7 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ open, onClose, form, s
           ].map((s) => {
             const checked = form.scopes.includes(s.id);
             return (
-              <label key={s.id} className="flex items-center gap-2 cursor-pointer bg-slate-950/40 p-2 rounded border border-slate-800">
+              <label key={s.id} className="flex items-center gap-2 cursor-pointer bg-primary/40 p-2 rounded border border-line-strong">
                 <input
                   type="checkbox"
                   checked={checked}
@@ -72,7 +72,7 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ open, onClose, form, s
                       setForm({ ...form, scopes: form.scopes.filter((sc) => sc !== s.id) });
                     }
                   }}
-                  className="rounded border-slate-700 text-sky-500 focus:ring-sky-500"
+                  className="rounded border-line-strong text-primary focus:ring-primary"
                 />
                 <span>{s.label}</span>
               </label>
@@ -82,17 +82,17 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ open, onClose, form, s
       </div>
 
       <div>
-        <label className="block text-xs font-semibold text-slate-300 mb-1">تاريخ انتهاء الصلاحية (اختياري)</label>
+        <label className="block text-xs font-semibold text-muted mb-1">تاريخ انتهاء الصلاحية (اختياري)</label>
         <input
           type="datetime-local"
           value={form.expiresAt}
           onChange={(e) => setForm({ ...form, expiresAt: e.target.value })}
           className={inputClass}
         />
-        <span className="text-[10px] text-slate-500 mt-0.5 block">اتركه فارغاً ليكون المفتاح دائماً وغير مقيد بوقت انتهاء.</span>
+        <span className="text-[10px] text-muted mt-0.5 block">اتركه فارغاً ليكون المفتاح دائماً وغير مقيد بوقت انتهاء.</span>
       </div>
 
-      <div className="flex justify-end gap-2 pt-3 border-t border-slate-800">
+      <div className="flex justify-end gap-2 pt-3 border-t border-line-strong">
         <Button variant="secondary" size="sm" onClick={onClose}>
           إلغاء
         </Button>

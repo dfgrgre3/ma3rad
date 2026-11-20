@@ -26,12 +26,12 @@ const STATUS_LABELS: Record<AttendanceStatus, string> = {
   HOLIDAY: 'عطلة', WEEKEND: 'راحة أسبوعية',
 };
 const STATUS_COLORS: Record<AttendanceStatus, string> = {
-  PRESENT: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-  LATE: 'bg-amber-50 text-amber-700 border-amber-200',
-  ABSENT: 'bg-rose-50 text-rose-700 border-rose-200',
-  LEAVE: 'bg-sky-50 text-sky-700 border-sky-200',
-  HOLIDAY: 'bg-violet-50 text-violet-700 border-violet-200',
-  WEEKEND: 'bg-slate-100 text-slate-600 border-slate-200',
+  PRESENT: 'bg-success-soft text-success border-success-border',
+  LATE: 'bg-warning-soft text-warning border-warning-border',
+  ABSENT: 'bg-danger-soft text-danger border-danger-border',
+  LEAVE: 'bg-accent-soft text-primary border-accent-border',
+  HOLIDAY: 'bg-accent-soft text-primary border-accent-border',
+  WEEKEND: 'bg-surface-sunken text-ink-secondary border-line',
 };
 const EDITABLE_STATUSES: AttendanceStatus[] = ['PRESENT', 'LATE', 'ABSENT', 'LEAVE'];
 const today = () => localDateString();
@@ -305,8 +305,8 @@ export const AttendancePage: React.FC = () => {
   ];
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
-      <div className="bg-white px-6 pt-4">
+    <div className="h-full flex flex-col bg-surface-muted text-ink overflow-hidden">
+      <div className="bg-surface px-6 pt-4">
         <PageHeader
           icon={<CalendarCheck className="h-5 w-5" />}
           title="الحضور والانصراف"
@@ -315,45 +315,45 @@ export const AttendancePage: React.FC = () => {
             <button onClick={() => filtered.filter((employee) => !recordsByEmployee.has(employee.id)).forEach((employee) => {
               try { AttendanceService.saveManualRecord({ employeeId: employee.id, date, status: 'PRESENT' }); }
               catch (reason) { setError(reason instanceof Error ? reason.message : 'تعذر تسجيل الموظفين.'); }
-            })} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-bold">
+            })} className="px-4 py-2 bg-success hover:bg-success text-white rounded-xl text-sm font-bold">
               تسجيل غير المسجلين حاضرين
             </button>
           )}
         />
       </div>
 
-      <div className="bg-white border-b border-slate-200 px-6 flex gap-2 overflow-auto">
+      <div className="bg-surface border-b border-line px-6 flex gap-2 overflow-auto">
         {tabs.map((item) => (
           <button key={item.id} onClick={() => changeTab(item.id)}
-            className={`px-4 py-3 text-xs font-bold border-b-2 whitespace-nowrap ${tab === item.id ? 'border-emerald-600 text-emerald-700' : 'border-transparent text-slate-500 hover:text-slate-800'}`}>
+            className={`px-4 py-3 text-xs font-bold border-b-2 whitespace-nowrap ${tab === item.id ? 'border-success text-success' : 'border-transparent text-muted hover:text-ink'}`}>
             {item.label}
           </button>
         ))}
       </div>
 
       {(error || notice) && (
-        <div className={`mx-6 mt-3 px-4 py-2.5 rounded-xl border text-xs font-semibold ${error ? 'bg-rose-50 border-rose-200 text-rose-700' : 'bg-emerald-50 border-emerald-200 text-emerald-700'}`}>
+        <div className={`mx-6 mt-3 px-4 py-2.5 rounded-xl border text-xs font-semibold ${error ? 'bg-danger-soft border-danger-border text-danger' : 'bg-success-soft border-success-border text-success'}`}>
           {error || notice}
         </div>
       )}
 
       {tab === 'daily' && (
         <>
-          <div className="px-6 py-3 bg-white border-b border-slate-200 flex flex-wrap items-end gap-3">
-            <label className="text-[10px] font-bold text-slate-500">التاريخ
+          <div className="px-6 py-3 bg-surface border-b border-line flex flex-wrap items-end gap-3">
+            <label className="text-[10px] font-bold text-muted">التاريخ
               <input type="date" value={date} onChange={(event) => {
                 setDate(event.target.value);
                 setPeriod(event.target.value.slice(0, 7));
-              }} className="mt-1 block px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold" />
+              }} className="mt-1 block px-3 py-2 bg-surface-muted border border-line rounded-xl text-xs font-bold" />
             </label>
             <div className="relative flex-1 min-w-[220px] max-w-sm">
-              <Search className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <Search className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
               <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="بحث باسم الموظف أو الوظيفة..."
-                className="w-full pl-4 pr-10 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm" />
+                className="w-full pl-4 pr-10 py-2 bg-surface-muted border border-line rounded-xl text-sm" />
             </div>
-            <p className="text-xs text-amber-700">لا يوجد دوام مفروض تلقائيًا؛ يلزم تعيين وردية للموظف لحساب التأخير والانصراف المبكر.</p>
+            <p className="text-xs text-warning">لا يوجد دوام مفروض تلقائيًا؛ يلزم تعيين وردية للموظف لحساب التأخير والانصراف المبكر.</p>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 px-6 py-3 bg-white border-b border-slate-200">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 px-6 py-3 bg-surface border-b border-line">
             {(Object.keys(STATUS_LABELS) as AttendanceStatus[]).map((status) => (
               <div key={status} className={`rounded-xl border px-4 py-2 ${STATUS_COLORS[status]}`}>
                 <div className="text-[10px] font-bold">{STATUS_LABELS[status]}</div>
@@ -365,10 +365,10 @@ export const AttendancePage: React.FC = () => {
       )}
 
       <div className="flex-1 overflow-auto p-6">
-        {loading ? <div className="py-16 flex justify-center"><Loader2 className="w-6 h-6 animate-spin text-emerald-500" /></div> : (
+        {loading ? <div className="py-16 flex justify-center"><Loader2 className="w-6 h-6 animate-spin text-success" /></div> : (
           <>
             {tab === 'daily' && (
-              <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+              <div className="bg-surface border border-line rounded-xl overflow-hidden">
                 <div className="overflow-x-auto">
                   <DataTable
                     ariaLabel="الحضور اليومي"
@@ -380,14 +380,14 @@ export const AttendancePage: React.FC = () => {
                     minWidth={1100}
                     dense
                     tableClassName="text-sm"
-                    rowClassName={() => 'align-top hover:bg-slate-50/70'}
+                    rowClassName={() => 'align-top hover:bg-surface-muted/70'}
                     columns={[
                       {
                         key: 'employee', header: 'الموظف',
                         render: ({ employee }) => (
                           <span className="flex items-center gap-2">
-                            <span className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-500"><Users className="w-4 h-4" /></span>
-                            <span><b className="block text-slate-800">{employee.name}</b><small className="text-slate-400">{employee.role}</small></span>
+                            <span className="w-8 h-8 rounded-lg bg-surface-sunken flex items-center justify-center text-muted"><Users className="w-4 h-4" /></span>
+                            <span><b className="block text-ink">{employee.name}</b><small className="text-muted">{employee.role}</small></span>
                           </span>
                         ),
                       },
@@ -396,8 +396,8 @@ export const AttendancePage: React.FC = () => {
                         render: ({ record }) => (
                           <span>
                             {record ? <span className={`text-[10px] px-2 py-1 rounded border font-bold ${STATUS_COLORS[record.status]}`}>{STATUS_LABELS[record.status]}</span>
-                              : <span className="text-xs text-slate-400">لم يسجل</span>}
-                            <span className="mt-1 block text-[10px] text-slate-400">{record?.source ?? ''}</span>
+                              : <span className="text-xs text-muted">لم يسجل</span>}
+                            <span className="mt-1 block text-[10px] text-muted">{record?.source ?? ''}</span>
                           </span>
                         ),
                       },
@@ -414,11 +414,11 @@ export const AttendancePage: React.FC = () => {
                         render: ({ record }) => (
                           <span className="text-xs">
                             <span className="block">{record ? formatMinutes(record.workedMinutes) : '—'} عمل</span>
-                            <span className="block text-slate-500">{record ? formatMinutes(record.breakMinutes) : '—'} استراحة</span>
+                            <span className="block text-muted">{record ? formatMinutes(record.breakMinutes) : '—'} استراحة</span>
                             {record && breaks.some((item) => item.attendanceId === record.id) && <details className="mt-1">
-                              <summary className="cursor-pointer text-[10px] text-sky-700">تفاصيل الاستراحات</summary>
+                              <summary className="cursor-pointer text-[10px] text-primary">تفاصيل الاستراحات</summary>
                               {breaks.filter((item) => item.attendanceId === record.id).map((item) => (
-                                <div key={item.id} className="mt-1 text-[10px] text-slate-500">
+                                <div key={item.id} className="mt-1 text-[10px] text-muted">
                                   {item.startedAt.slice(11, 16)}–{item.endedAt?.slice(11, 16) ?? 'مفتوحة'} ({item.minutes} د)
                                 </div>
                               ))}
@@ -430,7 +430,7 @@ export const AttendancePage: React.FC = () => {
                         key: 'late', header: 'التأخير / المبكر',
                         render: ({ record }) => (
                           <span className="text-xs">
-                            <span className="block">{record?.lateMinutes ?? 0} د تأخير</span><span className="block text-slate-500">{record?.earlyLeaveMinutes ?? 0} د مبكر</span>
+                            <span className="block">{record?.lateMinutes ?? 0} د تأخير</span><span className="block text-muted">{record?.earlyLeaveMinutes ?? 0} د مبكر</span>
                           </span>
                         ),
                       },
@@ -440,8 +440,8 @@ export const AttendancePage: React.FC = () => {
                           <span className="text-xs">
                             <span className="block">{record?.overtimeMinutes ?? 0} د</span>
                             {record?.overtimeMinutes ? record.overtimeApproved
-                              ? <span className="text-emerald-700">معتمد للرواتب</span>
-                              : <span className="text-amber-700">بانتظار الاعتماد</span> : null}
+                              ? <span className="text-success">معتمد للرواتب</span>
+                              : <span className="text-warning">بانتظار الاعتماد</span> : null}
                           </span>
                         ),
                       },
@@ -451,19 +451,19 @@ export const AttendancePage: React.FC = () => {
                           <div className="flex flex-wrap gap-1">
                             {!record?.checkInAt && <button disabled={!canManage || date !== today() || busy === employee.id}
                               onClick={() => runAction(employee.id, () => AttendanceService.punchIn(employee.id))}
-                              className="px-2 py-1 rounded-lg bg-emerald-50 text-emerald-700 text-[10px] font-bold disabled:opacity-40"><Clock3 className="inline w-3 h-3 ml-1" />دخول</button>}
+                              className="px-2 py-1 rounded-lg bg-success-soft text-success text-[10px] font-bold disabled:opacity-40"><Clock3 className="inline w-3 h-3 ml-1" />دخول</button>}
                             {!!record?.checkInAt && !record.checkOutAt && <button disabled={!canManage || date !== today() || busy === employee.id}
                               onClick={() => runAction(employee.id, () => AttendanceService.punchOut(employee.id))}
-                              className="px-2 py-1 rounded-lg bg-rose-50 text-rose-700 text-[10px] font-bold disabled:opacity-40">انصراف</button>}
+                              className="px-2 py-1 rounded-lg bg-danger-soft text-danger text-[10px] font-bold disabled:opacity-40">انصراف</button>}
                             {!!record?.checkInAt && !record.checkOutAt && !record.activeBreak && <button disabled={!canManage || date !== today()}
                               onClick={() => runAction(employee.id, () => AttendanceService.startBreak(employee.id))}
-                              className="px-2 py-1 rounded-lg bg-sky-50 text-sky-700 text-[10px] font-bold disabled:opacity-40"><Coffee className="inline w-3 h-3 ml-1" />استراحة</button>}
+                              className="px-2 py-1 rounded-lg bg-accent-soft text-primary text-[10px] font-bold disabled:opacity-40"><Coffee className="inline w-3 h-3 ml-1" />استراحة</button>}
                             {!!record?.activeBreak && <button disabled={!canManage || date !== today()}
                               onClick={() => runAction(employee.id, () => AttendanceService.endBreak(employee.id))}
-                              className="px-2 py-1 rounded-lg bg-amber-50 text-amber-700 text-[10px] font-bold disabled:opacity-40">إنهاء الاستراحة</button>}
+                              className="px-2 py-1 rounded-lg bg-warning-soft text-warning text-[10px] font-bold disabled:opacity-40">إنهاء الاستراحة</button>}
                             {!!record?.overtimeMinutes && !record.overtimeApproved && canApprove && <button disabled={busy === record.id}
                               onClick={() => runAction(record.id, () => AttendanceService.approveOvertime(record.id))}
-                              className="px-2 py-1 rounded-lg bg-violet-50 text-violet-700 text-[10px] font-bold">اعتماد الإضافي</button>}
+                              className="px-2 py-1 rounded-lg bg-accent-soft text-primary text-[10px] font-bold">اعتماد الإضافي</button>}
                           </div>
                         ),
                       },
@@ -471,7 +471,7 @@ export const AttendancePage: React.FC = () => {
                         key: 'correction', header: 'تصحيح يدوي',
                         render: ({ employee, record, form }) => (
                           <details>
-                            <summary className="cursor-pointer text-xs text-sky-700 font-bold">طلب تعديل</summary>
+                            <summary className="cursor-pointer text-xs text-primary font-bold">طلب تعديل</summary>
                             <div className="mt-2 grid grid-cols-2 gap-1.5 min-w-[230px]">
                               <select value={form.status} onChange={(event) => updateForm(employee.id, record, 'status', event.target.value)}
                                 className="col-span-2 rounded border p-1 text-xs">
@@ -483,7 +483,7 @@ export const AttendancePage: React.FC = () => {
                               <input aria-label="دقائق الإضافي" type="number" min={0} value={form.overtime} onChange={(event) => updateForm(employee.id, record, 'overtime', event.target.value)} className="rounded border p-1 text-xs" placeholder="الإضافي" />
                               <input value={form.notes} onChange={(event) => updateForm(employee.id, record, 'notes', event.target.value)} className="col-span-2 rounded border p-1 text-xs" placeholder="ملاحظات" />
                               <button disabled={!canManage} onClick={() => runAction(employee.id, () => saveManual(employee, record))}
-                                className="col-span-2 rounded-lg bg-slate-900 px-2 py-1.5 text-xs font-bold text-white disabled:opacity-40">إرسال للموافقة</button>
+                                className="col-span-2 rounded-lg bg-primary px-2 py-1.5 text-xs font-bold text-white disabled:opacity-40">إرسال للموافقة</button>
                             </div>
                           </details>
                         ),
@@ -497,15 +497,15 @@ export const AttendancePage: React.FC = () => {
 
             {tab === 'schedules' && (
               <div className="space-y-5">
-                <section className="bg-white border border-slate-200 rounded-xl p-5 space-y-4">
+                <section className="bg-surface border border-line rounded-xl p-5 space-y-4">
                   <h2 className="font-black flex items-center gap-2"><Settings2 className="w-4 h-4" />إنشاء وردية</h2>
                   <div className="grid md:grid-cols-3 gap-3">
-                    <label className="text-xs text-slate-500">اسم الوردية<input value={newShift.name} onChange={(e) => setNewShift((s) => ({ ...s, name: e.target.value }))} className="mt-1 block w-full rounded-lg border p-2 text-slate-900" /></label>
-                    <label className="text-xs text-slate-500">بداية<input type="time" value={newShift.startTime} onChange={(e) => setNewShift((s) => ({ ...s, startTime: e.target.value }))} className="mt-1 block w-full rounded-lg border p-2 text-slate-900" /></label>
-                    <label className="text-xs text-slate-500">نهاية<input type="time" value={newShift.endTime} onChange={(e) => setNewShift((s) => ({ ...s, endTime: e.target.value }))} className="mt-1 block w-full rounded-lg border p-2 text-slate-900" /></label>
-                    <label className="text-xs text-slate-500">مدة الاستراحة المتوقعة (دقيقة)<input type="number" min={0} value={newShift.breakMinutes} onChange={(e) => setNewShift((s) => ({ ...s, breakMinutes: Number(e.target.value) }))} className="mt-1 block w-full rounded-lg border p-2 text-slate-900" /></label>
-                    <label className="text-xs text-slate-500">السماح بالتأخير (دقيقة)<input type="number" min={0} value={newShift.graceMinutes} onChange={(e) => setNewShift((s) => ({ ...s, graceMinutes: Number(e.target.value) }))} className="mt-1 block w-full rounded-lg border p-2 text-slate-900" /></label>
-                    <label className="text-xs text-slate-500">مهلة بدء الإضافي (دقيقة)<input type="number" min={0} value={newShift.overtimeAfterMinutes} onChange={(e) => setNewShift((s) => ({ ...s, overtimeAfterMinutes: Number(e.target.value) }))} className="mt-1 block w-full rounded-lg border p-2 text-slate-900" /></label>
+                    <label className="text-xs text-muted">اسم الوردية<input value={newShift.name} onChange={(e) => setNewShift((s) => ({ ...s, name: e.target.value }))} className="mt-1 block w-full rounded-lg border p-2 text-ink" /></label>
+                    <label className="text-xs text-muted">بداية<input type="time" value={newShift.startTime} onChange={(e) => setNewShift((s) => ({ ...s, startTime: e.target.value }))} className="mt-1 block w-full rounded-lg border p-2 text-ink" /></label>
+                    <label className="text-xs text-muted">نهاية<input type="time" value={newShift.endTime} onChange={(e) => setNewShift((s) => ({ ...s, endTime: e.target.value }))} className="mt-1 block w-full rounded-lg border p-2 text-ink" /></label>
+                    <label className="text-xs text-muted">مدة الاستراحة المتوقعة (دقيقة)<input type="number" min={0} value={newShift.breakMinutes} onChange={(e) => setNewShift((s) => ({ ...s, breakMinutes: Number(e.target.value) }))} className="mt-1 block w-full rounded-lg border p-2 text-ink" /></label>
+                    <label className="text-xs text-muted">السماح بالتأخير (دقيقة)<input type="number" min={0} value={newShift.graceMinutes} onChange={(e) => setNewShift((s) => ({ ...s, graceMinutes: Number(e.target.value) }))} className="mt-1 block w-full rounded-lg border p-2 text-ink" /></label>
+                    <label className="text-xs text-muted">مهلة بدء الإضافي (دقيقة)<input type="number" min={0} value={newShift.overtimeAfterMinutes} onChange={(e) => setNewShift((s) => ({ ...s, overtimeAfterMinutes: Number(e.target.value) }))} className="mt-1 block w-full rounded-lg border p-2 text-ink" /></label>
                   </div>
                   <div className="flex flex-wrap gap-3">{WEEKDAYS.map((day, index) => (
                     <label key={day} className="text-xs flex items-center gap-1"><input type="checkbox" checked={newShift.workdays.includes(index)}
@@ -514,13 +514,13 @@ export const AttendancePage: React.FC = () => {
                   <button disabled={!canManage} onClick={() => runAction('shift', () => {
                     AttendanceService.saveShift(newShift);
                     setNewShift(emptyShift());
-                  }, 'تم حفظ الوردية.')} className="rounded-lg bg-emerald-600 px-4 py-2 text-xs font-bold text-white disabled:opacity-40">حفظ الوردية</button>
+                  }, 'تم حفظ الوردية.')} className="rounded-lg bg-success px-4 py-2 text-xs font-bold text-white disabled:opacity-40">حفظ الوردية</button>
                   <div className="divide-y">{shifts.map((shift) => (
                     <div key={shift.id} className="py-2 text-sm"><b>{shift.name}</b> · {shift.startTime}–{shift.endTime} · سماح {shift.graceMinutes} د · أيام: {shift.workdays.map((day) => WEEKDAYS[day]).join('، ')}</div>
                   ))}</div>
                 </section>
 
-                <section className="bg-white border border-slate-200 rounded-xl p-5 space-y-3">
+                <section className="bg-surface border border-line rounded-xl p-5 space-y-3">
                   <h2 className="font-black">تعيين وردية لموظف</h2>
                   <div className="grid md:grid-cols-4 gap-2">
                     <select value={assignment.employeeId} onChange={(e) => setAssignment((s) => ({ ...s, employeeId: e.target.value }))} className="rounded-lg border p-2 text-xs">
@@ -535,11 +535,11 @@ export const AttendancePage: React.FC = () => {
                   <button disabled={!canManage} onClick={() => runAction('assignment', () => {
                     AttendanceService.assignShift(assignment.employeeId, assignment.shiftId, assignment.from, assignment.to || undefined);
                     setAssignment((s) => ({ ...s, employeeId: '', shiftId: '', to: '' }));
-                  }, 'تم تعيين الوردية.')} className="rounded-lg bg-slate-900 px-4 py-2 text-xs font-bold text-white disabled:opacity-40">تعيين الوردية</button>
+                  }, 'تم تعيين الوردية.')} className="rounded-lg bg-primary px-4 py-2 text-xs font-bold text-white disabled:opacity-40">تعيين الوردية</button>
                   <div className="divide-y">{assignments.map((item) => <div key={item.id} className="py-2 text-xs">{item.employeeName} · {item.shiftName} · {item.effectiveFrom} – {item.effectiveTo || 'مستمر'}</div>)}</div>
                 </section>
 
-                <section className="bg-white border border-slate-200 rounded-xl p-5 space-y-3">
+                <section className="bg-surface border border-line rounded-xl p-5 space-y-3">
                   <h2 className="font-black">العطلات الرسمية للفرع</h2>
                   <div className="flex flex-wrap gap-2">
                     <input aria-label="تاريخ العطلة" type="date" value={holiday.date} onChange={(e) => setHoliday((s) => ({ ...s, date: e.target.value }))} className="rounded-lg border p-2 text-xs" />
@@ -547,23 +547,23 @@ export const AttendancePage: React.FC = () => {
                     <button disabled={!canManage} onClick={() => runAction('holiday', () => {
                       AttendanceService.addHoliday(holiday.date, holiday.name);
                       setHoliday((s) => ({ ...s, name: '' }));
-                    }, 'تم تسجيل العطلة.')} className="rounded-lg bg-sky-700 px-4 py-2 text-xs font-bold text-white disabled:opacity-40">إضافة عطلة</button>
+                    }, 'تم تسجيل العطلة.')} className="rounded-lg bg-primary px-4 py-2 text-xs font-bold text-white disabled:opacity-40">إضافة عطلة</button>
                   </div>
-                  {holidays.map((item) => <div key={item.id} className="flex items-center justify-between gap-2 text-xs text-slate-600">
+                  {holidays.map((item) => <div key={item.id} className="flex items-center justify-between gap-2 text-xs text-ink-secondary">
                     <span>{item.date} · {item.name}</span>
-                    {canManage && <button onClick={() => runAction(item.id, () => AttendanceService.removeHoliday(item.id), 'تم حذف العطلة.')} className="text-rose-700">حذف</button>}
+                    {canManage && <button onClick={() => runAction(item.id, () => AttendanceService.removeHoliday(item.id), 'تم حذف العطلة.')} className="text-danger">حذف</button>}
                   </div>)}
                 </section>
               </div>
             )}
 
             {tab === 'report' && (
-              <section className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+              <section className="bg-surface border border-line rounded-xl overflow-hidden">
                 <div className="p-4 flex flex-wrap items-center justify-between gap-3 border-b">
                   <label className="text-xs font-bold">الشهر<input type="month" value={period} onChange={(e) => setPeriod(e.target.value)} className="mr-2 rounded-lg border p-2" /></label>
-                  <div className="flex gap-2"><button onClick={exportReport} disabled={!canExport} title={canExport ? undefined : 'لا تملك صلاحية تصدير تقارير الحضور'} className="rounded-lg bg-sky-50 px-3 py-2 text-xs font-bold text-sky-700 disabled:opacity-40"><Download className="inline w-3 h-3 ml-1" />تصدير CSV</button>
-                    <button onClick={() => window.print()} className="rounded-lg bg-slate-100 px-3 py-2 text-xs font-bold">طباعة الكشف</button></div>
-                  <div className="text-xs text-slate-500">{report.length} سجل · العطلات المسجلة: {holidays.length}</div>
+                  <div className="flex gap-2"><button onClick={exportReport} disabled={!canExport} title={canExport ? undefined : 'لا تملك صلاحية تصدير تقارير الحضور'} className="rounded-lg bg-accent-soft px-3 py-2 text-xs font-bold text-primary disabled:opacity-40"><Download className="inline w-3 h-3 ml-1" />تصدير CSV</button>
+                    <button onClick={() => window.print()} className="rounded-lg bg-surface-sunken px-3 py-2 text-xs font-bold">طباعة الكشف</button></div>
+                  <div className="text-xs text-muted">{report.length} سجل · العطلات المسجلة: {holidays.length}</div>
                 </div>
                 <div className="overflow-x-auto">
                   <DataTable
@@ -588,7 +588,7 @@ export const AttendancePage: React.FC = () => {
                     ]}
                     emptyTitle="لا توجد سجلات لهذا الشهر."
                   />
-                  {!report.length && <div className="p-10 text-center text-slate-400">لا توجد سجلات لهذا الشهر.</div>}
+                  {!report.length && <div className="p-10 text-center text-muted">لا توجد سجلات لهذا الشهر.</div>}
                 </div>
               </section>
             )}
@@ -601,56 +601,56 @@ export const AttendancePage: React.FC = () => {
                     const proposed = JSON.parse(request.proposedJson) as {
                       status: AttendanceStatus; checkInAt: string | null; checkOutAt: string | null; notes: string;
                     };
-                    return <div key={request.id} className="bg-white border border-slate-200 rounded-xl p-4 flex flex-wrap items-center justify-between gap-3">
+                    return <div key={request.id} className="bg-surface border border-line rounded-xl p-4 flex flex-wrap items-center justify-between gap-3">
                       <div className="text-sm"><b>{request.employeeName}</b> · {request.attendanceDate}
-                        <div className="text-xs text-slate-500 mt-1">الطلب من {request.requestedByName} · الدخول {formatClock(proposed.checkInAt)} · الخروج {formatClock(proposed.checkOutAt)} · {STATUS_LABELS[proposed.status]}</div>
-                        {proposed.notes && <div className="text-xs text-slate-500">{proposed.notes}</div>}
+                        <div className="text-xs text-muted mt-1">الطلب من {request.requestedByName} · الدخول {formatClock(proposed.checkInAt)} · الخروج {formatClock(proposed.checkOutAt)} · {STATUS_LABELS[proposed.status]}</div>
+                        {proposed.notes && <div className="text-xs text-muted">{proposed.notes}</div>}
                       </div>
                       {canApprove ? <div className="flex gap-2">
-                        <button onClick={() => runAction(request.id, () => AttendanceService.decideCorrection(request.id, true), 'تم اعتماد التصحيح.')} className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white"><ShieldCheck className="inline w-3 h-3 ml-1" />اعتماد</button>
-                        <button onClick={() => runAction(request.id, () => AttendanceService.decideCorrection(request.id, false), 'تم رفض التصحيح.')} className="rounded-lg bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700">رفض</button>
-                      </div> : <span className="text-xs text-amber-700">يتطلب اعتماد مستخدم مخول</span>}
+                        <button onClick={() => runAction(request.id, () => AttendanceService.decideCorrection(request.id, true), 'تم اعتماد التصحيح.')} className="rounded-lg bg-success px-3 py-2 text-xs font-bold text-white"><ShieldCheck className="inline w-3 h-3 ml-1" />اعتماد</button>
+                        <button onClick={() => runAction(request.id, () => AttendanceService.decideCorrection(request.id, false), 'تم رفض التصحيح.')} className="rounded-lg bg-danger-soft px-3 py-2 text-xs font-bold text-danger">رفض</button>
+                      </div> : <span className="text-xs text-warning">يتطلب اعتماد مستخدم مخول</span>}
                     </div>;
                   })}
-                  {!requests.length && <div className="rounded-xl bg-white p-6 text-center text-slate-400">لا توجد طلبات معلقة.</div>}
+                  {!requests.length && <div className="rounded-xl bg-surface p-6 text-center text-muted">لا توجد طلبات معلقة.</div>}
                 </section>
                 <section className="space-y-3">
                   <h2 className="font-black">قرارات التصحيح للشهر المحدد</h2>
                   {correctionHistory.map((item) => {
                     const previous = item.beforeJson ? JSON.parse(item.beforeJson) as { checkInAt: string | null; checkOutAt: string | null; status: AttendanceStatus } : null;
                     const next = JSON.parse(item.proposedJson) as { checkInAt: string | null; checkOutAt: string | null; status: AttendanceStatus };
-                    return <div key={item.id} className="bg-white border border-slate-200 rounded-xl p-4 text-xs">
+                    return <div key={item.id} className="bg-surface border border-line rounded-xl p-4 text-xs">
                       <b>{item.employeeName}</b> · {item.attendanceDate} ·
-                      <span className={item.status === 'APPROVED' ? 'text-emerald-700' : 'text-rose-700'}>{item.status === 'APPROVED' ? 'معتمد' : 'مرفوض'}</span>
-                      <div className="mt-1 text-slate-600">قبل: {previous ? `${STATUS_LABELS[previous.status]}، ${formatClock(previous.checkInAt)}–${formatClock(previous.checkOutAt)}` : 'لا يوجد سجل'} · بعد: {STATUS_LABELS[next.status]}، {formatClock(next.checkInAt)}–{formatClock(next.checkOutAt)}</div>
-                      <div className="mt-1 text-slate-400">طلب {item.requestedByName} · قرار {item.decidedByName || '—'} · {item.decisionNotes || ''}</div>
+                      <span className={item.status === 'APPROVED' ? 'text-success' : 'text-danger'}>{item.status === 'APPROVED' ? 'معتمد' : 'مرفوض'}</span>
+                      <div className="mt-1 text-ink-secondary">قبل: {previous ? `${STATUS_LABELS[previous.status]}، ${formatClock(previous.checkInAt)}–${formatClock(previous.checkOutAt)}` : 'لا يوجد سجل'} · بعد: {STATUS_LABELS[next.status]}، {formatClock(next.checkInAt)}–{formatClock(next.checkOutAt)}</div>
+                      <div className="mt-1 text-muted">طلب {item.requestedByName} · قرار {item.decidedByName || '—'} · {item.decisionNotes || ''}</div>
                     </div>;
                   })}
-                  {!correctionHistory.length && <div className="rounded-xl bg-white p-6 text-center text-slate-400">لا توجد قرارات تصحيح لهذا الشهر.</div>}
+                  {!correctionHistory.length && <div className="rounded-xl bg-surface p-6 text-center text-muted">لا توجد قرارات تصحيح لهذا الشهر.</div>}
                 </section>
                 <section className="space-y-3">
                   <h2 className="font-black">سجل أحداث الحضور</h2>
                   {auditHistory.map((item) => (
-                    <div key={item.id} className="bg-white border border-slate-200 rounded-xl p-3 text-xs">
+                    <div key={item.id} className="bg-surface border border-line rounded-xl p-3 text-xs">
                       <b>{item.employeeName}</b> · {item.date} · {item.action} · بواسطة {item.actorName}
-                      <div className="mt-1 text-slate-500">{item.createdAt}</div>
+                      <div className="mt-1 text-muted">{item.createdAt}</div>
                     </div>
                   ))}
-                  {!auditHistory.length && <div className="rounded-xl bg-white p-6 text-center text-slate-400">لا توجد أحداث مسجلة لهذا الشهر.</div>}
+                  {!auditHistory.length && <div className="rounded-xl bg-surface p-6 text-center text-muted">لا توجد أحداث مسجلة لهذا الشهر.</div>}
                 </section>
               </div>
             )}
 
             {tab === 'import' && (
-              <section className="max-w-3xl bg-white border border-slate-200 rounded-xl p-6 space-y-4">
-                <h2 className="text-base font-black flex items-center gap-2"><FileUp className="w-5 h-5 text-sky-600" />استيراد سجلات جهاز البصمة</h2>
-                <p className="text-sm text-slate-600">الملف CSV بترميز UTF-8 ويحتوي على الأعمدة employee_code,date,check_in,check_out. صيغة التاريخ YYYY-MM-DD والوقت HH:mm. السجلات السابقة أو المكررة تُرسل كطلبات تصحيح للموافقة، ولا يُعتمد الإضافي للرواتب تلقائيًا.</p>
-                <button onClick={downloadTemplate} className="rounded-lg bg-slate-100 px-3 py-2 text-xs font-bold"><Download className="inline w-3 h-3 ml-1" />تنزيل القالب</button>
-                <label className="block rounded-xl border-2 border-dashed border-slate-300 p-8 text-center cursor-pointer hover:border-sky-400">
+              <section className="max-w-3xl bg-surface border border-line rounded-xl p-6 space-y-4">
+                <h2 className="text-base font-black flex items-center gap-2"><FileUp className="w-5 h-5 text-primary" />استيراد سجلات جهاز البصمة</h2>
+                <p className="text-sm text-ink-secondary">الملف CSV بترميز UTF-8 ويحتوي على الأعمدة employee_code,date,check_in,check_out. صيغة التاريخ YYYY-MM-DD والوقت HH:mm. السجلات السابقة أو المكررة تُرسل كطلبات تصحيح للموافقة، ولا يُعتمد الإضافي للرواتب تلقائيًا.</p>
+                <button onClick={downloadTemplate} className="rounded-lg bg-surface-sunken px-3 py-2 text-xs font-bold"><Download className="inline w-3 h-3 ml-1" />تنزيل القالب</button>
+                <label className="block rounded-xl border-2 border-dashed border-line-strong p-8 text-center cursor-pointer hover:border-primary">
                   <span className="block text-sm font-bold">اختر ملف CSV للاستيراد</span>
                   <input type="file" accept=".csv,text/csv" className="mt-3 text-xs" onChange={(event) => { void handleImport(event.target.files?.[0]); event.currentTarget.value = ''; }} />
                 </label>
-                {!!importErrors.length && <div className="max-h-64 overflow-auto rounded-lg bg-rose-50 p-3 text-xs text-rose-700">{importErrors.map((item) => <div key={item}>{item}</div>)}</div>}
+                {!!importErrors.length && <div className="max-h-64 overflow-auto rounded-lg bg-danger-soft p-3 text-xs text-danger">{importErrors.map((item) => <div key={item}>{item}</div>)}</div>}
               </section>
             )}
           </>

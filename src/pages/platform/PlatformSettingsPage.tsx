@@ -173,7 +173,7 @@ export const PlatformSettingsPage: React.FC<PlatformSettingsPageProps> = ({ curr
 
   if (loading || !settings) {
     return (
-      <div className="py-24 text-center text-sm font-semibold text-slate-500">
+      <div className="py-24 text-center text-sm font-semibold text-muted">
         جارٍ تحميل إعدادات المنصة المركزية...
       </div>
     );
@@ -195,7 +195,7 @@ export const PlatformSettingsPage: React.FC<PlatformSettingsPageProps> = ({ curr
       <PageHeader
         title="إعدادات المنصة المركزية"
         description="إدارة الهوية القانونية، بوابات الدفع، خوادم الاتصالات، سياسات الأمان والتشفير من بيئة آمنة."
-        icon={<Settings className="h-5 w-5 text-indigo-600" />}
+        icon={<Settings className="h-5 w-5 text-primary" />}
         actions={
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="sm" leadingIcon={<RefreshCw className="h-3.5 w-3.5" />} onClick={load}>
@@ -217,21 +217,21 @@ export const PlatformSettingsPage: React.FC<PlatformSettingsPageProps> = ({ curr
       />
 
       {error && (
-        <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-2.5 text-xs font-semibold text-rose-700">
+        <div role="alert" className="rounded-lg border border-danger-border bg-danger-soft px-4 py-2.5 text-xs font-semibold text-danger">
           {error}
         </div>
       )}
 
       {/* Navigation Tabs Bar */}
-      <div className="flex overflow-x-auto border-b border-slate-200 bg-white px-2 pt-2 rounded-t-xl gap-1">
+      <div className="flex overflow-x-auto border-b border-line bg-surface px-2 pt-2 rounded-t-xl gap-1">
         {tabs.map((tab) => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
             className={`flex items-center gap-2 border-b-2 px-4 py-3 text-xs font-semibold whitespace-nowrap transition-colors ${
               activeTab === tab.id
-                ? 'border-indigo-600 text-indigo-700 bg-indigo-50/40'
-                : 'border-transparent text-slate-600 hover:border-slate-300 hover:text-slate-900'
+                ? 'border-primary text-primary bg-accent-soft/40'
+                : 'border-transparent text-ink-secondary hover:border-line-strong hover:text-ink'
             }`}
           >
             {tab.icon}
@@ -241,13 +241,13 @@ export const PlatformSettingsPage: React.FC<PlatformSettingsPageProps> = ({ curr
       </div>
 
       {/* Tab Contents Card */}
-      <div className="rounded-b-xl rounded-tr-xl border border-slate-200 bg-white p-6 shadow-sm">
+      <div className="rounded-b-xl rounded-tr-xl border border-line bg-surface p-6 shadow-sm">
         {/* 1. Identity & General */}
         {activeTab === 'identity' && (
           <div className="space-y-6">
             <div>
-              <h3 className="text-sm font-bold text-slate-900">هوية المنصة والإعدادات الإقليمية</h3>
-              <p className="text-xs text-slate-500">اسم النظام الرسمي، اللغات، والعملات الافتراضية.</p>
+              <h3 className="text-sm font-bold text-ink">هوية المنصة والإعدادات الإقليمية</h3>
+              <p className="text-xs text-muted">اسم النظام الرسمي، اللغات، والعملات الافتراضية.</p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Field label="اسم المنصة">
@@ -309,8 +309,8 @@ export const PlatformSettingsPage: React.FC<PlatformSettingsPageProps> = ({ curr
         {activeTab === 'legal' && (
           <div className="space-y-6">
             <div>
-              <h3 className="text-sm font-bold text-slate-900">البيانات القانونية والضريبية للمنصة</h3>
-              <p className="text-xs text-slate-500">تستخدم هذه البيانات في العقود، الفواتير الرسمية، والتراخيص الموثقة.</p>
+              <h3 className="text-sm font-bold text-ink">البيانات القانونية والضريبية للمنصة</h3>
+              <p className="text-xs text-muted">تستخدم هذه البيانات في العقود، الفواتير الرسمية، والتراخيص الموثقة.</p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Field label="الاسم القانوني المسجل للشركة">
@@ -366,8 +366,8 @@ export const PlatformSettingsPage: React.FC<PlatformSettingsPageProps> = ({ curr
         {activeTab === 'communications' && (
           <div className="space-y-6">
             <div>
-              <h3 className="text-sm font-bold text-slate-900">خوادم إرسال البريد الإلكتروني والرسائل القصيرة (SMS)</h3>
-              <p className="text-xs text-slate-500">
+              <h3 className="text-sm font-bold text-ink">خوادم إرسال البريد الإلكتروني والرسائل القصيرة (SMS)</h3>
+              <p className="text-xs text-muted">
                 إرسال بيانات التفعيل، الفواتير، وتنبيهات الأمان. يتم حجب كلمات المرور والأسرار الحساسة تلقائياً.
               </p>
             </div>
@@ -428,8 +428,8 @@ export const PlatformSettingsPage: React.FC<PlatformSettingsPageProps> = ({ curr
               </Field>
             </div>
 
-            <div className="pt-4 border-t border-slate-100">
-              <h4 className="text-xs font-bold text-slate-800 mb-3">بوابة الرسائل النصية القصيرة (SMS Gateway)</h4>
+            <div className="pt-4 border-t border-line">
+              <h4 className="text-xs font-bold text-ink mb-3">بوابة الرسائل النصية القصيرة (SMS Gateway)</h4>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <Field label="مزود خدمة SMS">
                   <select
@@ -470,8 +470,8 @@ export const PlatformSettingsPage: React.FC<PlatformSettingsPageProps> = ({ curr
         {activeTab === 'payments' && (
           <div className="space-y-6">
             <div>
-              <h3 className="text-sm font-bold text-slate-900">بوابات الدفع الإلكتروني وسياسات الفوترة</h3>
-              <p className="text-xs text-slate-500">إعداد التحصيل الآلي لاشتراكات وتجديدات تراخيص العملاء.</p>
+              <h3 className="text-sm font-bold text-ink">بوابات الدفع الإلكتروني وسياسات الفوترة</h3>
+              <p className="text-xs text-muted">إعداد التحصيل الآلي لاشتراكات وتجديدات تراخيص العملاء.</p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <Field label="بوابة الدفع النشطة">
@@ -532,7 +532,7 @@ export const PlatformSettingsPage: React.FC<PlatformSettingsPageProps> = ({ curr
               </Field>
             </div>
 
-            <div className="pt-4 border-t border-slate-100 grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="pt-4 border-t border-line grid grid-cols-1 md:grid-cols-2 gap-4">
               <Field label="مدة التجربة المجانية الافتراضية (بالأيام)">
                 <input
                   type="number"
@@ -557,8 +557,8 @@ export const PlatformSettingsPage: React.FC<PlatformSettingsPageProps> = ({ curr
         {activeTab === 'network' && (
           <div className="space-y-6">
             <div>
-              <h3 className="text-sm font-bold text-slate-900">النطاقات والشهادات وعناوين الـ API</h3>
-              <p className="text-xs text-slate-500">إدارة نطاقات المنصة وعناوين خوادم الترخيص والمزامنة السحابية.</p>
+              <h3 className="text-sm font-bold text-ink">النطاقات والشهادات وعناوين الـ API</h3>
+              <p className="text-xs text-muted">إدارة نطاقات المنصة وعناوين خوادم الترخيص والمزامنة السحابية.</p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Field label="النطاق الرسمي للمنصة (Platform Domain)">
@@ -594,17 +594,17 @@ export const PlatformSettingsPage: React.FC<PlatformSettingsPageProps> = ({ curr
                   id="enforceHttps"
                   checked={settings.enforceHttps !== 'false'}
                   onChange={(e) => setSettings({ ...settings, enforceHttps: e.target.checked ? 'true' : 'false' })}
-                  className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                  className="h-4 w-4 rounded border-line-strong text-primary focus:ring-primary"
                 />
-                <label htmlFor="enforceHttps" className="text-xs font-semibold text-slate-700 cursor-pointer">
+                <label htmlFor="enforceHttps" className="text-xs font-semibold text-ink cursor-pointer">
                   إلزام الاتصال الآمن (Enforce HTTPS & HSTS) لجميع العملاء والأجهزة
                 </label>
               </div>
             </div>
 
-            <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4">
-              <h4 className="text-xs font-bold text-slate-800 mb-1">مصدر بيانات لوحة المنصة</h4>
-              <p className="text-[11px] text-slate-500 mb-3">
+            <div className="rounded-xl border border-line bg-surface-muted/60 p-4">
+              <h4 className="text-xs font-bold text-ink mb-1">مصدر بيانات لوحة المنصة</h4>
+              <p className="text-[11px] text-muted mb-3">
                 «المحلي» يقرأ ويكتب قاعدة بيانات هذا الجهاز. «المركزي» يوجّه الشاشات المدعومة (الأدوار، سجل العمليات، الأجهزة، التراخيص، الإشعارات، التكاملات) إلى السيرفر المركزي عبر جسر الاتصال الآمن.
               </p>
               <div className="flex flex-wrap items-center gap-3">
@@ -618,12 +618,12 @@ export const PlatformSettingsPage: React.FC<PlatformSettingsPageProps> = ({ curr
                   <option value="central">مركزي (Central Server)</option>
                 </select>
                 {dataSource === 'central' && (
-                  <span className="rounded-full bg-sky-50 px-2.5 py-1 text-[10.5px] font-bold text-sky-700 border border-sky-200">
+                  <span className="rounded-full bg-accent-soft px-2.5 py-1 text-[10.5px] font-bold text-primary border border-accent-border">
                     الشاشات المدعومة تقرأ من السيرفر المركزي
                   </span>
                 )}
                 {dataSource === 'local' && !import.meta.env.DEV && (
-                  <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[10.5px] font-bold text-amber-700 border border-amber-200">
+                  <span className="rounded-full bg-warning-soft px-2.5 py-1 text-[10.5px] font-bold text-warning border border-warning-border">
                     تنبيه: في نسخة الإنتاج لا يمكن إصدار التراخيص محلياً — اضبط المصدر على «مركزي» قبل إصدار التراخيص والاشتراكات.
                   </span>
                 )}
@@ -636,8 +636,8 @@ export const PlatformSettingsPage: React.FC<PlatformSettingsPageProps> = ({ curr
         {activeTab === 'security' && (
           <div className="space-y-6">
             <div>
-              <h3 className="text-sm font-bold text-slate-900">أمان المنصة، سياسة كلمات المرور والمصادقة المزدوجة</h3>
-              <p className="text-xs text-slate-500">حماية الجلسات وإدارة مفاتيح التشفير من البيئة الآمنة.</p>
+              <h3 className="text-sm font-bold text-ink">أمان المنصة، سياسة كلمات المرور والمصادقة المزدوجة</h3>
+              <p className="text-xs text-muted">حماية الجلسات وإدارة مفاتيح التشفير من البيئة الآمنة.</p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -674,9 +674,9 @@ export const PlatformSettingsPage: React.FC<PlatformSettingsPageProps> = ({ curr
                   id="enforceMfa"
                   checked={settings.enforceMfa === 'true'}
                   onChange={(e) => setSettings({ ...settings, enforceMfa: e.target.checked ? 'true' : 'false' })}
-                  className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                  className="h-4 w-4 rounded border-line-strong text-primary focus:ring-primary"
                 />
-                <label htmlFor="enforceMfa" className="text-xs font-semibold text-slate-700 cursor-pointer">
+                <label htmlFor="enforceMfa" className="text-xs font-semibold text-ink cursor-pointer">
                   إلزام المصادقة متعددة العوامل (Enforce 2FA / TOTP) على كافة مسؤولي المنصة
                 </label>
               </div>
@@ -687,22 +687,22 @@ export const PlatformSettingsPage: React.FC<PlatformSettingsPageProps> = ({ curr
                   id="passwordRequireComplex"
                   checked={settings.passwordRequireComplex !== 'false'}
                   onChange={(e) => setSettings({ ...settings, passwordRequireComplex: e.target.checked ? 'true' : 'false' })}
-                  className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                  className="h-4 w-4 rounded border-line-strong text-primary focus:ring-primary"
                 />
-                <label htmlFor="passwordRequireComplex" className="text-xs font-semibold text-slate-700 cursor-pointer">
+                <label htmlFor="passwordRequireComplex" className="text-xs font-semibold text-ink cursor-pointer">
                   اشتراط تعقيد كلمة المرور (أحرف كبيرة وصغيرة، أرقام، ورموز خاصة)
                 </label>
               </div>
             </div>
 
             {/* Key Management Section */}
-            <div className="p-4 rounded-xl border border-indigo-200 bg-indigo-50/40 space-y-3">
+            <div className="p-4 rounded-xl border border-accent-border bg-accent-soft/40 space-y-3">
               <div className="flex items-center justify-between">
                 <div>
-                  <h4 className="text-xs font-bold text-indigo-900 flex items-center gap-1.5">
-                    <ShieldCheck className="h-4 w-4 text-indigo-600" /> مفاتيح التشفير المركزية (Server-Side Encryption)
+                  <h4 className="text-xs font-bold text-primary flex items-center gap-1.5">
+                    <ShieldCheck className="h-4 w-4 text-primary" /> مفاتيح التشفير المركزية (Server-Side Encryption)
                   </h4>
-                  <p className="text-[11px] text-slate-600 mt-0.5">
+                  <p className="text-[11px] text-ink-secondary mt-0.5">
                     المفاتيح الخاصة محفوظة داخل بيئة الخادم المشفرة (KMS / Environment) ولا تخزن داخل القاعدة المحلية.
                   </p>
                 </div>
@@ -717,13 +717,13 @@ export const PlatformSettingsPage: React.FC<PlatformSettingsPageProps> = ({ curr
                 </Button>
               </div>
 
-              <div className="grid grid-cols-2 text-xs pt-2 border-t border-indigo-100 text-slate-600">
+              <div className="grid grid-cols-2 text-xs pt-2 border-t border-accent-border text-ink-secondary">
                 <div>
-                  مزود التشفير: <strong className="text-slate-800">{settings.kmsProvider || 'Server KMS'}</strong>
+                  مزود التشفير: <strong className="text-ink">{settings.kmsProvider || 'Server KMS'}</strong>
                 </div>
                 <div>
                   تاريخ آخر تدوير:{' '}
-                  <strong className="text-slate-800 font-mono">
+                  <strong className="text-ink font-mono">
                     {formatDateTime(String(settings.lastEncryptionRotation || '2026-01-01'))}
                   </strong>
                 </div>
@@ -736,8 +736,8 @@ export const PlatformSettingsPage: React.FC<PlatformSettingsPageProps> = ({ curr
         {activeTab === 'backup' && (
           <div className="space-y-6">
             <div>
-              <h3 className="text-sm font-bold text-slate-900">سياسة النسخ الاحتياطي والاحتفاظ بالبيانات</h3>
-              <p className="text-xs text-slate-500">جدولة إنشاء النسخ الاحتياطية المشفرة وتحديد مدة الاستبقاء.</p>
+              <h3 className="text-sm font-bold text-ink">سياسة النسخ الاحتياطي والاحتفاظ بالبيانات</h3>
+              <p className="text-xs text-muted">جدولة إنشاء النسخ الاحتياطية المشفرة وتحديد مدة الاستبقاء.</p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <Field label="دورية النسخ الاحتياطي التلقائي">
@@ -777,12 +777,12 @@ export const PlatformSettingsPage: React.FC<PlatformSettingsPageProps> = ({ curr
         {activeTab === 'password' && (
           <div className="space-y-6 max-w-md">
             <div>
-              <h3 className="text-sm font-bold text-slate-900">تغيير كلمة مرور حسابك الحالي</h3>
-              <p className="text-xs text-slate-500">حسابك الحالي: {currentUser.fullName} ({currentUser.username})</p>
+              <h3 className="text-sm font-bold text-ink">تغيير كلمة مرور حسابك الحالي</h3>
+              <p className="text-xs text-muted">حسابك الحالي: {currentUser.fullName} ({currentUser.username})</p>
             </div>
 
             {passwordError && (
-              <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-2.5 text-xs font-semibold text-rose-700">
+              <div role="alert" className="rounded-lg border border-danger-border bg-danger-soft px-4 py-2.5 text-xs font-semibold text-danger">
                 {passwordError}
               </div>
             )}

@@ -19,14 +19,14 @@ export const ElectronicInvoiceReadinessPage: React.FC = () => {
         description="حالة جاهزية الإرسال إلى مصلحة الضرائب المصرية"
       />
 
-      <section className={`rounded-2xl border p-5 ${readiness.ready ? 'border-emerald-300 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/30' : 'border-amber-300 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30'}`} role="status" aria-live="polite">
+      <section className={`rounded-2xl border p-5 ${readiness.ready ? 'border-success bg-success-soft dark:border-success dark:bg-success/30' : 'border-warning bg-warning-soft dark:border-warning dark:bg-warning/30'}`} role="status" aria-live="polite">
         <div className="flex items-start gap-3">
           {readiness.ready
-            ? <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-700 dark:text-emerald-300" />
-            : <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-700 dark:text-amber-300" />}
+            ? <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-success " />
+            : <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-warning " />}
           <div>
-            <h2 className="font-black text-slate-950 dark:text-slate-100">{readiness.ready ? 'جاهز للإرسال إلى ETA' : 'التكامل غير مهيأ حاليًا'}</h2>
-            <p className="mt-1 text-sm leading-6 text-slate-800 dark:text-slate-200">
+            <h2 className="font-black text-ink ">{readiness.ready ? 'جاهز للإرسال إلى ETA' : 'التكامل غير مهيأ حاليًا'}</h2>
+            <p className="mt-1 text-sm leading-6 text-ink ">
               {readiness.ready
                 ? 'تم إعداد موفر ETA وباني المستند. حالة الجاهزية لا تعني قبول الفواتير؛ تظهر النتيجة بعد الإرسال ومزامنة الحالة.'
                 : 'لا يرسل النظام الفواتير إلى ETA في هذا الإصدار. هذه الشاشة تعرض حالة الإعداد فقط؛ لا تنشئ مسودة ولا ترسل مستندًا.'}
@@ -35,24 +35,24 @@ export const ElectronicInvoiceReadinessPage: React.FC = () => {
         </div>
       </section>
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-800">
-        <h2 className="mb-4 text-sm font-black text-slate-900 dark:text-white">متطلبات التوصيل</h2>
+      <section className="rounded-2xl border border-line bg-surface p-5 ">
+        <h2 className="mb-4 text-sm font-black text-ink dark:text-white">متطلبات التوصيل</h2>
         <ul className="space-y-3">
           {checks.map((check) => (
             <li key={check.label} className="flex items-center gap-2 text-sm">
               {check.ready ? (
-                <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                <CheckCircle2 className="h-4 w-4 text-success" />
               ) : (
-                <XCircle className="h-4 w-4 text-rose-600" />
+                <XCircle className="h-4 w-4 text-danger" />
               )}
-              <span className="text-slate-700 dark:text-slate-200">{check.label}</span>
-              <span className={`mr-auto text-xs font-bold ${check.ready ? 'text-emerald-700 dark:text-emerald-300' : 'text-rose-700 dark:text-rose-300'}`}>
+              <span className="text-ink ">{check.label}</span>
+              <span className={`mr-auto text-xs font-bold ${check.ready ? 'text-success dark:text-success' : 'text-danger dark:text-danger'}`}>
                 {check.ready ? 'مهيأ' : 'غير مهيأ'}
               </span>
             </li>
           ))}
         </ul>
-        <p className="mt-4 border-t border-slate-100 pt-3 text-xs leading-5 text-slate-500 dark:border-slate-700 dark:text-slate-400">
+        <p className="mt-4 border-t border-line pt-3 text-xs leading-5 text-muted ">
           يتطلب التفعيل أيضًا بيانات المنشأة والفرع، وتصنيفات ETA للمنتجات والوحدات والضرائب، وشهادة توقيع معتمدة.
         </p>
       </section>

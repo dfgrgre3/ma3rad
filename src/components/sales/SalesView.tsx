@@ -53,6 +53,7 @@ const _paymentTypeLabel: Record<string, string> = {
 export const SalesView: React.FC = () => {
   const navigate = useNavigate();
   const salesLabel = useBusinessTerm('modules.sales');
+  const newInvoiceLabel = useBusinessTerm('actions.newInvoice');
   const { label: businessProfileLabel } = useBusinessProfileMeta();
   const salesService = useMemo(() => new SalesService(), []);
   const customerService = useMemo(() => new CustomerService(), []);
@@ -410,7 +411,7 @@ export const SalesView: React.FC = () => {
           <>
             {canExport && <Button variant="secondary" size="sm" leadingIcon={<FileSpreadsheet className="h-4 w-4" />} onClick={() => doExport('excel')}>جدول بيانات</Button>}
             {canExport && <Button variant="secondary" size="sm" leadingIcon={<FileDown className="h-4 w-4" />} onClick={() => doExport('pdf')}>مستند</Button>}
-            {canCreate && <Button variant="primary" leadingIcon={<Plus className="h-4 w-4" />} onClick={() => navigate('/pos')}>فاتورة جديدة (POS)</Button>}
+            {canCreate && <Button variant="primary" leadingIcon={<Plus className="h-4 w-4" />} onClick={() => navigate('/pos')}>{newInvoiceLabel} (POS)</Button>}
           </>
         }
       />

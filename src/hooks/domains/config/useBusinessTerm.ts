@@ -1,7 +1,9 @@
 import { useMemo } from 'react';
+import { useLocation } from 'react-router-dom';
 import type { BusinessTermKey } from '../../../config/businessTerminology';
 import { getBusinessProfile } from '../../../config/businessProfiles';
 import { getActivityPageCopy, type ActivityPageKey, type ActivityPageCopy } from '../../../config/activityPageCopy';
+import { getActivityPathCopy } from '../../../config/activityPathCopy';
 import { TerminologyService } from '../../../services/domains/config/TerminologyService';
 import { SettingsService } from '../../../services/domains/config/SettingsService';
 import { getEffectiveBusinessType } from '../../../services/domains/config/BusinessTypeService';
@@ -26,6 +28,18 @@ export function useActivityPageCopy(page: ActivityPageKey): ActivityPageCopy | u
   useTheme();
   const businessType = getEffectiveBusinessType();
   return useMemo(() => getActivityPageCopy(page, businessType), [page, businessType]);
+}
+
+/**
+ * Path-level activity copy for the current route. Resolves title/description
+ * written for the selected activity's family (or the activity itself for the
+ * main hub pages). Returns undefined on unmapped/admin routes.
+ */
+export function useActivityPathCopy(): ActivityPageCopy | undefined {
+  useTheme();
+  const { pathname } = useLocation();
+  const businessType = getEffectiveBusinessType();
+  return useMemo(() => getActivityPathCopy(pathname, businessType), [pathname, businessType]);
 }
 
 export function useBusinessProfileMeta() {

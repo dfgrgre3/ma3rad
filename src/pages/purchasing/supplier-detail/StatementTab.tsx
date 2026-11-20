@@ -31,37 +31,37 @@ export const StatementTab: React.FC<StatementTabProps> = ({
 }) => {
   return (
     <div className="space-y-6">
-      <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 pb-4">
+      <div className="bg-surface rounded-2xl border border-line p-5 shadow-sm space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-line pb-4">
           <div>
-            <h3 className="text-base font-extrabold text-slate-900">
+            <h3 className="text-base font-extrabold text-ink">
               كشف حساب المورد: {supplierName}
             </h3>
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-muted">
               حركات الشراء وسندات الصرف ورصيد الحساب التراكمي
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
             <div className="flex items-center gap-2 text-xs">
-              <label className="font-bold text-slate-600">من:</label>
+              <label className="font-bold text-ink-secondary">من:</label>
               <input
                 type="date"
                 value={statementFrom}
                 onChange={(e) => onFromChange(e.target.value)}
-                className="px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs"
+                className="px-2.5 py-1.5 border border-line rounded-lg text-xs"
               />
-              <label className="font-bold text-slate-600">إلى:</label>
+              <label className="font-bold text-ink-secondary">إلى:</label>
               <input
                 type="date"
                 value={statementTo}
                 onChange={(e) => onToChange(e.target.value)}
-                className="px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs"
+                className="px-2.5 py-1.5 border border-line rounded-lg text-xs"
               />
               {(statementFrom || statementTo) && (
                 <button
                   onClick={onClearFilters}
-                  className="text-xs text-rose-600 font-bold hover:underline"
+                  className="text-xs text-danger font-bold hover:underline"
                 >
                   إلغاء التصفية
                 </button>
@@ -70,7 +70,7 @@ export const StatementTab: React.FC<StatementTabProps> = ({
 
             {canExport && <button
               onClick={onExportCsv}
-              className="px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-sm"
+              className="px-3 py-1.5 bg-surface border border-line hover:bg-surface-muted text-ink font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-sm"
             >
               <Download className="w-3.5 h-3.5" />
               <span>تصدير CSV</span>
@@ -78,7 +78,7 @@ export const StatementTab: React.FC<StatementTabProps> = ({
 
             {canExport && <button
               onClick={onPrint}
-              className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-xs flex items-center gap-1.5"
+              className="px-3 py-1.5 bg-primary hover:bg-primary text-white font-bold rounded-xl text-xs flex items-center gap-1.5"
             >
               <Printer className="w-3.5 h-3.5" />
               <span>طباعة كشف الحساب</span>
@@ -87,28 +87,28 @@ export const StatementTab: React.FC<StatementTabProps> = ({
         </div>
 
         {/* Statement Balances Summary */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-slate-50 p-4 rounded-xl">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-surface-muted p-4 rounded-xl">
           <div>
-            <span className="text-xs text-slate-500 font-bold">رصيد أول المدة:</span>
-            <div className="text-lg font-black text-slate-800">
+            <span className="text-xs text-muted font-bold">رصيد أول المدة:</span>
+            <div className="text-lg font-black text-ink">
               {CeramicMath.formatCurrency(statement.openingBalance)}
             </div>
           </div>
           <div>
-            <span className="text-xs text-slate-500 font-bold">إجمالي الحركات في الفترة:</span>
-            <div className="text-lg font-bold text-slate-700">
+            <span className="text-xs text-muted font-bold">إجمالي الحركات في الفترة:</span>
+            <div className="text-lg font-bold text-ink">
               {statement.transactions.length} حركة
             </div>
           </div>
           <div>
-            <span className="text-xs text-slate-500 font-bold">الرصيد الختامي المستحق:</span>
+            <span className="text-xs text-muted font-bold">الرصيد الختامي المستحق:</span>
             <div
               className={`text-lg font-black ${
                 statement.closingBalance > 0
-                  ? 'text-rose-600'
+                  ? 'text-danger'
                   : statement.closingBalance < 0
-                  ? 'text-emerald-600'
-                  : 'text-slate-800'
+                  ? 'text-success'
+                  : 'text-ink'
               }`}
             >
               {CeramicMath.formatCurrency(statement.closingBalance)}
@@ -125,22 +125,22 @@ export const StatementTab: React.FC<StatementTabProps> = ({
             minWidth={700}
             dense
             tableClassName="text-xs"
-            rowClassName={() => 'transition hover:bg-slate-50'}
+            rowClassName={() => 'transition hover:bg-surface-muted'}
             columns={[
-              { key: 'date', header: 'التاريخ', render: (tx: any) => <span className="font-mono text-slate-600">{tx.date}</span> },
+              { key: 'date', header: 'التاريخ', render: (tx: any) => <span className="font-mono text-ink-secondary">{tx.date}</span> },
               {
                 key: 'type', header: 'النوع',
                 render: (tx: any) => (
-                  <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${tx.type === 'PURCHASE' ? 'bg-indigo-50 text-indigo-700' : 'bg-emerald-50 text-emerald-700'}`}>
+                  <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${tx.type === 'PURCHASE' ? 'bg-accent-soft text-primary' : 'bg-success-soft text-success'}`}>
                     {tx.type === 'PURCHASE' ? 'فاتورة شراء' : 'سداد دفعة'}
                   </span>
                 ),
               },
-              { key: 'doc', header: 'رقم المستند', render: (tx: any) => <span className="font-mono font-bold text-slate-900">{tx.docNumber}</span> },
-              { key: 'desc', header: 'البيان والتفاصيل', render: (tx: any) => <span className="text-slate-700">{tx.description}</span> },
-              { key: 'debit', header: 'مدين (سداد)', headerClassName: 'text-emerald-700', render: (tx: any) => <span className="font-black text-emerald-700">{tx.debit > 0 ? CeramicMath.formatCurrency(tx.debit) : '—'}</span> },
-              { key: 'credit', header: 'دائن (توريد)', headerClassName: 'text-rose-700', render: (tx: any) => <span className="font-black text-rose-700">{tx.credit > 0 ? CeramicMath.formatCurrency(tx.credit) : '—'}</span> },
-              { key: 'bal', header: 'الرصيد بعد الحركة', render: (tx: any) => <span className="font-mono font-black text-slate-900">{CeramicMath.formatCurrency(tx.balanceAfter)}</span> },
+              { key: 'doc', header: 'رقم المستند', render: (tx: any) => <span className="font-mono font-bold text-ink">{tx.docNumber}</span> },
+              { key: 'desc', header: 'البيان والتفاصيل', render: (tx: any) => <span className="text-ink">{tx.description}</span> },
+              { key: 'debit', header: 'مدين (سداد)', headerClassName: 'text-success', render: (tx: any) => <span className="font-black text-success">{tx.debit > 0 ? CeramicMath.formatCurrency(tx.debit) : '—'}</span> },
+              { key: 'credit', header: 'دائن (توريد)', headerClassName: 'text-danger', render: (tx: any) => <span className="font-black text-danger">{tx.credit > 0 ? CeramicMath.formatCurrency(tx.credit) : '—'}</span> },
+              { key: 'bal', header: 'الرصيد بعد الحركة', render: (tx: any) => <span className="font-mono font-black text-ink">{CeramicMath.formatCurrency(tx.balanceAfter)}</span> },
             ]}
             emptyTitle="لا توجد حركات في الفترة المحددة."
           />

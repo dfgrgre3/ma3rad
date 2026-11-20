@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "profileVersion": 2,
+  "profileVersion": 3,
   "id": "ceramics",
   "name": {
     "ar": "سيراميك وبورسلين",
@@ -25,9 +25,15 @@
       "الفرز",
       "اللون",
       "النغمة",
-      "التشطيب"
+      "التشطيب",
+      "الاستخدام"
     ],
     "productAttributeDefinitions": [
+      {
+        "code": "TILE_SIZE",
+        "name": "المقاس",
+        "dataType": "TEXT"
+      },
       {
         "code": "TILE_GRADE",
         "name": "الفرز",
@@ -35,7 +41,43 @@
         "options": [
           "فرز أول",
           "فرز ثان",
-          "فرز ثالث"
+          "فرز ثالث",
+          "تجاري"
+        ]
+      },
+      {
+        "code": "TILE_COLOR",
+        "name": "اللون",
+        "dataType": "TEXT"
+      },
+      {
+        "code": "TILE_TONE",
+        "name": "النغمة",
+        "dataType": "TEXT"
+      },
+      {
+        "code": "TILE_FINISH",
+        "name": "التشطيب",
+        "dataType": "SELECT",
+        "options": [
+          "لامع",
+          "مطفي",
+          "بوليستر",
+          "ها",
+          "خشب",
+          "رخامي",
+          "مات",
+          "بروفل"
+        ]
+      },
+      {
+        "code": "TILE_USAGE",
+        "name": "الاستخدام",
+        "dataType": "SELECT",
+        "options": [
+          "أرضيات",
+          "حوائط",
+          "خارجي"
         ]
       }
     ]
@@ -60,9 +102,9 @@
   "support": {
     "profileDefaults": "implemented",
     "productAttributes": "text-and-typed-profile-fields",
-    "industrySpecificWorkflows": "not-implemented",
-    "industrySpecificReports": "not-implemented",
-    "industrySpecificDocumentTemplates": "not-implemented",
+    "industrySpecificWorkflows": "implemented",
+    "industrySpecificReports": "implemented",
+    "industrySpecificDocumentTemplates": "implemented",
     "typedCustomFieldStorage": "implemented-for-profile-declared-fields"
   },
   "printTemplates": [
@@ -72,7 +114,16 @@
       "templateId": "table",
       "label": {
         "ar": "فاتورة معرض السيراميك",
-        "en": "Sales invoice"
+        "en": "Ceramics showroom invoice"
+      }
+    },
+    {
+      "id": "area_takeoff_ceramics",
+      "documentType": "quotation",
+      "templateId": "ceramic_takeoff",
+      "label": {
+        "ar": "مقاييسة مساحة سيراميك",
+        "en": "Ceramic area takeoff"
       }
     }
   ],
@@ -249,12 +300,42 @@
         "ar": "credit-exposure",
         "en": "credit-exposure"
       }
+    },
+    {
+      "id": "r13",
+      "reportId": "ceramics-design-sales",
+      "category": "sales",
+      "label": {
+        "ar": "مبيعات السيراميك بالتصميم",
+        "en": "Ceramics design sales"
+      }
+    },
+    {
+      "id": "r14",
+      "reportId": "ceramic-takeoffs",
+      "category": "sales",
+      "label": {
+        "ar": "مقاييسات المساحات",
+        "en": "Ceramic area takeoffs"
+      }
+    },
+    {
+      "id": "r15",
+      "reportId": "ceramic-stock-coverage",
+      "category": "inventory",
+      "label": {
+        "ar": "تغطية مخزون السيراميك",
+        "en": "Ceramic stock coverage"
+      }
     }
   ],
   "features": [
     "متر مربع",
     "تصميمات",
-    "فروع متعددة"
+    "فروع متعددة",
+    "حاسبة مساحة الغرف",
+    "مقاييسات المساحات",
+    "مخزون الصالة مقابل المخزن"
   ],
   "pricingRules": {
     "tiers": [

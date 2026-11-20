@@ -80,38 +80,38 @@ const ExpensesManagement: React.FC<{ dateMode: 'today' | 'range' }> = ({ dateMod
   };
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
-      <div className="shrink-0 bg-white px-6 pt-4">
+    <div className="h-full flex flex-col bg-surface-muted text-ink overflow-hidden">
+      <div className="shrink-0 bg-surface px-6 pt-4">
         <PageHeader
           icon={<TrendingDown className="h-5 w-5" />}
           title="إدارة المصروفات التشغيلية"
           description={dateMode === 'today' ? 'مصروفات اليوم' : 'مصروفات الفروع ضمن الفترة المحددة'}
           actions={<>
-            {canExport && <button onClick={exportExpenses} className="flex items-center gap-2 px-3 py-2 border border-slate-200 text-slate-700 rounded-xl text-sm font-semibold"><Download className="w-4 h-4" /> تصدير</button>}
-            {canAdd && <button onClick={() => setEditor({})} className="flex items-center gap-2 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-sm font-semibold"><Plus className="w-4 h-4" /> تسجيل مصروف جديد</button>}
+            {canExport && <button onClick={exportExpenses} className="flex items-center gap-2 px-3 py-2 border border-line text-ink rounded-xl text-sm font-semibold"><Download className="w-4 h-4" /> تصدير</button>}
+            {canAdd && <button onClick={() => setEditor({})} className="flex items-center gap-2 px-4 py-2 bg-danger hover:bg-danger text-white rounded-xl text-sm font-semibold"><Plus className="w-4 h-4" /> تسجيل مصروف جديد</button>}
           </>}
         />
       </div>
 
-      <section className="p-4 bg-white border-b border-slate-200 flex flex-col lg:flex-row gap-3 lg:items-center lg:justify-between px-6">
+      <section className="p-4 bg-surface border-b border-line flex flex-col lg:flex-row gap-3 lg:items-center lg:justify-between px-6">
         <form onSubmit={(event) => event.preventDefault()} className="relative flex-1 max-w-md">
-          <Search className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-          <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="بحث بالبند أو البيان..." className="w-full pl-4 pr-10 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-rose-400" />
+          <Search className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
+          <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="بحث بالبند أو البيان..." className="w-full pl-4 pr-10 py-2.5 bg-surface border border-line rounded-xl text-sm focus:outline-none focus:border-danger" />
         </form>
         <div className="flex flex-wrap items-center gap-2">
           {dateMode === 'range' ? <>
-            <CalendarDays className="w-4 h-4 text-slate-500" />
-            <label className="text-xs text-slate-500">من <input aria-label="من تاريخ" type="date" value={dateFrom} max={dateTo || undefined} onChange={(event) => setDateFrom(event.target.value)} className="rounded-lg border border-slate-200 px-2 py-1.5 text-slate-700" /></label>
-            <label className="text-xs text-slate-500">إلى <input aria-label="إلى تاريخ" type="date" value={dateTo} min={dateFrom || undefined} onChange={(event) => setDateTo(event.target.value)} className="rounded-lg border border-slate-200 px-2 py-1.5 text-slate-700" /></label>
-          </> : <span className="text-xs text-slate-500">{dateFrom}</span>}
-          <div className="text-xs font-bold text-slate-500 mr-2">الإجمالي المعروض: <span className="text-lg text-rose-600">{fmt(total)}</span></div>
+            <CalendarDays className="w-4 h-4 text-muted" />
+            <label className="text-xs text-muted">من <input aria-label="من تاريخ" type="date" value={dateFrom} max={dateTo || undefined} onChange={(event) => setDateFrom(event.target.value)} className="rounded-lg border border-line px-2 py-1.5 text-ink" /></label>
+            <label className="text-xs text-muted">إلى <input aria-label="إلى تاريخ" type="date" value={dateTo} min={dateFrom || undefined} onChange={(event) => setDateTo(event.target.value)} className="rounded-lg border border-line px-2 py-1.5 text-ink" /></label>
+          </> : <span className="text-xs text-muted">{dateFrom}</span>}
+          <div className="text-xs font-bold text-muted mr-2">الإجمالي المعروض: <span className="text-lg text-danger">{fmt(total)}</span></div>
         </div>
       </section>
 
       <main className="flex-1 overflow-auto p-6">
-        {error && <div role="alert" className="mb-3 px-4 py-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold">{error}</div>}
-        {loading ? <div className="py-16 flex justify-center"><Loader2 className="w-6 h-6 animate-spin text-rose-500" /></div> : (
-          <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+        {error && <div role="alert" className="mb-3 px-4 py-2.5 rounded-xl bg-danger-soft border border-danger-border text-danger text-xs font-semibold">{error}</div>}
+        {loading ? <div className="py-16 flex justify-center"><Loader2 className="w-6 h-6 animate-spin text-danger" /></div> : (
+          <div className="bg-surface border border-line rounded-xl overflow-hidden">
             <DataTable
               ariaLabel="المصروفات"
               rows={filtered}
@@ -120,22 +120,22 @@ const ExpensesManagement: React.FC<{ dateMode: 'today' | 'range' }> = ({ dateMod
               columns={[
                 {
                   key: 'category', header: 'الفئة',
-                  render: (expense: any) => <span className="inline-flex items-center gap-1 rounded border border-slate-200 bg-slate-100 px-2.5 py-1 text-[11px] text-slate-600"><Tag className="h-3 w-3" />{expense.category}</span>,
+                  render: (expense: any) => <span className="inline-flex items-center gap-1 rounded border border-line bg-surface-sunken px-2.5 py-1 text-[11px] text-ink-secondary"><Tag className="h-3 w-3" />{expense.category}</span>,
                 },
-                { key: 'date', header: 'التاريخ', render: (expense: any) => <span className="text-slate-500">{expense.date}</span> },
+                { key: 'date', header: 'التاريخ', render: (expense: any) => <span className="text-muted">{expense.date}</span> },
                 {
                   key: 'method', header: 'طريقة الدفع',
-                  render: (expense: any) => <span className="inline-flex items-center gap-1 font-semibold text-slate-700"><Wallet className="h-3.5 w-3.5" />{PAYMENT_LABELS[expense.paymentType] || expense.paymentType}</span>,
+                  render: (expense: any) => <span className="inline-flex items-center gap-1 font-semibold text-ink"><Wallet className="h-3.5 w-3.5" />{PAYMENT_LABELS[expense.paymentType] || expense.paymentType}</span>,
                 },
-                { key: 'recipient', header: 'المستفيد', render: (expense: any) => <span className="text-slate-500">{expense.recipient || '—'}</span> },
-                { key: 'desc', header: 'الوصف والبيان', render: (expense: any) => <span className="block max-w-[260px] truncate text-slate-500">{expense.description}</span> },
-                { key: 'amount', header: 'المبلغ', render: (expense: any) => <span className="font-black text-rose-600">{fmt(Number(expense.amount))}</span> },
+                { key: 'recipient', header: 'المستفيد', render: (expense: any) => <span className="text-muted">{expense.recipient || '—'}</span> },
+                { key: 'desc', header: 'الوصف والبيان', render: (expense: any) => <span className="block max-w-[260px] truncate text-muted">{expense.description}</span> },
+                { key: 'amount', header: 'المبلغ', render: (expense: any) => <span className="font-black text-danger">{fmt(Number(expense.amount))}</span> },
                 {
                   key: 'actions', header: 'إجراءات',
                   render: (expense: any) => (
                     <span>
-                      {canEdit && <button aria-label={`تعديل مصروف ${expense.description}`} onClick={() => setEditor({ initial: expense })} className="rounded-lg p-2 text-sky-600 hover:bg-sky-50"><Pencil className="h-4 w-4" /></button>}
-                      {canDelete && <button aria-label={`حذف مصروف ${expense.description}`} onClick={() => removeExpense(expense)} className="rounded-lg p-2 text-rose-600 hover:bg-rose-50"><Trash2 className="h-4 w-4" /></button>}
+                      {canEdit && <button aria-label={`تعديل مصروف ${expense.description}`} onClick={() => setEditor({ initial: expense })} className="rounded-lg p-2 text-primary hover:bg-accent-soft"><Pencil className="h-4 w-4" /></button>}
+                      {canDelete && <button aria-label={`حذف مصروف ${expense.description}`} onClick={() => removeExpense(expense)} className="rounded-lg p-2 text-danger hover:bg-danger-soft"><Trash2 className="h-4 w-4" /></button>}
                     </span>
                   ),
                 },

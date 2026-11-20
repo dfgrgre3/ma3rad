@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { DataTable } from '../../../components/ui/DataTable';
 import { PageHeader } from '../../../components/ui/PageHeader';
+import { useBusinessTerm } from '../../../hooks/domains/config/useBusinessTerm';
 import { useSearchParams } from 'react-router-dom';
 import { CheckCircle2, ChevronRight, FileText, Plus, Search, Wrench } from 'lucide-react';
 import { DatabaseManager } from '../../../database/repositories/databaseManager';
@@ -96,6 +97,7 @@ export function loadBranchAdjustments(): Adjustment[] {
 }
 
 export const InventoryAdjustmentsPage: React.FC = () => {
+  const newAdjustmentLabel = useBusinessTerm('actions.newAdjustment');
   const toast = useToast();
   const actor = AuthService.getCurrentUser();
   const canCreate = PermissionService.can(actor, 'inventory.adjust');
@@ -252,8 +254,8 @@ export const InventoryAdjustmentsPage: React.FC = () => {
   const selectedUnit = selectedProduct ? getStockQuantityLabel(selectedProduct) : 'م²';
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
-      <div className="bg-white px-6 pt-4">
+    <div className="h-full flex flex-col bg-surface-muted text-ink overflow-hidden">
+      <div className="bg-surface px-6 pt-4">
         <PageHeader
           icon={<Wrench className="w-5 h-5" />}
           title="تسويات المخزون"
@@ -261,70 +263,70 @@ export const InventoryAdjustmentsPage: React.FC = () => {
           actions={canCreate && (
             <button
               onClick={() => { setErrorMsg(''); setShowCreateModal(true); }}
-              className="flex items-center gap-2 px-4 py-2 bg-orange-600 hover:bg-orange-500 text-white rounded-xl text-sm font-semibold transition shrink-0"
+              className="flex items-center gap-2 px-4 py-2 bg-warning hover:bg-warning text-white rounded-xl text-sm font-semibold transition shrink-0"
             >
               <Plus className="w-4 h-4" />
-              طلب تسوية جديد
+              {newAdjustmentLabel}
             </button>
           )}
         />
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-amber-50 px-6 py-2 text-xs text-amber-900">
-        <span className="rounded-full bg-amber-200 px-2 py-1 font-black">{pendingCount}</span>
+      <div className="flex flex-wrap items-center gap-2 border-b border-line bg-warning-soft px-6 py-2 text-xs text-warning">
+        <span className="rounded-full bg-warning px-2 py-1 font-black">{pendingCount}</span>
         <span>طلب تسوية بانتظار الاعتماد أو الترحيل</span>
         {pendingCount > 0 && (!canApprove || !canPost) && (
-          <span className="text-amber-800">{!canApprove && 'اعتماد: تحتاج صلاحية inventory.adjustment.approve. '}{!canPost && 'ترحيل: تحتاج صلاحية inventory.adjustment.post.'}</span>
+          <span className="text-warning">{!canApprove && 'اعتماد: تحتاج صلاحية inventory.adjustment.approve. '}{!canPost && 'ترحيل: تحتاج صلاحية inventory.adjustment.post.'}</span>
         )}
       </div>
 
-      <div className="p-4 bg-white border-b border-slate-200 flex gap-3">
+      <div className="p-4 bg-surface border-b border-line flex gap-3">
         <div className="relative flex-1">
-          <Search className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+          <Search className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
           <input
             type="text"
             placeholder="بحث برقم التسوية، المخزن، أو السبب..."
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            className="w-full pl-4 pr-10 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-orange-500/50 transition"
+            className="w-full pl-4 pr-10 py-2.5 bg-surface border border-line rounded-xl text-sm text-ink placeholder-muted focus:outline-none focus:border-warning/50 transition"
           />
         </div>
       </div>
 
       <div className="flex-1 overflow-auto p-6">
         {errorMsg && !showCreateModal && (
-          <div className="mb-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700">{errorMsg}</div>
+          <div className="mb-4 rounded-xl border border-danger-border bg-danger-soft p-3 text-xs text-danger">{errorMsg}</div>
         )}
         {loading ? (
           <div className="flex items-center justify-center h-32">
-            <div className="w-6 h-6 bg-orange-600 rounded-lg animate-bounce" />
+            <div className="w-6 h-6 bg-warning rounded-lg animate-bounce" />
           </div>
         ) : filtered.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-48 gap-3 text-slate-500">
+          <div className="flex flex-col items-center justify-center h-48 gap-3 text-muted">
             <Wrench className="w-10 h-10 opacity-30" />
             <p className="text-sm">لا توجد تسويات مسجلة</p>
           </div>
         ) : (
-          <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+          <div className="bg-surface border border-line rounded-xl overflow-hidden">
             <DataTable
               ariaLabel="تسويات المخزون"
               rows={filtered}
               rowKey={(adjustment: any) => String(adjustment.id)}
               tableClassName="text-sm"
               columns={[
-                { key: 'code', header: 'رقم التسوية', render: (adjustment: any) => <span className="font-mono font-bold text-sky-600">{adjustment.code}</span> },
-                { key: 'wh', header: 'المخزن', render: (adjustment: any) => <span className="font-medium text-slate-900">{adjustment.warehouse}</span> },
+                { key: 'code', header: 'رقم التسوية', render: (adjustment: any) => <span className="font-mono font-bold text-primary">{adjustment.code}</span> },
+                { key: 'wh', header: 'المخزن', render: (adjustment: any) => <span className="font-medium text-ink">{adjustment.warehouse}</span> },
                 {
                   key: 'type', header: 'نوع التسوية',
                   render: (adjustment: any) => <span className="text-xs">{adjustment.type === 'DAMAGE' ? 'تالف (-)' : adjustment.type === 'SUBTRACT' ? 'عجز / صرف (-)' : 'زيادة / إضافة (+)'}</span>,
                 },
-                { key: 'reason', header: 'سبب التسوية', render: (adjustment: any) => <span className="block max-w-[200px] truncate text-slate-600">{adjustment.reason}</span> },
-                { key: 'qty', header: 'الكمية', render: (adjustment: any) => <span className="font-mono font-bold text-slate-900">{formatProductQuantity(adjustment.totalQuantityM2, adjustment)}</span> },
-                { key: 'val', header: 'القيمة', render: (adjustment: any) => <span className="font-mono text-slate-700">{fmt(adjustment.totalValue)}</span> },
+                { key: 'reason', header: 'سبب التسوية', render: (adjustment: any) => <span className="block max-w-[200px] truncate text-ink-secondary">{adjustment.reason}</span> },
+                { key: 'qty', header: 'الكمية', render: (adjustment: any) => <span className="font-mono font-bold text-ink">{formatProductQuantity(adjustment.totalQuantityM2, adjustment)}</span> },
+                { key: 'val', header: 'القيمة', render: (adjustment: any) => <span className="font-mono text-ink">{fmt(adjustment.totalValue)}</span> },
                 {
                   key: 'status', header: 'الحالة',
                   render: (adjustment: any) => (
-                    <span className={`rounded-full px-2 py-1 text-[10px] font-bold ${adjustment.status === 'POSTED' ? 'bg-emerald-100 text-emerald-700' : adjustment.approvalStatus === 'APPROVED' ? 'bg-sky-100 text-sky-700' : 'bg-amber-100 text-amber-700'}`}>
+                    <span className={`rounded-full px-2 py-1 text-[10px] font-bold ${adjustment.status === 'POSTED' ? 'bg-success-soft text-success' : adjustment.approvalStatus === 'APPROVED' ? 'bg-accent-soft text-primary' : 'bg-warning-soft text-warning'}`}>
                       {adjustment.status === 'POSTED' ? 'مرحّلة' : adjustment.approvalStatus === 'APPROVED' ? 'معتمدة - بانتظار الترحيل' : 'بانتظار الاعتماد'}
                     </span>
                   ),
@@ -332,7 +334,7 @@ export const InventoryAdjustmentsPage: React.FC = () => {
                 {
                   key: 'actors', header: 'منشئ الطلب / المعتمد / المرحّل',
                   render: (adjustment: any) => (
-                    <span className="block text-[10px] leading-5 text-slate-600">
+                    <span className="block text-[10px] leading-5 text-ink-secondary">
                       <span className="block">الإنشاء: {adjustment.adjustedBy}</span>
                       <span className="block">الاعتماد: {adjustment.approvedByName || '—'}</span>
                       <span className="block">الترحيل: {adjustment.postedByName || '—'}</span>
@@ -343,7 +345,7 @@ export const InventoryAdjustmentsPage: React.FC = () => {
                   key: 'actions', header: 'الخيارات',
                   render: (adjustment: any) => (
                     <span className="block min-w-40">
-                      <button onClick={() => handleViewDetails(adjustment)} className="flex items-center gap-1 text-xs font-bold text-sky-600 transition hover:text-sky-700">
+                      <button onClick={() => handleViewDetails(adjustment)} className="flex items-center gap-1 text-xs font-bold text-primary transition hover:text-primary">
                         <FileText className="h-3.5 w-3.5" />
                         <span>عرض البنود</span>
                         <ChevronRight className="h-3 w-3" />
@@ -351,13 +353,13 @@ export const InventoryAdjustmentsPage: React.FC = () => {
                       {canApprove && adjustment.status === 'PENDING_APPROVAL'
                         && adjustment.approvalStatus !== 'APPROVED'
                         && adjustment.createdBy !== actor?.id && (
-                          <button onClick={() => runWorkflowAction('approve', adjustment)} className="mt-2 flex items-center gap-1 text-xs font-bold text-emerald-700">
+                          <button onClick={() => runWorkflowAction('approve', adjustment)} className="mt-2 flex items-center gap-1 text-xs font-bold text-success">
                             <CheckCircle2 className="h-3.5 w-3.5" />
                             اعتماد
                           </button>
                         )}
                       {canPost && adjustment.status === 'PENDING_APPROVAL' && adjustment.approvalStatus === 'APPROVED' && (
-                        <button onClick={() => runWorkflowAction('post', adjustment)} className="mt-2 flex items-center gap-1 text-xs font-bold text-orange-700">
+                        <button onClick={() => runWorkflowAction('post', adjustment)} className="mt-2 flex items-center gap-1 text-xs font-bold text-warning">
                           <CheckCircle2 className="h-3.5 w-3.5" />
                           ترحيل
                         </button>

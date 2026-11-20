@@ -12,6 +12,7 @@ const {
   tenantScopePredicate,
 } = require('../middleware/auth');
 const { nowIso } = require('../lib/time');
+const { normalizeBanTarget, isLoopbackTarget } = require('../middleware/ipBan');
 
 const router = express.Router();
 
@@ -682,6 +683,128 @@ router.post(
         userAgent: req.headers['user-agent'],
       });
       res.json({ data: { keyId: rotated.keyId, currentKeyId: getKeyId() }, requestId: req.requestId });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// ── IP Bans ────────────────────────────────────────────────────────────────
+// A ban blocks every /api/v1 request from the address (see middleware/ipBan.js),
+// which cuts the whole device off from the central platform until lifted.
+router.get(
+  '/admin/security/ip-bans',
+  authenticatePlatformUser,
+  requirePlatformPermission(['platform.security.view', 'platform.security.manage']),
+  async (req, res, next) => {
+    try {
+      const db = getDb();
+      const { active } = req.query;
+      let query = 'SELECT * FROM platform_ip_bans WHERE 1=1';
+      const params = [];
+      if (active === '1' || active === 'true') {
+        query += ' AND is_active = 1 AND (expires_at IS NULL OR expires_at > ?)';
+        params.push(nowIso());
+      }
+      query += ' ORDER BY is_active DESC, created_at DESC';
+      const bans = await db.all(query, params);
+      res.json({ data: bans, requestId: req.requestId });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+router.post(
+  '/admin/security/ip-bans',
+  authenticatePlatformUser,
+  requirePlatformPermission(['platform.security.update', 'platform.security.manage']),
+  async (req, res, next) => {
+    try {
+      const db = getDb();
+      const { ipAddress, ip, reason, expiresAt } = req.body || {};
+      const target = normalizeBanTarget(ipAddress || ip || '');
+      if (!target) {
+        return res.status(400).json({ error: 'ipAddress must be a valid IPv4/IPv6 address or IPv4 CIDR' });
+      }
+      if (isLoopbackTarget(target)) {
+        return res.status(400).json({ error: 'Loopback addresses cannot be banned' });
+      }
+
+      let expiresIso = null;
+      if (expiresAt) {
+        const parsed = new Date(expiresAt);
+        if (Number.isNaN(parsed.getTime())) {
+          return res.status(400).json({ error: 'expiresAt must be a valid date' });
+        }
+        expiresIso = parsed.toISOString();
+      }
+
+      const existing = await db.get(
+        'SELECT id FROM platform_ip_bans WHERE ip_address = ? AND is_active = 1',
+        [target]
+      );
+      if (existing) {
+        return res.status(409).json({ error: 'This address already has an active ban' });
+      }
+
+      const id = `ipban_${uuidv4().replace(/-/g, '').slice(0, 12)}`;
+      await db.run(
+        `INSERT INTO platform_ip_bans (id, ip_address, reason, is_active, expires_at, banned_by, banned_by_name, created_at, updated_at)
+         VALUES (?, ?, ?, 1, ?, ?, ?, ?, ?)`,
+        [id, target, reason || null, expiresIso, req.platformUser?.id || null, req.platformUser?.full_name || null, nowIso(), nowIso()]
+      );
+      const ban = await db.get('SELECT * FROM platform_ip_bans WHERE id = ?', [id]);
+
+      await recordAuditEvent({
+        actorId: req.platformUser?.id,
+        actorName: req.platformUser?.full_name,
+        action: 'IP_BANNED',
+        resourceType: 'platform_ip_bans',
+        resourceId: id,
+        afterData: { ipAddress: target, reason: reason || null, expiresAt: expiresIso },
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+
+      res.status(201).json({ data: ban, requestId: req.requestId });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+router.post(
+  '/admin/security/ip-bans/:id/lift',
+  authenticatePlatformUser,
+  requirePlatformPermission(['platform.security.update', 'platform.security.manage']),
+  async (req, res, next) => {
+    try {
+      const db = getDb();
+      const ban = await db.get('SELECT * FROM platform_ip_bans WHERE id = ?', [req.params.id]);
+      if (!ban) return res.status(404).json({ error: 'IP ban not found' });
+      if (!ban.is_active) {
+        return res.status(409).json({ error: 'This ban is already lifted' });
+      }
+
+      await db.run(
+        `UPDATE platform_ip_bans SET is_active = 0, lifted_at = ?, lifted_by = ?, updated_at = ? WHERE id = ?`,
+        [nowIso(), req.platformUser?.id || null, nowIso(), ban.id]
+      );
+
+      await recordAuditEvent({
+        actorId: req.platformUser?.id,
+        actorName: req.platformUser?.full_name,
+        action: 'IP_BAN_LIFTED',
+        resourceType: 'platform_ip_bans',
+        resourceId: ban.id,
+        beforeData: { ipAddress: ban.ip_address, reason: ban.reason },
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+
+      const updated = await db.get('SELECT * FROM platform_ip_bans WHERE id = ?', [ban.id]);
+      res.json({ data: updated, requestId: req.requestId });
     } catch (err) {
       next(err);
     }

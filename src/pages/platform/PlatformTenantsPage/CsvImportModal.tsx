@@ -39,19 +39,19 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({
         }
       >
         <div className="space-y-3">
-          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+          <div className="rounded-lg border border-line bg-surface-muted p-3">
             <input
               type="file"
               accept=".csv"
               onChange={handleCsvFileSelect}
-              className="block w-full text-sm text-slate-600 file:mr-4 file:rounded-lg file:border-0 file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100"
+              className="block w-full text-sm text-ink-secondary file:mr-4 file:rounded-lg file:border-0 file:bg-success-soft file:text-success hover:file:bg-success-soft"
               disabled={csvImporting}
             />
-            <p className="mt-2 text-[10.5px] text-slate-500">تنسيق CSV مدعوم: أعمدة بالعربية أو الإنجليزية. سيستخدم الكود لتحديث العميل إن وجد، وإلا سينشئ جديد.</p>
+            <p className="mt-2 text-[10.5px] text-muted">تنسيق CSV مدعوم: أعمدة بالعربية أو الإنجليزية. سيستخدم الكود لتحديث العميل إن وجد، وإلا سينشئ جديد.</p>
           </div>
           {csvPreview.length > 0 && (
-            <div className="rounded-lg border border-slate-200 overflow-hidden">
-              <p className="px-3 py-2 text-[10.5px] font-semibold text-slate-700 bg-slate-50 border-b">معاينة أول 5 أسطر:</p>
+            <div className="rounded-lg border border-line overflow-hidden">
+              <p className="px-3 py-2 text-[10.5px] font-semibold text-ink bg-surface-muted border-b">معاينة أول 5 أسطر:</p>
                             <DataTable
                 ariaLabel="معاينة استيراد CSV"
                 rows={csvPreview.slice(1)}

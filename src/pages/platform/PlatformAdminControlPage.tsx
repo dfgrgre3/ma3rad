@@ -52,12 +52,12 @@ import { useToast } from '../../components/ui/Toast';
 type ActiveTab = 'STAFF' | 'TENANTS';
 
 const ROLE_BADGE_STYLE: Record<PlatformStaffRole, { bg: string; text: string; label: string }> = {
-  SUPER_ADMIN: { bg: 'bg-purple-500/20 border-purple-500/40', text: 'text-purple-300', label: 'مالك المنصة' },
-  PLATFORM_ADMIN: { bg: 'bg-indigo-500/20 border-indigo-500/40', text: 'text-indigo-300', label: 'مدير منصة عام' },
-  SUPPORT_AGENT: { bg: 'bg-emerald-500/20 border-emerald-500/40', text: 'text-emerald-300', label: 'دعم فني' },
-  OPERATIONS_ENGINEER: { bg: 'bg-sky-500/20 border-sky-500/40', text: 'text-sky-300', label: 'عمليات وبنية تحتية' },
-  BILLING_SPECIALIST: { bg: 'bg-amber-500/20 border-amber-500/40', text: 'text-amber-300', label: 'فواتير واشتراكات' },
-  LICENSE_MANAGER: { bg: 'bg-pink-500/20 border-pink-500/40', text: 'text-pink-300', label: 'إدارة التراخيص' },
+  SUPER_ADMIN: { bg: 'bg-primary/20 border-primary/40', text: 'text-primary', label: 'مالك المنصة' },
+  PLATFORM_ADMIN: { bg: 'bg-primary/20 border-primary/40', text: 'text-primary', label: 'مدير منصة عام' },
+  SUPPORT_AGENT: { bg: 'bg-success/20 border-success/40', text: 'text-success', label: 'دعم فني' },
+  OPERATIONS_ENGINEER: { bg: 'bg-primary/20 border-primary/40', text: 'text-primary', label: 'عمليات وبنية تحتية' },
+  BILLING_SPECIALIST: { bg: 'bg-warning/20 border-warning/40', text: 'text-warning', label: 'فواتير واشتراكات' },
+  LICENSE_MANAGER: { bg: 'bg-primary/20 border-primary/40', text: 'text-primary', label: 'إدارة التراخيص' },
 };
 
 export const PlatformAdminControlPage: React.FC = () => {
@@ -381,26 +381,26 @@ export const PlatformAdminControlPage: React.FC = () => {
       <PageHeader
         title="مركز التحكم الإداري (RBAC & Staff Console)"
         description="فصل كامل بين إدارة موظفي الشركة المالكة للمنصة (Platform Staff) وإدارة مستخدمي الشركات العميلة (Tenant Users)."
-        icon={<ShieldCheck className="h-6 w-6 text-emerald-400" />}
+        icon={<ShieldCheck className="h-6 w-6 text-success" />}
       />
 
       {error && (
-        <div role="alert" className="rounded-xl border border-rose-800 bg-rose-950/40 p-4 text-rose-200">
+        <div role="alert" className="rounded-xl border border-danger bg-danger/40 p-4 text-danger">
           <div className="flex items-center gap-2">
-            <AlertTriangle className="h-5 w-5 text-rose-400" />
+            <AlertTriangle className="h-5 w-5 text-danger" />
             <span className="font-bold">{error}</span>
           </div>
         </div>
       )}
 
       {/* Main Mode Tabs Switcher */}
-      <div className="flex border-b border-slate-800 pb-0">
+      <div className="flex border-b border-line-strong pb-0">
         <button
           onClick={() => setActiveTab('STAFF')}
           className={`flex items-center gap-2 px-6 py-3 text-sm font-bold border-b-2 transition-all ${
             activeTab === 'STAFF'
-              ? 'border-emerald-500 text-emerald-400 bg-slate-900/60'
-              : 'border-transparent text-slate-400 hover:text-slate-200'
+              ? 'border-success text-success bg-primary/60'
+              : 'border-transparent text-muted hover:text-muted'
           }`}
         >
           <Shield className="h-4 w-4" />
@@ -411,8 +411,8 @@ export const PlatformAdminControlPage: React.FC = () => {
           onClick={() => setActiveTab('TENANTS')}
           className={`flex items-center gap-2 px-6 py-3 text-sm font-bold border-b-2 transition-all ${
             activeTab === 'TENANTS'
-              ? 'border-emerald-500 text-emerald-400 bg-slate-900/60'
-              : 'border-transparent text-slate-400 hover:text-slate-200'
+              ? 'border-success text-success bg-primary/60'
+              : 'border-transparent text-muted hover:text-muted'
           }`}
         >
           <Building2 className="h-4 w-4" />
@@ -424,10 +424,10 @@ export const PlatformAdminControlPage: React.FC = () => {
       {activeTab === 'STAFF' && (
         <div className="space-y-5">
           {/* Top Bar: Search, Role Filter, Add Staff Button */}
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-800 bg-slate-900/80 p-3.5 shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line-strong bg-primary/80 p-3.5 shadow-sm">
             <div className="flex flex-wrap items-center gap-2.5 flex-1 min-w-[280px]">
               <div className="relative min-w-[220px]">
-                <Search className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <Search className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
                 <input
                   type="text"
                   value={staffSearch}
@@ -464,15 +464,15 @@ export const PlatformAdminControlPage: React.FC = () => {
           </div>
 
           {/* Platform Staff Table */}
-          <section className="overflow-hidden rounded-xl border border-slate-800 bg-slate-900/70 shadow-sm">
+          <section className="overflow-hidden rounded-xl border border-line-strong bg-primary/70 shadow-sm">
             {staffLoading ? (
-              <div className="py-16 text-center text-sm font-semibold text-slate-500">
+              <div className="py-16 text-center text-sm font-semibold text-muted">
                 <RefreshCw className="inline-block h-5 w-5 animate-spin mb-2" />
                 <p>جارٍ تحميل موظفي المنصة...</p>
               </div>
             ) : staffList.length === 0 ? (
               <EmptyState
-                icon={<Users className="h-6 w-6 text-slate-500" />}
+                icon={<Users className="h-6 w-6 text-muted" />}
                 title="لا يوجد موظفون مسجلون"
                 description="قم بإضافة موظفين للمنصة وتعيين أدوارهم وصلاحياتهم."
               />
@@ -490,17 +490,17 @@ export const PlatformAdminControlPage: React.FC = () => {
                         const isOwner = staff.role === 'SUPER_ADMIN';
                         return (
                           <span className="flex items-center gap-2.5">
-                            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-800 text-slate-300 font-bold text-xs">
+                            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-muted font-bold text-xs">
                               {staff.fullName.charAt(0)}
                             </span>
                             <span>
-                              <span className="block text-xs font-bold text-slate-100 flex items-center gap-1.5">
+                              <span className="block text-xs font-bold text-muted flex items-center gap-1.5">
                                 {staff.fullName}
                                 {isOwner && (
-                                  <span title="مالك المنصة" className="inline-flex items-center"><BadgeCheck className="h-3.5 w-3.5 text-purple-400" /></span>
+                                  <span title="مالك المنصة" className="inline-flex items-center"><BadgeCheck className="h-3.5 w-3.5 text-primary" /></span>
                                 )}
                               </span>
-                              <span className="block text-[11px] text-slate-400">{staff.email}</span>
+                              <span className="block text-[11px] text-muted">{staff.email}</span>
                             </span>
                           </span>
                         );
@@ -509,7 +509,7 @@ export const PlatformAdminControlPage: React.FC = () => {
                     {
                       key: 'role', header: 'الدور الوظيفي بالمنصة',
                       render: (staff) => {
-                        const badge = ROLE_BADGE_STYLE[staff.role] || { bg: 'bg-slate-800', text: 'text-slate-300', label: staff.role };
+                        const badge = ROLE_BADGE_STYLE[staff.role] || { bg: 'bg-primary', text: 'text-muted', label: staff.role };
                         return (
                           <span className={`inline-flex items-center rounded-md border px-2.5 py-1 text-[11px] font-bold ${badge.bg} ${badge.text}`}>
                             {badge.label}
@@ -520,24 +520,24 @@ export const PlatformAdminControlPage: React.FC = () => {
                     {
                       key: 'perms', header: 'الصلاحيات المتاحة والمقيدة',
                       render: (staff) => {
-                        if (staff.role === 'SUPER_ADMIN') return <span className="text-xs text-slate-400">وصول كامل لكافة الأنظمة (*)</span>;
-                        if (staff.role === 'SUPPORT_AGENT') return <span className="text-xs text-slate-400">تذاكر الدعم · جلسات Remote · التشخيص (مقيد الفواتير والأسعار)</span>;
-                        if (staff.role === 'OPERATIONS_ENGINEER') return <span className="text-xs text-slate-400">العمليات · النسخ الاحتياطي · المزامنة (مقيد الفواتير والتراخيص)</span>;
-                        if (staff.role === 'BILLING_SPECIALIST') return <span className="text-xs text-slate-400">الفوترة والمدفوعات · الاشتراكات (مقيد البنية والتراخيص)</span>;
-                        if (staff.role === 'LICENSE_MANAGER') return <span className="text-xs text-slate-400">إصدار التراخيص · الأجهزة والربط (مقيد الفواتير والعمليات)</span>;
-                        return <span className="text-xs text-slate-400">إدارة منصة عامة</span>;
+                        if (staff.role === 'SUPER_ADMIN') return <span className="text-xs text-muted">وصول كامل لكافة الأنظمة (*)</span>;
+                        if (staff.role === 'SUPPORT_AGENT') return <span className="text-xs text-muted">تذاكر الدعم · جلسات Remote · التشخيص (مقيد الفواتير والأسعار)</span>;
+                        if (staff.role === 'OPERATIONS_ENGINEER') return <span className="text-xs text-muted">العمليات · النسخ الاحتياطي · المزامنة (مقيد الفواتير والتراخيص)</span>;
+                        if (staff.role === 'BILLING_SPECIALIST') return <span className="text-xs text-muted">الفوترة والمدفوعات · الاشتراكات (مقيد البنية والتراخيص)</span>;
+                        if (staff.role === 'LICENSE_MANAGER') return <span className="text-xs text-muted">إصدار التراخيص · الأجهزة والربط (مقيد الفواتير والعمليات)</span>;
+                        return <span className="text-xs text-muted">إدارة منصة عامة</span>;
                       },
                     },
                     {
                       key: 'status', header: 'الحالة',
                       render: (staff) => (
-                        <span className={`inline-flex items-center gap-1 text-[11px] font-bold ${staff.isActive ? 'text-emerald-400' : 'text-rose-400'}`}>
+                        <span className={`inline-flex items-center gap-1 text-[11px] font-bold ${staff.isActive ? 'text-success' : 'text-danger'}`}>
                           {staff.isActive ? <CheckCircle2 className="h-3.5 w-3.5" /> : <XCircle className="h-3.5 w-3.5" />}
                           {staff.isActive ? 'نشط' : 'معطل'}
                         </span>
                       ),
                     },
-                    { key: 'created', header: 'تاريخ الإضافة', render: (staff) => <span className="text-xs text-slate-400">{formatDateTime(staff.createdAt)}</span> },
+                    { key: 'created', header: 'تاريخ الإضافة', render: (staff) => <span className="text-xs text-muted">{formatDateTime(staff.createdAt)}</span> },
                     {
                       key: 'actions', header: 'الإجراءات', align: 'center',
                       render: (staff) => {
@@ -548,7 +548,7 @@ export const PlatformAdminControlPage: React.FC = () => {
                               <button
                                 onClick={() => openStaffModal(staff)}
                                 title="تعديل الموظف"
-                                className="rounded p-1 text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition-colors"
+                                className="rounded p-1 text-muted hover:bg-primary hover:text-muted transition-colors"
                               >
                                 <Pencil className="h-3.5 w-3.5" />
                               </button>
@@ -560,8 +560,8 @@ export const PlatformAdminControlPage: React.FC = () => {
                                   title={staff.isActive ? 'تعطيل الحساب' : 'تنشيط الحساب'}
                                   className={`rounded p-1 transition-colors ${
                                     staff.isActive
-                                      ? 'text-amber-400 hover:bg-amber-950/40'
-                                      : 'text-emerald-400 hover:bg-emerald-950/40'
+                                      ? 'text-warning hover:bg-warning/40'
+                                      : 'text-success hover:bg-success/40'
                                   }`}
                                 >
                                   {staff.isActive ? <Lock className="h-3.5 w-3.5" /> : <Unlock className="h-3.5 w-3.5" />}
@@ -570,7 +570,7 @@ export const PlatformAdminControlPage: React.FC = () => {
                                   <button
                                     onClick={() => handleDeleteStaff(staff)}
                                     title="حذف الموظف"
-                                    className="rounded p-1 text-rose-400 hover:bg-rose-950/40 transition-colors"
+                                    className="rounded p-1 text-danger hover:bg-danger/40 transition-colors"
                                   >
                                     <Trash2 className="h-3.5 w-3.5" />
                                   </button>
@@ -588,19 +588,19 @@ export const PlatformAdminControlPage: React.FC = () => {
           </section>
 
           {/* Staff Roles & Permissions Matrix Overview */}
-          <section className="rounded-xl border border-slate-800 bg-slate-900/60 p-4 shadow-sm">
-            <h3 className="text-xs font-bold text-slate-200 mb-3 flex items-center gap-2">
-              <Shield className="h-4 w-4 text-emerald-400" />
+          <section className="rounded-xl border border-line-strong bg-primary/60 p-4 shadow-sm">
+            <h3 className="text-xs font-bold text-muted mb-3 flex items-center gap-2">
+              <Shield className="h-4 w-4 text-success" />
               مصفوفة الأدوار الوظيفية وعزل الصلاحيات في المنصة (Platform RBAC Rules)
             </h3>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {staffRoles.map((roleDef) => (
-                <div key={roleDef.role} className="rounded-lg border border-slate-800 bg-slate-950/50 p-3">
+                <div key={roleDef.role} className="rounded-lg border border-line-strong bg-primary/50 p-3">
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs font-bold text-slate-200">{roleDef.title}</span>
-                    <span className="text-[10px] text-slate-500 font-mono">{roleDef.role}</span>
+                    <span className="text-xs font-bold text-muted">{roleDef.title}</span>
+                    <span className="text-[10px] text-muted font-mono">{roleDef.role}</span>
                   </div>
-                  <p className="text-[11px] text-slate-400 leading-relaxed">{roleDef.description}</p>
+                  <p className="text-[11px] text-muted leading-relaxed">{roleDef.description}</p>
                 </div>
               ))}
             </div>
@@ -612,11 +612,11 @@ export const PlatformAdminControlPage: React.FC = () => {
       {activeTab === 'TENANTS' && (
         <div className="space-y-5">
           {/* Tenant Selector & Actions Bar */}
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-800 bg-slate-900/80 p-3.5 shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line-strong bg-primary/80 p-3.5 shadow-sm">
             <div className="flex items-center gap-3 flex-1 min-w-[280px]">
-              <Building2 className="h-5 w-5 text-emerald-400 shrink-0" />
+              <Building2 className="h-5 w-5 text-success shrink-0" />
               <div className="flex-1 max-w-md">
-                <label className="block text-[11px] font-bold text-slate-400 mb-1">اختر الشركة العميلة:</label>
+                <label className="block text-[11px] font-bold text-muted mb-1">اختر الشركة العميلة:</label>
                 <select
                   value={selectedTenantId}
                   onChange={(e) => setSelectedTenantId(e.target.value)}
@@ -644,26 +644,26 @@ export const PlatformAdminControlPage: React.FC = () => {
           </div>
 
           {/* Tenant Users Table */}
-          <section className="overflow-hidden rounded-xl border border-slate-800 bg-slate-900/70 shadow-sm">
-            <header className="border-b border-slate-800 px-4 py-3 bg-slate-950/40 flex items-center justify-between">
+          <section className="overflow-hidden rounded-xl border border-line-strong bg-primary/70 shadow-sm">
+            <header className="border-b border-line-strong px-4 py-3 bg-primary/40 flex items-center justify-between">
               <div>
-                <h3 className="text-xs font-bold text-slate-200">
+                <h3 className="text-xs font-bold text-muted">
                   مستخدمو نظام ERP للشركة المحددة ({tenantUsers.length} مستخدمين)
                 </h3>
-                <p className="text-[10.5px] text-slate-400">
+                <p className="text-[10.5px] text-muted">
                   إدارة أدوار وحسابات موظفي المتجر أو المصنع التابع للعميل.
                 </p>
               </div>
             </header>
 
             {tenantUsersLoading ? (
-              <div className="py-16 text-center text-sm font-semibold text-slate-500">
+              <div className="py-16 text-center text-sm font-semibold text-muted">
                 <RefreshCw className="inline-block h-5 w-5 animate-spin mb-2" />
                 <p>جارٍ تحميل مستخدمي العميل...</p>
               </div>
             ) : tenantUsers.length === 0 ? (
               <EmptyState
-                icon={<Users className="h-6 w-6 text-slate-500" />}
+                icon={<Users className="h-6 w-6 text-muted" />}
                 title="لا يوجد مستخدمون مسجلون لهذا العميل"
                 description="يمكنك إنشاء مستخدم جديد وتعيين دوره (مدير، محاسب، مبيعات، كاشير، إلخ)."
               />
@@ -675,15 +675,15 @@ export const PlatformAdminControlPage: React.FC = () => {
                   rowKey={(user) => user.id}
                   minWidth={800}
                   columns={[
-                    { key: 'name', header: 'اسم المستخدم', render: (user) => <span className="text-xs font-bold text-slate-100">{user.fullName}</span> },
-                    { key: 'login', header: 'اسم الدخول / البريد', render: (user) => <span className="text-xs text-slate-300">{user.email || user.username || '—'}</span> },
-                    { key: 'phone', header: 'رقم الهاتف', render: (user) => <span className="text-xs text-slate-400">{user.phone || '—'}</span> },
-                    { key: 'role', header: 'الدور في ERP', render: (user) => <span className="inline-flex rounded-md bg-slate-800 border border-slate-700 px-2.5 py-0.5 text-xs font-bold text-slate-200">{user.role}</span> },
+                    { key: 'name', header: 'اسم المستخدم', render: (user) => <span className="text-xs font-bold text-muted">{user.fullName}</span> },
+                    { key: 'login', header: 'اسم الدخول / البريد', render: (user) => <span className="text-xs text-muted">{user.email || user.username || '—'}</span> },
+                    { key: 'phone', header: 'رقم الهاتف', render: (user) => <span className="text-xs text-muted">{user.phone || '—'}</span> },
+                    { key: 'role', header: 'الدور في ERP', render: (user) => <span className="inline-flex rounded-md bg-primary border border-line-strong px-2.5 py-0.5 text-xs font-bold text-muted">{user.role}</span> },
                     {
                       key: 'status', header: 'الحالة',
                       render: (user) => (
                         <span className={`inline-flex items-center gap-1 text-[11px] font-bold ${
-                          user.status === 'ACTIVE' ? 'text-emerald-400' : user.status === 'INVITED' ? 'text-amber-400' : 'text-rose-400'
+                          user.status === 'ACTIVE' ? 'text-success' : user.status === 'INVITED' ? 'text-warning' : 'text-danger'
                         }`}>
                           {user.status === 'ACTIVE' ? 'نشط' : user.status === 'INVITED' ? 'في انتظار التفعيل' : 'معطل'}
                         </span>
@@ -698,7 +698,7 @@ export const PlatformAdminControlPage: React.FC = () => {
                               <button
                                 onClick={() => openTenantUserModal(user)}
                                 title="تعديل المستخدم"
-                                className="rounded p-1 text-slate-400 hover:bg-slate-800 hover:text-slate-200"
+                                className="rounded p-1 text-muted hover:bg-primary hover:text-muted"
                               >
                                 <Pencil className="h-3.5 w-3.5" />
                               </button>
@@ -706,7 +706,7 @@ export const PlatformAdminControlPage: React.FC = () => {
                                 onClick={() => handleToggleTenantUserActive(user)}
                                 title={user.status === 'ACTIVE' ? 'تعطيل الحساب' : 'تنشيط الحساب'}
                                 className={`rounded p-1 ${
-                                  user.status === 'ACTIVE' ? 'text-amber-400 hover:bg-amber-950/40' : 'text-emerald-400 hover:bg-emerald-950/40'
+                                  user.status === 'ACTIVE' ? 'text-warning hover:bg-warning/40' : 'text-success hover:bg-success/40'
                                 }`}
                               >
                                 {user.status === 'ACTIVE' ? <Lock className="h-3.5 w-3.5" /> : <Unlock className="h-3.5 w-3.5" />}
@@ -714,7 +714,7 @@ export const PlatformAdminControlPage: React.FC = () => {
                               <button
                                 onClick={() => handleDeleteTenantUser(user)}
                                 title="حذف المستخدم"
-                                className="rounded p-1 text-rose-400 hover:bg-rose-950/40"
+                                className="rounded p-1 text-danger hover:bg-danger/40"
                               >
                                 <Trash2 className="h-3.5 w-3.5" />
                               </button>
@@ -739,7 +739,7 @@ export const PlatformAdminControlPage: React.FC = () => {
       >
         <div className="space-y-3.5 text-right">
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">الاسم الكامل *</label>
+            <label className="block text-xs font-semibold text-muted mb-1">الاسم الكامل *</label>
             <input
               type="text"
               value={staffForm.fullName}
@@ -749,7 +749,7 @@ export const PlatformAdminControlPage: React.FC = () => {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">البريد الإلكتروني للعمل *</label>
+            <label className="block text-xs font-semibold text-muted mb-1">البريد الإلكتروني للعمل *</label>
             <input
               type="email"
               value={staffForm.email}
@@ -759,7 +759,7 @@ export const PlatformAdminControlPage: React.FC = () => {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">رقم الهاتف</label>
+            <label className="block text-xs font-semibold text-muted mb-1">رقم الهاتف</label>
             <input
               type="text"
               value={staffForm.phone}
@@ -769,7 +769,7 @@ export const PlatformAdminControlPage: React.FC = () => {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">الدور الوظيفي بالمنصة *</label>
+            <label className="block text-xs font-semibold text-muted mb-1">الدور الوظيفي بالمنصة *</label>
             <select
               value={staffForm.role}
               disabled={editingStaff?.role === 'SUPER_ADMIN'}
@@ -785,13 +785,13 @@ export const PlatformAdminControlPage: React.FC = () => {
                 <option value="SUPER_ADMIN">مالك المنصة (Super Admin)</option>
               )}
             </select>
-            <p className="text-[10.5px] text-slate-400 mt-1">
+            <p className="text-[10.5px] text-muted mt-1">
               ملاحظة: موظف الدعم أو العمليات لن يحصل على صلاحيات مالك المنصة أو تغيير الأسعار والتراخيص.
             </p>
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">
+            <label className="block text-xs font-semibold text-muted mb-1">
               {editingStaff ? 'كلمة مرور جديدة (اختياري)' : 'كلمة المرور الأولية *'}
             </label>
             <input
@@ -803,7 +803,7 @@ export const PlatformAdminControlPage: React.FC = () => {
             />
           </div>
 
-          <div className="flex justify-end gap-2 pt-3 border-t border-slate-800">
+          <div className="flex justify-end gap-2 pt-3 border-t border-line-strong">
             <Button variant="secondary" size="sm" onClick={() => setIsStaffModalOpen(false)}>
               إلغاء
             </Button>
@@ -822,7 +822,7 @@ export const PlatformAdminControlPage: React.FC = () => {
       >
         <div className="space-y-3.5 text-right">
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">اسم الموظف الكامل *</label>
+            <label className="block text-xs font-semibold text-muted mb-1">اسم الموظف الكامل *</label>
             <input
               type="text"
               value={tenantUserForm.fullName}
@@ -833,7 +833,7 @@ export const PlatformAdminControlPage: React.FC = () => {
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">اسم الدخول (Username)</label>
+              <label className="block text-xs font-semibold text-muted mb-1">اسم الدخول (Username)</label>
               <input
                 type="text"
                 value={tenantUserForm.username || ''}
@@ -842,7 +842,7 @@ export const PlatformAdminControlPage: React.FC = () => {
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">البريد الإلكتروني</label>
+              <label className="block text-xs font-semibold text-muted mb-1">البريد الإلكتروني</label>
               <input
                 type="email"
                 value={tenantUserForm.email || ''}
@@ -854,7 +854,7 @@ export const PlatformAdminControlPage: React.FC = () => {
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">الدور في ERP</label>
+              <label className="block text-xs font-semibold text-muted mb-1">الدور في ERP</label>
               <select
                 value={tenantUserForm.role}
                 onChange={(e) => setTenantUserForm({ ...tenantUserForm, role: e.target.value })}
@@ -869,7 +869,7 @@ export const PlatformAdminControlPage: React.FC = () => {
               </select>
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">رقم الهاتف</label>
+              <label className="block text-xs font-semibold text-muted mb-1">رقم الهاتف</label>
               <input
                 type="text"
                 value={tenantUserForm.phone || ''}
@@ -879,7 +879,7 @@ export const PlatformAdminControlPage: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex justify-end gap-2 pt-3 border-t border-slate-800">
+          <div className="flex justify-end gap-2 pt-3 border-t border-line-strong">
             <Button variant="secondary" size="sm" onClick={() => setIsTenantUserModalOpen(false)}>
               إلغاء
             </Button>

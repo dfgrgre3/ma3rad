@@ -38,16 +38,16 @@ const REPORT_TYPES: { id: ReportType; label: string; icon: React.ElementType; co
 ];
 
 const COLOR_MAP: Record<string, string> = {
-  sky: 'bg-sky-50 text-sky-600 border-sky-200',
-  violet: 'bg-violet-50 text-violet-600 border-violet-200',
-  emerald: 'bg-emerald-50 text-emerald-600 border-emerald-200',
-  amber: 'bg-amber-50 text-amber-600 border-amber-200',
-  orange: 'bg-orange-50 text-orange-600 border-orange-200',
-  pink: 'bg-pink-50 text-pink-600 border-pink-200',
+  sky: 'bg-accent-soft text-primary border-accent-border',
+  violet: 'bg-accent-soft text-primary border-accent-border',
+  emerald: 'bg-success-soft text-success border-success-border',
+  amber: 'bg-warning-soft text-warning border-warning-border',
+  orange: 'bg-warning-soft text-warning border-warning-border',
+  pink: 'bg-accent-soft text-primary border-accent-border',
 };
 const BAR_COLOR_MAP: Record<string, string> = {
-  sky: 'bg-sky-500', violet: 'bg-violet-500', emerald: 'bg-emerald-500',
-  amber: 'bg-amber-500', orange: 'bg-orange-500', pink: 'bg-pink-500',
+  sky: 'bg-primary', violet: 'bg-primary', emerald: 'bg-success',
+  amber: 'bg-warning', orange: 'bg-warning', pink: 'bg-primary',
 };
 
 export function loadReport(type: ReportType, from: string, to: string): SalesRow[] | DailyRow[] {
@@ -265,9 +265,9 @@ export function loadReport(type: ReportType, from: string, to: string): SalesRow
 }
 
 function SalesBarChart({ rows, color, reportType }: { rows: SalesRow[]; color: string; reportType: ReportType }) {
-  if (rows.length === 0) return <p className="text-xs text-slate-400 text-center py-8">لا توجد بيانات في هذه الفترة</p>;
+  if (rows.length === 0) return <p className="text-xs text-muted text-center py-8">لا توجد بيانات في هذه الفترة</p>;
   const max = Math.max(...rows.map(r => Math.abs(r.revenue)), 1);
-  const barColor = BAR_COLOR_MAP[color] || 'bg-sky-500';
+  const barColor = BAR_COLOR_MAP[color] || 'bg-primary';
 
   return (
     <div className="space-y-2.5 mt-2">
@@ -275,18 +275,18 @@ function SalesBarChart({ rows, color, reportType }: { rows: SalesRow[]; color: s
         const pct = Math.round((Math.abs(row.revenue) / max) * 100);
         return (
           <div key={i} className="flex items-center gap-3">
-            <span className="text-xs text-slate-600 w-36 shrink-0 font-medium truncate text-left">{row.label}</span>
-            <div className="flex-1 bg-slate-100 rounded-full h-5 overflow-hidden">
+            <span className="text-xs text-ink-secondary w-36 shrink-0 font-medium truncate text-left">{row.label}</span>
+            <div className="flex-1 bg-surface-sunken rounded-full h-5 overflow-hidden">
               <div
-                className={`h-full rounded-full ${row.revenue < 0 ? 'bg-rose-500' : barColor} transition-all duration-700 flex items-center justify-end pr-2`}
+                className={`h-full rounded-full ${row.revenue < 0 ? 'bg-danger' : barColor} transition-all duration-700 flex items-center justify-end pr-2`}
                 style={{ width: `${Math.max(pct, 3)}%` }}
               >
                 {pct > 15 && <span className="text-white text-xs font-black">{fmtM(row.revenue)}</span>}
               </div>
             </div>
             <div className="text-left w-24 shrink-0">
-              <p className="text-xs font-black text-slate-900">{fmtM(row.revenue)} ج</p>
-              <p className="text-xs text-slate-400">
+              <p className="text-xs font-black text-ink">{fmtM(row.revenue)} ج</p>
+              <p className="text-xs text-muted">
                 {fmt(row.count)} فاتورة
                 {reportType === 'by_city' && ` • ${fmt(row.customers || 0)} عميل`}
                 {reportType !== 'by_city' && row.margin > 0 && ` • ${row.margin}%`}
@@ -300,7 +300,7 @@ function SalesBarChart({ rows, color, reportType }: { rows: SalesRow[]; color: s
 }
 
 function DailyChart({ rows }: { rows: DailyRow[] }) {
-  if (rows.length === 0) return <p className="text-xs text-slate-400 text-center py-8">لا توجد بيانات في هذه الفترة</p>;
+  if (rows.length === 0) return <p className="text-xs text-muted text-center py-8">لا توجد بيانات في هذه الفترة</p>;
   const max = Math.max(...rows.map(r => Math.abs(r.revenue)), 1);
   const totalRevenue = rows.reduce((s, r) => s + r.revenue, 0);
   const totalInvoiceCount = rows.reduce((s, r) => s + r.invoiceCount, 0);
@@ -309,21 +309,21 @@ function DailyChart({ rows }: { rows: DailyRow[] }) {
   return (
     <div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
-        <div className="bg-pink-50 border border-pink-200 rounded-xl p-3 text-center">
-          <p className="text-lg font-black text-pink-700">{fmtM(totalRevenue)} ج</p>
-          <p className="text-xs text-pink-500">إجمالي الإيرادات</p>
+        <div className="bg-accent-soft border border-accent-border rounded-xl p-3 text-center">
+          <p className="text-lg font-black text-primary">{fmtM(totalRevenue)} ج</p>
+          <p className="text-xs text-primary">إجمالي الإيرادات</p>
         </div>
-        <div className="bg-violet-50 border border-violet-200 rounded-xl p-3 text-center">
-          <p className="text-lg font-black text-violet-700">{fmt(totalInvoiceCount)}</p>
-          <p className="text-xs text-violet-500">إجمالي الفواتير</p>
+        <div className="bg-accent-soft border border-accent-border rounded-xl p-3 text-center">
+          <p className="text-lg font-black text-primary">{fmt(totalInvoiceCount)}</p>
+          <p className="text-xs text-primary">إجمالي الفواتير</p>
         </div>
-        <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-center">
-          <p className="text-lg font-black text-amber-700">{fmt(totalReturnCount)}</p>
-          <p className="text-xs text-amber-500">إجمالي المرتجعات</p>
+        <div className="bg-warning-soft border border-warning-border rounded-xl p-3 text-center">
+          <p className="text-lg font-black text-warning">{fmt(totalReturnCount)}</p>
+          <p className="text-xs text-warning">إجمالي المرتجعات</p>
         </div>
-        <div className="bg-sky-50 border border-sky-200 rounded-xl p-3 text-center">
-          <p className="text-lg font-black text-sky-700">{totalInvoiceCount > 0 ? fmtM(totalRevenue / totalInvoiceCount) : '0'} ج</p>
-          <p className="text-xs text-sky-500">صافي الإيراد لكل فاتورة</p>
+        <div className="bg-accent-soft border border-accent-border rounded-xl p-3 text-center">
+          <p className="text-lg font-black text-primary">{totalInvoiceCount > 0 ? fmtM(totalRevenue / totalInvoiceCount) : '0'} ج</p>
+          <p className="text-xs text-primary">صافي الإيراد لكل فاتورة</p>
         </div>
       </div>
       <div className="space-y-1.5 max-h-96 overflow-y-auto">
@@ -331,13 +331,13 @@ function DailyChart({ rows }: { rows: DailyRow[] }) {
           const pct = Math.round((Math.abs(row.revenue) / max) * 100);
           return (
             <div key={i} className="flex items-center gap-3">
-              <span className="text-xs text-slate-500 w-24 shrink-0 font-medium">{row.date}</span>
-              <div className="flex-1 bg-slate-100 rounded-full h-4 overflow-hidden">
-                <div className={`h-full rounded-full ${row.revenue < 0 ? 'bg-rose-500' : 'bg-pink-500'} transition-all duration-700`}
+              <span className="text-xs text-muted w-24 shrink-0 font-medium">{row.date}</span>
+              <div className="flex-1 bg-surface-sunken rounded-full h-4 overflow-hidden">
+                <div className={`h-full rounded-full ${row.revenue < 0 ? 'bg-danger' : 'bg-primary'} transition-all duration-700`}
                   style={{ width: `${Math.max(pct, 2)}%` }} />
               </div>
-              <span className="text-xs font-black text-slate-900 w-20 text-left">{fmtM(row.revenue)} ج</span>
-              <span className="text-xs text-slate-400 w-28 text-left">
+              <span className="text-xs font-black text-ink w-20 text-left">{fmtM(row.revenue)} ج</span>
+              <span className="text-xs text-muted w-28 text-left">
                 {fmt(row.invoiceCount)} ف • {fmt(row.returnCount)} م
               </span>
             </div>
@@ -434,17 +434,17 @@ export const SalesReportsPage: React.FC = () => {
     return (
       <div className="h-full flex items-center justify-center">
         <div className="text-center">
-          <AlertCircle className="w-12 h-12 text-rose-400 mx-auto mb-3" />
-          <p className="text-slate-600 font-bold">لا تملك صلاحية مشاهدة التقارير</p>
+          <AlertCircle className="w-12 h-12 text-danger mx-auto mb-3" />
+          <p className="text-ink-secondary font-bold">لا تملك صلاحية مشاهدة التقارير</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
+    <div className="h-full flex flex-col bg-surface-muted text-ink overflow-hidden">
       {/* Header */}
-      <div className="bg-white border-b border-slate-200 px-6 pt-4 flex-shrink-0">
+      <div className="bg-surface border-b border-line px-6 pt-4 flex-shrink-0">
         <PageHeader
           icon={<BarChart3 className="w-5 h-5" />}
           title={activeSection === 'reports' ? 'تقارير المبيعات المتقدمة' : 'بوابة المصالحة المالية'}
@@ -453,13 +453,13 @@ export const SalesReportsPage: React.FC = () => {
             : 'مراجعة المبيعات والمرتجعات والدفتر العام والأرصدة التشغيلية'}
           actions={<>
             {activeSection === 'reports' && (
-              <button onClick={handleExport} className="text-xs font-bold text-white bg-teal-600 hover:bg-teal-700 transition px-3 py-2 rounded-lg flex items-center gap-1.5">
+              <button onClick={handleExport} className="text-xs font-bold text-white bg-success hover:bg-success transition px-3 py-2 rounded-lg flex items-center gap-1.5">
                 <Download className="w-3.5 h-3.5" /> تصدير
               </button>
             )}
             {activeSection === 'reports' && (
-              <button onClick={load} className="p-2 hover:bg-slate-100 rounded-lg transition">
-                <RefreshCw className={`w-4 h-4 text-slate-500 ${loading ? 'animate-spin' : ''}`} />
+              <button onClick={load} className="p-2 hover:bg-surface-sunken rounded-lg transition">
+                <RefreshCw className={`w-4 h-4 text-muted ${loading ? 'animate-spin' : ''}`} />
               </button>
             )}
           </>}
@@ -467,34 +467,34 @@ export const SalesReportsPage: React.FC = () => {
       </div>
 
       {/* Filters */}
-      <div className="bg-white border-b border-slate-100 px-6 py-3 flex flex-wrap items-center gap-3 flex-shrink-0">
+      <div className="bg-surface border-b border-line px-6 py-3 flex flex-wrap items-center gap-3 flex-shrink-0">
         {/* Quick periods */}
         <div className="flex gap-1.5">
           {quickPeriods.map(p => (
             <button key={p.label}
               onClick={() => { setFrom(p.from); setTo(p.to); }}
-              className={`text-xs font-bold px-3 py-1.5 rounded-lg border transition ${from === p.from && to === p.to ? 'bg-teal-600 text-white border-teal-600' : 'bg-white text-slate-600 border-slate-200 hover:border-teal-300'}`}
+              className={`text-xs font-bold px-3 py-1.5 rounded-lg border transition ${from === p.from && to === p.to ? 'bg-success text-white border-success' : 'bg-surface text-ink-secondary border-line hover:border-success'}`}
             >
               {p.label}
             </button>
           ))}
         </div>
         <div className="flex items-center gap-2">
-          <CalendarDays className="w-4 h-4 text-slate-400" />
+          <CalendarDays className="w-4 h-4 text-muted" />
           <input type="date" value={from} onChange={e => setFrom(e.target.value)}
-            className="text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white font-medium focus:outline-none focus:border-teal-400" />
-          <span className="text-xs text-slate-400">إلى</span>
+            className="text-xs border border-line rounded-lg px-2 py-1.5 bg-surface font-medium focus:outline-none focus:border-success" />
+          <span className="text-xs text-muted">إلى</span>
           <input type="date" value={to} onChange={e => setTo(e.target.value)}
-            className="text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white font-medium focus:outline-none focus:border-teal-400" />
+            className="text-xs border border-line rounded-lg px-2 py-1.5 bg-surface font-medium focus:outline-none focus:border-success" />
         </div>
       </div>
 
       {/* Report Type Tabs */}
-      <div className="bg-white border-b border-slate-100 px-6 py-2 flex gap-1 overflow-x-auto flex-shrink-0">
+      <div className="bg-surface border-b border-line px-6 py-2 flex gap-1 overflow-x-auto flex-shrink-0">
         {REPORT_TYPES.map(type => {
           const Icon = type.icon;
           const isActive = activeSection === 'reports' && reportType === type.id;
-          const colorClass = isActive ? COLOR_MAP[type.color] : 'text-slate-500 hover:bg-slate-50';
+          const colorClass = isActive ? COLOR_MAP[type.color] : 'text-muted hover:bg-surface-muted';
           return (
             <button key={type.id} onClick={() => { setActiveSection('reports'); setReportType(type.id); }}
               className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold border transition whitespace-nowrap ${isActive ? colorClass + ' border' : 'border-transparent ' + colorClass}`}
@@ -506,8 +506,8 @@ export const SalesReportsPage: React.FC = () => {
         <button onClick={() => setActiveSection('reconciliation')}
           className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold border transition whitespace-nowrap ${
             activeSection === 'reconciliation'
-              ? 'bg-teal-50 text-teal-700 border-teal-200'
-              : 'border-transparent text-slate-500 hover:bg-slate-50'
+              ? 'bg-success-soft text-success border-success-border'
+              : 'border-transparent text-muted hover:bg-surface-muted'
           }`}>
           <Scale className="w-3.5 h-3.5" /> مصالحة الفروقات المالية
         </button>
@@ -515,7 +515,7 @@ export const SalesReportsPage: React.FC = () => {
 
       {/* Content */}
       {activeSection === 'reports' && error && (
-        <div className="mx-6 mt-3 px-4 py-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs font-semibold flex items-center gap-2">
+        <div className="mx-6 mt-3 px-4 py-3 bg-danger-soft border border-danger-border rounded-xl text-danger text-xs font-semibold flex items-center gap-2">
           <AlertCircle className="w-4 h-4" /> {error}
         </div>
       )}
@@ -524,17 +524,17 @@ export const SalesReportsPage: React.FC = () => {
         {activeSection === 'reconciliation' ? (
           <SalesFinancialReconciliation dateFrom={from} dateTo={to} />
         ) : (
-          <div className="bg-white rounded-2xl border border-slate-200 p-6">
+          <div className="bg-surface rounded-2xl border border-line p-6">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <currentType.icon className={`w-5 h-5 ${COLOR_MAP[currentType.color].split(' ')[1]}`} />
-                <h2 className="text-sm font-black text-slate-900">{currentType.label}</h2>
-                <span className="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">
+                <h2 className="text-sm font-black text-ink">{currentType.label}</h2>
+                <span className="text-xs bg-surface-sunken text-muted px-2 py-0.5 rounded-full">
                   {from} — {to}
                 </span>
               </div>
               {!loading && (
-                <span className="text-xs font-bold text-slate-400">
+                <span className="text-xs font-bold text-muted">
                   {data.length} {reportType === 'daily' ? 'يوم' : 'نتيجة'}
                 </span>
               )}
@@ -542,7 +542,7 @@ export const SalesReportsPage: React.FC = () => {
 
             {loading ? (
               <div className="flex items-center justify-center py-16">
-                <Loader2 className="w-8 h-8 animate-spin text-teal-500" />
+                <Loader2 className="w-8 h-8 animate-spin text-success" />
               </div>
             ) : reportType === 'daily' ? (
               <DailyChart rows={data as DailyRow[]} />

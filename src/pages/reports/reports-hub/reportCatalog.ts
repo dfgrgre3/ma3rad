@@ -12,6 +12,7 @@ import { ReportCenterService } from '../../../services/domains/reports/ReportCen
 import type { ReportParams, ReportResult } from '../../../services/domains/reports/ReportCenterService';
 import { AuthService } from '../../../services/domains/auth/AuthService';
 import { PermissionService } from '../../../services/domains/auth/PermissionService';
+import { getEffectiveBusinessType } from '../../../services/domains/config/BusinessTypeService';
 import { REPORT_DEFINITIONS } from './reportDefinitions';
 import {
   reportPermission,
@@ -100,6 +101,9 @@ export async function runReport(id: string, params: ReportParams): Promise<Repor
   const definition = REPORT_DEFINITIONS.find((report) => report.id === id);
   if (definition) {
     PermissionService.require(AuthService.getCurrentUser(), reportPermission(definition));
+    if (definition.activityOnly && definition.activityOnly !== getEffectiveBusinessType()) {
+      throw new Error('هذا التقرير غير متاح للنشاط الحالي.');
+    }
   }
 
   let result: ReportResult;
@@ -273,8 +277,53 @@ export async function runReport(id: string, params: ReportParams): Promise<Repor
     case 'mfg-production-kpis':
       result = await service.mfgProductionKpis(params);
       break;
+    case 'manufacturing-production':
+      result = await service.manufacturingProduction(params);
+      break;
+    case 'manufacturing-wip':
+      result = await service.manufacturingWip(params);
+      break;
+    case 'manufacturing-oee':
+      result = await service.manufacturingOee(params);
+      break;
     case 'sales-target-kpis':
       result = await service.salesTargetKpis(params);
+      break;
+    case 'ceramics-design-sales':
+      result = await service.ceramicsDesignSales(params);
+      break;
+    case 'ceramic-takeoffs':
+      result = await service.ceramicTakeoffs(params);
+      break;
+    case 'ceramic-stock-coverage':
+      result = await service.ceramicStockCoverage();
+      break;
+    case 'project-certificates':
+      result = await service.projectCertificates(params);
+      break;
+    case 'project-cost-variance':
+      result = await service.projectCostVariance(params);
+      break;
+    case 'site-daily-reports':
+      result = await service.siteDailyReports(params);
+      break;
+    case 'hotel-occupancy':
+      result = await service.hotelOccupancy(params);
+      break;
+    case 'restaurant-operations':
+      result = await service.restaurantOperations(params);
+      break;
+    case 'education-attendance':
+      result = await service.educationAttendance(params);
+      break;
+    case 'education-fees':
+      result = await service.educationFees(params);
+      break;
+    case 'workshop-orders':
+      result = await service.workshopOrders(params);
+      break;
+    case 'time-billing-report':
+      result = await service.timeBillingReport(params);
       break;
     case 'hr-training-expenses':
       result = await service.hrTrainingExpenses(params);

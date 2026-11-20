@@ -9,22 +9,22 @@ function StatementSection({ title, amount, lines, color }: {
   color: 'teal' | 'rose' | 'emerald';
 }) {
   const colors = {
-    teal: 'bg-teal-50/60 text-teal-800 text-teal-700',
-    rose: 'bg-rose-50/60 text-rose-800 text-rose-700',
-    emerald: 'bg-emerald-50/60 text-emerald-800 text-emerald-700',
+    teal: 'bg-success-soft/60 text-success text-success',
+    rose: 'bg-danger-soft/60 text-danger text-danger',
+    emerald: 'bg-success-soft/60 text-success text-success',
   }[color].split(' ');
 
   return (
-    <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-      <div className={`px-4 py-3 border-b border-slate-200 ${colors[0]} flex items-center justify-between`}>
+    <div className="bg-surface border border-line rounded-xl overflow-hidden">
+      <div className={`px-4 py-3 border-b border-line ${colors[0]} flex items-center justify-between`}>
         <h3 className={`text-sm font-black ${colors[1]}`}>{title}</h3>
         <span className={`text-xs font-bold ${colors[2]}`}>{formatCurrency(amount)}</span>
       </div>
-      <div className="divide-y divide-slate-100">
+      <div className="divide-y divide-line-strong">
         {lines.map((line, index) => (
-          <div key={`${line.label}-${index}`} className={`flex items-center justify-between px-4 py-2.5 text-sm ${line.emphasis ? 'bg-slate-50 font-black text-slate-900' : 'text-slate-700'}`}>
-            <span className={line.indent ? 'pr-4 text-slate-500' : ''}>{line.label}</span>
-            <span className={`font-mono ${line.amount < 0 ? 'text-rose-600' : ''}`}>{formatCurrency(line.amount)}</span>
+          <div key={`${line.label}-${index}`} className={`flex items-center justify-between px-4 py-2.5 text-sm ${line.emphasis ? 'bg-surface-muted font-black text-ink' : 'text-ink'}`}>
+            <span className={line.indent ? 'pr-4 text-muted' : ''}>{line.label}</span>
+            <span className={`font-mono ${line.amount < 0 ? 'text-danger' : ''}`}>{formatCurrency(line.amount)}</span>
           </div>
         ))}
       </div>
@@ -40,9 +40,9 @@ export function BalanceSheetPanel({ balance }: { balance: BalanceSheet }) {
         <StatementSection title="الالتزامات" amount={balance.totals.liabilities} lines={balance.liabilities} color="rose" />
         <StatementSection title="حقوق الملكية" amount={balance.totals.equity} lines={balance.equity} color="emerald" />
       </div>
-      <div className="lg:col-span-2 bg-slate-900 text-white rounded-xl px-5 py-3 flex items-center justify-between">
+      <div className="lg:col-span-2 bg-primary text-white rounded-xl px-5 py-3 flex items-center justify-between">
         <span className="text-xs font-bold">الأصول = الالتزامات + حقوق الملكية</span>
-        <span className={`text-sm font-black font-mono ${Math.abs(balance.totals.difference) < 0.01 ? 'text-emerald-400' : 'text-amber-400'}`}>
+        <span className={`text-sm font-black font-mono ${Math.abs(balance.totals.difference) < 0.01 ? 'text-success' : 'text-warning'}`}>
           فرق التسوية: {formatCurrency(balance.totals.difference)}
         </span>
       </div>

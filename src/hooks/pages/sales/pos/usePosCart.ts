@@ -12,6 +12,7 @@ import {
 import { getCartQuantityStep } from '../../../../pages/sales/pos/components/cartUtils';
 import { round2, type CartItem, type PosUnit, type Toast } from '../../../../types/pos';
 import type { PricingService } from '../../../../services/domains/sales/PricingService';
+import { ExpiryService } from '../../../../services/domains/inventory/ExpiryService';
 
 interface UsePosCartOptions {
   can: (permission: string) => boolean;
@@ -93,6 +94,27 @@ export const usePosCart = ({
   }, [pricingService]);
 
   const addToCart = useCallback((product: Product, requestedM2?: number) => {
+    // حظر بيع الأصناف منتهية الصلاحية — المنتجات ذات تشغيلات صلاحية لا تُضاف
+    // إذا كانت الكمية المطلوبة تتجاوز الرصيد غير المنتهي.
+    try {
+      const existingItem = allowDuplicateItems
+        ? undefined
+        : cart.find((item) => !item.specialStockId && item.product.id === product.id);
+      const sellableUnits = getSellableUnits(product);
+      const preferredUnit = product.sellUnit && sellableUnits.includes(product.sellUnit)
+        ? product.sellUnit
+        : (product.baseUnit || 'M2');
+      const oneSellUnitInBase = toBaseQuantity(1, preferredUnit, product).quantity;
+      const stepM2 = requestedM2
+        ?? (product.productType === 'GENERAL'
+          ? (preferredUnit !== (product.baseUnit || 'M2') ? oneSellUnitInBase : 1)
+          : (product.metersPerBox || 1.44));
+      const prospective = round2((existingItem?.quantityM2 ?? 0) + stepM2);
+      new ExpiryService().assertNotExpired(product.id, prospective);
+    } catch (expiryError: any) {
+      notify(expiryError?.message || 'لا يمكن إضافة صنف منتهي الصلاحية.', 'error');
+      return;
+    }
     setCart((prev) => {
       const existingIndex = allowDuplicateItems ? -1 : prev.findIndex((item) => !item.specialStockId && item.product.id === product.id);
       const sellable = getSellableUnits(product);
@@ -127,7 +149,7 @@ export const usePosCart = ({
       }
       return [...prev, makeCartItem(product, stepM2)];
     });
-  }, [selectedCustomer, pricingService, makeCartItem, allowDuplicateItems]);
+  }, [cart, selectedCustomer, pricingService, makeCartItem, allowDuplicateItems, notify]);
 
   const addDiscountedToCart = useCallback((product: Product, source: {
     id: string;

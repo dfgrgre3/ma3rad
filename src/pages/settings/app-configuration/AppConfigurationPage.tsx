@@ -27,8 +27,8 @@ import { useAppConfig } from '../../../hooks/domains/config/useAppConfig';
 import { useToast } from '../../../components/ui/Toast';
 
 const inputCls =
-  'w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-500/30 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100';
-const labelCls = 'mb-1 block text-[11px] font-bold text-slate-600 dark:text-slate-300';
+  'w-full rounded-xl border border-line bg-surface-muted px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/30 ';
+const labelCls = 'mb-1 block text-[11px] font-bold text-ink-secondary ';
 
 type TabId = 'overview' | 'pages' | 'sections' | 'fields' | 'texts' | 'policies' | 'history';
 
@@ -62,12 +62,12 @@ function newRuleId(): string {
 const Card: React.FC<{ title?: string; description?: string; children: React.ReactNode; actions?: React.ReactNode }> = ({
   title, description, children, actions,
 }) => (
-  <section className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
+  <section className="space-y-3 rounded-2xl border border-line bg-surface p-4 ">
     {(title || actions) && (
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
-          {title && <h3 className="text-sm font-extrabold text-slate-900 dark:text-slate-100">{title}</h3>}
-          {description && <p className="mt-1 text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">{description}</p>}
+          {title && <h3 className="text-sm font-extrabold text-ink ">{title}</h3>}
+          {description && <p className="mt-1 text-[11px] leading-relaxed text-muted ">{description}</p>}
         </div>
         {actions}
       </div>
@@ -92,8 +92,8 @@ const Toggle: React.FC<{ checked: boolean; onChange: (value: boolean) => void; l
     onClick={() => onChange(!checked)}
     className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[11px] font-bold transition disabled:opacity-40 ${
       checked
-        ? 'border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300'
-        : 'border-slate-200 bg-slate-100 text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400'
+        ? 'border-success bg-success-soft text-success dark:bg-success/40 '
+        : 'border-line bg-surface-sunken text-muted '
     }`}
     aria-pressed={checked}
   >
@@ -360,24 +360,24 @@ export const AppConfigurationPage: React.FC = () => {
   }, [pageCatalog, pageSearch]);
 
   return (
-    <div className="h-full overflow-y-auto bg-slate-100 p-4 dark:bg-slate-950 lg:p-6" data-config-ignore>
+    <div className="h-full overflow-y-auto bg-surface-sunken p-4 lg:p-6" data-config-ignore>
       <div className="w-full space-y-4">
         <PageHeader
           icon={<Wand2 className="h-5 w-5" />}
           title="محرك التكوين الديناميكي"
           description="تحكم في الصفحات والأقسام والحقول والنصوص والسياسات والترقيم وقوالب الطباعة دون تعديل الكود."
           actions={<>
-            <button onClick={resetDraft} disabled={!dirty} className="flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 disabled:opacity-40 dark:border-slate-700 dark:text-slate-300">
+            <button onClick={resetDraft} disabled={!dirty} className="flex items-center gap-1.5 rounded-xl border border-line px-3 py-2 text-xs font-bold text-ink-secondary disabled:opacity-40 ">
               <RotateCcw className="h-3.5 w-3.5" /> تراجع
             </button>
-            <button onClick={save} disabled={readOnly || !dirty} className="flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-40">
+            <button onClick={save} disabled={readOnly || !dirty} className="flex items-center gap-1.5 rounded-xl bg-success px-4 py-2 text-xs font-bold text-white hover:bg-success disabled:opacity-40">
               <Save className="h-4 w-4" /> حفظ وتطبيق
             </button>
           </>}
         />
 
         {readOnly && (
-          <p role="alert" className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] font-bold text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
+          <p role="alert" className="rounded-xl border border-warning-border bg-warning-soft px-3 py-2 text-[11px] font-bold text-warning dark:border-warning/30 dark:bg-warning/10 ">
             <ShieldCheck className="ml-1 inline h-3.5 w-3.5" /> وضع القراءة فقط: تحتاج صلاحية settings.update للحفظ.
           </p>
         )}
@@ -394,8 +394,8 @@ export const AppConfigurationPage: React.FC = () => {
                 aria-current={active ? 'page' : undefined}
                 className={`flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-bold transition ${
                   active
-                    ? 'bg-sky-600 text-white shadow-lg shadow-sky-600/20'
-                    : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800'
+                    ? 'bg-primary text-white shadow-lg shadow-primary/20'
+                    : 'border border-line bg-surface text-ink-secondary hover:bg-surface-muted dark:hover:bg-primary'
                 }`}
               >
                 <Icon className="h-4 w-4" /> {item.label}
@@ -415,16 +415,16 @@ export const AppConfigurationPage: React.FC = () => {
                 ['حقول مخفية', stats.fieldsHidden],
                 ['نصوص مخصصة', stats.textOverrides],
               ].map(([label, value]) => (
-                <div key={String(label)} className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
-                  <div className="text-[11px] font-bold text-slate-500 dark:text-slate-400">{label}</div>
-                  <div className="mt-1 font-mono text-xl font-black text-slate-900 dark:text-slate-100">{value}</div>
+                <div key={String(label)} className="rounded-2xl border border-line bg-surface p-4 ">
+                  <div className="text-[11px] font-bold text-muted ">{label}</div>
+                  <div className="mt-1 font-mono text-xl font-black text-ink ">{value}</div>
                 </div>
               ))}
             </div>
 
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
               <Card title="كيف يعمل المحرك؟" description="كل تعديل يُحفظ كإصدار قابل للاستعادة، ويُطبّق فورًا على الواجهة.">
-                <ul className="space-y-2 text-[11px] leading-relaxed text-slate-600 dark:text-slate-300">
+                <ul className="space-y-2 text-[11px] leading-relaxed text-ink-secondary ">
                   <li><strong>الصفحات:</strong> إخفاء الصفحة يخفي رابطها ويمنع فتح مسارها.</li>
                   <li><strong>الأقسام:</strong> أخفِ أي قسم عبر محدد CSS أو عبر تغليفه بـ ConfigSection.</li>
                   <li><strong>الحقول:</strong> إخفاء أو إلزام أو إعادة تسمية حقول النماذج.</li>
@@ -434,14 +434,14 @@ export const AppConfigurationPage: React.FC = () => {
               </Card>
               <Card title="نسخ احتياطي للتكوين">
                 <div className="flex flex-wrap gap-2">
-                  <button onClick={() => void exportConfig()} className="flex items-center gap-1.5 rounded-xl bg-sky-600 px-3 py-2 text-xs font-bold text-white hover:bg-sky-700">
+                  <button onClick={() => void exportConfig()} className="flex items-center gap-1.5 rounded-xl bg-primary px-3 py-2 text-xs font-bold text-white hover:bg-primary">
                     <ArrowDownToLine className="h-4 w-4" /> تصدير JSON
                   </button>
-                  <button onClick={resetAll} disabled={readOnly} className="flex items-center gap-1.5 rounded-xl border border-rose-200 px-3 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50 disabled:opacity-40 dark:border-rose-500/30 dark:hover:bg-rose-950/30">
+                  <button onClick={resetAll} disabled={readOnly} className="flex items-center gap-1.5 rounded-xl border border-danger-border px-3 py-2 text-xs font-bold text-danger hover:bg-danger-soft disabled:opacity-40 dark:border-danger/30 dark:hover:bg-danger/30">
                     <RotateCcw className="h-4 w-4" /> إعادة الضبط الكامل
                   </button>
                 </div>
-                <label className="mt-3 block text-[11px] font-bold text-slate-600 dark:text-slate-300">استيراد تكوين (JSON)</label>
+                <label className="mt-3 block text-[11px] font-bold text-ink-secondary ">استيراد تكوين (JSON)</label>
                 <textarea
                   value={importText}
                   onChange={(event) => setImportText(event.target.value)}
@@ -451,10 +451,10 @@ export const AppConfigurationPage: React.FC = () => {
                   className={`${inputCls} mt-1 font-mono`}
                 />
                 <div className="mt-2 flex gap-2">
-                  <button onClick={() => importConfig(importText)} disabled={readOnly} className="flex items-center gap-1.5 rounded-xl bg-violet-600 px-3 py-2 text-xs font-bold text-white hover:bg-violet-700 disabled:opacity-40">
+                  <button onClick={() => importConfig(importText)} disabled={readOnly} className="flex items-center gap-1.5 rounded-xl bg-primary px-3 py-2 text-xs font-bold text-white hover:bg-primary disabled:opacity-40">
                     <ArrowUpFromLine className="h-4 w-4" /> استيراد
                   </button>
-                  <label className="flex cursor-pointer items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">
+                  <label className="flex cursor-pointer items-center gap-1.5 rounded-xl border border-line px-3 py-2 text-xs font-bold text-ink-secondary hover:bg-surface-muted dark:hover:bg-primary">
                     <FileText className="h-4 w-4" /> من ملف
                     <input
                       type="file"
@@ -488,7 +488,7 @@ export const AppConfigurationPage: React.FC = () => {
             description="أخفِ صفحة كاملة أو غيّر اسمها أو ترتيبها. الإخفاء لا يحذف البيانات، ويمنع فتح المسار أيضًا."
             actions={
               <div className="relative w-64">
-                <Search className="pointer-events-none absolute right-2 top-2.5 h-3.5 w-3.5 text-slate-400" />
+                <Search className="pointer-events-none absolute right-2 top-2.5 h-3.5 w-3.5 text-muted" />
                 <input
                   type="search"
                   value={pageSearch}
@@ -504,10 +504,10 @@ export const AppConfigurationPage: React.FC = () => {
                 const entry = formEntries.get(entryKey('page', page.path));
                 const enabled = entry?.enabled ?? true;
                 return (
-                  <div key={page.path} className="grid grid-cols-1 items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 dark:border-slate-700 sm:grid-cols-[minmax(0,1fr)_10rem_4.5rem_2rem]">
+                  <div key={page.path} className="grid grid-cols-1 items-center gap-2 rounded-xl border border-line px-3 py-2 sm:grid-cols-[minmax(0,1fr)_10rem_4.5rem_2rem]">
                     <div className="min-w-0">
-                      <div className="truncate text-xs font-bold text-slate-800 dark:text-slate-100">{page.label}</div>
-                      <code className="text-[9px] text-slate-400" dir="ltr">{page.path}</code>
+                      <div className="truncate text-xs font-bold text-ink ">{page.label}</div>
+                      <code className="text-[9px] text-muted" dir="ltr">{page.path}</code>
                     </div>
                     <input
                       value={entry?.label ?? ''}
@@ -538,7 +538,7 @@ export const AppConfigurationPage: React.FC = () => {
                 );
               })}
               {filteredPages.length === 0 && (
-                <p className="rounded-xl border border-slate-200 p-6 text-center text-xs text-slate-500 dark:border-slate-700">لا توجد صفحات تطابق البحث.</p>
+                <p className="rounded-xl border border-line p-6 text-center text-xs text-muted ">لا توجد صفحات تطابق البحث.</p>
               )}
             </div>
           </Card>
@@ -549,7 +549,7 @@ export const AppConfigurationPage: React.FC = () => {
             <Card title="أقسام مُعرّفة في الكود" description="تظهر الأقسام هنا بعد زيارة صفحتها مرة واحدة. يمكن إخفاؤها أو إعادة تسميتها.">
               <div className="space-y-1.5">
                 {registeredSections.length === 0 && (
-                  <p className="rounded-xl border border-dashed border-slate-300 p-5 text-center text-[11px] text-slate-500 dark:border-slate-700">
+                  <p className="rounded-xl border border-dashed border-line-strong p-5 text-center text-[11px] text-muted ">
                     لم تُسجّل أقسام بعد. افتح صفحة تحتوي على ConfigSection ثم عد إلى هنا، أو استخدم قواعد المحدد بالأسفل.
                   </p>
                 )}
@@ -557,10 +557,10 @@ export const AppConfigurationPage: React.FC = () => {
                   const entry = formEntries.get(entryKey('section', target.key));
                   const enabled = entry?.enabled ?? true;
                   return (
-                    <div key={target.key} className="grid grid-cols-1 items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 dark:border-slate-700 sm:grid-cols-[minmax(0,1fr)_12rem_7rem_2rem]">
+                    <div key={target.key} className="grid grid-cols-1 items-center gap-2 rounded-xl border border-line px-3 py-2 sm:grid-cols-[minmax(0,1fr)_12rem_7rem_2rem]">
                       <div className="min-w-0">
-                        <div className="truncate text-xs font-bold text-slate-800 dark:text-slate-100">{entry?.label || target.label}</div>
-                        <code className="text-[9px] text-slate-400" dir="ltr">{target.key}</code>
+                        <div className="truncate text-xs font-bold text-ink ">{entry?.label || target.label}</div>
+                        <code className="text-[9px] text-muted" dir="ltr">{target.key}</code>
                       </div>
                       <input
                         value={entry?.label ?? ''}
@@ -571,7 +571,7 @@ export const AppConfigurationPage: React.FC = () => {
                         disabled={readOnly}
                       />
                       <Toggle checked={enabled} disabled={readOnly} onChange={(value) => upsertEntry('section', target.key, { enabled: value })} label={enabled ? 'ظاهر' : 'مخفي'} />
-                      <button onClick={() => removeEntry('section', target.key)} disabled={readOnly} className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-rose-50 hover:text-rose-500 disabled:opacity-40" title="مسح التخصيص" aria-label="مسح التخصيص">
+                      <button onClick={() => removeEntry('section', target.key)} disabled={readOnly} className="flex h-8 w-8 items-center justify-center rounded-lg text-muted hover:bg-danger-soft hover:text-danger disabled:opacity-40" title="مسح التخصيص" aria-label="مسح التخصيص">
                         <X className="h-4 w-4" />
                       </button>
                     </div>
@@ -621,22 +621,22 @@ export const AppConfigurationPage: React.FC = () => {
                   <input value={ruleNote} onChange={(event) => setRuleNote(event.target.value)} placeholder="سبب القاعدة" className={inputCls} />
                 </Field>
               </div>
-              <button onClick={addRule} disabled={readOnly} className="mt-2 flex items-center gap-1.5 rounded-xl bg-violet-600 px-3 py-2 text-xs font-bold text-white hover:bg-violet-700 disabled:opacity-40">
+              <button onClick={addRule} disabled={readOnly} className="mt-2 flex items-center gap-1.5 rounded-xl bg-primary px-3 py-2 text-xs font-bold text-white hover:bg-primary disabled:opacity-40">
                 <Wand2 className="h-4 w-4" /> إضافة القاعدة للمسودة
               </button>
 
               <div className="mt-4 space-y-1.5">
-                {rules.length === 0 && <p className="text-center text-[11px] text-slate-400">لا توجد قواعد بعد.</p>}
+                {rules.length === 0 && <p className="text-center text-[11px] text-muted">لا توجد قواعد بعد.</p>}
                 {rules.map((rule) => (
-                  <div key={rule.id} className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 dark:border-slate-700">
-                    <span className={`rounded-lg px-2 py-1 text-[10px] font-bold ${rule.kind === 'selector' ? 'bg-sky-50 text-sky-700 dark:bg-sky-950/40 dark:text-sky-300' : 'bg-violet-50 text-violet-700 dark:bg-violet-950/40 dark:text-violet-300'}`}>
+                  <div key={rule.id} className="flex flex-wrap items-center gap-2 rounded-xl border border-line px-3 py-2 ">
+                    <span className={`rounded-lg px-2 py-1 text-[10px] font-bold ${rule.kind === 'selector' ? 'bg-accent-soft text-primary dark:bg-primary/40 dark:text-primary' : 'bg-accent-soft text-primary dark:bg-primary/40 dark:text-primary'}`}>
                       {rule.kind === 'selector' ? 'عنصر' : 'نص'}
                     </span>
-                    <code className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-[10px] text-slate-500" dir="ltr">
+                    <code className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-[10px] text-muted" dir="ltr">
                       {rule.pagePath} · {rule.kind === 'selector' ? rule.selector : `${rule.matchText} → ${rule.replacementText}`} · {rule.action}
                     </code>
                     <Toggle checked={rule.enabled} disabled={readOnly} onChange={(value) => updateRule(rule.id, { enabled: value })} label={rule.enabled ? 'مفعّلة' : 'معطلة'} />
-                    <button onClick={() => removeRule(rule.id)} disabled={readOnly} className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-rose-50 hover:text-rose-500 disabled:opacity-40" aria-label="حذف القاعدة">
+                    <button onClick={() => removeRule(rule.id)} disabled={readOnly} className="flex h-8 w-8 items-center justify-center rounded-lg text-muted hover:bg-danger-soft hover:text-danger disabled:opacity-40" aria-label="حذف القاعدة">
                       <Trash2 className="h-4 w-4" />
                     </button>
                   </div>
@@ -650,7 +650,7 @@ export const AppConfigurationPage: React.FC = () => {
           <div className="space-y-4">
             <Card title="حقول النماذج المسجّلة" description="تظهر الحقول بعد زيارة النموذج مرة واحدة. يمكن إخفاؤها أو جعلها مطلوبة أو إعادة تسميتها.">
               {registeredFields.length === 0 ? (
-                <p className="rounded-xl border border-dashed border-slate-300 p-5 text-center text-[11px] text-slate-500 dark:border-slate-700">
+                <p className="rounded-xl border border-dashed border-line-strong p-5 text-center text-[11px] text-muted ">
                   لم تُسجّل حقول بعد. غلّف الحقل بـ ConfigField أو أضف هدفًا يدويًا بالأسفل.
                 </p>
               ) : (
@@ -660,10 +660,10 @@ export const AppConfigurationPage: React.FC = () => {
                     const visible = entry?.enabled ?? true;
                     const required = entry?.required ?? false;
                     return (
-                      <div key={target.key} className="grid grid-cols-1 items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 dark:border-slate-700 sm:grid-cols-[minmax(0,1fr)_11rem_2.5rem_2.5rem]">
+                      <div key={target.key} className="grid grid-cols-1 items-center gap-2 rounded-xl border border-line px-3 py-2 sm:grid-cols-[minmax(0,1fr)_11rem_2.5rem_2.5rem]">
                         <div className="min-w-0">
-                          <div className="truncate text-xs font-bold text-slate-800 dark:text-slate-100">{entry?.label || target.label}</div>
-                          <code className="text-[9px] text-slate-400" dir="ltr">{target.key}</code>
+                          <div className="truncate text-xs font-bold text-ink ">{entry?.label || target.label}</div>
+                          <code className="text-[9px] text-muted" dir="ltr">{target.key}</code>
                         </div>
                         <input value={entry?.label ?? ''} onChange={(event) => upsertEntry('field', target.key, { label: event.target.value })} placeholder="تسمية الحقل" className={inputCls} disabled={readOnly} aria-label={`تسمية ${target.label}`} />
                         <Toggle checked={visible} disabled={readOnly} onChange={(value) => upsertEntry('field', target.key, { enabled: value })} label={visible ? 'ظاهر' : 'مخفي'} />
@@ -703,7 +703,7 @@ export const AppConfigurationPage: React.FC = () => {
                           disabled={readOnly}
                         />
                         {entry && (
-                          <button onClick={() => removeEntry('text', item.key)} disabled={readOnly} className="shrink-0 rounded-xl border border-slate-200 px-2 text-[10px] font-bold text-slate-500 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300" title="استعادة الافتراضي">
+                          <button onClick={() => removeEntry('text', item.key)} disabled={readOnly} className="shrink-0 rounded-xl border border-line px-2 text-[10px] font-bold text-muted hover:bg-surface-muted " title="استعادة الافتراضي">
                             افتراضي
                           </button>
                         )}
@@ -748,7 +748,7 @@ export const AppConfigurationPage: React.FC = () => {
                   toast.success('أُضيفت قاعدة النص إلى المسودة.');
                 }}
                 disabled={readOnly}
-                className="mt-2 flex items-center gap-1.5 rounded-xl bg-violet-600 px-3 py-2 text-xs font-bold text-white hover:bg-violet-700 disabled:opacity-40"
+                className="mt-2 flex items-center gap-1.5 rounded-xl bg-primary px-3 py-2 text-xs font-bold text-white hover:bg-primary disabled:opacity-40"
               >
                 <Type className="h-4 w-4" /> إضافة قاعدة نص
               </button>
@@ -783,7 +783,7 @@ export const AppConfigurationPage: React.FC = () => {
                         disabled={readOnly}
                       />
                     )}
-                    <p className="mt-1 text-[10px] leading-relaxed text-slate-400">{policy.description}</p>
+                    <p className="mt-1 text-[10px] leading-relaxed text-muted">{policy.description}</p>
                   </Field>
                 ))}
               </div>
@@ -805,11 +805,11 @@ export const AppConfigurationPage: React.FC = () => {
                           disabled={readOnly}
                           aria-label={`قالب ترقيم ${item.label}`}
                         />
-                        <button onClick={() => removeEntry('numbering', item.key)} disabled={readOnly} className="shrink-0 rounded-xl border border-slate-200 px-2 text-[10px] font-bold text-slate-500 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300" title="القالب الافتراضي">
+                        <button onClick={() => removeEntry('numbering', item.key)} disabled={readOnly} className="shrink-0 rounded-xl border border-line px-2 text-[10px] font-bold text-muted hover:bg-surface-muted " title="القالب الافتراضي">
                           افتراضي
                         </button>
                       </div>
-                      <p className="mt-1 text-[10px] text-slate-400" dir="ltr">المتاح: {'{prefix}'} {'{year}'} {'{month}'} {'{day}'} {'{seq:6}'}</p>
+                      <p className="mt-1 text-[10px] text-muted" dir="ltr">المتاح: {'{prefix}'} {'{year}'} {'{month}'} {'{day}'} {'{seq:6}'}</p>
                     </Field>
                   );
                 })}
@@ -836,10 +836,10 @@ export const AppConfigurationPage: React.FC = () => {
             <Card title="الوحدات والميزات" description="تعطيل الوحدة يخفي صفحاتها ويمنع عملياتها مع الاحتفاظ ببياناتها.">
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
                 {moduleState.map((module) => (
-                  <div key={module.id} className="flex items-center justify-between gap-2 rounded-xl border border-slate-200 px-3 py-2 dark:border-slate-700">
+                  <div key={module.id} className="flex items-center justify-between gap-2 rounded-xl border border-line px-3 py-2 ">
                     <div className="min-w-0">
-                      <div className="truncate text-xs font-bold text-slate-800 dark:text-slate-100">{module.label}</div>
-                      <div className="text-[10px] text-slate-400">{module.enabled ? 'مفعّلة' : 'معطّلة'}{module.available ? '' : ' · غير متاحة'}</div>
+                      <div className="truncate text-xs font-bold text-ink ">{module.label}</div>
+                      <div className="text-[10px] text-muted">{module.enabled ? 'مفعّلة' : 'معطّلة'}{module.available ? '' : ' · غير متاحة'}</div>
                     </div>
                     <Toggle checked={module.enabled} disabled={readOnly || !module.available} onChange={() => toggleModule(module.id)} label={module.enabled ? 'مفعّلة' : 'معطّلة'} />
                   </div>
@@ -851,20 +851,20 @@ export const AppConfigurationPage: React.FC = () => {
 
         {tab === 'history' && canViewHistory && (
           <Card title="سجل إصدارات التكوين" description="كل حفظ يُنشئ إصدارًا قابلًا للاستعادة. الاستعادة تُنشئ إصدارًا جديدًا ولا تمحو السجل.">
-            {versionsError && <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-[11px] text-rose-700 dark:border-rose-800 dark:bg-rose-950/30 dark:text-rose-300">{versionsError}</p>}
+            {versionsError && <p role="alert" className="rounded-xl border border-danger-border bg-danger-soft px-3 py-2 text-[11px] text-danger dark:bg-danger/30 ">{versionsError}</p>}
             <div className="space-y-1.5">
               {versions.map((version) => (
-                <div key={version.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 px-3 py-2 dark:border-slate-700">
+                <div key={version.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line px-3 py-2 ">
                   <div className="min-w-0">
-                    <div className="text-xs font-bold text-slate-800 dark:text-slate-100">الإصدار {version.version} · {version.reason}</div>
-                    <div className="text-[10px] text-slate-400">{version.createdByName} · {version.createdAt} · {version.snapshot.entries.length} هدف · {version.snapshot.rules.length} قاعدة</div>
+                    <div className="text-xs font-bold text-ink ">الإصدار {version.version} · {version.reason}</div>
+                    <div className="text-[10px] text-muted">{version.createdByName} · {version.createdAt} · {version.snapshot.entries.length} هدف · {version.snapshot.rules.length} قاعدة</div>
                   </div>
-                  <button onClick={() => restoreVersion(version)} disabled={readOnly} className="flex items-center gap-1.5 rounded-lg border border-sky-200 px-2.5 py-1.5 text-[10px] font-bold text-sky-700 hover:bg-sky-50 disabled:opacity-40 dark:border-sky-800 dark:text-sky-300 dark:hover:bg-sky-950/40">
+                  <button onClick={() => restoreVersion(version)} disabled={readOnly} className="flex items-center gap-1.5 rounded-lg border border-accent-border px-2.5 py-1.5 text-[10px] font-bold text-primary hover:bg-accent-soft disabled:opacity-40 dark:hover:bg-primary/40">
                     <Redo2 className="h-3.5 w-3.5" /> استعادة
                   </button>
                 </div>
               ))}
-              {versions.length === 0 && !versionsError && <p className="py-6 text-center text-xs text-slate-400">لا توجد إصدارات محفوظة بعد.</p>}
+              {versions.length === 0 && !versionsError && <p className="py-6 text-center text-xs text-muted">لا توجد إصدارات محفوظة بعد.</p>}
             </div>
           </Card>
         )}
@@ -898,7 +898,7 @@ const ManualEntryForm: React.FC<{
           onAdd(key.trim());
           setKey('');
         }}
-        className="flex items-center gap-1.5 rounded-xl bg-sky-600 px-3 py-2 text-xs font-bold text-white hover:bg-sky-700 disabled:opacity-40"
+        className="flex items-center gap-1.5 rounded-xl bg-primary px-3 py-2 text-xs font-bold text-white hover:bg-primary disabled:opacity-40"
       >
         <Check className="h-4 w-4" /> إضافة
       </button>

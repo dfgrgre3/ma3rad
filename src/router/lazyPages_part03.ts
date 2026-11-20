@@ -5,6 +5,8 @@ export const SuppliersView = lazy(() => import('../components/suppliers/Supplier
 
 export const SupplierDetailPage = lazy(() => import('../pages/purchasing/supplier-detail/SupplierDetailPage').then(m => ({ default: m.SupplierDetailPage })));
 
+export const PurchasingHubPage = lazy(() => import('../pages/purchasing/purchasing-hub/PurchasingHubPage').then(m => ({ default: m.PurchasingHubPage })));
+
 export const PurchasesView = lazy(() => import('../components/purchases/PurchasesView').then(m => ({ default: m.PurchasesView })));
 
 export const PurchaseRequestsPage = lazy(() => import('../pages/purchasing/purchase-requests/PurchaseRequestsPage').then(m => ({ default: m.PurchaseRequestsPage })));
@@ -64,6 +66,12 @@ export const FixedAssetsPage = lazy(() => import('../pages/finance/fixed-assets/
 export const ProjectsPage = lazy(() => import('../pages/projects/projects/ProjectsPage').then(m => ({ default: m.ProjectsPage })));
 
 export const ProjectDetailPage = lazy(() => import('../pages/projects/project-detail/ProjectDetailPage').then(m => ({ default: m.ProjectDetailPage })));
+
+export const ProjectExecutionPage = lazy(() => import('../pages/construction/ProjectExecutionPage').then(m => ({ default: m.ProjectExecutionPage })));
+
+export const SiteManagementPage = lazy(() => import('../pages/construction/SiteManagementPage').then(m => ({ default: m.SiteManagementPage })));
+
+export const GeneralBoqPage = lazy(() => import('../pages/construction/GeneralBoqPage').then(m => ({ default: m.GeneralBoqPage })));
 
 export const ReportsView = lazy(() => import('../components/reports/ReportsView').then(m => ({ default: m.ReportsView })));
 

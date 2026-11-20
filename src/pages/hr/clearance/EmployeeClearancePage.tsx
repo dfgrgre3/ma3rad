@@ -49,12 +49,12 @@ const itemStatusLabel: Record<ClearanceItemStatus, string> = {
 
 const statusTone = (status: string): string => {
   switch (status) {
-    case 'CLEARED': return 'bg-emerald-50 text-emerald-700 border-emerald-200';
-    case 'PENDING': return 'bg-amber-50 text-amber-700 border-amber-200';
-    case 'IN_PROGRESS': return 'bg-sky-50 text-sky-700 border-sky-200';
-    case 'REJECTED': return 'bg-rose-50 text-rose-700 border-rose-200';
-    case 'CANCELLED': return 'bg-slate-100 text-slate-500 border-slate-200';
-    default: return 'bg-teal-50 text-teal-700 border-teal-200';
+    case 'CLEARED': return 'bg-success-soft text-success border-success-border';
+    case 'PENDING': return 'bg-warning-soft text-warning border-warning-border';
+    case 'IN_PROGRESS': return 'bg-accent-soft text-primary border-accent-border';
+    case 'REJECTED': return 'bg-danger-soft text-danger border-danger-border';
+    case 'CANCELLED': return 'bg-surface-sunken text-muted border-line';
+    default: return 'bg-success-soft text-success border-success-border';
   }
 };
 
@@ -245,8 +245,8 @@ export const EmployeeClearancePage: React.FC = () => {
   }, [selected]);
 
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-slate-50 text-slate-900">
-      <div className="border-b border-slate-200 bg-white px-6 pt-4">
+    <div className="flex h-full flex-col overflow-hidden bg-surface-muted text-ink">
+      <div className="border-b border-line bg-surface px-6 pt-4">
         <PageHeader
           icon={<ShieldCheck className="h-5 w-5" />}
           title="إخلاء الطرف"
@@ -255,15 +255,15 @@ export const EmployeeClearancePage: React.FC = () => {
       </div>
 
       <div className="flex-1 space-y-4 overflow-auto p-6">
-        {error && <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-xs font-semibold text-rose-700">{error}</div>}
-        {notice && <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-xs font-semibold text-emerald-700">{notice}</div>}
+        {error && <div className="rounded-xl border border-danger-border bg-danger-soft px-4 py-2.5 text-xs font-semibold text-danger">{error}</div>}
+        {notice && <div className="rounded-xl border border-success-border bg-success-soft px-4 py-2.5 text-xs font-semibold text-success">{notice}</div>}
 
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-          <StatCard label="إجمالي الطلبات" value={String(summary?.total ?? 0)} icon={<ClipboardCheck className="h-4 w-4" />} tone="border-slate-200 bg-slate-50 text-slate-600" />
-          <StatCard label="بالانتظار" value={String(summary?.pending ?? 0)} icon={<XCircle className="h-4 w-4" />} tone="border-amber-200 bg-amber-50 text-amber-600" />
-          <StatCard label="قيد الإجراء" value={String(summary?.inProgress ?? 0)} icon={<RefreshCw className="h-4 w-4" />} tone="border-sky-200 bg-sky-50 text-sky-600" />
-          <StatCard label="مكتمل" value={String(summary?.cleared ?? 0)} icon={<CheckCircle2 className="h-4 w-4" />} tone="border-emerald-200 bg-emerald-50 text-emerald-600" />
-          <StatCard label="مرفوض / ملغي" value={String((summary?.rejected ?? 0) + (summary?.cancelled ?? 0))} icon={<XCircle className="h-4 w-4" />} tone="border-rose-200 bg-rose-50 text-rose-600" />
+          <StatCard label="إجمالي الطلبات" value={String(summary?.total ?? 0)} icon={<ClipboardCheck className="h-4 w-4" />} tone="border-line bg-surface-muted text-ink-secondary" />
+          <StatCard label="بالانتظار" value={String(summary?.pending ?? 0)} icon={<XCircle className="h-4 w-4" />} tone="border-warning-border bg-warning-soft text-warning" />
+          <StatCard label="قيد الإجراء" value={String(summary?.inProgress ?? 0)} icon={<RefreshCw className="h-4 w-4" />} tone="border-accent-border bg-accent-soft text-primary" />
+          <StatCard label="مكتمل" value={String(summary?.cleared ?? 0)} icon={<CheckCircle2 className="h-4 w-4" />} tone="border-success-border bg-success-soft text-success" />
+          <StatCard label="مرفوض / ملغي" value={String((summary?.rejected ?? 0) + (summary?.cancelled ?? 0))} icon={<XCircle className="h-4 w-4" />} tone="border-danger-border bg-danger-soft text-danger" />
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
@@ -271,28 +271,28 @@ export const EmployeeClearancePage: React.FC = () => {
             <button
               key={item.id}
               onClick={() => setTab(item.id)}
-              className={`flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-bold transition ${activeTab === item.id ? 'bg-teal-600 text-white' : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}
+              className={`flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-bold transition ${activeTab === item.id ? 'bg-success text-white' : 'border border-line bg-surface text-ink hover:bg-surface-muted'}`}
             >
               {item.icon} {item.label}
             </button>
           ))}
           <div className="mr-auto flex items-center gap-2">
-            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs">
+            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="rounded-lg border border-line bg-surface px-3 py-2 text-xs">
               <option value="">كل الحالات</option>
               {(Object.keys(statusLabel) as ClearanceStatus[]).map((status) => <option key={status} value={status}>{statusLabel[status]}</option>)}
             </select>
-            <button onClick={load} className="flex items-center gap-1 rounded-lg bg-slate-800 px-3 py-2 text-xs font-bold text-white hover:bg-slate-700">
+            <button onClick={load} className="flex items-center gap-1 rounded-lg bg-primary px-3 py-2 text-xs font-bold text-white hover:bg-primary">
               <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} /> تحديث
             </button>
           </div>
         </div>
 
         {loading ? (
-          <div className="flex justify-center py-16"><RefreshCw className="h-6 w-6 animate-spin text-teal-500" /></div>
+          <div className="flex justify-center py-16"><RefreshCw className="h-6 w-6 animate-spin text-success" /></div>
         ) : activeTab === 'requests' ? (
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_360px]">
-            <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
-              <div className="border-b border-slate-100 px-4 py-3">
+            <div className="overflow-hidden rounded-xl border border-line bg-surface">
+              <div className="border-b border-line px-4 py-3">
                 <h2 className="text-sm font-black">الطلبات ({clearances.length})</h2>
               </div>
               <div className="overflow-x-auto">
@@ -302,7 +302,7 @@ export const EmployeeClearancePage: React.FC = () => {
                   rowKey={(clearance: any) => String(clearance.id)}
                   dense
                   tableClassName="text-xs"
-                  rowClassName={(clearance: any) => `hover:bg-slate-50/70 ${selectedId === clearance.id ? 'bg-teal-50/40' : ''}`}
+                  rowClassName={(clearance: any) => `hover:bg-surface-muted/70 ${selectedId === clearance.id ? 'bg-success-soft/40' : ''}`}
                   columns={[
                     { key: 'num', header: 'رقم الطلب', render: (clearance: any) => <span className="font-mono text-[10px]">{clearance.clearanceNumber}</span> },
                     {
@@ -310,7 +310,7 @@ export const EmployeeClearancePage: React.FC = () => {
                       render: (clearance: any) => (
                         <span className="block">
                           <span className="block font-bold">{clearance.employeeName}</span>
-                          <span className="block text-[10px] text-slate-500">{clearance.departmentName} • {clearance.branchName}</span>
+                          <span className="block text-[10px] text-muted">{clearance.departmentName} • {clearance.branchName}</span>
                         </span>
                       ),
                     },
@@ -322,7 +322,7 @@ export const EmployeeClearancePage: React.FC = () => {
                       render: (clearance: any) => (
                         <span className="block">
                           <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-bold ${statusTone(clearance.status)}`}>{statusLabel[clearance.status as keyof typeof statusLabel]}</span>
-                          {clearance.clearanceCertificateIssued && <span className="mt-1 block text-[10px] font-bold text-emerald-600">شهادة صادرة</span>}
+                          {clearance.clearanceCertificateIssued && <span className="mt-1 block text-[10px] font-bold text-success">شهادة صادرة</span>}
                         </span>
                       ),
                     },
@@ -330,12 +330,12 @@ export const EmployeeClearancePage: React.FC = () => {
                       key: 'actions', header: 'إجراءات',
                       render: (clearance: any) => (
                         <span className="flex flex-wrap gap-1">
-                          <button onClick={() => openFollowup(clearance)} className="rounded border border-teal-200 px-2 py-1 text-[10px] font-bold text-teal-700 hover:bg-teal-50">متابعة</button>
+                          <button onClick={() => openFollowup(clearance)} className="rounded border border-success-border px-2 py-1 text-[10px] font-bold text-success hover:bg-success-soft">متابعة</button>
                           {clearance.status === 'CLEARED' && !clearance.clearanceCertificateIssued && (
-                            <button onClick={() => { setSelectedId(clearance.id); run(() => EmployeeClearanceService.issueClearanceCertificate(clearance.id), 'تم إصدار الشهادة.'); }} className="rounded border border-emerald-200 px-2 py-1 text-[10px] font-bold text-emerald-700 hover:bg-emerald-50">شهادة</button>
+                            <button onClick={() => { setSelectedId(clearance.id); run(() => EmployeeClearanceService.issueClearanceCertificate(clearance.id), 'تم إصدار الشهادة.'); }} className="rounded border border-success-border px-2 py-1 text-[10px] font-bold text-success hover:bg-success-soft">شهادة</button>
                           )}
                           {clearance.status !== 'CLEARED' && clearance.status !== 'CANCELLED' && (
-                            <button onClick={() => { if (window.confirm('إلغاء الطلب؟')) run(() => EmployeeClearanceService.cancelClearance(clearance.id), 'تم إلغاء الطلب.'); }} className="rounded border border-rose-200 px-2 py-1 text-[10px] font-bold text-rose-600 hover:bg-rose-50" aria-label="إلغاء"><Trash2 className="h-3 w-3" /></button>
+                            <button onClick={() => { if (window.confirm('إلغاء الطلب؟')) run(() => EmployeeClearanceService.cancelClearance(clearance.id), 'تم إلغاء الطلب.'); }} className="rounded border border-danger-border px-2 py-1 text-[10px] font-bold text-danger hover:bg-danger-soft" aria-label="إلغاء"><Trash2 className="h-3 w-3" /></button>
                           )}
                         </span>
                       ),
@@ -346,89 +346,89 @@ export const EmployeeClearancePage: React.FC = () => {
               </div>
             </div>
 
-            <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-4">
+            <div className="space-y-3 rounded-xl border border-line bg-surface p-4">
               <h2 className="text-sm font-black">طلب إخلاء طرف جديد</h2>
-              <label className="block text-[10px] font-bold text-slate-500">الموظف
-                <select value={form.employeeId} onChange={(e) => setForm((prev) => ({ ...prev, employeeId: e.target.value }))} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm">
+              <label className="block text-[10px] font-bold text-muted">الموظف
+                <select value={form.employeeId} onChange={(e) => setForm((prev) => ({ ...prev, employeeId: e.target.value }))} className="mt-1 w-full rounded-lg border border-line px-3 py-2 text-sm">
                   <option value="">اختر الموظف</option>
                   {employees.map((employee) => (
                     <option key={employee.id} value={employee.id}>{employee.name} ({employee.code})</option>
                   ))}
                 </select>
               </label>
-              <label className="block text-[10px] font-bold text-slate-500">تاريخ إنهاء الخدمة
-                <input type="date" value={form.terminationDate} onChange={(e) => setForm((prev) => ({ ...prev, terminationDate: e.target.value }))} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+              <label className="block text-[10px] font-bold text-muted">تاريخ إنهاء الخدمة
+                <input type="date" value={form.terminationDate} onChange={(e) => setForm((prev) => ({ ...prev, terminationDate: e.target.value }))} className="mt-1 w-full rounded-lg border border-line px-3 py-2 text-sm" />
               </label>
-              <label className="block text-[10px] font-bold text-slate-500">سبب إنهاء الخدمة
-                <textarea value={form.reason} onChange={(e) => setForm((prev) => ({ ...prev, reason: e.target.value }))} rows={3} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" placeholder="استقالة، إنهاء عقد، تقاعد..." />
+              <label className="block text-[10px] font-bold text-muted">سبب إنهاء الخدمة
+                <textarea value={form.reason} onChange={(e) => setForm((prev) => ({ ...prev, reason: e.target.value }))} rows={3} className="mt-1 w-full rounded-lg border border-line px-3 py-2 text-sm" placeholder="استقالة، إنهاء عقد، تقاعد..." />
               </label>
-              <button onClick={createClearance} className="flex w-full items-center justify-center gap-1 rounded-lg bg-teal-600 px-4 py-2.5 text-xs font-bold text-white hover:bg-teal-700">
+              <button onClick={createClearance} className="flex w-full items-center justify-center gap-1 rounded-lg bg-success px-4 py-2.5 text-xs font-bold text-white hover:bg-success">
                 <Plus className="h-3.5 w-3.5" /> إنشاء الطلب
               </button>
-              <p className="text-[10px] leading-4 text-slate-400">يُنشئ النظام تلقائياً قائمة تحقق تشمل الأصول، التسويات المالية، صلاحيات النظام، ومقابلة الخروج.</p>
+              <p className="text-[10px] leading-4 text-muted">يُنشئ النظام تلقائياً قائمة تحقق تشمل الأصول، التسويات المالية، صلاحيات النظام، ومقابلة الخروج.</p>
             </div>
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_400px]">
             <div className="space-y-4">
               {!selected ? (
-                <div className="rounded-xl border border-dashed border-slate-300 bg-white px-6 py-16 text-center">
-                  <ClipboardCheck className="mx-auto h-10 w-10 text-slate-300" />
-                  <p className="mt-3 text-sm font-bold text-slate-600">اختر طلباً من قائمة الطلبات لمتابعة إخلاء الطرف.</p>
-                  <button onClick={() => setTab('requests')} className="mt-3 rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50">العودة للطلبات</button>
+                <div className="rounded-xl border border-dashed border-line-strong bg-surface px-6 py-16 text-center">
+                  <ClipboardCheck className="mx-auto h-10 w-10 text-muted" />
+                  <p className="mt-3 text-sm font-bold text-ink-secondary">اختر طلباً من قائمة الطلبات لمتابعة إخلاء الطرف.</p>
+                  <button onClick={() => setTab('requests')} className="mt-3 rounded-lg border border-line px-3 py-2 text-xs font-bold text-ink hover:bg-surface-muted">العودة للطلبات</button>
                 </div>
               ) : (
                 <>
-                  <div className="rounded-xl border border-slate-200 bg-white p-4">
+                  <div className="rounded-xl border border-line bg-surface p-4">
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div>
-                        <h2 className="text-sm font-black">{selected.employeeName} <span className="text-xs font-medium text-slate-400">({selected.clearanceNumber})</span></h2>
-                        <p className="mt-1 text-[11px] text-slate-500">{selected.departmentName} • {selected.branchName} • تاريخ الإنهاء {selected.terminationDate}</p>
-                        <p className="mt-1 text-[11px] text-slate-500">السبب: {selected.reason}</p>
-                        <p className="mt-1 text-[10px] text-slate-400">مقدم الطلب: {selected.requestedByName} • {selected.requestedAt?.slice(0, 10)}</p>
+                        <h2 className="text-sm font-black">{selected.employeeName} <span className="text-xs font-medium text-muted">({selected.clearanceNumber})</span></h2>
+                        <p className="mt-1 text-[11px] text-muted">{selected.departmentName} • {selected.branchName} • تاريخ الإنهاء {selected.terminationDate}</p>
+                        <p className="mt-1 text-[11px] text-muted">السبب: {selected.reason}</p>
+                        <p className="mt-1 text-[10px] text-muted">مقدم الطلب: {selected.requestedByName} • {selected.requestedAt?.slice(0, 10)}</p>
                       </div>
                       <span className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-bold ${statusTone(selected.status)}`}>{statusLabel[selected.status]}</span>
                     </div>
                     <div className="mt-3 grid grid-cols-2 gap-2 text-[10px] sm:grid-cols-4">
-                      <div className="rounded-lg bg-slate-50 px-3 py-2"><div className="text-slate-400">الأصول</div><div className="font-bold">{assetStatusLabel[selected.assetClearanceStatus] || selected.assetClearanceStatus}</div></div>
-                      <div className="rounded-lg bg-slate-50 px-3 py-2"><div className="text-slate-400">المالية</div><div className="font-bold">{financialStatusLabel[selected.financialClearanceStatus] || selected.financialClearanceStatus}</div></div>
-                      <div className="rounded-lg bg-slate-50 px-3 py-2"><div className="text-slate-400">مقابلة الخروج</div><div className="font-bold">{selected.exitInterviewDate || 'لم تُسجّل'}</div></div>
-                      <div className="rounded-lg bg-slate-50 px-3 py-2"><div className="text-slate-400">الشهادة</div><div className="font-bold">{selected.clearanceCertificateIssued ? 'صادرة' : 'غير صادرة'}</div></div>
+                      <div className="rounded-lg bg-surface-muted px-3 py-2"><div className="text-muted">الأصول</div><div className="font-bold">{assetStatusLabel[selected.assetClearanceStatus] || selected.assetClearanceStatus}</div></div>
+                      <div className="rounded-lg bg-surface-muted px-3 py-2"><div className="text-muted">المالية</div><div className="font-bold">{financialStatusLabel[selected.financialClearanceStatus] || selected.financialClearanceStatus}</div></div>
+                      <div className="rounded-lg bg-surface-muted px-3 py-2"><div className="text-muted">مقابلة الخروج</div><div className="font-bold">{selected.exitInterviewDate || 'لم تُسجّل'}</div></div>
+                      <div className="rounded-lg bg-surface-muted px-3 py-2"><div className="text-muted">الشهادة</div><div className="font-bold">{selected.clearanceCertificateIssued ? 'صادرة' : 'غير صادرة'}</div></div>
                     </div>
                     <div className="mt-3 flex flex-wrap gap-2">
                       {(selected.status === 'PENDING' || selected.status === 'IN_PROGRESS') && (
                         <>
-                          <button onClick={approve} className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white hover:bg-emerald-700">اعتماد الإخلاء</button>
-                          <button onClick={reject} className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700 hover:bg-rose-100">رفض</button>
-                          <button onClick={cancel} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50">إلغاء</button>
+                          <button onClick={approve} className="rounded-lg bg-success px-3 py-2 text-xs font-bold text-white hover:bg-success">اعتماد الإخلاء</button>
+                          <button onClick={reject} className="rounded-lg border border-danger-border bg-danger-soft px-3 py-2 text-xs font-bold text-danger hover:bg-danger-soft">رفض</button>
+                          <button onClick={cancel} className="rounded-lg border border-line px-3 py-2 text-xs font-bold text-ink-secondary hover:bg-surface-muted">إلغاء</button>
                         </>
                       )}
                       {selected.status === 'CLEARED' && !selected.clearanceCertificateIssued && (
-                        <button onClick={issueCertificate} className="flex items-center gap-1 rounded-lg bg-teal-600 px-3 py-2 text-xs font-bold text-white hover:bg-teal-700"><FileBadge className="h-3.5 w-3.5" /> إصدار شهادة إخلاء الطرف</button>
+                        <button onClick={issueCertificate} className="flex items-center gap-1 rounded-lg bg-success px-3 py-2 text-xs font-bold text-white hover:bg-success"><FileBadge className="h-3.5 w-3.5" /> إصدار شهادة إخلاء الطرف</button>
                       )}
                       {selected.clearanceCertificateIssued && (
-                        <span className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-[10px] font-bold text-emerald-700">
+                        <span className="rounded-lg border border-success-border bg-success-soft px-3 py-2 text-[10px] font-bold text-success">
                           صدرت الشهادة بتاريخ {selected.certificateIssuedAt?.slice(0, 10)} بواسطة {selected.certificateIssuedBy || '—'}
                         </span>
                       )}
                     </div>
                   </div>
 
-                  <div className="rounded-xl border border-slate-200 bg-white p-4">
+                  <div className="rounded-xl border border-line bg-surface p-4">
                     <h3 className="text-sm font-black">قائمة التحقق ({selected.checklistItems.filter((item) => item.status === 'COMPLETED' || item.status === 'WAIVED' || item.status === 'NOT_APPLICABLE').length}/{selected.checklistItems.length})</h3>
                     <div className="mt-3 space-y-4">
                       {groupedItems.map(([category, items]) => (
                         <div key={category}>
-                          <div className="mb-2 text-[10px] font-black uppercase tracking-wide text-slate-400">{categoryLabel[category] || category}</div>
+                          <div className="mb-2 text-[10px] font-black uppercase tracking-wide text-muted">{categoryLabel[category] || category}</div>
                           <div className="space-y-2">
                             {items.map((item) => (
-                              <div key={item.id} className="rounded-lg border border-slate-100 bg-slate-50/60 p-2.5">
+                              <div key={item.id} className="rounded-lg border border-line bg-surface-muted/60 p-2.5">
                                 <div className="flex flex-wrap items-center justify-between gap-2">
-                                  <span className="text-xs font-bold text-slate-700">{item.itemName}</span>
+                                  <span className="text-xs font-bold text-ink">{item.itemName}</span>
                                   <select
                                     value={item.status}
                                     onChange={(e) => updateItem(item, e.target.value as ClearanceItemStatus)}
-                                    className="rounded-md border border-slate-200 bg-white px-2 py-1 text-[10px] font-bold"
+                                    className="rounded-md border border-line bg-surface px-2 py-1 text-[10px] font-bold"
                                     aria-label={`حالة ${item.itemName}`}
                                   >
                                     {(Object.keys(itemStatusLabel) as ClearanceItemStatus[]).map((status) => <option key={status} value={status}>{itemStatusLabel[status]}</option>)}
@@ -439,11 +439,11 @@ export const EmployeeClearancePage: React.FC = () => {
                                     value={notesDraft[item.id] ?? ''}
                                     onChange={(e) => setNotesDraft((prev) => ({ ...prev, [item.id]: e.target.value }))}
                                     placeholder="ملاحظات"
-                                    className="w-full rounded-md border border-slate-200 bg-white px-2 py-1 text-[10px]"
+                                    className="w-full rounded-md border border-line bg-surface px-2 py-1 text-[10px]"
                                   />
-                                  <button onClick={() => saveItemNotes(item)} className="rounded-md border border-slate-200 bg-white px-2 py-1 text-[10px] font-bold text-slate-600 hover:bg-slate-50">حفظ</button>
+                                  <button onClick={() => saveItemNotes(item)} className="rounded-md border border-line bg-surface px-2 py-1 text-[10px] font-bold text-ink-secondary hover:bg-surface-muted">حفظ</button>
                                 </div>
-                                {item.completedAt && <div className="mt-1 text-[10px] text-slate-400">اكتمل في {item.completedAt.slice(0, 10)} {item.completedByName ? `• ${item.completedByName}` : ''}</div>}
+                                {item.completedAt && <div className="mt-1 text-[10px] text-muted">اكتمل في {item.completedAt.slice(0, 10)} {item.completedByName ? `• ${item.completedByName}` : ''}</div>}
                               </div>
                             ))}
                           </div>
@@ -455,45 +455,45 @@ export const EmployeeClearancePage: React.FC = () => {
               )}
             </div>
 
-            <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-4">
-              <h2 className="flex items-center gap-1.5 text-sm font-black"><MessageSquareText className="h-4 w-4 text-teal-600" /> مقابلة الخروج</h2>
+            <div className="space-y-3 rounded-xl border border-line bg-surface p-4">
+              <h2 className="flex items-center gap-1.5 text-sm font-black"><MessageSquareText className="h-4 w-4 text-success" /> مقابلة الخروج</h2>
               {!selected ? (
-                <p className="text-[11px] text-slate-400">اختر طلباً أولاً لتسجيل مقابلة الخروج.</p>
+                <p className="text-[11px] text-muted">اختر طلباً أولاً لتسجيل مقابلة الخروج.</p>
               ) : (
                 <>
                   {selected.exitInterviewDate && (
-                    <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-[10px] font-semibold text-emerald-700">
+                    <div className="rounded-lg border border-success-border bg-success-soft px-3 py-2 text-[10px] font-semibold text-success">
                       مسجلة بتاريخ {selected.exitInterviewDate} {selected.exitInterviewerName ? `• ${selected.exitInterviewerName}` : ''}
-                      {selected.exitInterviewNotes && <div className="mt-1 font-normal text-emerald-800">{selected.exitInterviewNotes}</div>}
+                      {selected.exitInterviewNotes && <div className="mt-1 font-normal text-success">{selected.exitInterviewNotes}</div>}
                     </div>
                   )}
-                  <label className="block text-[10px] font-bold text-slate-500">مسؤول المقابلة
-                    <select value={interviewForm.interviewerId} onChange={(e) => setInterviewForm((prev) => ({ ...prev, interviewerId: e.target.value }))} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm">
+                  <label className="block text-[10px] font-bold text-muted">مسؤول المقابلة
+                    <select value={interviewForm.interviewerId} onChange={(e) => setInterviewForm((prev) => ({ ...prev, interviewerId: e.target.value }))} className="mt-1 w-full rounded-lg border border-line px-3 py-2 text-sm">
                       <option value="">اختر المسؤول</option>
                       {interviewers.map((user) => <option key={user.id} value={user.id}>{user.fullName}</option>)}
                     </select>
                   </label>
-                  <label className="block text-[10px] font-bold text-slate-500">تاريخ المقابلة
-                    <input type="date" value={interviewForm.interviewDate} onChange={(e) => setInterviewForm((prev) => ({ ...prev, interviewDate: e.target.value }))} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+                  <label className="block text-[10px] font-bold text-muted">تاريخ المقابلة
+                    <input type="date" value={interviewForm.interviewDate} onChange={(e) => setInterviewForm((prev) => ({ ...prev, interviewDate: e.target.value }))} className="mt-1 w-full rounded-lg border border-line px-3 py-2 text-sm" />
                   </label>
-                  <label className="block text-[10px] font-bold text-slate-500">سبب ترك العمل
-                    <input value={interviewForm.reasonForLeaving} onChange={(e) => setInterviewForm((prev) => ({ ...prev, reasonForLeaving: e.target.value }))} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+                  <label className="block text-[10px] font-bold text-muted">سبب ترك العمل
+                    <input value={interviewForm.reasonForLeaving} onChange={(e) => setInterviewForm((prev) => ({ ...prev, reasonForLeaving: e.target.value }))} className="mt-1 w-full rounded-lg border border-line px-3 py-2 text-sm" />
                   </label>
                   <div className="grid grid-cols-2 gap-2">
-                    <label className="block text-[10px] font-bold text-slate-500">درجة الرضا (1-5)
-                      <input type="number" min="1" max="5" value={interviewForm.satisfactionScore} onChange={(e) => setInterviewForm((prev) => ({ ...prev, satisfactionScore: e.target.value }))} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+                    <label className="block text-[10px] font-bold text-muted">درجة الرضا (1-5)
+                      <input type="number" min="1" max="5" value={interviewForm.satisfactionScore} onChange={(e) => setInterviewForm((prev) => ({ ...prev, satisfactionScore: e.target.value }))} className="mt-1 w-full rounded-lg border border-line px-3 py-2 text-sm" />
                     </label>
-                    <label className="block text-[10px] font-bold text-slate-500">التوصية (1-5)
-                      <input type="number" min="1" max="5" value={interviewForm.wouldRecommend} onChange={(e) => setInterviewForm((prev) => ({ ...prev, wouldRecommend: e.target.value }))} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+                    <label className="block text-[10px] font-bold text-muted">التوصية (1-5)
+                      <input type="number" min="1" max="5" value={interviewForm.wouldRecommend} onChange={(e) => setInterviewForm((prev) => ({ ...prev, wouldRecommend: e.target.value }))} className="mt-1 w-full rounded-lg border border-line px-3 py-2 text-sm" />
                     </label>
                   </div>
-                  <label className="block text-[10px] font-bold text-slate-500">ملاحظات الموظف
-                    <textarea value={interviewForm.feedback} onChange={(e) => setInterviewForm((prev) => ({ ...prev, feedback: e.target.value }))} rows={2} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+                  <label className="block text-[10px] font-bold text-muted">ملاحظات الموظف
+                    <textarea value={interviewForm.feedback} onChange={(e) => setInterviewForm((prev) => ({ ...prev, feedback: e.target.value }))} rows={2} className="mt-1 w-full rounded-lg border border-line px-3 py-2 text-sm" />
                   </label>
-                  <label className="block text-[10px] font-bold text-slate-500">إجراءات مطلوبة
-                    <textarea value={interviewForm.actionItems} onChange={(e) => setInterviewForm((prev) => ({ ...prev, actionItems: e.target.value }))} rows={2} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+                  <label className="block text-[10px] font-bold text-muted">إجراءات مطلوبة
+                    <textarea value={interviewForm.actionItems} onChange={(e) => setInterviewForm((prev) => ({ ...prev, actionItems: e.target.value }))} rows={2} className="mt-1 w-full rounded-lg border border-line px-3 py-2 text-sm" />
                   </label>
-                  <button onClick={saveInterview} className="w-full rounded-lg bg-teal-600 px-4 py-2.5 text-xs font-bold text-white hover:bg-teal-700">تسجيل المقابلة</button>
+                  <button onClick={saveInterview} className="w-full rounded-lg bg-success px-4 py-2.5 text-xs font-bold text-white hover:bg-success">تسجيل المقابلة</button>
                 </>
               )}
             </div>

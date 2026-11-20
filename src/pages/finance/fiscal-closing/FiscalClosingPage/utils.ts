@@ -20,18 +20,18 @@ export const formatMoney = (value: number) => new Intl.NumberFormat('ar-EG', {
 
 export const periodStatus = (period: FiscalPeriod) => {
   const state = period.workflowState || (period.status === 'LOCKED' ? 'LOCKED' : period.status === 'CLOSED' ? 'CLOSED' : 'OPEN');
-  if (state === 'LOCKED') return { label: 'مؤمّن نهائيًا', className: 'border-rose-200 bg-rose-50 text-rose-800' };
-  if (state === 'CLOSED') return { label: 'مقفلة', className: 'border-emerald-200 bg-emerald-50 text-emerald-800' };
-  if (state === 'PENDING_APPROVAL') return { label: 'بانتظار الاعتماد', className: 'border-violet-200 bg-violet-50 text-violet-800' };
-  if (state === 'IN_REVIEW') return { label: 'قيد المراجعة', className: 'border-amber-200 bg-amber-50 text-amber-800' };
-  return { label: 'مفتوحة', className: 'border-sky-200 bg-sky-50 text-sky-800' };
+  if (state === 'LOCKED') return { label: 'مؤمّن نهائيًا', className: 'border-danger-border bg-danger-soft text-danger' };
+  if (state === 'CLOSED') return { label: 'مقفلة', className: 'border-success-border bg-success-soft text-success' };
+  if (state === 'PENDING_APPROVAL') return { label: 'بانتظار الاعتماد', className: 'border-accent-border bg-accent-soft text-primary' };
+  if (state === 'IN_REVIEW') return { label: 'قيد المراجعة', className: 'border-warning-border bg-warning-soft text-warning' };
+  return { label: 'مفتوحة', className: 'border-accent-border bg-accent-soft text-primary' };
 };
 
 export const checkStatusStyle = (status: FiscalCloseCheck['status']) => {
-  if (status === 'PASS') return { label: 'ناجح', className: 'border-emerald-200 bg-emerald-50 text-emerald-900', icon: CheckCircle2 };
-  if (status === 'WARNING') return { label: 'تحذير', className: 'border-amber-200 bg-amber-50 text-amber-950', icon: AlertTriangle };
-  if (status === 'FAIL') return { label: 'فشل', className: 'border-rose-200 bg-rose-50 text-rose-950', icon: AlertCircle };
-  return { label: 'غير منطبق', className: 'border-slate-200 bg-slate-50 text-slate-700', icon: Circle };
+  if (status === 'PASS') return { label: 'ناجح', className: 'border-success-border bg-success-soft text-success', icon: CheckCircle2 };
+  if (status === 'WARNING') return { label: 'تحذير', className: 'border-warning-border bg-warning-soft text-warning', icon: AlertTriangle };
+  if (status === 'FAIL') return { label: 'فشل', className: 'border-danger-border bg-danger-soft text-danger', icon: AlertCircle };
+  return { label: 'غير منطبق', className: 'border-line bg-surface-muted text-ink', icon: Circle };
 };
 
 export const taskStatusLabel: Record<string, string> = {

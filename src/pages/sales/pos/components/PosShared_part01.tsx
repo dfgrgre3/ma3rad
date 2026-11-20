@@ -2,7 +2,7 @@ import React from 'react';
 import { RefreshCw } from 'lucide-react';
 
 export const inputCls =
-  'w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-sky-500';
+  'w-full bg-surface-muted border border-line rounded-xl px-3 py-2 text-xs text-ink focus:outline-none focus:border-primary';
 
 export const RotateCcwIcon: React.FC = () => <RefreshCw className="w-4 h-4" />;
 

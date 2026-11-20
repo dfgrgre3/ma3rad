@@ -3,7 +3,7 @@
  * Source: central-server/routeManifest.js
  * Regenerate with: node central-server/scripts/generate-routes.mjs
  *
- * 174 allowlisted endpoint pattern(s).
+ * 176 allowlisted endpoint pattern(s).
  */
 
 const ROUTE_DEFINITIONS = [
@@ -753,6 +753,19 @@ const ROUTE_DEFINITIONS = [
   },
   {
     "pattern": "/api/v1/admin/security/signing-keys/rotate",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/security/ip-bans",
+    "methods": [
+      "GET",
+      "POST"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/security/ip-bans/:id/lift",
     "methods": [
       "POST"
     ]

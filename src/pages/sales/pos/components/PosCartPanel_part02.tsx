@@ -3,6 +3,7 @@ import { ShoppingCart } from 'lucide-react';
 import { CartLine } from './CartLine';
 import { PosCustomerPicker } from './PosCustomerPicker';
 import type { PosCartPanelProps } from './PosCartPanel_part01';
+import { usePosActivityCopy } from '../../../../hooks/pages/sales/pos/usePosActivityCopy';
 
 export const PosCartPanel: React.FC<PosCartPanelProps> = ({
   selectedCustomer,
@@ -35,7 +36,9 @@ export const PosCartPanel: React.FC<PosCartPanelProps> = ({
   onSelectCartLine,
   customerSummary,
   onClearCustomer,
-}) => (
+}) => {
+  const copy = usePosActivityCopy();
+  return (
   <>
     <PosCustomerPicker
       selectedCustomer={selectedCustomer}
@@ -59,19 +62,19 @@ export const PosCartPanel: React.FC<PosCartPanelProps> = ({
         <button
           type="button"
           onClick={onUndoRemove}
-          className="w-full px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 rounded-xl text-xs font-bold transition"
+          className="w-full px-3 py-1.5 bg-warning-soft hover:bg-warning-soft text-warning border border-warning-border rounded-xl text-xs font-bold transition"
         >
           تم حذف {recentlyRemoved.product?.name || 'المنتج'} من السلة — تراجع
         </button>
       </div>
     )}
-    <div className="flex items-center justify-between border-b border-slate-100 px-3 py-2 text-xs dark:border-slate-800">
-      <span className="font-black text-slate-800 dark:text-slate-100">سلة البيع <span className="font-semibold text-slate-500 dark:text-slate-400">({cart.length} أصناف)</span></span>
-      {cart.length > 0 && <span className="text-slate-600 dark:text-slate-300">{cart.length} بنود{cartQuantitySummary ? ` · ${cartQuantitySummary}` : ''}</span>}
+    <div className="flex items-center justify-between border-b border-line px-3 py-2 text-xs ">
+      <span className="font-black text-ink ">{copy.cartTitle} <span className="font-semibold text-muted ">({cart.length} أصناف)</span></span>
+      {cart.length > 0 && <span className="text-ink-secondary ">{cart.length} بنود{cartQuantitySummary ? ` · ${cartQuantitySummary}` : ''}</span>}
     </div>
     <div className="flex-1 min-h-0 overflow-y-auto px-2.5 py-2 space-y-2">
       {cart.length === 0 ? (
-        <div className="h-full flex flex-col items-center justify-center text-center text-slate-600">
+        <div className="h-full flex flex-col items-center justify-center text-center text-ink-secondary">
           <ShoppingCart className="w-12 h-12 mb-2 opacity-40" />
           <p className="text-xs font-bold">السلة فارغة</p>
           <p className="text-[11px]">انقر على أي صنف لإضافته، أو امسح الباركود</p>
@@ -106,4 +109,5 @@ export const PosCartPanel: React.FC<PosCartPanelProps> = ({
       )}
     </div>
   </>
-);
+  );
+};

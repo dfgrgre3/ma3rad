@@ -157,10 +157,10 @@ export const PlatformStaffInviteAcceptPage: React.FC<Props> = ({ token, onSucces
                 />
               </div>
               <ul className="space-y-1 text-[10px] text-[var(--win-text-muted)]">
-                <li className={`flex items-center gap-1.5 ${hasMinLength ? 'text-emerald-700 dark:text-emerald-400' : ''}`}>
+                <li className={`flex items-center gap-1.5 ${hasMinLength ? 'text-success dark:text-success' : ''}`}>
                   <CheckCircle2 className="h-3 w-3" /> 8 أحرف على الأقل
                 </li>
-                <li className={`flex items-center gap-1.5 ${passwordsMatch ? 'text-emerald-700 dark:text-emerald-400' : ''}`}>
+                <li className={`flex items-center gap-1.5 ${passwordsMatch ? 'text-success dark:text-success' : ''}`}>
                   <CheckCircle2 className="h-3 w-3" /> تطابق كلمة المرور
                 </li>
               </ul>

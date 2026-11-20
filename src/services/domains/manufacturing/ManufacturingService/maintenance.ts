@@ -1,5 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import { localDateString } from '../../../../utils/shared/date';
+import { postLedgerEntry } from '../../../../database/repositories/ledger';
 import type { ManufacturingContext } from './context';
 import type {
   CreateMaintenanceDTO,
@@ -14,7 +15,7 @@ export class MaintenanceModule {
 
   public createMaintenance(input: CreateMaintenanceDTO): MaintenanceRecord {
     this.ctx.guardWrites();
-    const actor = this.ctx.require('manufacturing.manage');
+    const actor = this.ctx.requireAny(['manufacturing.manage', 'manufacturing.maintenance.manage']);
     if (!input?.equipmentName?.trim()) throw new Error('اسم المعدة مطلوب.');
     let branchId = input.branchId;
     if (input.workCenterId) {
@@ -34,21 +35,29 @@ export class MaintenanceModule {
       if (!/^\d{4}-\d{2}-\d{2}$/.test(input.scheduledDate)) throw new Error('تاريخ الجدولة غير صالح.');
     }
 
+    const recurrence = input.recurrenceIntervalDays ?? null;
+    if (recurrence !== null && (!Number.isInteger(recurrence) || recurrence < 1 || recurrence > 3650)) {
+      throw new Error('فترة تكرار الصيانة يجب أن تكون بين 1 و 3650 يوماً.');
+    }
+    if (maintenanceType !== 'PREVENTIVE' && recurrence !== null) {
+      throw new Error('التكرار متاح للسجلات الوقائية فقط.');
+    }
+
     const id = `mnt_${uuidv4().replace(/-/g, '').slice(0, 12)}`;
     const now = new Date().toISOString();
     const notes = input.notes === undefined ? null : (input.notes?.trim() || null);
     this.ctx.db.run(
       `INSERT INTO manufacturing_maintenance
-        (id, work_center_id, equipment_name, maintenance_type, status, scheduled_date, cost, notes, performed_by, branch_id, created_at, updated_at)
-       VALUES (?, ?, ?, ?, 'SCHEDULED', ?, 0, ?, ?, ?, ?, ?)`,
-      [id, input.workCenterId || null, input.equipmentName.trim(), maintenanceType, input.scheduledDate || null, notes, actor.id, branchId, now, now]
+        (id, work_center_id, equipment_name, maintenance_type, status, scheduled_date, cost, notes, performed_by, branch_id, recurrence_interval_days, created_at, updated_at)
+       VALUES (?, ?, ?, ?, 'SCHEDULED', ?, 0, ?, ?, ?, ?, ?, ?)`,
+      [id, input.workCenterId || null, input.equipmentName.trim(), maintenanceType, input.scheduledDate || null, notes, actor.id, branchId, recurrence, now, now]
     );
     this.ctx.audit('جدولة صيانة', id, { equipmentName: input.equipmentName.trim(), maintenanceType });
     return this.getMaintenance(id);
   }
 
   public getMaintenance(id: string): MaintenanceRecord {
-    const actor = this.ctx.require('manufacturing.view');
+    const actor = this.ctx.requireAny(['manufacturing.view', 'manufacturing.maintenance.view']);
     const row = this.ctx.db.query<any>(`SELECT * FROM manufacturing_maintenance WHERE id = ?`, [id])[0];
     if (!row) throw new Error('سجل الصيانة غير موجود.');
     if (row.branchId) this.ctx.branchAccess.requireBranchAccess(row.branchId, actor);
@@ -56,7 +65,7 @@ export class MaintenanceModule {
   }
 
   public getMaintenanceRecords(filters?: { status?: string; workCenterId?: string }): MaintenanceRecord[] {
-    const actor = this.ctx.require('manufacturing.view');
+    const actor = this.ctx.requireAny(['manufacturing.view', 'manufacturing.maintenance.view']);
     const conditions: string[] = [];
     const params: Array<string> = [];
     if (filters?.status) {
@@ -81,7 +90,7 @@ export class MaintenanceModule {
 
   public updateMaintenance(id: string, input: UpdateMaintenanceDTO): MaintenanceRecord {
     this.ctx.guardWrites();
-    const actor = this.ctx.require('manufacturing.manage');
+    const actor = this.ctx.requireAny(['manufacturing.manage', 'manufacturing.maintenance.manage']);
     const existing = this.ctx.db.query<any>(`SELECT * FROM manufacturing_maintenance WHERE id = ?`, [id])[0];
     if (!existing) throw new Error('سجل الصيانة غير موجود.');
     if (existing.branchId) this.ctx.branchAccess.requireBranchAccess(existing.branchId, actor);
@@ -91,6 +100,13 @@ export class MaintenanceModule {
     if (input.maintenanceType !== undefined) {
       if (!['PREVENTIVE', 'CORRECTIVE', 'PREDICTIVE'].includes(input.maintenanceType)) throw new Error('نوع الصيانة غير صالح.');
       updates.push('maintenance_type = ?'); params.push(input.maintenanceType);
+    }
+    if (input.recurrenceIntervalDays !== undefined) {
+      const recurrence = input.recurrenceIntervalDays ?? null;
+      if (recurrence !== null && (!Number.isInteger(recurrence) || recurrence < 1 || recurrence > 3650)) {
+        throw new Error('فترة تكرار الصيانة يجب أن تكون بين 1 و 3650 يوماً.');
+      }
+      updates.push('recurrence_interval_days = ?'); params.push(recurrence);
     }
     if (input.status !== undefined) {
       if (!['SCHEDULED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'].includes(input.status)) throw new Error('حالة الصيانة غير صالحة.');
@@ -116,14 +132,69 @@ export class MaintenanceModule {
     updates.push('updated_at = ?');
     params.push(new Date().toISOString());
     params.push(id);
-    this.ctx.db.run(`UPDATE manufacturing_maintenance SET ${updates.join(', ')} WHERE id = ?`, params);
+    this.ctx.db.executeFinancialTransaction((db) => {
+      db.run(`UPDATE manufacturing_maintenance SET ${updates.join(', ')} WHERE id = ?`, params);
+      // Post the maintenance cost to the ledger once, on completion:
+      // Dr 5204 (maintenance expense) / Cr 2104 (accrued liabilities).
+      // postLedgerEntry is idempotent on (referenceType, referenceId), so a
+      // repeated completion or cost edit cannot double-post.
+      const completing = input.status === 'COMPLETED' && existing.status !== 'COMPLETED';
+      // Auto-schedule the next occurrence when a recurring PREVENTIVE record
+      // completes: next scheduled_date = completion date + interval days.
+      const effectiveType = input.maintenanceType ?? existing.maintenanceType;
+      const effectiveRecurrence = input.recurrenceIntervalDays !== undefined
+        ? input.recurrenceIntervalDays
+        : (existing.recurrenceIntervalDays ?? null);
+      if (completing && effectiveType === 'PREVENTIVE' && effectiveRecurrence) {
+        const baseDate = input.completedDate || localDateString();
+        const base = new Date(`${baseDate}T00:00:00Z`);
+        if (!Number.isNaN(base.getTime())) {
+          base.setUTCDate(base.getUTCDate() + Number(effectiveRecurrence));
+          const nextDate = base.toISOString().slice(0, 10);
+          db.run(
+            `INSERT INTO manufacturing_maintenance
+              (id, work_center_id, equipment_name, maintenance_type, status, scheduled_date, cost, notes, performed_by, branch_id, recurrence_interval_days, created_at, updated_at)
+             VALUES (?, ?, ?, 'PREVENTIVE', 'SCHEDULED', ?, 0, ?, NULL, ?, ?, ?, ?)`,
+            [
+              `mnt_${uuidv4().replace(/-/g, '').slice(0, 12)}`,
+              existing.workCenterId || existing.work_center_id || null,
+              existing.equipmentName || existing.equipment_name,
+              nextDate,
+              existing.notes ? `تكرار تلقائي — ${existing.notes}` : 'تكرار تلقائي',
+              existing.branchId || existing.branch_id || null,
+              effectiveRecurrence,
+              new Date().toISOString(), new Date().toISOString(),
+            ]
+          );
+        }
+      }
+      // input.cost is in major units; the stored column is in piastres.
+      const ledgerMajor = completing
+        ? (input.cost !== undefined ? Number(input.cost) : Number(existing.cost || 0) / 100)
+        : 0;
+      if (ledgerMajor > 0) {
+        const major = ledgerMajor;
+        postLedgerEntry(db.getDatabase(), {
+          date: localDateString(),
+          description: `صيانة مكتملة - ${existing.equipmentName || id}`,
+          referenceType: 'MAINTENANCE',
+          referenceId: id,
+          createdBy: actor.id,
+          branchId: existing.branchId || null,
+          lines: [
+            { accountCode: '5204', debit: major, credit: 0 },
+            { accountCode: '2104', debit: 0, credit: major },
+          ],
+        });
+      }
+    });
     this.ctx.audit('تحديث صيانة', id, { status: input.status });
     return this.getMaintenance(id);
   }
 
   /** Preventive-maintenance alerts: overdue and due-within-N-days schedules. */
   public getMaintenanceAlerts(withinDays = 7): { overdue: MaintenanceRecord[]; dueSoon: MaintenanceRecord[] } {
-    this.ctx.require('manufacturing.view');
+    this.ctx.requireAny(['manufacturing.view', 'manufacturing.maintenance.view']);
     const records = this.getMaintenanceRecords({ status: 'SCHEDULED' })
       .filter((record) => record.maintenanceType === 'PREVENTIVE' && record.scheduledDate);
     const today = localDateString();
@@ -149,6 +220,7 @@ export class MaintenanceModule {
       notes: row.notes ?? null,
       performedBy: row.performedBy ?? null,
       branchId: row.branchId ?? null,
+      recurrenceIntervalDays: row.recurrenceIntervalDays ?? null,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
     };

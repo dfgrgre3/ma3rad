@@ -106,7 +106,7 @@ export const PosCustomerSelectionDialog: React.FC<PosCustomerSelectionDialogProp
 
   const dialog = createPortal(
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/55 p-3 backdrop-blur-sm sm:p-6"
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-primary/55 p-3 backdrop-blur-sm sm:p-6"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}
@@ -116,16 +116,16 @@ export const PosCustomerSelectionDialog: React.FC<PosCustomerSelectionDialogProp
         role="dialog"
         aria-modal="true"
         aria-labelledby="pos-customer-dialog-title"
-        className="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white text-slate-900 shadow-2xl dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+        className="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-line bg-surface text-ink shadow-2xl "
       >
-        <header className="flex items-center justify-between gap-4 border-b border-slate-200 px-5 py-4 dark:border-slate-700">
+        <header className="flex items-center justify-between gap-4 border-b border-line px-5 py-4 ">
           <div className="flex min-w-0 items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-50 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent-soft text-primary dark:bg-primary/40 ">
               <Users className="h-5 w-5" />
             </div>
             <div className="min-w-0">
               <h2 id="pos-customer-dialog-title" className="text-base font-black">اختيار عميل</h2>
-              <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+              <p className="mt-0.5 text-xs text-muted ">
                 {isLoading && !result ? 'جارٍ تحميل العملاء…' : `${totalItems.toLocaleString('ar-EG')} عميل`}
               </p>
             </div>
@@ -134,15 +134,15 @@ export const PosCustomerSelectionDialog: React.FC<PosCustomerSelectionDialogProp
             type="button"
             onClick={onClose}
             aria-label="إغلاق نافذة اختيار العميل"
-            className="rounded-lg p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-white"
+            className="rounded-lg p-2 text-muted transition hover:bg-surface-sunken hover:text-ink dark:hover:bg-primary dark:hover:text-white"
           >
             <X className="h-5 w-5" />
           </button>
         </header>
 
-        <div className="grid gap-3 border-b border-slate-200 bg-slate-50/70 p-4 dark:border-slate-700 dark:bg-slate-800/40 sm:grid-cols-[minmax(0,1fr)_190px_170px]">
+        <div className="grid gap-3 border-b border-line bg-surface-muted/70 p-4 dark:bg-primary/40 sm:grid-cols-[minmax(0,1fr)_190px_170px]">
           <label className="relative block">
-            <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
             <input
               autoFocus
               value={search}
@@ -152,7 +152,7 @@ export const PosCustomerSelectionDialog: React.FC<PosCustomerSelectionDialogProp
               }}
               placeholder="ابحث بالاسم أو الهاتف أو كود العميل"
               aria-label="البحث عن عميل"
-              className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pr-9 pl-3 text-sm outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 dark:border-slate-600 dark:bg-slate-900"
+              className="w-full rounded-xl border border-line bg-surface py-2.5 pr-9 pl-3 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 "
             />
           </label>
           <label className="sr-only" htmlFor="pos-customer-type-filter">نوع العميل</label>
@@ -163,7 +163,7 @@ export const PosCustomerSelectionDialog: React.FC<PosCustomerSelectionDialogProp
               setCustomerType(event.target.value as CustomerTypeFilter);
               setPage(1);
             }}
-            className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-sky-500 dark:border-slate-600 dark:bg-slate-900"
+            className="rounded-xl border border-line bg-surface px-3 py-2.5 text-sm outline-none focus:border-primary "
           >
             <option value="ALL">كل أنواع العملاء</option>
             {Object.entries(CUSTOMER_TYPE_LABELS).map(([type, label]) => (
@@ -178,7 +178,7 @@ export const PosCustomerSelectionDialog: React.FC<PosCustomerSelectionDialogProp
               setStatus(event.target.value as CustomerStatusFilter);
               setPage(1);
             }}
-            className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-sky-500 dark:border-slate-600 dark:bg-slate-900"
+            className="rounded-xl border border-line bg-surface px-3 py-2.5 text-sm outline-none focus:border-primary "
           >
             <option value="ALL">كل الحالات</option>
             <option value="ACTIVE">نشط</option>
@@ -189,17 +189,17 @@ export const PosCustomerSelectionDialog: React.FC<PosCustomerSelectionDialogProp
         <div className="min-h-0 flex-1 overflow-auto">
           {error ? (
             <div role="alert" className="flex min-h-56 flex-col items-center justify-center gap-3 p-6 text-center">
-              <p className="text-sm font-bold text-rose-700 dark:text-rose-300">{error}</p>
+              <p className="text-sm font-bold text-danger ">{error}</p>
               <button
                 type="button"
                 onClick={() => setReloadToken((token) => token + 1)}
-                className="rounded-lg bg-sky-700 px-4 py-2 text-xs font-bold text-white hover:bg-sky-800"
+                className="rounded-lg bg-primary px-4 py-2 text-xs font-bold text-white hover:bg-primary"
               >
                 إعادة المحاولة
               </button>
             </div>
           ) : isLoading ? (
-            <div role="status" className="flex min-h-56 items-center justify-center gap-2 text-sm text-slate-500">
+            <div role="status" className="flex min-h-56 items-center justify-center gap-2 text-sm text-muted">
               <LoaderCircle className="h-5 w-5 animate-spin" />
               جارٍ تحميل العملاء…
             </div>
@@ -229,7 +229,7 @@ export const PosCustomerSelectionDialog: React.FC<PosCustomerSelectionDialogProp
                   render: (customer: any) => {
                     const isActive = customer.isActive !== 0;
                     return (
-                      <span className={`rounded-full px-2 py-1 text-[10px] font-bold ${isActive ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300' : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-300'}`}>
+                      <span className={`rounded-full px-2 py-1 text-[10px] font-bold ${isActive ? 'bg-success-soft text-success dark:bg-success/40 dark:text-success' : 'bg-surface-sunken text-muted dark:bg-primary dark:text-muted'}`}>
                         {isActive ? 'نشط' : 'موقوف'}
                       </span>
                     );
@@ -248,7 +248,7 @@ export const PosCustomerSelectionDialog: React.FC<PosCustomerSelectionDialogProp
                           onSelectCustomer(customer);
                           onClose();
                         }}
-                        className="inline-flex items-center gap-1.5 rounded-lg bg-sky-700 px-3 py-2 text-xs font-bold text-white transition hover:bg-sky-800 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 dark:disabled:bg-slate-700 dark:disabled:text-slate-400"
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-xs font-bold text-white transition hover:bg-primary disabled:cursor-not-allowed disabled:bg-surface-sunken disabled:text-muted dark:disabled:bg-primary dark:disabled:text-muted"
                       >
                         {isSelected ? <Check className="h-3.5 w-3.5" /> : null}
                         {isSelected ? 'محدد' : 'اختيار'}
@@ -260,15 +260,15 @@ export const PosCustomerSelectionDialog: React.FC<PosCustomerSelectionDialogProp
             />
           ) : (
             <div className="flex min-h-56 flex-col items-center justify-center gap-2 p-6 text-center">
-              <Users className="h-9 w-9 text-slate-300 dark:text-slate-600" />
-              <p className="text-sm font-bold text-slate-600 dark:text-slate-300">لا توجد عملاء مطابقة</p>
-              <p className="text-xs text-slate-400">جرّب تغيير البحث أو الفلاتر.</p>
+              <Users className="h-9 w-9 text-muted " />
+              <p className="text-sm font-bold text-ink-secondary ">لا توجد عملاء مطابقة</p>
+              <p className="text-xs text-muted">جرّب تغيير البحث أو الفلاتر.</p>
             </div>
           )}
         </div>
 
-        <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 px-4 py-3 text-xs dark:border-slate-700">
-          <span className="text-slate-500 dark:text-slate-400">
+        <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-line px-4 py-3 text-xs ">
+          <span className="text-muted ">
             عرض {firstItem}–{lastItem} من {totalItems.toLocaleString('ar-EG')}
           </span>
           <div className="flex items-center gap-2">
@@ -276,7 +276,7 @@ export const PosCustomerSelectionDialog: React.FC<PosCustomerSelectionDialogProp
               type="button"
               disabled={!result || page <= 1 || isLoading}
               onClick={() => setPage((current) => Math.max(1, current - 1))}
-              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-2 font-bold disabled:opacity-40 dark:border-slate-700"
+              className="inline-flex items-center gap-1 rounded-lg border border-line px-3 py-2 font-bold disabled:opacity-40 "
             >
               <ChevronRight className="h-4 w-4" /> السابق
             </button>
@@ -285,7 +285,7 @@ export const PosCustomerSelectionDialog: React.FC<PosCustomerSelectionDialogProp
               type="button"
               disabled={!result || page >= result.totalPages || isLoading}
               onClick={() => setPage((current) => current + 1)}
-              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-2 font-bold disabled:opacity-40 dark:border-slate-700"
+              className="inline-flex items-center gap-1 rounded-lg border border-line px-3 py-2 font-bold disabled:opacity-40 "
             >
               التالي <ChevronLeft className="h-4 w-4" />
             </button>

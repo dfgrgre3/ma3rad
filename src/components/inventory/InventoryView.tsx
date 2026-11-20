@@ -21,6 +21,7 @@ import { useBusinessProfileMeta, useBusinessTerm } from '../../hooks/domains/con
 
 export const InventoryView: React.FC = () => {
   const inventoryLabel = useBusinessTerm('modules.inventory');
+  const newTransferLabel = useBusinessTerm('actions.newTransfer');
   const { label: businessProfileLabel } = useBusinessProfileMeta();
   const [stockList, setStockList] = useState<any[]>([]);
   const [inactiveStockList, setInactiveStockList] = useState<any[]>([]);
@@ -153,7 +154,7 @@ export const InventoryView: React.FC = () => {
               leadingIcon={<ArrowLeftRight className="h-4 w-4" />}
               onClick={() => setIsTransferModalOpen(true)}
             >
-              تحويل بين المخازن
+              {newTransferLabel} بين المخازن
             </Button>
           ) : undefined
         }

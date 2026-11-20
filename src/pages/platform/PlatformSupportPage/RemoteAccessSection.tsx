@@ -21,17 +21,17 @@ export const RemoteAccessSection: React.FC<RemoteAccessSectionProps> = ({
   onStartSession,
   onEndRemoteSession,
 }) => (
-  <div className="border-b border-slate-800 bg-slate-950/40 p-3">
+  <div className="border-b border-line-strong bg-primary/40 p-3">
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div className="flex items-center gap-2">
-        <Monitor className="h-4 w-4 text-sky-400" />
-        <span className="text-xs font-bold text-slate-200">الوصول عن بُعد للعميل:</span>
-        <span className="text-xs text-slate-400">
+        <Monitor className="h-4 w-4 text-primary" />
+        <span className="text-xs font-bold text-muted">الوصول عن بُعد للعميل:</span>
+        <span className="text-xs text-muted">
           {details.ticket.remoteAccessRequested ? (
             details.ticket.remoteAccessApproved ? (
-              <span className="text-emerald-400 font-bold">معتمد من العميل</span>
+              <span className="text-success font-bold">معتمد من العميل</span>
             ) : (
-              <span className="text-amber-400 font-bold">بانتظار موافقة العميل</span>
+              <span className="text-warning font-bold">بانتظار موافقة العميل</span>
             )
           ) : (
             'غير مطلوب'
@@ -75,7 +75,7 @@ export const RemoteAccessSection: React.FC<RemoteAccessSectionProps> = ({
             )}
             {canManageSupport && (<button
               onClick={() => onToggleRemoteRequest(false)}
-              className="text-xs text-rose-400 hover:underline"
+              className="text-xs text-danger hover:underline"
             >
               إلغاء الطلب
             </button>)}
@@ -86,20 +86,20 @@ export const RemoteAccessSection: React.FC<RemoteAccessSectionProps> = ({
 
     {/* Active Remote Sessions List */}
     {details.remoteSessions.length > 0 && (
-      <div className="mt-2.5 space-y-1.5 border-t border-slate-800/60 pt-2">
-        <p className="text-[11px] font-bold text-slate-400">جلسات الوصول النشطة:</p>
+      <div className="mt-2.5 space-y-1.5 border-t border-line-strong/60 pt-2">
+        <p className="text-[11px] font-bold text-muted">جلسات الوصول النشطة:</p>
         {details.remoteSessions.map((session) => (
           <div
             key={session.id}
-            className="flex items-center justify-between rounded-lg bg-slate-900 p-2 text-xs border border-slate-800"
+            className="flex items-center justify-between rounded-lg bg-primary p-2 text-xs border border-line-strong"
           >
             <div>
-              <span className="font-bold text-slate-200">{session.technicianName}</span>
-              <span className="text-slate-400 text-[11px] mr-2">
+              <span className="font-bold text-muted">{session.technicianName}</span>
+              <span className="text-muted text-[11px] mr-2">
                 {formatDateTime(session.startedAt)} ({session.durationMinutes} دقيقة)
               </span>
               {session.actionsSummary && (
-                <p className="text-[11px] text-slate-400 mt-0.5">{session.actionsSummary}</p>
+                <p className="text-[11px] text-muted mt-0.5">{session.actionsSummary}</p>
               )}
             </div>
 
@@ -113,7 +113,7 @@ export const RemoteAccessSection: React.FC<RemoteAccessSectionProps> = ({
                 إنهاء الجلسة
               </Button>
             ) : (
-              <span className="text-emerald-400 text-[11px] font-bold">منتهية</span>
+              <span className="text-success text-[11px] font-bold">منتهية</span>
             )}
           </div>
         ))}

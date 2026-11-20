@@ -188,13 +188,13 @@ export const PlatformRolesPage: React.FC = () => {
     );
 
   if (loading) {
-    return <div className="py-20 text-center text-sm font-semibold text-slate-500">جارٍ تحميل مصفوفة الصلاحيات...</div>;
+    return <div className="py-20 text-center text-sm font-semibold text-muted">جارٍ تحميل مصفوفة الصلاحيات...</div>;
   }
 
   if (!matrix) {
     return (
       <EmptyState
-        icon={<ShieldCheck className="h-6 w-6 text-slate-500" />}
+        icon={<ShieldCheck className="h-6 w-6 text-muted" />}
         title="تعذر تحميل المصفوفة"
         description="تأكد من تشغيل النظام على أحدث نسخة (ترقية قاعدة البيانات 200_platform_rbac_v2 مطلوبة)."
       />
@@ -205,7 +205,7 @@ export const PlatformRolesPage: React.FC = () => {
 
   const renderCheckbox = (role: string, code: string | undefined, label?: string) => {
     if (!code) {
-      return <span className="text-slate-700 select-none">—</span>;
+      return <span className="text-ink select-none">—</span>;
     }
     const checked = grantedSets.get(role)?.has(code) ?? (role === 'SUPER_ADMIN');
     const disabled = role === 'SUPER_ADMIN' || !canManage;
@@ -219,8 +219,8 @@ export const PlatformRolesPage: React.FC = () => {
         onClick={() => togglePermission(role, code)}
         className={`mx-auto flex h-5 w-5 items-center justify-center rounded border transition-all ${
           checked
-            ? 'border-sky-500 bg-sky-500 text-white'
-            : 'border-slate-700 bg-slate-900 hover:border-slate-500'
+            ? 'border-primary bg-primary text-white'
+            : 'border-line-strong bg-primary hover:border-line-strong'
         } ${disabled ? 'cursor-not-allowed opacity-70' : 'cursor-pointer'}`}
       >
         {checked && (
@@ -260,33 +260,33 @@ export const PlatformRolesPage: React.FC = () => {
           const count = role === 'SUPER_ADMIN' ? matrix.sections.flatMap((s) => s.permissions).length : (draft[role]?.length ?? 0);
           const isDirty = dirtyRoles.has(role);
           return (
-            <div key={role} className={`rounded-xl border p-3 ${isDirty ? 'border-amber-500/50 bg-amber-500/5' : 'border-slate-800 bg-slate-900/60'}`}>
+            <div key={role} className={`rounded-xl border p-3 ${isDirty ? 'border-warning/50 bg-warning/5' : 'border-line-strong bg-primary/60'}`}>
               <div className="flex items-center justify-between">
-                <span className="text-lg font-black text-slate-100">{count}</span>
-                {role === 'SUPER_ADMIN' ? <Lock className="h-4 w-4 text-purple-400" /> : isDirty ? <span className="text-[10px] font-black text-amber-400">معدّلة</span> : <CheckCircle2 className="h-4 w-4 text-emerald-500" />}
+                <span className="text-lg font-black text-muted">{count}</span>
+                {role === 'SUPER_ADMIN' ? <Lock className="h-4 w-4 text-primary" /> : isDirty ? <span className="text-[10px] font-black text-warning">معدّلة</span> : <CheckCircle2 className="h-4 w-4 text-success" />}
               </div>
-              <p className="mt-1 text-[10.5px] font-bold text-slate-200 leading-tight">{roleTitle(role)}</p>
-              <p className="mt-0.5 text-[9px] text-slate-500">صلاحية ممنوحة</p>
+              <p className="mt-1 text-[10.5px] font-bold text-muted leading-tight">{roleTitle(role)}</p>
+              <p className="mt-0.5 text-[9px] text-muted">صلاحية ممنوحة</p>
             </div>
           );
         })}
       </div>
 
-      <div className="flex items-start gap-2 rounded-xl border border-sky-500/20 bg-sky-500/5 p-3 text-[10.5px] leading-5 text-sky-200/80">
+      <div className="flex items-start gap-2 rounded-xl border border-primary/20 bg-primary/5 p-3 text-[10.5px] leading-5 text-primary/80">
         <Info className="mt-0.5 h-4 w-4 shrink-0" />
         <p>التغييرات تسري فوراً على كل طلبات الـ API. الأعمدة الفارغة (—) تعني أن العملية غير متاحة لهذا القسم وليست قابلة للتفعيل. الأزرار في الواجهة تخفي ما لا تملكه — لكن الحماية الحقيقية تحدث في طبقة الخدمة.</p>
       </div>
 
       {/* ─── Matrix 1: standard actions × sections ─────────────────────── */}
-      <div className="overflow-hidden rounded-xl border border-slate-800 bg-slate-900/70 shadow-sm">
-        <div className="flex items-center justify-between border-b border-slate-800 bg-slate-950/50 px-4 py-2.5">
-          <p className="text-xs font-black text-slate-200">المصفوفة الأساسية — القسم × العملية</p>
+      <div className="overflow-hidden rounded-xl border border-line-strong bg-primary/70 shadow-sm">
+        <div className="flex items-center justify-between border-b border-line-strong bg-primary/50 px-4 py-2.5">
+          <p className="text-xs font-black text-muted">المصفوفة الأساسية — القسم × العملية</p>
           {canManage && (
-            <div className="flex items-center gap-3 text-[10px] font-bold text-slate-500">
+            <div className="flex items-center gap-3 text-[10px] font-bold text-muted">
               {ROLE_ORDER.filter((r) => r !== 'SUPER_ADMIN').map((role) => (
                 <span key={role} className="hidden xl:flex items-center gap-1.5">
-                  <button className="text-sky-400 hover:underline" onClick={() => toggleAllForRole(role, standardCodesForRole(), true)}>الكل+</button>
-                  <button className="text-rose-400/80 hover:underline" onClick={() => toggleAllForRole(role, standardCodesForRole(), false)}>الكل−</button>
+                  <button className="text-primary hover:underline" onClick={() => toggleAllForRole(role, standardCodesForRole(), true)}>الكل+</button>
+                  <button className="text-danger/80 hover:underline" onClick={() => toggleAllForRole(role, standardCodesForRole(), false)}>الكل−</button>
                 </span>
               ))}
             </div>
@@ -300,11 +300,11 @@ export const PlatformRolesPage: React.FC = () => {
             minWidth={980}
             dense
             tableClassName="text-xs"
-            rowClassName={() => 'hover:bg-slate-800/20'}
+            rowClassName={() => 'hover:bg-primary/20'}
             columns={[
               {
                 key: 'section', header: 'القسم / العملية',
-                render: (section) => <span className="font-bold text-slate-200">{section.title}</span>,
+                render: (section) => <span className="font-bold text-muted">{section.title}</span>,
               },
               ...ROLE_ORDER.map((role) => ({
                 key: `role-${role}`, header: roleTitle(role).split('(')[0], align: 'center' as const,
@@ -312,13 +312,13 @@ export const PlatformRolesPage: React.FC = () => {
                   <div className="grid grid-cols-6 gap-1">
                     {ACTION_ORDER.map((action) => {
                       if (!section.standardActions.includes(action)) {
-                        return <span key={action} className="text-center text-slate-800 select-none">—</span>;
+                        return <span key={action} className="text-center text-ink select-none">—</span>;
                       }
                       const code = permissionByModuleAction.get(`${section.module}.${action}`)?.code;
                       return (
                         <div key={action} className="flex flex-col items-center">
                           {renderCheckbox(role, code, `${section.title} — ${actionLabel(action)} (${roleTitle(role)})`)}
-                          <span className="mt-0.5 text-[8px] font-bold text-slate-600">{actionLabel(action)}</span>
+                          <span className="mt-0.5 text-[8px] font-bold text-ink-secondary">{actionLabel(action)}</span>
                         </div>
                       );
                     })}
@@ -327,7 +327,7 @@ export const PlatformRolesPage: React.FC = () => {
               })),
               {
                 key: 'code', header: 'الرموز',
-                render: (section) => <code className="block max-w-[190px] truncate text-[8px] text-slate-600" dir="ltr">platform.{section.module}.*</code>,
+                render: (section) => <code className="block max-w-[190px] truncate text-[8px] text-ink-secondary" dir="ltr">platform.{section.module}.*</code>,
               },
             ]}
           />
@@ -335,10 +335,10 @@ export const PlatformRolesPage: React.FC = () => {
       </div>
 
       {/* ─── Matrix 2: special operations ───────────────────────────────── */}
-      <div className="overflow-hidden rounded-xl border border-slate-800 bg-slate-900/70 shadow-sm">
-        <div className="border-b border-slate-800 bg-slate-950/50 px-4 py-2.5">
-          <p className="text-xs font-black text-slate-200">العمليات الخاصة — كل عملية على حدة</p>
-          <p className="text-[9.5px] text-slate-500">تعليق عميل، إعادة تعيين كلمة المرور، نقل الصلاحيات، تغيير السياسة... لا يمكن منحها عبر المصفوفة الأساسية.</p>
+      <div className="overflow-hidden rounded-xl border border-line-strong bg-primary/70 shadow-sm">
+        <div className="border-b border-line-strong bg-primary/50 px-4 py-2.5">
+          <p className="text-xs font-black text-muted">العمليات الخاصة — كل عملية على حدة</p>
+          <p className="text-[9.5px] text-muted">تعليق عميل، إعادة تعيين كلمة المرور، نقل الصلاحيات، تغيير السياسة... لا يمكن منحها عبر المصفوفة الأساسية.</p>
         </div>
         <div className="overflow-x-auto">
           <DataTable
@@ -348,14 +348,14 @@ export const PlatformRolesPage: React.FC = () => {
             minWidth={880}
             dense
             tableClassName="text-xs"
-            rowClassName={() => 'hover:bg-slate-800/20'}
+            rowClassName={() => 'hover:bg-primary/20'}
             columns={[
               {
                 key: 'perm', header: 'العملية الخاصة',
                 render: (permission) => (
                   <span>
-                    <span className="font-semibold text-slate-300">{permission.name}</span>
-                    <span className="mr-2 text-[9px] text-slate-600">({permission.sectionTitle})</span>
+                    <span className="font-semibold text-muted">{permission.name}</span>
+                    <span className="mr-2 text-[9px] text-ink-secondary">({permission.sectionTitle})</span>
                   </span>
                 ),
               },
@@ -365,7 +365,7 @@ export const PlatformRolesPage: React.FC = () => {
               })),
               {
                 key: 'code', header: 'الرمز',
-                render: (permission) => <code className="block max-w-[220px] truncate text-[8.5px] text-slate-600" dir="ltr">{permission.code}</code>,
+                render: (permission) => <code className="block max-w-[220px] truncate text-[8.5px] text-ink-secondary" dir="ltr">{permission.code}</code>,
               },
             ]}
           />
@@ -373,12 +373,12 @@ export const PlatformRolesPage: React.FC = () => {
       </div>
 
       {!canManage && (
-        <p className="flex items-center gap-2 text-[10.5px] text-slate-600">
+        <p className="flex items-center gap-2 text-[10.5px] text-ink-secondary">
           <Lock className="h-3.5 w-3.5" /> وضع العرض فقط — تعديل المصفوفة يتطلب صلاحية platform.staff.manage_permissions.
         </p>
       )}
 
-      <p className="flex items-center gap-2 text-[10px] text-slate-600">
+      <p className="flex items-center gap-2 text-[10px] text-ink-secondary">
         <Users className="h-3.5 w-3.5" /> الصلاحيات الفعلية لأي موظف = مصفوفة دوره ∪ التجاوزات الفردية (permissions_override) — الأولوية دائماً لمنع ما ليس ممنوحاً صراحة.
       </p>
     </div>

@@ -90,11 +90,11 @@ const TENANT_STATUS_LABELS: Record<string, string> = {
 };
 
 const TENANT_STATUS_TONES: Record<string, string> = {
-  ACTIVE: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-  TRIAL: 'bg-amber-50 text-amber-700 border-amber-200',
-  SUSPENDED: 'bg-rose-50 text-rose-700 border-rose-200',
-  EXPIRED: 'bg-slate-100 text-slate-600 border-slate-200',
-  CANCELLED: 'bg-slate-100 text-slate-500 border-slate-200',
+  ACTIVE: 'bg-success-soft text-success border-success-border',
+  TRIAL: 'bg-warning-soft text-warning border-warning-border',
+  SUSPENDED: 'bg-danger-soft text-danger border-danger-border',
+  EXPIRED: 'bg-surface-sunken text-ink-secondary border-line',
+  CANCELLED: 'bg-surface-sunken text-muted border-line',
 };
 
 const SUB_STATUS_COLORS: Record<string, string> = {
@@ -114,11 +114,11 @@ const LIC_STATUS_COLORS: Record<string, string> = {
 };
 
 const AUDIT_SEVERITY_DOT: Record<string, string> = {
-  CRITICAL: 'bg-rose-500',
-  SECURITY: 'bg-rose-500',
-  WARNING: 'bg-amber-500',
-  NOTICE: 'bg-sky-500',
-  INFO: 'bg-slate-400',
+  CRITICAL: 'bg-danger',
+  SECURITY: 'bg-danger',
+  WARNING: 'bg-warning',
+  NOTICE: 'bg-primary',
+  INFO: 'bg-line-strong',
 };
 
 type Tone = 'default' | 'success' | 'warning' | 'danger' | 'info' | 'violet';
@@ -154,11 +154,11 @@ const DonutLegend: React.FC<{ segments: Array<{ label: string; value: number; co
   <ul className="mt-3 space-y-1.5">
     {segments.filter((s) => s.value > 0).map((s) => (
       <li key={s.label} className="flex items-center justify-between gap-3 text-[11px]">
-        <span className="flex items-center gap-1.5 font-semibold text-slate-600">
+        <span className="flex items-center gap-1.5 font-semibold text-ink-secondary">
           <span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: s.color }} />
           {s.label}
         </span>
-        <span className="font-black text-slate-800">{formatNumber(s.value)}</span>
+        <span className="font-black text-ink">{formatNumber(s.value)}</span>
       </li>
     ))}
   </ul>
@@ -180,15 +180,15 @@ export const PlatformSuperAdminDashboard: React.FC = () => {
 
   if (error) {
     return (
-      <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">
+      <div role="alert" className="rounded-xl border border-danger-border bg-danger-soft px-4 py-3 text-sm font-semibold text-danger">
         {error}
-        <button onClick={reload} className="ml-3 text-emerald-700 hover:underline">إعادة المحاولة</button>
+        <button onClick={reload} className="ml-3 text-success hover:underline">إعادة المحاولة</button>
       </div>
     );
   }
 
   if (loading || !data?.overview) {
-    return <div className="py-16 text-center text-sm font-semibold text-slate-500">جارٍ تحميل بيانات المنصة...</div>;
+    return <div className="py-16 text-center text-sm font-semibold text-muted">جارٍ تحميل بيانات المنصة...</div>;
   }
 
   const { overview, plans, bp, cm, sm, lm, om, ca, alerts: rawAlerts, extras } = data;
@@ -386,27 +386,27 @@ export const PlatformSuperAdminDashboard: React.FC = () => {
   return (
     <div className="space-y-5">
       {/* Header with Period Selector */}
-      <section className="overflow-hidden rounded-2xl bg-gradient-to-l from-slate-900 via-slate-800 to-emerald-900 p-5 text-white shadow-lg md:p-6">
+      <section className="overflow-hidden rounded-2xl bg-gradient-to-l from-ink via-ink to-success p-5 text-white shadow-lg md:p-6">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="min-w-0">
-            <p className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-emerald-300">
+            <p className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-success">
               <ShieldCheck className="h-4 w-4" /> لوحة مالك المنصة — تحليلات متقدمة
             </p>
             <h2 className="mt-2 text-2xl font-black">مرحباً، {overview.currentInstallation?.companyName || 'سيراميسي'}</h2>
-            <p className="mt-1 max-w-2xl text-xs leading-6 text-slate-300">
+            <p className="mt-1 max-w-2xl text-xs leading-6 text-muted">
               تحكم كامل في المنتج، عملاء المنصة، التراخيص، الاشتراكات والمبيعات — مع تحليلات مفصلة وفترات زمنية قابلة للتخصيص.
             </p>
             <div className="mt-2 flex flex-wrap items-center gap-2">
-              <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10.5px] font-bold ${isCentral ? 'bg-sky-400/20 text-sky-200' : 'bg-emerald-400/20 text-emerald-200'}`}>
-                <span className={`h-1.5 w-1.5 rounded-full ${isCentral ? 'bg-sky-300' : 'bg-emerald-300'}`} />
+              <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10.5px] font-bold ${isCentral ? 'bg-primary/20 text-primary' : 'bg-success/20 text-success'}`}>
+                <span className={`h-1.5 w-1.5 rounded-full ${isCentral ? 'bg-accent-border' : 'bg-success'}`} />
                 {isCentral ? 'الخادم المركزي' : 'البيانات المحلية'}
               </span>
               {latestReleaseRaw && (
-                <span className="inline-flex flex-wrap items-center gap-2 rounded-lg bg-white/10 px-2.5 py-1 text-[10.5px] font-semibold text-slate-200">
-                  <Rocket className="h-3.5 w-3.5 text-emerald-300" />
+                <span className="inline-flex flex-wrap items-center gap-2 rounded-lg bg-surface/10 px-2.5 py-1 text-[10.5px] font-semibold text-muted">
+                  <Rocket className="h-3.5 w-3.5 text-success" />
                   آخر إصدار: <span dir="ltr" className="font-mono">v{latestReleaseRaw.version}</span>
-                  {latestReleaseChannel && <span className="rounded-full bg-emerald-400/20 px-2 py-0.5 text-emerald-200">{latestReleaseChannel}</span>}
-                  <span className="text-slate-400">· {formatDate(latestReleaseDate)}</span>
+                  {latestReleaseChannel && <span className="rounded-full bg-success/20 px-2 py-0.5 text-success">{latestReleaseChannel}</span>}
+                  <span className="text-muted">· {formatDate(latestReleaseDate)}</span>
                 </span>
               )}
             </div>
@@ -418,7 +418,7 @@ export const PlatformSuperAdminDashboard: React.FC = () => {
               onChange={(e) => setPlanFilter(e.target.value)}
               disabled={isCentral}
               title={isCentral ? 'تصفية الخطط غير مدعومة في الوضع المركزي' : undefined}
-              className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[12px] font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/40 w-auto min-w-[180px] disabled:opacity-50"
+              className="rounded-lg border border-line bg-surface px-3 py-1.5 text-[12px] font-medium text-ink focus:outline-none focus:ring-2 focus:ring-success/40 w-auto min-w-[180px] disabled:opacity-50"
               aria-label="تصفية حسب الخطة"
             >
               <option value="">كل الخطط</option>
@@ -429,14 +429,14 @@ export const PlatformSuperAdminDashboard: React.FC = () => {
               ))}
             </select>
             {lastUpdated && (
-              <span className="text-[10px] text-slate-400">
+              <span className="text-[10px] text-muted">
                 آخر تحديث: {lastUpdated.toLocaleTimeString('ar-EG')}
               </span>
             )}
             <button
               onClick={reload}
               disabled={loading}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-[11.5px] font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 transition"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-success px-3 py-1.5 text-[11.5px] font-semibold text-white hover:bg-success disabled:opacity-50 transition"
             >
               <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} aria-hidden="true" />
               تحديث
@@ -494,70 +494,70 @@ export const PlatformSuperAdminDashboard: React.FC = () => {
             hint: 'معالج خطوة بخطوة',
             href: '/platform/tenants?new=1',
             icon: <UserPlus className="h-5 w-5" />,
-            chip: 'bg-emerald-50 text-emerald-600',
+            chip: 'bg-success-soft text-success',
           },
           {
             label: 'إنشاء فاتورة',
             hint: 'الفوترة والمدفوعات',
             href: '/platform/billing',
             icon: <ReceiptText className="h-5 w-5" />,
-            chip: 'bg-sky-50 text-sky-600',
+            chip: 'bg-accent-soft text-primary',
           },
           {
             label: 'إدارة الاشتراكات',
             hint: 'تجديدات وتجارب',
             href: '/platform/subscriptions',
             icon: <CalendarClock className="h-5 w-5" />,
-            chip: 'bg-violet-50 text-violet-600',
+            chip: 'bg-accent-soft text-primary',
           },
           {
             label: 'الخطط والاشتراكات',
             hint: 'الباقات والأسعار والحدود',
             href: '/platform/plans',
             icon: <CreditCard className="h-5 w-5" />,
-            chip: 'bg-indigo-50 text-indigo-600',
+            chip: 'bg-accent-soft text-primary',
           },
           {
             label: 'الأجهزة والمزامنة',
             hint: 'الأجهزة المرتبطة والمزامنة',
             href: '/platform/devices',
             icon: <MonitorSmartphone className="h-5 w-5" />,
-            chip: 'bg-teal-50 text-teal-600',
+            chip: 'bg-success-soft text-success',
           },
           {
             label: 'مراقبة المزامنة',
             hint: 'أحداث المزامنة الفاشلة',
             href: '/platform/sync',
             icon: <Activity className="h-5 w-5" />,
-            chip: 'bg-cyan-50 text-cyan-600',
+            chip: 'bg-accent-soft text-primary',
           },
           {
             label: 'سجل التدقيق',
             hint: 'سجل الأحداث والأمان',
             href: '/platform/audit',
             icon: <ScrollText className="h-5 w-5" />,
-            chip: 'bg-slate-100 text-slate-600',
+            chip: 'bg-surface-sunken text-ink-secondary',
           },
           {
             label: 'مركز الطوارئ',
             hint: alerts.length > 0 ? `${alerts.length} تنبيه نشط` : 'كل الأنظمة سليمة',
             href: '/platform/emergency',
             icon: <ShieldAlert className="h-5 w-5" />,
-            chip: alerts.length > 0 ? 'bg-rose-50 text-rose-600' : 'bg-slate-100 text-slate-500',
+            chip: alerts.length > 0 ? 'bg-danger-soft text-danger' : 'bg-surface-sunken text-muted',
           },
         ].map((action) => (
           <button
             key={action.label}
             type="button"
             onClick={() => go(action.href)}
-            className="group flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-4 text-right shadow-sm transition hover:border-emerald-300 hover:shadow"
+            className="group flex items-center gap-3 rounded-xl border border-line bg-surface p-4 text-right shadow-sm transition hover:border-success hover:shadow"
           >
             <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${action.chip}`}>{action.icon}</span>
             <span className="min-w-0">
-              <span className="block text-[13px] font-bold text-slate-800 group-hover:text-emerald-700">{action.label}</span>
-              <span className="block truncate text-[10.5px] text-slate-500">{action.hint}</span>
+              <span className="block text-[13px] font-bold text-ink group-hover:text-success">{action.label}</span>
+              <span className="block truncate text-[10.5px] text-muted">{action.hint}</span>
             </span>
-            <Plus className="mr-auto h-4 w-4 text-slate-300 transition group-hover:text-emerald-500" />
+            <Plus className="mr-auto h-4 w-4 text-muted transition group-hover:text-success" />
           </button>
         ))}
       </section>
@@ -567,7 +567,7 @@ export const PlatformSuperAdminDashboard: React.FC = () => {
         title="حالة العملاء"
         subtitle="توزيع العملاء حسب الحالة — اضغط على أي حالة لعرضها في صفحة العملاء"
         icon={<Users className="h-4 w-4" />}
-        iconClass="bg-sky-50 text-sky-600"
+        iconClass="bg-accent-soft text-primary"
         action={
           <DrillDownLink label="كل العملاء" href="/platform/tenants" icon={<ExternalLink className="h-3.5 w-3.5" />} />
         }
@@ -593,13 +593,13 @@ export const PlatformSuperAdminDashboard: React.FC = () => {
           <button
             type="button"
             onClick={() => go('/platform/subscriptions')}
-            className="flex items-center justify-between rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-right transition hover:shadow-sm"
+            className="flex items-center justify-between rounded-xl border border-warning-border bg-warning-soft px-4 py-3 text-right transition hover:shadow-sm"
           >
             <div>
-              <p className="text-[11px] font-semibold text-amber-700">اشتراك ينتهي قريباً</p>
-              <p className="mt-0.5 text-[20px] font-black leading-tight text-amber-800">{formatNumber(overview.tenants?.expiringSoon ?? 0)}</p>
+              <p className="text-[11px] font-semibold text-warning">اشتراك ينتهي قريباً</p>
+              <p className="mt-0.5 text-[20px] font-black leading-tight text-warning">{formatNumber(overview.tenants?.expiringSoon ?? 0)}</p>
             </div>
-            <span className="rounded-full border border-amber-200 bg-white px-2 py-0.5 text-[10px] font-bold text-amber-700">30 يوم</span>
+            <span className="rounded-full border border-warning-border bg-surface px-2 py-0.5 text-[10px] font-bold text-warning">30 يوم</span>
           </button>
         </div>
       </Panel>
@@ -609,7 +609,7 @@ export const PlatformSuperAdminDashboard: React.FC = () => {
         title="توزيع الحالات"
         subtitle="الاشتراكات والتراخيص مجمّعة حسب الحالة — تمثيل مرئي"
         icon={<PieChart className="h-4 w-4" />}
-        iconClass="bg-violet-50 text-violet-600"
+        iconClass="bg-accent-soft text-primary"
       >
         <div className="grid gap-6 sm:grid-cols-2">
           <div className="flex flex-col items-center">
@@ -620,7 +620,7 @@ export const PlatformSuperAdminDashboard: React.FC = () => {
               centerLabel="اشتراك"
               aria-label="توزيع الاشتراكات حسب الحالة"
             />
-            <p className="mt-2 text-[12px] font-bold text-slate-700">الاشتراكات حسب الحالة</p>
+            <p className="mt-2 text-[12px] font-bold text-ink">الاشتراكات حسب الحالة</p>
             <DonutLegend segments={subSegs} />
           </div>
           <div className="flex flex-col items-center">
@@ -631,7 +631,7 @@ export const PlatformSuperAdminDashboard: React.FC = () => {
               centerLabel="ترخيص"
               aria-label="توزيع التراخيص حسب الحالة"
             />
-            <p className="mt-2 text-[12px] font-bold text-slate-700">التراخيص حسب الحالة</p>
+            <p className="mt-2 text-[12px] font-bold text-ink">التراخيص حسب الحالة</p>
             <DonutLegend segments={licSegs} />
           </div>
         </div>
@@ -642,7 +642,7 @@ export const PlatformSuperAdminDashboard: React.FC = () => {
         title="الأداء التجاري"
         subtitle={`مقارنة ${periodLabel(period)} مع الفترة السابقة`}
         icon={<BarChart2 className="h-4 w-4" />}
-        iconClass="bg-emerald-50 text-emerald-600"
+        iconClass="bg-success-soft text-success"
         action={
           <DrillDownLink label="التحليلات" href="/platform/analytics" icon={<ExternalLink className="h-3.5 w-3.5" />} />
         }
@@ -668,7 +668,7 @@ export const PlatformSuperAdminDashboard: React.FC = () => {
         title="العملاء"
         subtitle={`جديد، نشط، ملغي، ومعدل الفقد (Churn Rate) — ${periodLabel(period)}`}
         icon={<Users className="h-4 w-4" />}
-        iconClass="bg-sky-50 text-sky-600"
+        iconClass="bg-accent-soft text-primary"
         action={
           <>
             <DrillDownLink label="العملاء" href="/platform/tenants" icon={<ExternalLink className="h-3.5 w-3.5" />} />
@@ -692,7 +692,7 @@ export const PlatformSuperAdminDashboard: React.FC = () => {
               <div className="mt-4 grid gap-4 xl:grid-cols-2">
                 {topCustomerItems.length > 0 && (
                   <div>
-                    <h4 className="mb-2 text-sm font-bold text-slate-700">أعلى العملاء إيراداً</h4>
+                    <h4 className="mb-2 text-sm font-bold text-ink">أعلى العملاء إيراداً</h4>
                     <div className="overflow-x-auto">
                       <DataTable
                         ariaLabel="أعلى العملاء إيراداً"
@@ -701,11 +701,11 @@ export const PlatformSuperAdminDashboard: React.FC = () => {
                         onRowClick={() => go('/platform/tenants')}
                         tableClassName="text-sm"
                         columns={[
-                          { key: 'name', header: 'العميل', render: (cust) => <span className="text-[12px] font-semibold text-slate-700">{cust.name}</span> },
-                          { key: 'code', header: 'الكود', render: (cust) => <span className="text-[11px] text-slate-500 font-mono">{cust.code}</span> },
+                          { key: 'name', header: 'العميل', render: (cust) => <span className="text-[12px] font-semibold text-ink">{cust.name}</span> },
+                          { key: 'code', header: 'الكود', render: (cust) => <span className="text-[11px] text-muted font-mono">{cust.code}</span> },
                           { key: 'status', header: 'الحالة', render: (cust) => <StatusBadge value={cust.status} /> },
-                          { key: 'revenue', header: 'الإيراد', render: (cust) => <span className="text-[12px] font-bold text-emerald-700">{formatMoney(cust.revenue)}</span> },
-                          { key: 'invoices', header: 'الفواتير', render: (cust) => <span className="text-[11px] text-slate-500">{cust.invoicesCount}</span> },
+                          { key: 'revenue', header: 'الإيراد', render: (cust) => <span className="text-[12px] font-bold text-success">{formatMoney(cust.revenue)}</span> },
+                          { key: 'invoices', header: 'الفواتير', render: (cust) => <span className="text-[11px] text-muted">{cust.invoicesCount}</span> },
                         ]}
                       />
                     </div>
@@ -713,17 +713,17 @@ export const PlatformSuperAdminDashboard: React.FC = () => {
                 )}
                 {cancelledCustomerItems.length > 0 && (
                   <div>
-                    <h4 className="mb-2 text-sm font-bold text-slate-700">عملاء ألغوا حديثاً</h4>
-                    <ul className="divide-y divide-slate-100 max-h-64 overflow-y-auto rounded-lg border border-slate-100">
+                    <h4 className="mb-2 text-sm font-bold text-ink">عملاء ألغوا حديثاً</h4>
+                    <ul className="divide-y divide-line-strong max-h-64 overflow-y-auto rounded-lg border border-line">
                       {cancelledCustomerItems.slice(0, 8).map((t) => (
-                        <li key={t.id} className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-slate-50 cursor-pointer" onClick={() => go('/platform/tenants')}>
+                        <li key={t.id} className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-surface-muted cursor-pointer" onClick={() => go('/platform/tenants')}>
                           <div className="min-w-0">
-                            <p className="truncate text-[12.5px] font-bold text-slate-800">{t.name}</p>
-                            <p className="text-[10.5px] text-slate-500"><span dir="ltr" className="font-mono">{t.code}</span>{t.planName ? ` · ${t.planName}` : ''}</p>
+                            <p className="truncate text-[12.5px] font-bold text-ink">{t.name}</p>
+                            <p className="text-[10.5px] text-muted"><span dir="ltr" className="font-mono">{t.code}</span>{t.planName ? ` · ${t.planName}` : ''}</p>
                           </div>
                           <div className="shrink-0 text-left">
                             <StatusBadge value={t.status} />
-                            <p className="mt-1 text-[10px] text-slate-500">{formatDate(t.updatedAt)}</p>
+                            <p className="mt-1 text-[10px] text-muted">{formatDate(t.updatedAt)}</p>
                           </div>
                         </li>
                       ))}
@@ -741,18 +741,18 @@ export const PlatformSuperAdminDashboard: React.FC = () => {
         title="أحدث العملاء المسجلين"
         subtitle="آخر العملاء الذين انضموا إلى المنصة"
         icon={<UserPlus className="h-4 w-4" />}
-        iconClass="bg-emerald-50 text-emerald-600"
+        iconClass="bg-success-soft text-success"
         action={
           <DrillDownLink label="كل العملاء" href="/platform/tenants" icon={<ExternalLink className="h-3.5 w-3.5" />} />
         }
       >
         {Array.isArray(overview.recentTenants) && overview.recentTenants.length > 0 ? (
-          <ul className="divide-y divide-slate-100">
+          <ul className="divide-y divide-line-strong">
             {overview.recentTenants.slice(0, 8).map((tenant) => (
-              <li key={tenant.id} className="flex items-center justify-between gap-3 px-2 py-3 hover:bg-slate-50 cursor-pointer" onClick={() => go('/platform/tenants')}>
+              <li key={tenant.id} className="flex items-center justify-between gap-3 px-2 py-3 hover:bg-surface-muted cursor-pointer" onClick={() => go('/platform/tenants')}>
                 <div className="min-w-0">
-                  <p className="truncate text-[12.5px] font-bold text-slate-800">{tenant.name}</p>
-                  <p className="text-[10.5px] text-slate-500">
+                  <p className="truncate text-[12.5px] font-bold text-ink">{tenant.name}</p>
+                  <p className="text-[10.5px] text-muted">
                     <span dir="ltr" className="font-mono">{tenant.code}</span>
                     {tenant.planName ? ` · ${tenant.planName}` : ''}
                     {tenant.businessType ? ` · ${tenant.businessType}` : ''}
@@ -761,7 +761,7 @@ export const PlatformSuperAdminDashboard: React.FC = () => {
                 <div className="flex shrink-0 items-center gap-3 text-left">
                   <div>
                     <StatusBadge value={tenant.status} />
-                    <p className="mt-1 text-[10px] text-slate-500">{formatDate(tenant.createdAt)}</p>
+                    <p className="mt-1 text-[10px] text-muted">{formatDate(tenant.createdAt)}</p>
                   </div>
                 </div>
               </li>
@@ -777,7 +777,7 @@ export const PlatformSuperAdminDashboard: React.FC = () => {
         title="الاشتراكات"
         subtitle={`تجارب منتهية، تجديدات قادمة، اشتراكات متعثرة — ${periodLabel(period)}`}
         icon={<CalendarClock className="h-4 w-4" />}
-        iconClass="bg-violet-50 text-violet-600"
+        iconClass="bg-accent-soft text-primary"
         action={
           <>
             <DrillDownLink label="الاشتراكات" href="/platform/subscriptions" icon={<ExternalLink className="h-3.5 w-3.5" />} />
@@ -791,18 +791,18 @@ export const PlatformSuperAdminDashboard: React.FC = () => {
             {(renewalItems.length > 0 || strugglingItems.length > 0) && (
               <div className="grid gap-4 xl:grid-cols-2">
                 <div>
-                  <h4 className="mb-2 text-sm font-bold text-slate-700">التجديدات القادمة (30 يوم)</h4>
+                  <h4 className="mb-2 text-sm font-bold text-ink">التجديدات القادمة (30 يوم)</h4>
                   {renewalItems.length > 0 ? (
-                    <ul className="divide-y divide-slate-100 max-h-64 overflow-y-auto rounded-lg border border-slate-100">
+                    <ul className="divide-y divide-line-strong max-h-64 overflow-y-auto rounded-lg border border-line">
                       {renewalItems.slice(0, 10).map((sub) => (
-                        <li key={sub.id} className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-slate-50 cursor-pointer" onClick={() => go('/platform/tenants')}>
+                        <li key={sub.id} className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-surface-muted cursor-pointer" onClick={() => go('/platform/tenants')}>
                           <div className="min-w-0">
-                            <p className="truncate text-[12.5px] font-bold text-slate-800">{sub.tenantName}</p>
-                            <p className="text-[10.5px] text-slate-500">{sub.tenantCode} · {sub.planName}</p>
+                            <p className="truncate text-[12.5px] font-bold text-ink">{sub.tenantName}</p>
+                            <p className="text-[10.5px] text-muted">{sub.tenantCode} · {sub.planName}</p>
                           </div>
                           <div className="shrink-0 text-left">
                             <StatusBadge value={sub.status} />
-                            <p className="mt-1 text-[10px] text-slate-500">{formatDate(sub.endDate)} · {formatMoney(sub.price)}</p>
+                            <p className="mt-1 text-[10px] text-muted">{formatDate(sub.endDate)} · {formatMoney(sub.price)}</p>
                           </div>
                         </li>
                       ))}
@@ -812,18 +812,18 @@ export const PlatformSuperAdminDashboard: React.FC = () => {
                   )}
                 </div>
                 <div>
-                  <h4 className="mb-2 text-sm font-bold text-slate-700">الاشتراكات المتعثرة (PAST_DUE)</h4>
+                  <h4 className="mb-2 text-sm font-bold text-ink">الاشتراكات المتعثرة (PAST_DUE)</h4>
                   {strugglingItems.length > 0 ? (
-                    <ul className="divide-y divide-slate-100 max-h-64 overflow-y-auto rounded-lg border border-slate-100">
+                    <ul className="divide-y divide-line-strong max-h-64 overflow-y-auto rounded-lg border border-line">
                       {strugglingItems.slice(0, 10).map((sub) => (
-                        <li key={sub.id} className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-slate-50 cursor-pointer" onClick={() => go('/platform/tenants')}>
+                        <li key={sub.id} className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-surface-muted cursor-pointer" onClick={() => go('/platform/tenants')}>
                           <div className="min-w-0">
-                            <p className="truncate text-[12.5px] font-bold text-slate-800">{sub.tenantName || '—'}</p>
-                            <p className="text-[10.5px] text-slate-500">{sub.planName || '—'} · {formatMoney(sub.price)}</p>
+                            <p className="truncate text-[12.5px] font-bold text-ink">{sub.tenantName || '—'}</p>
+                            <p className="text-[10.5px] text-muted">{sub.planName || '—'} · {formatMoney(sub.price)}</p>
                           </div>
                           <div className="shrink-0 text-left">
                             <StatusBadge value={sub.status} />
-                            <p className="mt-1 text-[10px] text-slate-500">ينتهي: {formatDate(sub.endDate)}</p>
+                            <p className="mt-1 text-[10px] text-muted">ينتهي: {formatDate(sub.endDate)}</p>
                           </div>
                         </li>
                       ))}
@@ -843,7 +843,7 @@ export const PlatformSuperAdminDashboard: React.FC = () => {
         title="التراخيص"
         subtitle={`أجهزة مفعلة، استخدام، تراخيص معلقة، محاولات فاشلة — ${periodLabel(period)}`}
         icon={<KeyRound className="h-4 w-4" />}
-        iconClass="bg-amber-50 text-amber-600"
+        iconClass="bg-warning-soft text-warning"
         action={
           <>
             <DrillDownLink label="التراخيص" href="/platform/licenses" icon={<ExternalLink className="h-3.5 w-3.5" />} />
@@ -857,18 +857,18 @@ export const PlatformSuperAdminDashboard: React.FC = () => {
             {(failedActivationItems.length > 0 || pendingLicenseItems.length > 0) && (
               <div className="grid gap-4 xl:grid-cols-2">
                 <div>
-                  <h4 className="mb-2 text-sm font-bold text-slate-700">محاولات التفعيل الفاشلة (الأخيرة)</h4>
+                  <h4 className="mb-2 text-sm font-bold text-ink">محاولات التفعيل الفاشلة (الأخيرة)</h4>
                   {failedActivationItems.length > 0 ? (
-                    <ul className="divide-y divide-slate-100 max-h-64 overflow-y-auto rounded-lg border border-slate-100">
+                    <ul className="divide-y divide-line-strong max-h-64 overflow-y-auto rounded-lg border border-line">
                       {failedActivationItems.slice(0, 10).map((act) => (
-                        <li key={act.id} className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-slate-50">
+                        <li key={act.id} className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-surface-muted">
                           <div className="min-w-0">
-                            <p className="truncate text-[12px] font-bold text-slate-800">{act.tenantName || '—'}</p>
-                            <p className="text-[10px] text-slate-500 font-mono">{act.licenseKey || act.licenseId}</p>
+                            <p className="truncate text-[12px] font-bold text-ink">{act.tenantName || '—'}</p>
+                            <p className="text-[10px] text-muted font-mono">{act.licenseKey || act.licenseId}</p>
                           </div>
                           <div className="shrink-0 text-left">
                             <StatusBadge value={act.status} />
-                            <p className="mt-1 text-[10px] text-slate-500">{formatDateTime(act.createdAt)}</p>
+                            <p className="mt-1 text-[10px] text-muted">{formatDateTime(act.createdAt)}</p>
                           </div>
                         </li>
                       ))}
@@ -878,18 +878,18 @@ export const PlatformSuperAdminDashboard: React.FC = () => {
                   )}
                 </div>
                 <div>
-                  <h4 className="mb-2 text-sm font-bold text-slate-700">التراخيص المعلقة (ISSUED)</h4>
+                  <h4 className="mb-2 text-sm font-bold text-ink">التراخيص المعلقة (ISSUED)</h4>
                   {pendingLicenseItems.length > 0 ? (
-                    <ul className="divide-y divide-slate-100 max-h-64 overflow-y-auto rounded-lg border border-slate-100">
+                    <ul className="divide-y divide-line-strong max-h-64 overflow-y-auto rounded-lg border border-line">
                       {pendingLicenseItems.slice(0, 10).map((lic) => (
-                        <li key={lic.id} className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-slate-50 cursor-pointer" onClick={() => go('/platform/licenses')}>
+                        <li key={lic.id} className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-surface-muted cursor-pointer" onClick={() => go('/platform/licenses')}>
                           <div className="min-w-0">
-                            <p className="truncate text-[12px] font-bold text-slate-800">{lic.tenantName || '—'}</p>
-                            <p className="text-[10px] text-slate-500 font-mono">{lic.licenseKey}</p>
+                            <p className="truncate text-[12px] font-bold text-ink">{lic.tenantName || '—'}</p>
+                            <p className="text-[10px] text-muted font-mono">{lic.licenseKey}</p>
                           </div>
                           <div className="shrink-0 text-left">
                             <StatusBadge value={lic.status} />
-                            <p className="mt-1 text-[10px] text-slate-500">{lic.planName || '—'}</p>
+                            <p className="mt-1 text-[10px] text-muted">{lic.planName || '—'}</p>
                           </div>
                         </li>
                       ))}
@@ -909,7 +909,7 @@ export const PlatformSuperAdminDashboard: React.FC = () => {
         title="التشغيل"
         subtitle={`أجهزة متصلة/غير متصلة، أخطاء مزامنة، صحة المزامنة — ${periodLabel(period)}`}
         icon={<Server className="h-4 w-4" />}
-        iconClass="bg-slate-100 text-slate-600"
+        iconClass="bg-surface-sunken text-ink-secondary"
         action={
           <>
             <DrillDownLink label="الأجهزة" href="/platform/devices" icon={<ExternalLink className="h-3.5 w-3.5" />} />
@@ -956,18 +956,18 @@ export const PlatformSuperAdminDashboard: React.FC = () => {
             {(syncErrorItems.length > 0 || endpointHealthItems.length > 0) && (
               <div className="grid gap-4 xl:grid-cols-2">
                 <div>
-                  <h4 className="mb-2 text-sm font-bold text-slate-700">أخطاء المزامنة الأخيرة</h4>
+                  <h4 className="mb-2 text-sm font-bold text-ink">أخطاء المزامنة الأخيرة</h4>
                   {syncErrorItems.length > 0 ? (
-                    <ul className="divide-y divide-slate-100 max-h-64 overflow-y-auto rounded-lg border border-slate-100">
+                    <ul className="divide-y divide-line-strong max-h-64 overflow-y-auto rounded-lg border border-line">
                       {syncErrorItems.slice(0, 10).map((err) => (
-                        <li key={err.id} className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-slate-50">
+                        <li key={err.id} className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-surface-muted">
                           <div className="min-w-0">
-                            <p className="truncate text-[12px] font-bold text-slate-800">{err.deviceName}</p>
-                            <p className="text-[10px] text-slate-500">{err.tenantName} · {err.deviceId}</p>
+                            <p className="truncate text-[12px] font-bold text-ink">{err.deviceName}</p>
+                            <p className="text-[10px] text-muted">{err.tenantName} · {err.deviceId}</p>
                           </div>
                           <div className="shrink-0 text-left">
                             <StatusBadge value="FAILED" label="فشل" />
-                            <p className="mt-1 text-[10px] text-slate-500">{formatDateTime(err.occurredAt)}</p>
+                            <p className="mt-1 text-[10px] text-muted">{formatDateTime(err.occurredAt)}</p>
                           </div>
                         </li>
                       ))}
@@ -977,21 +977,21 @@ export const PlatformSuperAdminDashboard: React.FC = () => {
                   )}
                 </div>
                 <div>
-                  <h4 className="mb-2 text-sm font-bold text-slate-700">صحة نقاط API</h4>
+                  <h4 className="mb-2 text-sm font-bold text-ink">صحة نقاط API</h4>
                   {endpointHealthItems.length > 0 ? (
-                    <ul className="divide-y divide-slate-100 rounded-lg border border-slate-100">
+                    <ul className="divide-y divide-line-strong rounded-lg border border-line">
                       {endpointHealthItems.map((ep) => (
-                        <li key={ep.endpoint} className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-slate-50">
+                        <li key={ep.endpoint} className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-surface-muted">
                           <div className="min-w-0">
-                            <p className="truncate text-[11px] font-mono text-slate-700">{ep.endpoint}</p>
-                            <p className="text-[10px] text-slate-500">{ep.requests.toLocaleString('ar-EG')} طلب · {ep.avgResponseMs}ms متوسط</p>
+                            <p className="truncate text-[11px] font-mono text-ink">{ep.endpoint}</p>
+                            <p className="text-[10px] text-muted">{ep.requests.toLocaleString('ar-EG')} طلب · {ep.avgResponseMs}ms متوسط</p>
                           </div>
                           <div className="shrink-0 text-left">
                             <div className="flex items-center gap-1">
-                              <span className={`inline-flex h-2 w-2 rounded-full ${ep.successRate >= 99 ? 'bg-emerald-500' : ep.successRate >= 95 ? 'bg-amber-500' : 'bg-rose-500'}`} />
-                              <span className="text-[11px] font-bold text-slate-700">{ep.successRate.toFixed(1)}%</span>
+                              <span className={`inline-flex h-2 w-2 rounded-full ${ep.successRate >= 99 ? 'bg-success' : ep.successRate >= 95 ? 'bg-warning' : 'bg-danger'}`} />
+                              <span className="text-[11px] font-bold text-ink">{ep.successRate.toFixed(1)}%</span>
                             </div>
-                            <p className="mt-1 text-[10px] text-slate-500">{ep.errors} خطأ</p>
+                            <p className="mt-1 text-[10px] text-muted">{ep.errors} خطأ</p>
                           </div>
                         </li>
                       ))}
@@ -1011,7 +1011,7 @@ export const PlatformSuperAdminDashboard: React.FC = () => {
         title="تنتهي صلاحيتها قريباً"
         subtitle="اشتراكات وتراخيص ستنتهي خلال 30 يوماً — رتّب أولويات التجديد"
         icon={<AlertTriangle className="h-4 w-4" />}
-        iconClass="bg-amber-50 text-amber-600"
+        iconClass="bg-warning-soft text-warning"
         action={
           <>
             <DrillDownLink label="الاشتراكات" href="/platform/subscriptions" icon={<ExternalLink className="h-3.5 w-3.5" />} />
@@ -1020,24 +1020,24 @@ export const PlatformSuperAdminDashboard: React.FC = () => {
         }
       >
         {expiringSubItems.length === 0 && expiringLicenseItems.length === 0 ? (
-          <div className="flex items-center gap-2 px-4 py-5 text-[12px] font-semibold text-emerald-700">
+          <div className="flex items-center gap-2 px-4 py-5 text-[12px] font-semibold text-success">
             <CheckCircle2 className="h-4 w-4" /> لا توجد اشتراكات أو تراخيص على وشك الانتهاء.
           </div>
         ) : (
           <div className="grid gap-4 xl:grid-cols-2">
             <div>
-              <h4 className="mb-2 text-sm font-bold text-slate-700">اشتراكات ({expiringSubItems.length})</h4>
+              <h4 className="mb-2 text-sm font-bold text-ink">اشتراكات ({expiringSubItems.length})</h4>
               {expiringSubItems.length > 0 ? (
-                <ul className="divide-y divide-slate-100 max-h-64 overflow-y-auto rounded-lg border border-slate-100">
+                <ul className="divide-y divide-line-strong max-h-64 overflow-y-auto rounded-lg border border-line">
                   {expiringSubItems.slice(0, 10).map((sub) => (
-                    <li key={sub.id} className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-slate-50 cursor-pointer" onClick={() => go('/platform/subscriptions')}>
+                    <li key={sub.id} className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-surface-muted cursor-pointer" onClick={() => go('/platform/subscriptions')}>
                       <div className="min-w-0">
-                        <p className="truncate text-[12.5px] font-bold text-slate-800">{sub.tenantName || '—'}</p>
-                        <p className="text-[10.5px] text-slate-500">{sub.planName || '—'} · {formatMoney(sub.price)}</p>
+                        <p className="truncate text-[12.5px] font-bold text-ink">{sub.tenantName || '—'}</p>
+                        <p className="text-[10.5px] text-muted">{sub.planName || '—'} · {formatMoney(sub.price)}</p>
                       </div>
                       <div className="shrink-0 text-left">
                         <StatusBadge value={sub.status} />
-                        <p className="mt-1 text-[10px] font-semibold text-amber-700">ينتهي: {formatDate(sub.endDate)}</p>
+                        <p className="mt-1 text-[10px] font-semibold text-warning">ينتهي: {formatDate(sub.endDate)}</p>
                       </div>
                     </li>
                   ))}
@@ -1047,18 +1047,18 @@ export const PlatformSuperAdminDashboard: React.FC = () => {
               )}
             </div>
             <div>
-              <h4 className="mb-2 text-sm font-bold text-slate-700">تراخيص ({expiringLicenseItems.length})</h4>
+              <h4 className="mb-2 text-sm font-bold text-ink">تراخيص ({expiringLicenseItems.length})</h4>
               {expiringLicenseItems.length > 0 ? (
-                <ul className="divide-y divide-slate-100 max-h-64 overflow-y-auto rounded-lg border border-slate-100">
+                <ul className="divide-y divide-line-strong max-h-64 overflow-y-auto rounded-lg border border-line">
                   {expiringLicenseItems.slice(0, 10).map((lic) => (
-                    <li key={lic.id} className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-slate-50 cursor-pointer" onClick={() => go('/platform/licenses')}>
+                    <li key={lic.id} className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-surface-muted cursor-pointer" onClick={() => go('/platform/licenses')}>
                       <div className="min-w-0">
-                        <p className="truncate text-[12px] font-bold text-slate-800">{lic.tenantName || '—'}</p>
-                        <p className="text-[10px] text-slate-500 font-mono">{lic.licenseKey}</p>
+                        <p className="truncate text-[12px] font-bold text-ink">{lic.tenantName || '—'}</p>
+                        <p className="text-[10px] text-muted font-mono">{lic.licenseKey}</p>
                       </div>
                       <div className="shrink-0 text-left">
                         <StatusBadge value={lic.status} />
-                        <p className="mt-1 text-[10px] font-semibold text-amber-700">ينتهي: {formatDate(lic.expiresAt)}</p>
+                        <p className="mt-1 text-[10px] font-semibold text-warning">ينتهي: {formatDate(lic.expiresAt)}</p>
                       </div>
                     </li>
                   ))}
@@ -1076,7 +1076,7 @@ export const PlatformSuperAdminDashboard: React.FC = () => {
         title="الإيراد حسب الخطة"
         subtitle="إجمالي الاشتراكات النشطة مجمّعة حسب خطة الاشتراك"
         icon={<Wallet className="h-4 w-4" />}
-        iconClass="bg-emerald-50 text-emerald-600"
+        iconClass="bg-success-soft text-success"
         action={
           <DrillDownLink label="الخطط" href="/platform/plans" icon={<ExternalLink className="h-3.5 w-3.5" />} />
         }
@@ -1089,9 +1089,9 @@ export const PlatformSuperAdminDashboard: React.FC = () => {
             rowKey={(r) => `${r.planName}-${r.__i}`}
             tableClassName="text-sm"
             columns={[
-              { key: 'plan', header: 'الخطة', render: (r) => <span className="text-[12px] font-semibold text-slate-700">{r.planName}</span> },
-              { key: 'tenants', header: 'العملاء', render: (r) => <span className="text-[11px] text-slate-500">{r.tenants}</span> },
-              { key: 'revenue', header: 'الإيراد', render: (r) => <span className="text-[12px] font-bold text-emerald-700">{formatMoney(r.revenue)}</span> },
+              { key: 'plan', header: 'الخطة', render: (r) => <span className="text-[12px] font-semibold text-ink">{r.planName}</span> },
+              { key: 'tenants', header: 'العملاء', render: (r) => <span className="text-[11px] text-muted">{r.tenants}</span> },
+              { key: 'revenue', header: 'الإيراد', render: (r) => <span className="text-[12px] font-bold text-success">{formatMoney(r.revenue)}</span> },
             ]}
           />
           </div>
@@ -1105,7 +1105,7 @@ export const PlatformSuperAdminDashboard: React.FC = () => {
         title="نظرة على الباقات"
         subtitle="خطط الاشتراك المعتمدة — الأسعار والحدود وعدد المشتركين"
         icon={<CreditCard className="h-4 w-4" />}
-        iconClass="bg-indigo-50 text-indigo-600"
+        iconClass="bg-accent-soft text-primary"
         action={
           <DrillDownLink label="إدارة الباقات" href="/platform/plans" icon={<ExternalLink className="h-3.5 w-3.5" />} />
         }
@@ -1119,38 +1119,38 @@ export const PlatformSuperAdminDashboard: React.FC = () => {
                 key={plan.id}
                 type="button"
                 onClick={() => go('/platform/plans')}
-                className="group rounded-xl border border-slate-200 bg-white p-4 text-right shadow-sm transition hover:border-indigo-300 hover:shadow"
+                className="group rounded-xl border border-line bg-surface p-4 text-right shadow-sm transition hover:border-accent-border hover:shadow"
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <p className="flex flex-wrap items-center gap-1.5 text-[12.5px] font-black text-slate-800">
+                    <p className="flex flex-wrap items-center gap-1.5 text-[12.5px] font-black text-ink">
                       {plan.name}
-                      <span className="font-mono text-[9.5px] font-normal text-slate-400" dir="ltr">{plan.code}</span>
+                      <span className="font-mono text-[9.5px] font-normal text-muted" dir="ltr">{plan.code}</span>
                     </p>
-                    <p className="mt-0.5 text-[15px] font-black text-emerald-700">{formatMoney(plan.price, plan.currency)}</p>
+                    <p className="mt-0.5 text-[15px] font-black text-success">{formatMoney(plan.price, plan.currency)}</p>
                   </div>
                   <div className="flex shrink-0 flex-col items-end gap-1">
                     {plan.isDefault && (
-                      <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[9.5px] font-bold text-amber-700">افتراضية</span>
+                      <span className="rounded-full border border-warning-border bg-warning-soft px-2 py-0.5 text-[9.5px] font-bold text-warning">افتراضية</span>
                     )}
                     <StatusBadge value={plan.isActive ? 'ACTIVE' : 'CANCELLED'} label={plan.isActive ? 'نشطة' : 'موقوفة'} />
                   </div>
                 </div>
                 <div className="mt-3 grid grid-cols-3 gap-1.5 text-center">
-                  <div className="rounded-lg bg-slate-50 px-1.5 py-1.5">
-                    <p className="text-[13px] font-black text-slate-700">{formatNumber(plan.seatsLimit)}</p>
-                    <p className="text-[9px] font-bold text-slate-400">مستخدم</p>
+                  <div className="rounded-lg bg-surface-muted px-1.5 py-1.5">
+                    <p className="text-[13px] font-black text-ink">{formatNumber(plan.seatsLimit)}</p>
+                    <p className="text-[9px] font-bold text-muted">مستخدم</p>
                   </div>
-                  <div className="rounded-lg bg-slate-50 px-1.5 py-1.5">
-                    <p className="text-[13px] font-black text-slate-700">{formatNumber(plan.branchesLimit)}</p>
-                    <p className="text-[9px] font-bold text-slate-400">فرع</p>
+                  <div className="rounded-lg bg-surface-muted px-1.5 py-1.5">
+                    <p className="text-[13px] font-black text-ink">{formatNumber(plan.branchesLimit)}</p>
+                    <p className="text-[9px] font-bold text-muted">فرع</p>
                   </div>
-                  <div className="rounded-lg bg-slate-50 px-1.5 py-1.5">
-                    <p className="text-[13px] font-black text-slate-700">{formatNumber(plan.devicesLimit)}</p>
-                    <p className="text-[9px] font-bold text-slate-400">جهاز</p>
+                  <div className="rounded-lg bg-surface-muted px-1.5 py-1.5">
+                    <p className="text-[13px] font-black text-ink">{formatNumber(plan.devicesLimit)}</p>
+                    <p className="text-[9px] font-bold text-muted">جهاز</p>
                   </div>
                 </div>
-                <p className="mt-2 truncate text-[10px] text-slate-400">
+                <p className="mt-2 truncate text-[10px] text-muted">
                   {(plan.features ?? []).length} ميزة · {(plan.includedModules ?? []).length} وحدة
                   {typeof plan.subscriberCount === 'number' ? ` · ${formatNumber(plan.subscriberCount)} مشترك` : ''}
                 </p>
@@ -1165,7 +1165,7 @@ export const PlatformSuperAdminDashboard: React.FC = () => {
         title="الوحدات والميزات"
         subtitle="وحدات المنتج المتاحة وتفعيلها عبر المنصة"
         icon={<Layers className="h-4 w-4" />}
-        iconClass="bg-indigo-50 text-indigo-600"
+        iconClass="bg-accent-soft text-primary"
         action={
           <DrillDownLink label="إدارة الوحدات" href="/platform/product" icon={<ExternalLink className="h-3.5 w-3.5" />} />
         }
@@ -1175,17 +1175,17 @@ export const PlatformSuperAdminDashboard: React.FC = () => {
         ) : (
           <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
             {moduleItems.slice(0, 16).map((m) => (
-              <div key={m.code} className="flex items-center justify-between gap-2 rounded-lg border border-slate-100 bg-slate-50/60 px-3 py-2">
+              <div key={m.code} className="flex items-center justify-between gap-2 rounded-lg border border-line bg-surface-muted/60 px-3 py-2">
                 <div className="min-w-0">
-                  <p className="truncate text-[11.5px] font-bold text-slate-700">{m.name}</p>
-                  <p className="truncate text-[9.5px] text-slate-400" dir="ltr">{m.code}</p>
+                  <p className="truncate text-[11.5px] font-bold text-ink">{m.name}</p>
+                  <p className="truncate text-[9.5px] text-muted" dir="ltr">{m.code}</p>
                 </div>
                 <div className="flex shrink-0 items-center gap-1.5">
                   {(m.licenseCount ?? 0) > 0 && (
-                    <span className="rounded-full bg-sky-50 px-1.5 py-0.5 text-[9px] font-bold text-sky-700">{formatNumber(m.licenseCount)} ترخيص</span>
+                    <span className="rounded-full bg-accent-soft px-1.5 py-0.5 text-[9px] font-bold text-primary">{formatNumber(m.licenseCount)} ترخيص</span>
                   )}
                   {(m.tenantCount ?? 0) > 0 && (
-                    <span className="rounded-full bg-violet-50 px-1.5 py-0.5 text-[9px] font-bold text-violet-700">{formatNumber(m.tenantCount)} عميل</span>
+                    <span className="rounded-full bg-accent-soft px-1.5 py-0.5 text-[9px] font-bold text-primary">{formatNumber(m.tenantCount)} عميل</span>
                   )}
                   <StatusBadge value={m.enabled ? 'ACTIVE' : 'CANCELLED'} label={m.enabled ? 'مفعّلة' : 'معطّلة'} />
                 </div>
@@ -1200,7 +1200,7 @@ export const PlatformSuperAdminDashboard: React.FC = () => {
         title="أحدث أحداث التدقيق"
         subtitle="آخر الإجراءات على مستوى المنصة"
         icon={<FileClock className="h-4 w-4" />}
-        iconClass="bg-slate-100 text-slate-600"
+        iconClass="bg-surface-sunken text-ink-secondary"
         action={
           <DrillDownLink label="سجل التدقيق" href="/platform/audit" icon={<ExternalLink className="h-3.5 w-3.5" />} />
         }
@@ -1208,19 +1208,19 @@ export const PlatformSuperAdminDashboard: React.FC = () => {
         {auditItems.length === 0 ? (
           <EmptyState icon={<ScrollText className="h-5 w-5" />} title="لا توجد أحداث حديثة" />
         ) : (
-          <ul className="divide-y divide-slate-100">
+          <ul className="divide-y divide-line-strong">
             {auditItems.slice(0, 10).map((a) => (
-              <li key={a.id} className="flex items-center justify-between gap-3 px-2 py-2.5 hover:bg-slate-50">
+              <li key={a.id} className="flex items-center justify-between gap-3 px-2 py-2.5 hover:bg-surface-muted">
                 <div className="flex min-w-0 items-center gap-2.5">
-                  <span className={`h-2 w-2 shrink-0 rounded-full ${AUDIT_SEVERITY_DOT[String(a.severity ?? 'INFO').toUpperCase()] ?? 'bg-slate-400'}`} />
+                  <span className={`h-2 w-2 shrink-0 rounded-full ${AUDIT_SEVERITY_DOT[String(a.severity ?? 'INFO').toUpperCase()] ?? 'bg-line-strong'}`} />
                   <div className="min-w-0">
-                    <p className="truncate text-[12px] font-bold text-slate-800">{a.action}</p>
-                    <p className="text-[10px] text-slate-500">
+                    <p className="truncate text-[12px] font-bold text-ink">{a.action}</p>
+                    <p className="text-[10px] text-muted">
                       {a.actorName || 'النظام'}{a.entityType ? ` · ${a.entityType}` : ''}
                     </p>
                   </div>
                 </div>
-                <span className="shrink-0 text-[10px] text-slate-400">{formatDateTime(a.createdAt)}</span>
+                <span className="shrink-0 text-[10px] text-muted">{formatDateTime(a.createdAt)}</span>
               </li>
             ))}
           </ul>
@@ -1232,26 +1232,26 @@ export const PlatformSuperAdminDashboard: React.FC = () => {
         title="أحدث المدفوعات"
         subtitle="آخر المبالغ المحصلة من العملاء"
         icon={<Banknote className="h-4 w-4" />}
-        iconClass="bg-emerald-50 text-emerald-600"
+        iconClass="bg-success-soft text-success"
         action={
           <DrillDownLink label="الفوترة" href="/platform/billing" icon={<ExternalLink className="h-3.5 w-3.5" />} />
         }
       >
         {Array.isArray(overview.recentPayments) && overview.recentPayments.length > 0 ? (
-          <ul className="divide-y divide-slate-100">
+          <ul className="divide-y divide-line-strong">
             {overview.recentPayments.slice(0, 8).map((payment) => (
-              <li key={payment.id} className="flex items-center justify-between gap-3 px-2 py-3 hover:bg-slate-50">
+              <li key={payment.id} className="flex items-center justify-between gap-3 px-2 py-3 hover:bg-surface-muted">
                 <div className="min-w-0">
-                  <p className="truncate text-[12.5px] font-bold text-slate-800">{payment.tenantName || '—'}</p>
-                  <p className="text-[10.5px] text-slate-500">
+                  <p className="truncate text-[12.5px] font-bold text-ink">{payment.tenantName || '—'}</p>
+                  <p className="text-[10.5px] text-muted">
                     {PAYMENT_METHOD_LABELS[payment.method] ?? payment.method}
                     {payment.invoiceNumber ? ` · فاتورة ${payment.invoiceNumber}` : ''}
                     {payment.reference ? ` · مرجع ${payment.reference}` : ''}
                   </p>
                 </div>
                 <div className="shrink-0 text-left">
-                  <p className="text-[13px] font-black text-emerald-700">{formatMoney(payment.amount)}</p>
-                  <p className="mt-0.5 text-[10px] text-slate-500">{formatDateTime(payment.paidAt)}</p>
+                  <p className="text-[13px] font-black text-success">{formatMoney(payment.amount)}</p>
+                  <p className="mt-0.5 text-[10px] text-muted">{formatDateTime(payment.paidAt)}</p>
                 </div>
               </li>
             ))}
@@ -1266,13 +1266,13 @@ export const PlatformSuperAdminDashboard: React.FC = () => {
         title="التنبيهات"
         subtitle={`${alerts.length} تنبيه يحتاج متابعة — مع إمكانية فتح العنصر مباشرة`}
         icon={<Bell className="h-4 w-4" />}
-        iconClass="bg-rose-50 text-rose-600"
+        iconClass="bg-danger-soft text-danger"
         action={
           <DrillDownLink label="مركز الطوارئ" href="/platform/emergency" icon={<ExternalLink className="h-3.5 w-3.5" />} count={alerts.length} />
         }
       >
         {alerts.length === 0 ? (
-          <div className="flex items-center gap-2 px-4 py-5 text-[12px] font-semibold text-emerald-700">
+          <div className="flex items-center gap-2 px-4 py-5 text-[12px] font-semibold text-success">
             <CheckCircle2 className="h-4 w-4" /> كل التراخيص والاشتراكات والأنظمة في وضع سليم.
           </div>
         ) : (
@@ -1297,7 +1297,7 @@ export const PlatformSuperAdminDashboard: React.FC = () => {
         title="التقارير والروابط السريعة"
         subtitle="التحليلات، المقارنة بين الفترات، والتصدير"
         icon={<PieChart className="h-4 w-4" />}
-        iconClass="bg-violet-50 text-violet-600"
+        iconClass="bg-accent-soft text-primary"
       >
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <DrillDownLink

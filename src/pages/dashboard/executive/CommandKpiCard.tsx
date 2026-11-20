@@ -38,7 +38,7 @@ export const CommandKpiCard: React.FC<CommandKpiCardProps> = ({
     <button
       type="button"
       onClick={onClick}
-      className="group relative flex min-h-[92px] min-w-0 flex-col justify-between gap-2 overflow-hidden rounded-[2px] border border-[#d9d9d9] bg-white p-3 text-right transition-colors hover:border-[#0078d4] hover:bg-[#f8fbfe] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0078d4] dark:border-[#3d3d3d] dark:bg-[#2b2b2b] dark:hover:bg-[#30363b]"
+      className="group relative flex min-h-[92px] min-w-0 flex-col justify-between gap-2 overflow-hidden rounded-[2px] border border-[#d9d9d9] bg-surface p-3 text-right transition-colors hover:border-[#0078d4] hover:bg-[#f8fbfe] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0078d4] dark:border-[#3d3d3d] dark:bg-[#2b2b2b] dark:hover:bg-[#30363b]"
       aria-label={`فتح تفاصيل ${label}`}
     >
       <span className={`absolute inset-y-0 right-0 w-1 ${palette.bar} opacity-80`} aria-hidden="true" />

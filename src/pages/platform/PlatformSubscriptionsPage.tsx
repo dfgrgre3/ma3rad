@@ -226,34 +226,34 @@ export const PlatformSubscriptionsPage: React.FC = () => {
 
       {/* Metrics Row */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <div className="p-3 bg-slate-900/60 border border-slate-800 rounded-xl">
-          <p className="text-[11px] font-semibold text-slate-400">إجمالي الاشتراكات</p>
-          <p className="text-xl font-black text-slate-100 mt-1">{subscriptions.length}</p>
+        <div className="p-3 bg-primary/60 border border-line-strong rounded-xl">
+          <p className="text-[11px] font-semibold text-muted">إجمالي الاشتراكات</p>
+          <p className="text-xl font-black text-muted mt-1">{subscriptions.length}</p>
         </div>
-        <div className="p-3 bg-emerald-950/20 border border-emerald-500/20 rounded-xl">
-          <p className="text-[11px] font-semibold text-emerald-400">الاشتراكات النشطة</p>
-          <p className="text-xl font-black text-emerald-300 mt-1">
+        <div className="p-3 bg-success/20 border border-success/20 rounded-xl">
+          <p className="text-[11px] font-semibold text-success">الاشتراكات النشطة</p>
+          <p className="text-xl font-black text-success mt-1">
             {subscriptions.filter((s) => s.status === 'ACTIVE').length}
           </p>
         </div>
-        <div className="p-3 bg-amber-950/20 border border-amber-500/20 rounded-xl">
-          <p className="text-[11px] font-semibold text-amber-400">الفترة التجريبية (Trial)</p>
-          <p className="text-xl font-black text-amber-300 mt-1">
+        <div className="p-3 bg-warning/20 border border-warning/20 rounded-xl">
+          <p className="text-[11px] font-semibold text-warning">الفترة التجريبية (Trial)</p>
+          <p className="text-xl font-black text-warning mt-1">
             {subscriptions.filter((s) => s.status === 'TRIAL').length}
           </p>
         </div>
-        <div className="p-3 bg-rose-950/20 border border-rose-500/20 rounded-xl">
-          <p className="text-[11px] font-semibold text-rose-400">ملغاة أو منتهية</p>
-          <p className="text-xl font-black text-rose-300 mt-1">
+        <div className="p-3 bg-danger/20 border border-danger/20 rounded-xl">
+          <p className="text-[11px] font-semibold text-danger">ملغاة أو منتهية</p>
+          <p className="text-xl font-black text-danger mt-1">
             {subscriptions.filter((s) => s.status === 'CANCELLED' || s.status === 'EXPIRED').length}
           </p>
         </div>
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-800 bg-slate-900/60 p-3 shadow-sm">
+      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-line-strong bg-primary/60 p-3 shadow-sm">
         <div className="relative min-w-[240px] flex-1">
-          <Search className="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-500" />
+          <Search className="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted" />
           <input
             type="text"
             value={search}
@@ -291,18 +291,18 @@ export const PlatformSubscriptionsPage: React.FC = () => {
       </div>
 
       {error && (
-        <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-lg text-xs font-bold text-rose-300">
+        <div className="p-3 bg-danger/10 border border-danger/20 rounded-lg text-xs font-bold text-danger">
           {error}
         </div>
       )}
 
       {/* Table */}
-      <div className="overflow-hidden rounded-xl border border-slate-800 bg-slate-900/70 shadow-sm">
+      <div className="overflow-hidden rounded-xl border border-line-strong bg-primary/70 shadow-sm">
         {loading ? (
-          <div className="py-16 text-center text-sm font-semibold text-slate-500">جارٍ تحميل الاشتراكات...</div>
+          <div className="py-16 text-center text-sm font-semibold text-muted">جارٍ تحميل الاشتراكات...</div>
         ) : subscriptions.length === 0 ? (
           <EmptyState
-            icon={<CalendarClock className="h-6 w-6 text-slate-500" />}
+            icon={<CalendarClock className="h-6 w-6 text-muted" />}
             title="لا توجد اشتراكات مطابقة"
             description="غيّر عوامل التصفية أو أضف اشتراكات جديدة للعملاء."
           />
@@ -315,22 +315,22 @@ export const PlatformSubscriptionsPage: React.FC = () => {
               minWidth={950}
               dense
               tableClassName="text-xs"
-              rowClassName={() => 'transition-colors hover:bg-slate-800/30'}
+              rowClassName={() => 'transition-colors hover:bg-primary/30'}
               columns={[
                 {
                   key: 'tenant', header: 'العميل / المستأجر',
                   render: (sub: any) => (
                     <span className="block">
-                      <span className="block font-bold text-slate-100">{sub.tenantName || 'عميل غير مسمى'}</span>
-                      <span className="block font-mono text-[10px] text-slate-500">{sub.tenantId}</span>
+                      <span className="block font-bold text-muted">{sub.tenantName || 'عميل غير مسمى'}</span>
+                      <span className="block font-mono text-[10px] text-muted">{sub.tenantId}</span>
                     </span>
                   ),
                 },
-                { key: 'plan', header: 'الباقة', render: (sub: any) => <span className="font-semibold text-slate-200">{sub.planName || 'باقة محذوفة'}</span> },
+                { key: 'plan', header: 'الباقة', render: (sub: any) => <span className="font-semibold text-muted">{sub.planName || 'باقة محذوفة'}</span> },
                 {
                   key: 'status', header: 'الحالة',
                   render: (sub: any) => (
-                    <span className={`inline-flex items-center gap-1 font-bold ${sub.status === 'ACTIVE' ? 'text-emerald-400' : sub.status === 'TRIAL' ? 'text-sky-400' : 'text-rose-400'}`}>
+                    <span className={`inline-flex items-center gap-1 font-bold ${sub.status === 'ACTIVE' ? 'text-success' : sub.status === 'TRIAL' ? 'text-primary' : 'text-danger'}`}>
                       {sub.status === 'ACTIVE' ? 'نشط' : sub.status === 'TRIAL' ? 'تجريبي' : sub.status}
                     </span>
                   ),
@@ -339,37 +339,37 @@ export const PlatformSubscriptionsPage: React.FC = () => {
                   key: 'price', header: 'القيمة والفوترة',
                   render: (sub: any) => (
                     <span className="block">
-                      <span className="block font-bold text-slate-200">{formatMoney(sub.price)}</span>
-                      <span className="block text-[10px] text-slate-500">{CYCLE_LABELS[sub.billingCycle as keyof typeof CYCLE_LABELS] || sub.billingCycle}</span>
+                      <span className="block font-bold text-muted">{formatMoney(sub.price)}</span>
+                      <span className="block text-[10px] text-muted">{CYCLE_LABELS[sub.billingCycle as keyof typeof CYCLE_LABELS] || sub.billingCycle}</span>
                     </span>
                   ),
                 },
-                { key: 'start', header: 'البداية', render: (sub: any) => <span className="text-slate-400">{formatDate(sub.startDate)}</span> },
+                { key: 'start', header: 'البداية', render: (sub: any) => <span className="text-muted">{formatDate(sub.startDate)}</span> },
                 {
                   key: 'end', header: 'نهاية الصلاحية',
                   render: (sub: any) => (
-                    <span className={`font-semibold ${sub.endDate && new Date(sub.endDate) < new Date() ? 'font-bold text-rose-400' : 'text-slate-300'}`}>
+                    <span className={`font-semibold ${sub.endDate && new Date(sub.endDate) < new Date() ? 'font-bold text-danger' : 'text-muted'}`}>
                       {sub.endDate ? formatDate(sub.endDate) : 'مفتوح (مدى الحياة)'}
                     </span>
                   ),
                 },
-                { key: 'renew', header: 'التجديد التلقائي', render: (sub: any) => <span className={sub.autoRenew ? 'text-emerald-400' : 'text-slate-500'}>{sub.autoRenew ? 'مفعل' : 'معطل'}</span> },
+                { key: 'renew', header: 'التجديد التلقائي', render: (sub: any) => <span className={sub.autoRenew ? 'text-success' : 'text-muted'}>{sub.autoRenew ? 'مفعل' : 'معطل'}</span> },
                 {
                   key: 'actions', header: 'إجراءات', align: 'center',
                   render: (sub: any) => (
                     <span className="flex items-center justify-center gap-2">
                       {canManageSubscriptions && (
                         <>
-                          <button onClick={() => handleRenew(sub)} className="flex items-center gap-1 text-xs text-emerald-400 hover:text-emerald-300" title="تجديد مدة الاشتراك">
+                          <button onClick={() => handleRenew(sub)} className="flex items-center gap-1 text-xs text-success hover:text-success" title="تجديد مدة الاشتراك">
                             <RotateCw className="h-3 w-3" />
                             تجديد
                           </button>
-                          <button onClick={() => handleChangePlan(sub)} className="flex items-center gap-1 text-xs text-sky-400 hover:text-sky-300" title="ترقية أو تخفيض الباقة">
+                          <button onClick={() => handleChangePlan(sub)} className="flex items-center gap-1 text-xs text-primary hover:text-primary" title="ترقية أو تخفيض الباقة">
                             <ArrowUpRight className="h-3 w-3" />
                             تغيير الباقة
                           </button>
                           {sub.status !== 'CANCELLED' && (
-                            <button onClick={() => void handleCancelSub(sub)} className="text-xs text-rose-400 hover:text-rose-300" title="إلغاء الاشتراك فوراً">
+                            <button onClick={() => void handleCancelSub(sub)} className="text-xs text-danger hover:text-danger" title="إلغاء الاشتراك فوراً">
                               إلغاء
                             </button>
                           )}
@@ -397,7 +397,7 @@ export const PlatformSubscriptionsPage: React.FC = () => {
         <div className="space-y-3.5 text-right">
           {actionType === 'CHANGE_PLAN' && (
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">اختر الباقة الجديدة *</label>
+              <label className="block text-xs font-semibold text-muted mb-1">اختر الباقة الجديدة *</label>
               <select
                 value={newPlanId}
                 onChange={(e) => setNewPlanId(e.target.value)}
@@ -413,7 +413,7 @@ export const PlatformSubscriptionsPage: React.FC = () => {
           )}
 
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">
+            <label className="block text-xs font-semibold text-muted mb-1">
               {actionType === 'RENEW' ? 'عدد أشهر التجديد الإضافية' : 'فترة الاشتراك بالباقة الجديدة (بالأشهر)'}
             </label>
             <select
@@ -429,7 +429,7 @@ export const PlatformSubscriptionsPage: React.FC = () => {
             </select>
           </div>
 
-          <div className="flex justify-end gap-2 pt-3 border-t border-slate-800">
+          <div className="flex justify-end gap-2 pt-3 border-t border-line-strong">
             <Button variant="secondary" size="sm" onClick={() => setActiveSub(null)}>
               إلغاء
             </Button>

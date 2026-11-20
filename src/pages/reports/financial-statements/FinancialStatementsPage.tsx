@@ -50,7 +50,7 @@ const FinancialStatementsContent: React.FC<FinancialStatementsContentProps> = ({
   service, from, to, setAccountId, setLedger, onPartyTypeChange, onPartyChange,
 }) => {
   if (loading) {
-    return <div className="py-16 flex justify-center"><Loader2 className="w-6 h-6 animate-spin text-teal-500" /></div>;
+    return <div className="py-16 flex justify-center"><Loader2 className="w-6 h-6 animate-spin text-success" /></div>;
   }
 
   switch (tab) {
@@ -403,7 +403,7 @@ export const FinancialStatementsPage: React.FC = () => {
               : Boolean(reconciliation);
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
+    <div className="h-full flex flex-col bg-surface-muted text-ink overflow-hidden">
       <FinancialStatementsHeader
         tab={activeTab}
         visibleTabs={visibleTabs}
@@ -422,7 +422,7 @@ export const FinancialStatementsPage: React.FC = () => {
       />
 
       <div className="flex-1 overflow-auto p-6">
-        {scopeWarning && <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">{scopeWarning}</div>}
+        {scopeWarning && <div className="mb-4 rounded-xl border border-warning-border bg-warning-soft px-4 py-3 text-sm font-semibold text-warning">{scopeWarning}</div>}
         <FinancialStatementsContent
           loading={loading}
           tab={activeTab}

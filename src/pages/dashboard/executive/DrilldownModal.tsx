@@ -91,12 +91,12 @@ export const DrilldownModal: React.FC<DrilldownModalProps> = ({
       )}
 
       {!loading && error && (
-        <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800 dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-200">
+        <div role="alert" className="rounded-lg border border-danger-border bg-danger-soft p-4 text-sm text-danger dark:bg-danger/30 ">
           <div className="flex items-center gap-2 font-bold">
             <AlertTriangle className="h-4 w-4 shrink-0" />
             {error}
           </div>
-          <button type="button" onClick={onRetry} className="mt-3 rounded bg-rose-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-rose-700">
+          <button type="button" onClick={onRetry} className="mt-3 rounded bg-danger px-3 py-1.5 text-xs font-bold text-white hover:bg-danger">
             إعادة المحاولة
           </button>
         </div>

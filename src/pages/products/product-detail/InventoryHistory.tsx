@@ -16,7 +16,7 @@ export const InventoryHistory: React.FC<InventoryHistoryProps> = ({ productId, u
      FROM inventory_transactions it JOIN warehouses w ON w.id = it.warehouse_id
      WHERE it.product_id = ? AND ${scope.clause} ORDER BY it.created_at DESC LIMIT 50`, [productId, ...scope.params]
   );
-  if (rows.length === 0) return <div className="text-center text-slate-500 py-8 text-sm">لا توجد حركات مخزون</div>;
+  if (rows.length === 0) return <div className="text-center text-muted py-8 text-sm">لا توجد حركات مخزون</div>;
   return (
     <DataTable
       ariaLabel="سجل حركة المخزون"
@@ -25,11 +25,11 @@ export const InventoryHistory: React.FC<InventoryHistoryProps> = ({ productId, u
       dense
       tableClassName="text-sm"
       columns={[
-        { key: 'date', header: 'التاريخ', render: (r: any) => <span className="text-slate-500">{r.date ? new Date(r.date).toLocaleString('ar-EG') : '—'}</span> },
-        { key: 'type', header: 'النوع', render: (r: any) => <span className="font-bold text-slate-700">{r.type}</span> },
-        { key: 'wh', header: 'المخزن', render: (r: any) => <span className="text-slate-600">{r.warehouseName || '—'}</span> },
+        { key: 'date', header: 'التاريخ', render: (r: any) => <span className="text-muted">{r.date ? new Date(r.date).toLocaleString('ar-EG') : '—'}</span> },
+        { key: 'type', header: 'النوع', render: (r: any) => <span className="font-bold text-ink">{r.type}</span> },
+        { key: 'wh', header: 'المخزن', render: (r: any) => <span className="text-ink-secondary">{r.warehouseName || '—'}</span> },
         { key: 'qty', header: `الكمية (${unitLabel})`, render: (r: any) => <span className="font-mono">{r.qty} {unitLabel}</span> },
-        { key: 'notes', header: 'ملاحظات', render: (r: any) => <span className="block max-w-[240px] truncate text-slate-500">{r.notes}</span> },
+        { key: 'notes', header: 'ملاحظات', render: (r: any) => <span className="block max-w-[240px] truncate text-muted">{r.notes}</span> },
       ]}
     />
   );

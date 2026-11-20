@@ -57,7 +57,7 @@
     "productAttributes": "text-and-typed-profile-fields",
     "industrySpecificWorkflows": "not-implemented",
     "industrySpecificReports": "not-implemented",
-    "industrySpecificDocumentTemplates": "not-implemented",
+    "industrySpecificDocumentTemplates": "partially-implemented",
     "typedCustomFieldStorage": "implemented-for-profile-declared-fields",
     "expiryBatchEnforcement": "not-implemented"
   },

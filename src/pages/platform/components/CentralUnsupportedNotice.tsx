@@ -11,7 +11,7 @@ export const CentralUnsupportedNotice: React.FC<{ feature?: string }> = ({ featu
   const state = getCentralDataSourceState();
   if (!state.active) return null;
   return (
-    <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">
+    <div className="flex items-start gap-2 rounded-xl border border-warning-border bg-warning-soft px-4 py-3 text-sm font-semibold text-warning">
       <CloudOff className="mt-0.5 h-4 w-4 shrink-0" />
       <span>
         {feature

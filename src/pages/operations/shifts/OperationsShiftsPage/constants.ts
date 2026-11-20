@@ -9,12 +9,12 @@ export const STATUS_LABELS: Record<string, string> = {
   CLOSED: 'مغلقة', MISSED: 'فائتة', CANCELLED: 'ملغاة',
 };
 export const STATUS_STYLES: Record<string, string> = {
-  PLANNED: 'bg-slate-100 text-slate-700 border-slate-200',
-  OPEN: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-  HANDOVER_PENDING: 'bg-amber-50 text-amber-700 border-amber-200',
-  CLOSED: 'bg-sky-50 text-sky-700 border-sky-200',
-  MISSED: 'bg-rose-50 text-rose-700 border-rose-200',
-  CANCELLED: 'bg-slate-100 text-slate-500 border-slate-200',
+  PLANNED: 'bg-surface-sunken text-ink border-line',
+  OPEN: 'bg-success-soft text-success border-success-border',
+  HANDOVER_PENDING: 'bg-warning-soft text-warning border-warning-border',
+  CLOSED: 'bg-accent-soft text-primary border-accent-border',
+  MISSED: 'bg-danger-soft text-danger border-danger-border',
+  CANCELLED: 'bg-surface-sunken text-muted border-line',
 };
 export const WORK_MODES: Array<{ value: OperationsWorkMode; label: string }> = [
   { value: 'NORMAL', label: 'وردية واحدة' },

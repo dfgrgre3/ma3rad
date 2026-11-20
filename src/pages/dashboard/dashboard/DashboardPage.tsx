@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
-  Award, Banknote, LayoutDashboard, ShoppingBag, ShoppingCart, Target, TrendingUp, Truck,
+  Award, Banknote, LayoutDashboard, LayoutGrid, ShoppingBag, ShoppingCart, Target, TrendingUp, Truck,
 } from 'lucide-react';
 import { DashboardHeader } from '../../../components/dashboard/DashboardHeader';
 import { DashboardRefreshContext } from '../../../contexts/DashboardRefreshContext';
@@ -14,9 +14,14 @@ import { AuthService } from '../../../services/domains/auth/AuthService';
 import { PermissionService } from '../../../services/domains/auth/PermissionService';
 import { ModuleRegistryService } from '../../../services/domains/config/ModuleRegistryService';
 import { CentralFeaturePermissionService } from '../../../services/domains/licensing/CentralFeaturePermissionService';
+import { getEffectiveBusinessType } from '../../../services/domains/config/BusinessTypeService';
+import { getActivityDashboardSpec, getActivityDashboardCopy } from '../../../config/activityDashboard';
+import { getActivityPageCopy, type ActivityPageKey } from '../../../config/activityPageCopy';
+import { isActivityPathHidden } from '../../../config/activityPageVisibility';
 
 // Lazy loaded integrated dashboards
 const ExecutiveCommandCenter = lazy(() => import('../executive/ExecutiveCommandCenter').then(m => ({ default: m.ExecutiveCommandCenter })));
+const ActivityDashboardPanel = lazy(() => import('../../../components/dashboard/activity/ActivityDashboardPanel').then(m => ({ default: m.ActivityDashboardPanel })));
 const SalesAnalyticsPage = lazy(() => import('../../sales/sales-analytics/SalesAnalyticsPage').then(m => ({ default: m.SalesAnalyticsPage })));
 const PurchaseInventoryReportPage = lazy(() => import('../../reports/purchase-inventory/PurchaseInventoryReportPage').then(m => ({ default: m.PurchaseInventoryReportPage })));
 const DebtsDashboardPage = lazy(() => import('../../finance/debts-dashboard/DebtsDashboardPage').then(m => ({ default: m.DebtsDashboardPage })));
@@ -51,6 +56,11 @@ export const DashboardPage: React.FC = () => {
   const [refreshingOverview, setRefreshingOverview] = useState(false);
 
   const currentUser = AuthService.getCurrentUser();
+  // النشاط الحالي يحدد محتوى لوحة المعلومات: قسم مخصص + إخفاء مسارات لا تنطبق عليه.
+  const businessType = getEffectiveBusinessType();
+  const activitySpec = getActivityDashboardSpec(businessType);
+  const activityCopy = getActivityDashboardCopy(businessType);
+  const sectionCopy = (key: ActivityPageKey) => getActivityPageCopy(key, businessType);
   // القسم مسموح فقط إذا تحققت صلاحية مجاله ووحدته الفعّالة وقواعد المنصة المركزية.
   const canViewSection = (id: SectionId) => {
     if (id === 'all') return true;
@@ -62,6 +72,8 @@ export const DashboardPage: React.FC = () => {
     if (access.permissions?.some((permission) => !PermissionService.can(currentUser, permission, access.scopes?.[permission] ?? access.path))) return false;
     if (access.moduleId && !ModuleRegistryService.isModuleEnabled(access.moduleId)) return false;
     if (access.path && !CentralFeaturePermissionService.isPageVisible(access.path)) return false;
+    // قواعد ظهور الصفحات حسب النشاط (activityPageVisibility) تمنع القسم أيضًا.
+    if (access.path && isActivityPathHidden(access.path, businessType)) return false;
     return true;
   };
   const hasDomainSection = SECTIONS_CONFIG.some(
@@ -71,7 +83,9 @@ export const DashboardPage: React.FC = () => {
     if (section.id === 'pulse') return true;
     if (section.id === 'all') return hasDomainSection;
     return canViewSection(section.id);
-  });
+  }).map((section) =>
+    section.id === 'activity' ? { ...section, label: activitySpec.navLabel } : section
+  );
   // قد يشير الرابط إلى قسم غير مسموح؛ نعود إلى ملخص اليوم.
   const fallbackSection = visibleSections.find((section) => section.id !== 'all' && canViewSection(section.id))?.id ?? 'pulse';
   const effectiveTab: SectionId = canViewSection(activeTab) ? activeTab : fallbackSection;
@@ -136,7 +150,7 @@ export const DashboardPage: React.FC = () => {
 
         {(effectiveTab === 'pulse' || isOverview) && !canViewSection('pulse') && (
           <SectionCard id="sec-pulse" title="ملخص لوحة المعلومات" subtitle="تتطلب المؤشرات صلاحيات المجالات التي تعرض بياناتها." icon={LayoutDashboard}>
-            <p className="p-4 text-sm text-slate-600">لا توجد صلاحية كافية لعرض مؤشرات المبيعات والمشتريات والمالية والعملاء والمخزون.</p>
+            <p className="p-4 text-sm text-ink-secondary">لا توجد صلاحية كافية لعرض مؤشرات المبيعات والمشتريات والمالية والعملاء والمخزون.</p>
           </SectionCard>
         )}
         {(effectiveTab === 'pulse' || isOverview) && canViewSection('pulse') && (
@@ -146,45 +160,57 @@ export const DashboardPage: React.FC = () => {
               title="نبض حركة اليوم"
               subtitle={`ملخص المبيعات والمشتريات والأداء • ${lastUpdated ? `آخر تحديث ${new Intl.DateTimeFormat('ar-EG', { hour: '2-digit', minute: '2-digit' }).format(lastUpdated)}` : 'لم يتم التحديث بعد'}`}
               icon={LayoutDashboard}
-              iconBg="bg-teal-50 dark:bg-teal-950"
-              iconColor="text-teal-700 dark:text-teal-300"
+              iconBg="bg-success-soft "
+              iconColor="text-success "
             >
               <OverviewSection onDataLoaded={handleOverviewDataLoaded} />
             </SectionCard>
           </>
         )}
+        {showSection('activity') && (
+          <SectionCard
+            id="sec-activity"
+            title={activityCopy.title}
+            subtitle={activityCopy.description}
+            icon={LayoutGrid}
+            iconBg="bg-accent-soft "
+            iconColor="text-primary "
+          >
+            <Suspense fallback={<DashboardLoader />}><ActivityDashboardPanel /></Suspense>
+          </SectionCard>
+        )}
         {showSection('executive') && (
-          <SectionCard id="sec-executive" title="مركز القيادة التنفيذي" subtitle="مؤشرات الأداء والأرباح والسيولة — كل رقم قابل للضغط لعرض تفاصيله" icon={TrendingUp} iconBg="bg-indigo-50 dark:bg-indigo-950" iconColor="text-indigo-700 dark:text-indigo-300">
+          <SectionCard id="sec-executive" title="مركز القيادة التنفيذي" subtitle="مؤشرات الأداء والأرباح والسيولة — كل رقم قابل للضغط لعرض تفاصيله" icon={TrendingUp} iconBg="bg-accent-soft " iconColor="text-primary ">
             <Suspense fallback={<DashboardLoader />}><ExecutiveCommandCenter /></Suspense>
           </SectionCard>
         )}
         {showSection('sales') && (
-          <SectionCard id="sec-sales" title="تحليلات المبيعات" subtitle="أداء البيع والأصناف والعملاء" icon={ShoppingCart} iconBg="bg-emerald-50 dark:bg-emerald-950" iconColor="text-emerald-700 dark:text-emerald-300">
+          <SectionCard id="sec-sales" title={sectionCopy('sales')?.title ?? 'تحليلات المبيعات'} subtitle={sectionCopy('sales')?.description ?? 'أداء البيع والأصناف والعملاء'} icon={ShoppingCart} iconBg="bg-success-soft " iconColor="text-success ">
             <Suspense fallback={<DashboardLoader />}><SalesAnalyticsPage /></Suspense>
           </SectionCard>
         )}
         {showSection('purchases') && (
-          <SectionCard id="sec-purchases" title="المشتريات والمخزون" subtitle="حركة الفواتير وتقييم المخزون والموردين" icon={ShoppingBag} iconBg="bg-amber-50 dark:bg-amber-950" iconColor="text-amber-700 dark:text-amber-300">
+          <SectionCard id="sec-purchases" title={sectionCopy('purchasing')?.title ?? 'المشتريات والمخزون'} subtitle={sectionCopy('purchasing')?.description ?? 'حركة الفواتير وتقييم المخزون والموردين'} icon={ShoppingBag} iconBg="bg-warning-soft " iconColor="text-warning ">
             <Suspense fallback={<DashboardLoader />}><PurchaseInventoryReportPage /></Suspense>
           </SectionCard>
         )}
         {showSection('debts') && (
-          <SectionCard id="sec-debts" title="الديون والذمم" subtitle="متابعة مستحقات العملاء والموردين" icon={Banknote} iconBg="bg-rose-50 dark:bg-rose-950" iconColor="text-rose-700 dark:text-rose-300">
+          <SectionCard id="sec-debts" title={sectionCopy('finance')?.title ?? 'الديون والذمم'} subtitle={sectionCopy('finance')?.description ?? 'متابعة مستحقات العملاء والموردين'} icon={Banknote} iconBg="bg-danger-soft " iconColor="text-danger ">
             <Suspense fallback={<DashboardLoader />}><DebtsDashboardPage /></Suspense>
           </SectionCard>
         )}
         {showSection('crm') && (
-          <SectionCard id="sec-crm" title="إدارة العملاء والفرص" subtitle="متابعة العملاء المحتملين والأنشطة" icon={Target} iconBg="bg-violet-50 dark:bg-violet-950" iconColor="text-violet-700 dark:text-violet-300">
+          <SectionCard id="sec-crm" title={sectionCopy('crm')?.title ?? 'إدارة العملاء والفرص'} subtitle={sectionCopy('crm')?.description ?? 'متابعة العملاء المحتملين والأنشطة'} icon={Target} iconBg="bg-accent-soft " iconColor="text-primary ">
             <Suspense fallback={<DashboardLoader />}><CrmDashboardPage /></Suspense>
           </SectionCard>
         )}
         {showSection('fleet') && (
-          <SectionCard id="sec-fleet" title="التوصيل والأسطول" subtitle="متابعة الشحنات والسائقين والمركبات" icon={Truck} iconBg="bg-cyan-50 dark:bg-cyan-950" iconColor="text-cyan-700 dark:text-cyan-300">
+          <SectionCard id="sec-fleet" title={sectionCopy('operations')?.title ?? 'التوصيل والأسطول'} subtitle={sectionCopy('operations')?.description ?? 'متابعة الشحنات والسائقين والمركبات'} icon={Truck} iconBg="bg-accent-soft " iconColor="text-primary ">
             <Suspense fallback={<DashboardLoader />}><FleetDashboardPage /></Suspense>
           </SectionCard>
         )}
         {showSection('hr') && (
-          <SectionCard id="sec-hr" title="الموارد البشرية" subtitle="متابعة فريق العمل والحضور والعمولات" icon={Award} iconBg="bg-teal-50 dark:bg-teal-950" iconColor="text-teal-700 dark:text-teal-300">
+          <SectionCard id="sec-hr" title={sectionCopy('hr')?.title ?? 'الموارد البشرية'} subtitle={sectionCopy('hr')?.description ?? 'متابعة فريق العمل والحضور والعمولات'} icon={Award} iconBg="bg-success-soft " iconColor="text-success ">
             <Suspense fallback={<DashboardLoader />}><HrDashboardPage /></Suspense>
           </SectionCard>
         )}

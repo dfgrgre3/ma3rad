@@ -441,19 +441,19 @@ export const FinancialEventsCalendar: React.FC = () => {
         : canManage;
 
   return (
-    <section className="space-y-4 rounded-2xl border border-slate-200 bg-slate-100/70 p-4 text-slate-900 sm:p-6">
-      <div className="rounded-2xl border border-slate-200 bg-white px-5 py-3 shadow-sm">
+    <section className="space-y-4 rounded-2xl border border-line bg-surface-sunken/70 p-4 text-ink sm:p-6">
+      <div className="rounded-2xl border border-line bg-surface px-5 py-3 shadow-sm">
         <PageHeader
           icon={<CalendarDays className="h-5 w-5" />}
           title="التقويم المالي"
           description={`${options?.branchName || 'مواعيد الاستحقاق والتحصيل والسداد'} · أحداثك المالية في عرض واحد`}
           actions={<>
             {canManage && (
-              <button type="button" onClick={() => openNewEvent()} className="inline-flex items-center gap-2 rounded-xl bg-cyan-700 px-3.5 py-2.5 text-sm font-bold text-white hover:bg-cyan-800">
+              <button type="button" onClick={() => openNewEvent()} className="inline-flex items-center gap-2 rounded-xl bg-primary px-3.5 py-2.5 text-sm font-bold text-white hover:bg-primary">
                 <Plus className="h-4 w-4" /> حدث مالي جديد
               </button>
             )}
-            <button type="button" onClick={loadEvents} disabled={loading} aria-label="تحديث الأحداث" className="rounded-xl border border-slate-300 bg-white p-2.5 text-slate-600 transition hover:bg-slate-100 disabled:opacity-50">
+            <button type="button" onClick={loadEvents} disabled={loading} aria-label="تحديث الأحداث" className="rounded-xl border border-line-strong bg-surface p-2.5 text-ink-secondary transition hover:bg-surface-sunken disabled:opacity-50">
               <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
             </button>
           </>}

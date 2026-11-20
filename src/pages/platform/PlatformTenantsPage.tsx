@@ -14,7 +14,7 @@ import { Button } from '../../components/ui/Button';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { downloadCsv } from './components/PlatformUI';
 import { useToast } from '../../components/ui/Toast';
-import { emptyForm } from './PlatformTenantsPage/constants';
+import { emptyAccountForm, emptyForm, type CreatedAccountInfo, type NewAccountForm } from './PlatformTenantsPage/constants';
 import { useTenantDetail } from './PlatformTenantsPage/useTenantDetail';
 import { useTenantBulk } from './PlatformTenantsPage/useTenantBulk';
 import { useCsvImport } from './PlatformTenantsPage/useCsvImport';
@@ -55,8 +55,10 @@ export const PlatformTenantsPage: React.FC = () => {
   const [formOpen, setFormOpen] = React.useState(false);
   const [editing, setEditing] = React.useState<PlatformTenant | null>(null);
   const [form, setForm] = React.useState<PlatformTenantInput>(emptyForm);
+  const [accountForm, setAccountForm] = React.useState<NewAccountForm>(emptyAccountForm);
   const [saving, setSaving] = React.useState(false);
   const [createdTenant, setCreatedTenant] = React.useState<PlatformTenant | null>(null);
+  const [createdAccount, setCreatedAccount] = React.useState<CreatedAccountInfo | null>(null);
   const [catalogTenant, setCatalogTenant] = React.useState<PlatformTenant | null>(null);
   const [catalogOpen, setCatalogOpen] = React.useState(false);
 
@@ -97,6 +99,7 @@ export const PlatformTenantsPage: React.FC = () => {
     if (searchParams.get('new') === '1' && canManageTenants) {
       setEditing(null);
       setForm({ ...emptyForm, planId: plans.find((plan) => plan.isDefault)?.id ?? plans[0]?.id ?? '' });
+      setAccountForm(emptyAccountForm);
       setFormOpen(true);
     }
     if (presetStatus || searchParams.get('new') === '1') {
@@ -113,6 +116,7 @@ export const PlatformTenantsPage: React.FC = () => {
   const openCreate = () => {
     setEditing(null);
     setForm({ ...emptyForm, planId: plans.find((plan) => plan.isDefault)?.id ?? plans[0]?.id ?? '' });
+    setAccountForm(emptyAccountForm);
     setFormOpen(true);
   };
 
@@ -138,42 +142,88 @@ export const PlatformTenantsPage: React.FC = () => {
     setFormOpen(true);
   };
 
+  const createAccountForTenant = (tenant: PlatformTenant): Promise<CreatedAccountInfo> => {
+    const input = {
+      username: accountForm.username.trim() || undefined,
+      email: accountForm.email.trim() || tenant.email || undefined,
+      fullName: accountForm.fullName.trim() || tenant.contactName || tenant.name,
+      password: accountForm.password || undefined,
+    };
+    if (centralActive) {
+      return centralPlatformClient.createTenantAccount(tenant.id, input).then((result: any) => ({
+        username: result?.account?.username ?? input.username ?? '',
+        temporaryPassword: result?.temporaryPassword ?? null,
+        activationCode: result?.activationCode ?? result?.account?.activationCode ?? null,
+        loginUrl: `${window.location.origin}/login`,
+      }));
+    }
+    const details = platformAdminService.createTenantAccount(tenant.id, input);
+    return Promise.resolve({
+      username: details.username,
+      temporaryPassword: details.temporaryPassword ?? null,
+      activationCode: details.activationCode,
+      loginUrl: details.loginUrl,
+    });
+  };
+
   const save = () => {
     setSaving(true);
-    const done = (created?: PlatformTenant | null) => {
+    const fail = (err: unknown) => {
+      toast.error('تعذر حفظ العميل', err instanceof Error ? err.message : undefined);
+      setSaving(false);
+    };
+    const finishCreate = (created: PlatformTenant) => {
+      const done = (account: CreatedAccountInfo | null, accountError?: unknown) => {
+        if (accountError) {
+          toast.error('تم إنشاء العميل لكن تعذر إنشاء حساب الدخول', accountError instanceof Error ? accountError.message : undefined);
+        }
+        setCreatedAccount(account);
+        setCreatedTenant(created);
+        setFormOpen(false);
+        load();
+        setSaving(false);
+      };
+      if (!accountForm.enabled) {
+        done(null);
+        return;
+      }
+      createAccountForTenant(created).then((account) => done(account)).catch((err) => done(null, err));
+    };
+    const finishEdit = () => {
       setFormOpen(false);
       if (detail.detailId && editing?.id === detail.detailId) detail.loadProfile(detail.detailId);
       load();
-      if (!editing && created) setCreatedTenant(created);
+      setSaving(false);
     };
-    const fail = (err: unknown) => toast.error('تعذر حفظ العميل', err instanceof Error ? err.message : undefined);
     if (centralActive) {
       const request = editing
         ? centralPlatformClient.updateTenant(editing.id, form as Record<string, any>)
         : centralPlatformClient.createTenant(form);
       request
         .then((result: any) => {
-          toast.success(editing ? 'تم تحديث بيانات العميل' : 'تمت إضافة العميل بنجاح');
-          done(editing ? null : (result as PlatformTenant));
+          if (editing) {
+            toast.success('تم تحديث بيانات العميل');
+            finishEdit();
+          } else {
+            toast.success('تمت إضافة العميل بنجاح');
+            finishCreate(result as PlatformTenant);
+          }
         })
-        .catch(fail)
-        .finally(() => setSaving(false));
+        .catch(fail);
       return;
     }
     try {
       if (editing) {
         platformAdminService.updateTenant(editing.id, form);
         toast.success('تم تحديث بيانات العميل');
-        done(null);
+        finishEdit();
       } else {
         const created = platformAdminService.createTenant(form);
         toast.success('تمت إضافة العميل بنجاح');
-        done(created);
+        finishCreate(created);
       }
     } catch (err) {
       fail(err);
-    } finally {
-      setSaving(false);
     }
   };
 
@@ -306,6 +356,8 @@ export const PlatformTenantsPage: React.FC = () => {
         saving={saving}
         save={save}
         canManageTenants={canManageTenants}
+        accountForm={accountForm}
+        setAccountForm={setAccountForm}
       />
 
       <TenantDetailModal
@@ -378,10 +430,12 @@ export const PlatformTenantsPage: React.FC = () => {
       <TenantCreatedModal
         open={Boolean(createdTenant)}
         tenant={createdTenant}
-        onClose={() => setCreatedTenant(null)}
+        account={createdAccount}
+        onClose={() => { setCreatedTenant(null); setCreatedAccount(null); }}
         onContinue={() => {
           setCatalogTenant(createdTenant);
           setCreatedTenant(null);
+          setCreatedAccount(null);
           setCatalogOpen(true);
         }}
       />

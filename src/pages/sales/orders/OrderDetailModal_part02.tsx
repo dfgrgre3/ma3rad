@@ -16,11 +16,11 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
   <Modal onClose={onClose} wide>
     <div className="flex items-start justify-between mb-4">
       <div>
-        <h3 className="text-base font-black text-slate-900">طلب {detail.orderNumber}</h3>
-        <p className="text-[11px] text-slate-500 mt-1">{detail.date} • {detail.warehouseName} • {getOrderStatusLabel(detail.status).label}</p>
+        <h3 className="text-base font-black text-ink">طلب {detail.orderNumber}</h3>
+        <p className="text-[11px] text-muted mt-1">{detail.date} • {detail.warehouseName} • {getOrderStatusLabel(detail.status).label}</p>
       </div>
       <OperationalFieldsSummary fields={operationalFields} values={operationalFieldValues} />
-      <button onClick={onClose} className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100"><X className="w-4 h-4" /></button>
+      <button onClick={onClose} className="p-1.5 rounded-lg text-muted hover:bg-surface-sunken"><X className="w-4 h-4" /></button>
     </div>
     <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 mb-4">
       <Info label="العميل" value={detail.customerName || '—'} sub={detail.customerPhone || ''} />
@@ -37,7 +37,7 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
       <Info label="المتبقي" value={fmt(detail.remainingAmount)} sub={detail.financialStatus === 'PAID' ? 'الرصيد مسدد' : 'مستحق على العميل'} />
       <Info label="حالة العملية" value={detail.deliveryStatus === 'DELIVERED' ? 'التسليم كامل' : detail.deliveryStatus === 'PARTIAL' ? 'تسليم جزئي' : 'لم يبدأ التسليم'} sub={detail.billingStatus === 'INVOICED' ? `تمت الفوترة (${detail.invoiceNumber || ''})` : 'لم تصدر فاتورة'} />
     </div>
-    <div className="border border-slate-200 rounded-xl overflow-x-auto mb-4">
+    <div className="border border-line rounded-xl overflow-x-auto mb-4">
       <DataTable
       ariaLabel="بنود الطلب"
       rows={detail.items || []}
@@ -49,9 +49,9 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
         {
           key: 'product', header: 'الصنف',
           render: (item: any) => (
-            <span className="font-bold text-slate-800">
+            <span className="font-bold text-ink">
               {item.productName}
-              <div className="text-[9px] font-normal text-slate-400">{item.size} • {item.grade}</div>
+              <div className="text-[9px] font-normal text-muted">{item.size} • {item.grade}</div>
             </span>
           ),
         },
@@ -62,54 +62,54 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
             const remaining = Math.max(0, Number(item.quantityM2) - Number(item.deliveredM2 || 0));
             return (
               <span className="font-mono">
-                <span className={remaining <= 0 ? 'font-bold text-emerald-600' : 'text-sky-600'}>
+                <span className={remaining <= 0 ? 'font-bold text-success' : 'text-primary'}>
                   {formatProductQuantity(Number(item.deliveredM2 || 0), item)}
                 </span>
-                {remaining > 0 && <div className="text-[9px] text-slate-400">متبقي {remaining.toFixed(2)}</div>}
+                {remaining > 0 && <div className="text-[9px] text-muted">متبقي {remaining.toFixed(2)}</div>}
               </span>
             );
           },
         },
         { key: 'boxes', header: 'الكراتين', render: (item: any) => <span className="font-mono">{item.boxesCount}</span> },
         { key: 'price', header: 'السعر', render: (item: any) => <span className="font-mono">{fmt(item.unitPrice)}</span> },
-        { key: 'disc', header: 'الخصم', render: (item: any) => <span className="font-mono text-rose-600">{item.discountAmount ? `-${fmt(item.discountAmount)}` : '—'}</span> },
+        { key: 'disc', header: 'الخصم', render: (item: any) => <span className="font-mono text-danger">{item.discountAmount ? `-${fmt(item.discountAmount)}` : '—'}</span> },
         { key: 'total', header: 'الإجمالي', render: (item: any) => <span className="font-bold">{fmt(item.totalPrice)}</span> },
       ]}
     />
     </div>
-    <div className="flex flex-wrap items-center justify-end gap-2 pt-3 border-t border-slate-100">
-      <button onClick={() => onPrint(detail)} className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold flex items-center gap-1.5"><Printer className="w-3.5 h-3.5" /> طباعة</button>
-      <button onClick={() => onShareOnWhatsApp(detail)} className="px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-xl text-xs font-bold flex items-center gap-1.5"><MessageCircle className="w-3.5 h-3.5" /> واتساب</button>
-      <button onClick={() => onOpenTimeline(detail)} className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold flex items-center gap-1.5"><History className="w-3.5 h-3.5" /> سجل الحالات</button>
+    <div className="flex flex-wrap items-center justify-end gap-2 pt-3 border-t border-line">
+      <button onClick={() => onPrint(detail)} className="px-3 py-2 bg-surface-sunken hover:bg-surface-sunken text-ink rounded-xl text-xs font-bold flex items-center gap-1.5"><Printer className="w-3.5 h-3.5" /> طباعة</button>
+      <button onClick={() => onShareOnWhatsApp(detail)} className="px-3 py-2 bg-success-soft hover:bg-success-soft text-success border border-success-border rounded-xl text-xs font-bold flex items-center gap-1.5"><MessageCircle className="w-3.5 h-3.5" /> واتساب</button>
+      <button onClick={() => onOpenTimeline(detail)} className="px-3 py-2 bg-surface-sunken hover:bg-surface-sunken text-ink rounded-xl text-xs font-bold flex items-center gap-1.5"><History className="w-3.5 h-3.5" /> سجل الحالات</button>
       {canUpdate && ['CONFIRMED', 'PROCESSING', 'PARTIAL', 'READY'].includes(detail.status) && (
-        <button onClick={() => onOpenDelivery(detail)} className="px-3 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5"><PackageCheck className="w-3.5 h-3.5" /> تسجيل تسليم</button>
+        <button onClick={() => onOpenDelivery(detail)} className="px-3 py-2 bg-primary hover:bg-primary text-white rounded-xl text-xs font-bold flex items-center gap-1.5"><PackageCheck className="w-3.5 h-3.5" /> تسجيل تسليم</button>
       )}
       {canApprove && ['PENDING', 'CONFIRMED'].includes(detail.status) && (
-        <button onClick={() => onAdvance(detail)} className="px-3 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5">
+        <button onClick={() => onAdvance(detail)} className="px-3 py-2 bg-primary hover:bg-primary text-white rounded-xl text-xs font-bold flex items-center gap-1.5">
           <ChevronLeft className="w-3.5 h-3.5" />
           {detail.status === 'PENDING' ? getOrderActionLabels().confirm : getOrderActionLabels().start}
         </button>
       )}
       {canApprove && ['CONFIRMED', 'PROCESSING'].includes(detail.status) && (
-        <button onClick={() => onSetStatus(detail, 'ON_HOLD')} className="px-3 py-2 bg-orange-50 hover:bg-orange-100 text-orange-700 border border-orange-200 rounded-xl text-xs font-bold flex items-center gap-1.5"><Pause className="w-3.5 h-3.5" /> تعليق مؤقت</button>
+        <button onClick={() => onSetStatus(detail, 'ON_HOLD')} className="px-3 py-2 bg-warning-soft hover:bg-warning-soft text-warning border border-warning-border rounded-xl text-xs font-bold flex items-center gap-1.5"><Pause className="w-3.5 h-3.5" /> تعليق مؤقت</button>
       )}
       {canApprove && detail.status === 'ON_HOLD' && (
         <>
-          <button onClick={() => onSetStatus(detail, 'CONFIRMED')} className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold flex items-center gap-1.5"><Play className="w-3.5 h-3.5" /> استئناف: تأكيد</button>
-          <button onClick={() => onSetStatus(detail, 'PROCESSING')} className="px-3 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5"><Play className="w-3.5 h-3.5" /> استئناف: تجهيز</button>
+          <button onClick={() => onSetStatus(detail, 'CONFIRMED')} className="px-3 py-2 bg-surface-sunken hover:bg-surface-sunken text-ink rounded-xl text-xs font-bold flex items-center gap-1.5"><Play className="w-3.5 h-3.5" /> استئناف: تأكيد</button>
+          <button onClick={() => onSetStatus(detail, 'PROCESSING')} className="px-3 py-2 bg-primary hover:bg-primary text-white rounded-xl text-xs font-bold flex items-center gap-1.5"><Play className="w-3.5 h-3.5" /> استئناف: تجهيز</button>
         </>
       )}
       {canApprove && detail.status === 'PROCESSING' && (
-        <button onClick={() => onSetStatus(detail, 'READY')} className="px-3 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5"><PackageCheck className="w-3.5 h-3.5" /> تحديد كجاهز</button>
+        <button onClick={() => onSetStatus(detail, 'READY')} className="px-3 py-2 bg-primary hover:bg-primary text-white rounded-xl text-xs font-bold flex items-center gap-1.5"><PackageCheck className="w-3.5 h-3.5" /> تحديد كجاهز</button>
       )}
       {canApprove && detail.status === 'READY' && (
-        <button onClick={() => onSetStatus(detail, 'PROCESSING')} className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold flex items-center gap-1.5"><ChevronLeft className="w-3.5 h-3.5" /> إعادة للتجهيز</button>
+        <button onClick={() => onSetStatus(detail, 'PROCESSING')} className="px-3 py-2 bg-surface-sunken hover:bg-surface-sunken text-ink rounded-xl text-xs font-bold flex items-center gap-1.5"><ChevronLeft className="w-3.5 h-3.5" /> إعادة للتجهيز</button>
       )}
       {['PENDING', 'CONFIRMED', 'PROCESSING', 'PARTIAL', 'READY'].includes(detail.status) && detail.billingStatus !== 'INVOICED' && (
-        <button onClick={() => onOpenConvert(detail)} className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5"><Receipt className="w-3.5 h-3.5" /> إصدار فاتورة وإتمام</button>
+        <button onClick={() => onOpenConvert(detail)} className="px-3 py-2 bg-success hover:bg-success text-white rounded-xl text-xs font-bold flex items-center gap-1.5"><Receipt className="w-3.5 h-3.5" /> إصدار فاتورة وإتمام</button>
       )}
       {canApprove && !['COMPLETED', 'CANCELLED'].includes(detail.status) && (
-        <button onClick={() => onCancel(detail)} className="px-3 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5"><Ban className="w-3.5 h-3.5" /> إلغاء الطلب</button>
+        <button onClick={() => onCancel(detail)} className="px-3 py-2 bg-danger hover:bg-danger text-white rounded-xl text-xs font-bold flex items-center gap-1.5"><Ban className="w-3.5 h-3.5" /> إلغاء الطلب</button>
       )}
     </div>
   </Modal>

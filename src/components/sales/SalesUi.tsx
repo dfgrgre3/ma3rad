@@ -5,7 +5,7 @@ const fmt = (n: number) => CeramicMath.formatCurrency(Number(n) || 0);
 
 
 export const IconButton: React.FC<{ title: string; onClick: () => void; children: React.ReactNode; tone?: string }> = ({ title, onClick, children, tone }) => (
-  <button title={title} onClick={onClick} className={`p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 transition ${tone || ''}`}>
+  <button title={title} onClick={onClick} className={`p-1.5 rounded-lg text-muted hover:bg-surface-sunken transition ${tone || ''}`}>
     {children}
   </button>
 );
@@ -36,7 +36,7 @@ export const Modal: React.FC<{ children: React.ReactNode; onClose: () => void; w
         type="button"
         aria-label="إغلاق النافذة"
         onClick={onClose}
-        className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm"
+        className="absolute inset-0 bg-primary/50 backdrop-blur-sm"
       />
       <div
         ref={dialogRef}
@@ -44,7 +44,7 @@ export const Modal: React.FC<{ children: React.ReactNode; onClose: () => void; w
         aria-modal="true"
         aria-label="نافذة حوارية"
         tabIndex={-1}
-        className={`relative z-10 w-full overflow-y-auto rounded-2xl border border-slate-200 bg-white shadow-2xl ${wide ? 'max-w-4xl' : 'max-w-lg'} max-h-[92vh] p-6`}
+        className={`relative z-10 w-full overflow-y-auto rounded-2xl border border-line bg-surface shadow-2xl ${wide ? 'max-w-4xl' : 'max-w-lg'} max-h-[92vh] p-6`}
       >
         {children}
       </div>
@@ -53,15 +53,15 @@ export const Modal: React.FC<{ children: React.ReactNode; onClose: () => void; w
 };
 
 export const InfoBox: React.FC<{ label: string; value: string; sub?: string }> = ({ label, value, sub }) => (
-  <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
-    <div className="text-[10px] font-bold text-slate-400">{label}</div>
-    <div className="text-xs font-black text-slate-800 mt-0.5">{value}</div>
-    {sub && <div className="text-[10px] text-slate-500 font-mono mt-0.5">{sub}</div>}
+  <div className="bg-surface-muted border border-line rounded-xl p-3">
+    <div className="text-[10px] font-bold text-muted">{label}</div>
+    <div className="text-xs font-black text-ink mt-0.5">{value}</div>
+    {sub && <div className="text-[10px] text-muted font-mono mt-0.5">{sub}</div>}
   </div>
 );
 
 export const SummaryRow: React.FC<{ label: string; value: number; strong?: boolean; tone?: string }> = ({ label, value, strong, tone }) => (
-  <div className={`flex items-center justify-between py-0.5 text-[11px] ${strong ? 'font-black text-slate-900 text-xs' : 'text-slate-600'}`}>
+  <div className={`flex items-center justify-between py-0.5 text-[11px] ${strong ? 'font-black text-ink text-xs' : 'text-ink-secondary'}`}>
     <span>{label}</span>
     <span className={`font-mono ${tone || ''}`}>{fmt(value)}</span>
   </div>

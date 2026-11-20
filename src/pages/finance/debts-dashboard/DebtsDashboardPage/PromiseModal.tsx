@@ -14,10 +14,10 @@ export const PromiseModal: React.FC<Props> = ({
   onSubmit,
   onClose,
 }) => (
-  <div className="fixed inset-0 z-50 bg-slate-900/40 flex items-center justify-center p-4">
+  <div className="fixed inset-0 z-50 bg-primary/40 flex items-center justify-center p-4">
     <form
       onSubmit={onSubmit}
-      className="bg-white rounded-2xl shadow-xl max-w-md w-full p-5 space-y-3"
+      className="bg-surface rounded-2xl shadow-xl max-w-md w-full p-5 space-y-3"
     >
       <h3 className="font-black text-lg">وعد السداد والمتابعة</h3>
       <label className="block text-xs font-bold">
@@ -71,11 +71,11 @@ export const PromiseModal: React.FC<Props> = ({
         <button
           type="button"
           onClick={onClose}
-          className="px-4 py-2 bg-slate-100 rounded-lg"
+          className="px-4 py-2 bg-surface-sunken rounded-lg"
         >
           إلغاء
         </button>
-        <button className="px-4 py-2 bg-amber-600 text-white font-bold rounded-lg">
+        <button className="px-4 py-2 bg-warning text-white font-bold rounded-lg">
           حفظ
         </button>
       </div>

@@ -210,16 +210,16 @@ export const TenantDetailModal: React.FC<TenantDetailModalProps> = ({
         }
       >
         {!profile || !tenant ? (
-          <div className="py-16 text-center text-sm font-semibold text-slate-500">جارٍ تحميل ملف العميل...</div>
+          <div className="py-16 text-center text-sm font-semibold text-muted">جارٍ تحميل ملف العميل...</div>
         ) : (
           <div className="space-y-4">
             {/* Header strip */}
-            <div className="rounded-xl bg-gradient-to-l from-slate-900 via-slate-800 to-emerald-900 p-4 text-white">
+            <div className="rounded-xl bg-gradient-to-l from-ink via-ink to-success p-4 text-white">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="text-[10.5px] font-bold uppercase tracking-wide text-emerald-300">{tenant.businessType || 'نشاط غير محدد'}</p>
+                  <p className="text-[10.5px] font-bold uppercase tracking-wide text-success">{tenant.businessType || 'نشاط غير محدد'}</p>
                   <h3 className="mt-1 truncate text-lg font-black">{tenant.name}</h3>
-                  <p className="mt-1 text-[11px] text-slate-300">
+                  <p className="mt-1 text-[11px] text-muted">
                     رقم العميل <span dir="ltr" className="font-mono font-bold text-white">{tenant.code}</span>
                     {' · '}Tenant ID <span dir="ltr" className="font-mono">{tenant.id}</span>
                     {' · '}مسجل في {formatDate(tenant.createdAt)}
@@ -228,7 +228,7 @@ export const TenantDetailModal: React.FC<TenantDetailModalProps> = ({
                 <div className="flex flex-wrap items-center gap-2">
                   <StatusBadge value={tenant.status} label={PLATFORM_TENANT_STATUS_LABELS[tenant.status]} />
                   <span className={`rounded-full border px-2 py-0.5 text-[10.5px] font-bold ${
-                    account?.isActive ? 'border-emerald-300/40 bg-emerald-400/20 text-emerald-200' : 'border-rose-300/40 bg-rose-400/20 text-rose-200'
+                    account?.isActive ? 'border-success/40 bg-success/20 text-success' : 'border-danger/40 bg-danger/20 text-danger'
                   }`}>
                     الحساب: {account ? ACCOUNT_STATUS(account.isActive) : 'غير منشأ'}
                   </span>
@@ -287,14 +287,14 @@ export const TenantDetailModal: React.FC<TenantDetailModalProps> = ({
             </div>
 
             {/* Tabs */}
-            <div className="flex flex-wrap gap-1 rounded-xl border border-slate-200 bg-slate-50 p-1">
+            <div className="flex flex-wrap gap-1 rounded-xl border border-line bg-surface-muted p-1">
               {TABS.map((item) => (
                 <button
                   key={item.key}
                   type="button"
                   onClick={() => setTab(item.key)}
                   className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[11.5px] font-bold transition ${
-                    tab === item.key ? 'bg-white text-emerald-700 shadow-sm ring-1 ring-emerald-200' : 'text-slate-600 hover:bg-white/70'
+                    tab === item.key ? 'bg-surface text-success shadow-sm ring-1 ring-success' : 'text-ink-secondary hover:bg-surface/70'
                   }`}
                 >
                   {item.icon} {item.label}

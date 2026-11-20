@@ -15,7 +15,7 @@ export function GeneralLedgerPanel({ accounts, accountId, ledger, onAccountChang
   return (
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row gap-3">
-        <select value={accountId} aria-label="الحساب" onChange={(event) => onAccountChange(event.target.value)} className="flex-1 px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold">
+        <select value={accountId} aria-label="الحساب" onChange={(event) => onAccountChange(event.target.value)} className="flex-1 px-3 py-2.5 bg-surface border border-line rounded-xl text-xs font-bold">
           <option value="">— اختر الحساب —</option>
           {accounts.map((account) => <option key={account.id} value={account.id}>{account.code} — {account.name}</option>)}
         </select>
@@ -23,20 +23,20 @@ export function GeneralLedgerPanel({ accounts, accountId, ledger, onAccountChang
       {ledger && (
         <>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div className="bg-white border border-slate-200 rounded-xl p-4"><p className="text-xs text-slate-500 font-bold">الرصيد الافتتاحي</p><p className="text-lg font-black font-mono">{formatCurrency(ledger.opening)}</p></div>
-            <div className="bg-white border border-slate-200 rounded-xl p-4"><p className="text-xs text-slate-500 font-bold">عدد الحركات</p><p className="text-lg font-black font-mono">{ledger.lines.length}</p></div>
-            <div className="bg-white border border-slate-200 rounded-xl p-4"><p className="text-xs text-slate-500 font-bold">الرصيد الختامي</p><p className="text-lg font-black font-mono">{formatCurrency(ledger.closing)}</p></div>
+            <div className="bg-surface border border-line rounded-xl p-4"><p className="text-xs text-muted font-bold">الرصيد الافتتاحي</p><p className="text-lg font-black font-mono">{formatCurrency(ledger.opening)}</p></div>
+            <div className="bg-surface border border-line rounded-xl p-4"><p className="text-xs text-muted font-bold">عدد الحركات</p><p className="text-lg font-black font-mono">{ledger.lines.length}</p></div>
+            <div className="bg-surface border border-line rounded-xl p-4"><p className="text-xs text-muted font-bold">الرصيد الختامي</p><p className="text-lg font-black font-mono">{formatCurrency(ledger.closing)}</p></div>
           </div>
-          <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+          <div className="bg-surface border border-line rounded-xl overflow-hidden">
             <DataTable
               ariaLabel="الأستاذ العام"
               rows={ledger.lines.map((line, index) => ({ ...line, __index: index }))}
               rowKey={(line: any) => `${line.entryNumber}-${line.__index}`}
               tableClassName="text-sm"
               columns={[
-                { key: 'date', header: 'التاريخ', render: (line: any) => <span className="text-slate-500">{line.date}</span> },
-                { key: 'entry', header: 'رقم القيد', render: (line: any) => <span className="font-mono font-bold text-teal-700">{line.entryNumber}</span> },
-                { key: 'ref', header: 'المصدر', render: (line: any) => <span className="text-xs text-slate-500">{line.referenceType || '—'}</span> },
+                { key: 'date', header: 'التاريخ', render: (line: any) => <span className="text-muted">{line.date}</span> },
+                { key: 'entry', header: 'رقم القيد', render: (line: any) => <span className="font-mono font-bold text-success">{line.entryNumber}</span> },
+                { key: 'ref', header: 'المصدر', render: (line: any) => <span className="text-xs text-muted">{line.referenceType || '—'}</span> },
                 { key: 'desc', header: 'البيان', render: (line: any) => line.description },
                 { key: 'debit', header: 'مدين', render: (line: any) => <span className="font-mono">{formatCurrency(line.debit)}</span> },
                 { key: 'credit', header: 'دائن', render: (line: any) => <span className="font-mono">{formatCurrency(line.credit)}</span> },

@@ -22,6 +22,9 @@ export const ACTIVITY_NAV_PATHS = [
   '/sales/after-sales',
   '/partners',
   '/projects',
+  '/projects/execution',
+  '/projects/sites',
+  '/projects/boq',
   '/suppliers',
   '/reports',
   '/documents',
@@ -30,6 +33,7 @@ export const ACTIVITY_NAV_PATHS = [
   '/restaurant',
   '/manufacturing',
   '/construction-estimate',
+  '/retail',
   '/crm/dashboard',
 ] as const;
 
@@ -51,6 +55,7 @@ const FAMILY_NAV_LABELS: Record<string, NavLabelMap> = {
     '/documents': 'الفواتير والمستندات',
     '/daily/sales': 'مبيعات اليوم',
     '/daily/purchases': 'مشتريات البضاعة اليوم',
+    '/retail': 'مساحة النشاط',
     '/crm/dashboard': 'علاقات العملاء',
   },
   distribution: {
@@ -92,6 +97,9 @@ const FAMILY_NAV_LABELS: Record<string, NavLabelMap> = {
     '/sales/after-sales': 'ضمان الأعمال',
     '/partners': 'الشركاء',
     '/projects': 'المشروعات والعقود',
+    '/projects/execution': 'العقود والمستخلصات والتكاليف',
+    '/projects/sites': 'المواقع والتقارير اليومية',
+    '/projects/boq': 'مقاييس الأعمال',
     '/suppliers': 'الموردون',
     '/reports': 'تقارير المشاريع',
     '/documents': 'العقود والمستخلصات',
@@ -201,6 +209,7 @@ const ACTIVITY_NAV_LABELS: Record<string, NavLabelMap> = {
     '/documents': 'فواتير المعرض',
     '/daily/sales': 'مبيعات الأدوات اليوم',
     '/projects': 'مشاريع العملاء',
+    '/retail': 'مساحة الأدوات الصحية',
   },
   furniture: {
     '/pos': 'نقطة البيع',
@@ -212,6 +221,7 @@ const ACTIVITY_NAV_LABELS: Record<string, NavLabelMap> = {
     '/documents': 'فواتير المعرض',
     '/daily/sales': 'مبيعات الأثاث اليوم',
     '/projects': 'توريدات المشاريع',
+    '/retail': 'مساحة الأثاث',
   },
   home_appliances: {
     '/pos': 'نقطة البيع',
@@ -223,6 +233,7 @@ const ACTIVITY_NAV_LABELS: Record<string, NavLabelMap> = {
     '/documents': 'فواتير المعرض',
     '/daily/sales': 'مبيعات الأجهزة اليوم',
     '/projects': 'توريدات المشاريع',
+    '/retail': 'مساحة الأجهزة',
   },
   electronics: {
     '/pos': 'نقطة البيع',
@@ -234,6 +245,7 @@ const ACTIVITY_NAV_LABELS: Record<string, NavLabelMap> = {
     '/documents': 'فواتير المعرض',
     '/daily/sales': 'مبيعات الأجهزة اليوم',
     '/projects': 'توريدات الشركات',
+    '/retail': 'مساحة الإلكترونيات',
   },
   clothing: {
     '/pos': 'نقطة البيع',
@@ -245,6 +257,7 @@ const ACTIVITY_NAV_LABELS: Record<string, NavLabelMap> = {
     '/documents': 'فواتير المحل',
     '/daily/sales': 'مبيعات اليوم',
     '/projects': 'توريدات موحدة',
+    '/retail': 'مساحة الملابس',
   },
   food: {
     '/pos': 'نقطة البيع',
@@ -256,6 +269,7 @@ const ACTIVITY_NAV_LABELS: Record<string, NavLabelMap> = {
     '/documents': 'إيصالات ومستندات',
     '/daily/sales': 'مبيعات اليوم',
     '/projects': 'عقود التوريد',
+    '/retail': 'مساحة السوبر ماركت',
   },
   cosmetics: {
     '/pos': 'نقطة البيع',
@@ -267,6 +281,7 @@ const ACTIVITY_NAV_LABELS: Record<string, NavLabelMap> = {
     '/documents': 'فواتير المحل',
     '/daily/sales': 'مبيعات اليوم',
     '/projects': 'توريدات المناسبات',
+    '/retail': 'مساحة التجميل',
   },
   automotive: {
     '/pos': 'نقطة البيع',
@@ -278,6 +293,7 @@ const ACTIVITY_NAV_LABELS: Record<string, NavLabelMap> = {
     '/documents': 'فواتير المحل',
     '/daily/sales': 'مبيعات القطع اليوم',
     '/projects': 'توريدات ورش',
+    '/retail': 'مساحة قطع الغيار',
   },
   building_materials: {
     '/pos': 'نقطة البيع',
@@ -289,6 +305,7 @@ const ACTIVITY_NAV_LABELS: Record<string, NavLabelMap> = {
     '/documents': 'فواتير المحل',
     '/daily/sales': 'مبيعات المواد اليوم',
     '/projects': 'توريدات المشاريع',
+    '/retail': 'مساحة مواد البناء',
   },
   lighting: {
     '/pos': 'نقطة البيع',
@@ -300,6 +317,7 @@ const ACTIVITY_NAV_LABELS: Record<string, NavLabelMap> = {
     '/documents': 'فواتير المحل',
     '/daily/sales': 'مبيعات اليوم',
     '/projects': 'توريدات المشاريع',
+    '/retail': 'مساحة الإضاءة',
   },
   ecommerce: {
     '/pos': 'نقطة البيع',
@@ -311,6 +329,7 @@ const ACTIVITY_NAV_LABELS: Record<string, NavLabelMap> = {
     '/documents': 'فواتير المتجر',
     '/daily/sales': 'مبيعات اليوم',
     '/projects': 'حملات المتجر',
+    '/retail': 'مساحة المتجر الإلكتروني',
   },
   general: {
     '/pos': 'نقطة البيع',
@@ -323,6 +342,7 @@ const ACTIVITY_NAV_LABELS: Record<string, NavLabelMap> = {
     '/reports': 'التقارير',
     '/documents': 'الفواتير والمستندات',
     '/daily/sales': 'مبيعات اليوم',
+    '/retail': 'مساحة النشاط',
     '/crm/dashboard': 'علاقات العملاء',
   },
   // Distribution & operations.
@@ -377,6 +397,9 @@ const ACTIVITY_NAV_LABELS: Record<string, NavLabelMap> = {
     '/sales/after-sales': 'ضمان الأعمال',
     '/partners': 'الشركاء',
     '/projects': 'المشروعات والعقود',
+    '/projects/execution': 'العقود والمستخلصات والتكاليف',
+    '/projects/sites': 'المواقع والتقارير اليومية',
+    '/projects/boq': 'مقاييس الأعمال',
     '/suppliers': 'الموردون',
     '/reports': 'تقارير المشاريع',
     '/documents': 'عقود ومستخلصات',

@@ -372,19 +372,19 @@ export const PlatformBillingPage: React.FC = () => {
         }
       />
 
-      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white p-2 shadow-sm">
-        <div className="inline-flex rounded-lg bg-slate-100 p-1">
+      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface p-2 shadow-sm">
+        <div className="inline-flex rounded-lg bg-surface-sunken p-1">
           <button
             type="button"
             onClick={() => setTab('invoices')}
-            className={`rounded-md px-3 py-1.5 text-[12px] font-bold transition ${tab === 'invoices' ? 'bg-white text-slate-900 shadow' : 'text-slate-500'}`}
+            className={`rounded-md px-3 py-1.5 text-[12px] font-bold transition ${tab === 'invoices' ? 'bg-surface text-ink shadow' : 'text-muted'}`}
           >
             الفواتير ({invoices.length})
           </button>
           <button
             type="button"
             onClick={() => setTab('payments')}
-            className={`rounded-md px-3 py-1.5 text-[12px] font-bold transition ${tab === 'payments' ? 'bg-white text-slate-900 shadow' : 'text-slate-500'}`}
+            className={`rounded-md px-3 py-1.5 text-[12px] font-bold transition ${tab === 'payments' ? 'bg-surface text-ink shadow' : 'text-muted'}`}
           >
             المدفوعات ({payments.length})
           </button>
@@ -392,7 +392,7 @@ export const PlatformBillingPage: React.FC = () => {
         {tab === 'invoices' && (
           <>
             <div className="relative min-w-[220px] flex-1">
-              <Search className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+              <Search className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted" />
               <input
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
@@ -411,12 +411,12 @@ export const PlatformBillingPage: React.FC = () => {
       </div>
 
       {error && (
-        <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-2.5 text-xs font-semibold text-rose-700">{error}</div>
+        <div role="alert" className="rounded-lg border border-danger-border bg-danger-soft px-4 py-2.5 text-xs font-semibold text-danger">{error}</div>
       )}
 
-      <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+      <section className="overflow-hidden rounded-xl border border-line bg-surface shadow-sm">
         {loading ? (
-          <div className="py-16 text-center text-sm font-semibold text-slate-500">جارٍ تحميل البيانات...</div>
+          <div className="py-16 text-center text-sm font-semibold text-muted">جارٍ تحميل البيانات...</div>
         ) : tab === 'invoices' ? (
           invoiceRows.length === 0 ? (
             <EmptyState icon={<ReceiptText className="h-5 w-5" />} title="لا توجد فواتير" description="أنشئ فاتورة جديدة لعميل." />
@@ -428,34 +428,34 @@ export const PlatformBillingPage: React.FC = () => {
                           minWidth={900}
                           dense
                           columns={[
-                            { key: 'number', header: 'الرقم', render: (invoice) => <span className="font-mono text-[11px] font-bold text-slate-800" dir="ltr">{invoice.number}</span> },
-                            { key: 'tenant', header: 'العميل', render: (invoice) => <span className="text-[12px] font-semibold text-slate-700">{invoice.tenantName || '—'}</span> },
+                            { key: 'number', header: 'الرقم', render: (invoice) => <span className="font-mono text-[11px] font-bold text-ink" dir="ltr">{invoice.number}</span> },
+                            { key: 'tenant', header: 'العميل', render: (invoice) => <span className="text-[12px] font-semibold text-ink">{invoice.tenantName || '—'}</span> },
                             { key: 'status', header: 'الحالة', render: (invoice) => <StatusBadge value={invoice.status} label={PLATFORM_INVOICE_STATUS_LABELS[invoice.status]} /> },
-                            { key: 'total', header: 'الإجمالي', render: (invoice) => <span className="text-[11.5px] font-bold text-slate-800">{formatMoney(invoice.total, invoice.currency)}</span> },
-                            { key: 'paid', header: 'المدفوع', render: (invoice) => <span className="text-[11px] text-emerald-700">{formatMoney(invoice.paidAmount, invoice.currency)}</span> },
+                            { key: 'total', header: 'الإجمالي', render: (invoice) => <span className="text-[11.5px] font-bold text-ink">{formatMoney(invoice.total, invoice.currency)}</span> },
+                            { key: 'paid', header: 'المدفوع', render: (invoice) => <span className="text-[11px] text-success">{formatMoney(invoice.paidAmount, invoice.currency)}</span> },
                             {
                               key: 'remaining', header: 'المتبقي',
                               render: (invoice) => {
                                 const remaining = invoice.total - invoice.paidAmount;
-                                return <span className={`text-[11px] font-bold ${remaining > 0 ? 'text-rose-600' : 'text-slate-400'}`}>{formatMoney(remaining, invoice.currency)}</span>;
+                                return <span className={`text-[11px] font-bold ${remaining > 0 ? 'text-danger' : 'text-muted'}`}>{formatMoney(remaining, invoice.currency)}</span>;
                               },
                             },
-                            { key: 'due', header: 'الاستحقاق', render: (invoice) => <span className="text-[11px] text-slate-600">{formatDate(invoice.dueDate)}</span> },
+                            { key: 'due', header: 'الاستحقاق', render: (invoice) => <span className="text-[11px] text-ink-secondary">{formatDate(invoice.dueDate)}</span> },
                             {
                               key: 'actions', header: 'إجراءات',
                               render: (invoice) => {
                                 const remaining = invoice.total - invoice.paidAmount;
                                 return (
                                   <div className="flex items-center gap-1">
-                                    <button type="button" onClick={() => openDetail(invoice)} className="rounded p-1.5 text-slate-500 hover:bg-sky-50 hover:text-sky-700" title="عرض"><Eye className="h-3.5 w-3.5" /></button>
+                                    <button type="button" onClick={() => openDetail(invoice)} className="rounded p-1.5 text-muted hover:bg-accent-soft hover:text-primary" title="عرض"><Eye className="h-3.5 w-3.5" /></button>
                                     {canManageBilling && invoice.status === 'DRAFT' && (
-                                      <button type="button" onClick={() => sendInvoice(invoice)} className="rounded p-1.5 text-slate-500 hover:bg-indigo-50 hover:text-indigo-700" title="إرسال"><Send className="h-3.5 w-3.5" /></button>
+                                      <button type="button" onClick={() => sendInvoice(invoice)} className="rounded p-1.5 text-muted hover:bg-accent-soft hover:text-primary" title="إرسال"><Send className="h-3.5 w-3.5" /></button>
                                     )}
                                     {canManageBilling && invoice.status !== 'VOID' && invoice.status !== 'PAID' && remaining > 0 && (
-                                      <button type="button" onClick={() => openPayment(invoice)} className="rounded p-1.5 text-slate-500 hover:bg-emerald-50 hover:text-emerald-700" title="تسجيل دفعة"><Wallet className="h-3.5 w-3.5" /></button>
+                                      <button type="button" onClick={() => openPayment(invoice)} className="rounded p-1.5 text-muted hover:bg-success-soft hover:text-success" title="تسجيل دفعة"><Wallet className="h-3.5 w-3.5" /></button>
                                     )}
                                     {canManageBilling && invoice.status !== 'VOID' && (
-                                      <button type="button" onClick={() => voidInvoice(invoice)} className="rounded p-1.5 text-slate-500 hover:bg-rose-50 hover:text-rose-700" title="إلغاء"><Ban className="h-3.5 w-3.5" /></button>
+                                      <button type="button" onClick={() => voidInvoice(invoice)} className="rounded p-1.5 text-muted hover:bg-danger-soft hover:text-danger" title="إلغاء"><Ban className="h-3.5 w-3.5" /></button>
                                     )}
                                   </div>
                                 );
@@ -475,16 +475,16 @@ export const PlatformBillingPage: React.FC = () => {
                       minWidth={800}
                       dense
                       columns={[
-                        { key: 'date', header: 'التاريخ', render: (payment) => <span className="text-[11px] text-slate-600">{formatDateTime(payment.paidAt)}</span> },
-                        { key: 'tenant', header: 'العميل', render: (payment) => <span className="text-[12px] font-semibold text-slate-700">{payment.tenantName || '—'}</span> },
-                        { key: 'invoice', header: 'الفاتورة', render: (payment) => <span className="font-mono text-[10.5px] text-slate-600" dir="ltr">{payment.invoiceNumber || '—'}</span> },
-                        { key: 'method', header: 'الطريقة', render: (payment) => <span className="text-[11px] text-slate-600">{PAYMENT_METHOD_LABELS[payment.method]}</span> },
-                        { key: 'reference', header: 'المرجع', render: (payment) => <span className="font-mono text-[10.5px] text-slate-500" dir="ltr">{payment.reference || '—'}</span> },
-                        { key: 'amount', header: 'المبلغ', render: (payment) => <span className="text-[12px] font-bold text-emerald-700">{formatMoney(payment.amount)}</span> },
+                        { key: 'date', header: 'التاريخ', render: (payment) => <span className="text-[11px] text-ink-secondary">{formatDateTime(payment.paidAt)}</span> },
+                        { key: 'tenant', header: 'العميل', render: (payment) => <span className="text-[12px] font-semibold text-ink">{payment.tenantName || '—'}</span> },
+                        { key: 'invoice', header: 'الفاتورة', render: (payment) => <span className="font-mono text-[10.5px] text-ink-secondary" dir="ltr">{payment.invoiceNumber || '—'}</span> },
+                        { key: 'method', header: 'الطريقة', render: (payment) => <span className="text-[11px] text-ink-secondary">{PAYMENT_METHOD_LABELS[payment.method]}</span> },
+                        { key: 'reference', header: 'المرجع', render: (payment) => <span className="font-mono text-[10.5px] text-muted" dir="ltr">{payment.reference || '—'}</span> },
+                        { key: 'amount', header: 'المبلغ', render: (payment) => <span className="text-[12px] font-bold text-success">{formatMoney(payment.amount)}</span> },
                         {
                           key: 'action', header: 'إجراء',
                           render: (payment) => canManageBilling ? (
-                            <button type="button" onClick={() => voidPayment(payment)} className="rounded p-1.5 text-slate-500 hover:bg-rose-50 hover:text-rose-700" title="إلغاء الدفعة"><Trash2 className="h-3.5 w-3.5" /></button>
+                            <button type="button" onClick={() => voidPayment(payment)} className="rounded p-1.5 text-muted hover:bg-danger-soft hover:text-danger" title="إلغاء الدفعة"><Trash2 className="h-3.5 w-3.5" /></button>
                           ) : null,
                         },
                       ]}
@@ -503,7 +503,7 @@ export const PlatformBillingPage: React.FC = () => {
         busy={savingInvoice}
         footer={
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <span className="text-[12px] font-bold text-slate-700">الإجمالي: {formatMoney(total)}</span>
+            <span className="text-[12px] font-bold text-ink">الإجمالي: {formatMoney(total)}</span>
             <div className="flex gap-2">
               <Button variant="ghost" onClick={() => setInvoiceOpen(false)} disabled={savingInvoice}>إلغاء</Button>
               <Button variant="primary" onClick={saveInvoice} loading={savingInvoice} disabled={!canManageBilling}>إنشاء الفاتورة</Button>
@@ -538,7 +538,7 @@ export const PlatformBillingPage: React.FC = () => {
 
         <div className="mt-3">
           <div className="mb-2 flex items-center justify-between">
-            <span className="text-[12px] font-bold text-slate-800">بنود الفاتورة</span>
+            <span className="text-[12px] font-bold text-ink">بنود الفاتورة</span>
             <Button variant="ghost" size="sm" leadingIcon={<Plus className="h-3.5 w-3.5" />} onClick={addItem}>إضافة بند</Button>
           </div>
           <div className="space-y-2">
@@ -553,13 +553,13 @@ export const PlatformBillingPage: React.FC = () => {
                 <Field label={index === 0 ? 'السعر' : ''}>
                   <input type="number" min={0} className={inputClass} value={item.unitPrice} onChange={(event) => updateItem(index, { unitPrice: Number(event.target.value) })} />
                 </Field>
-                <div className="pb-2 text-left text-[11px] font-bold text-slate-700">
+                <div className="pb-2 text-left text-[11px] font-bold text-ink">
                   {formatMoney((Number(item.quantity) || 0) * (Number(item.unitPrice) || 0))}
                 </div>
                 <button
                   type="button"
                   onClick={() => removeItem(index)}
-                  className="mb-1 flex h-7 w-7 items-center justify-center rounded text-slate-400 hover:bg-rose-50 hover:text-rose-600"
+                  className="mb-1 flex h-7 w-7 items-center justify-center rounded text-muted hover:bg-danger-soft hover:text-danger"
                   title="حذف البند"
                   disabled={invoiceForm.items.length === 1}
                 >
@@ -583,11 +583,11 @@ export const PlatformBillingPage: React.FC = () => {
         </div>
 
         <div className="mt-3 flex justify-end">
-          <div className="w-full max-w-xs rounded-lg bg-slate-50 p-3 text-[11.5px]">
-            <div className="flex justify-between"><span className="text-slate-500">المجموع</span><b>{formatMoney(subtotal)}</b></div>
-            <div className="mt-1 flex justify-between"><span className="text-slate-500">الخصم</span><b>- {formatMoney(Number(invoiceForm.discount) || 0)}</b></div>
-            <div className="mt-1 flex justify-between"><span className="text-slate-500">الضريبة</span><b>+ {formatMoney(Number(invoiceForm.tax) || 0)}</b></div>
-            <div className="mt-2 flex justify-between border-t border-slate-200 pt-2 text-[13px]"><span className="font-bold text-slate-700">الإجمالي</span><b className="text-emerald-700">{formatMoney(total)}</b></div>
+          <div className="w-full max-w-xs rounded-lg bg-surface-muted p-3 text-[11.5px]">
+            <div className="flex justify-between"><span className="text-muted">المجموع</span><b>{formatMoney(subtotal)}</b></div>
+            <div className="mt-1 flex justify-between"><span className="text-muted">الخصم</span><b>- {formatMoney(Number(invoiceForm.discount) || 0)}</b></div>
+            <div className="mt-1 flex justify-between"><span className="text-muted">الضريبة</span><b>+ {formatMoney(Number(invoiceForm.tax) || 0)}</b></div>
+            <div className="mt-2 flex justify-between border-t border-line pt-2 text-[13px]"><span className="font-bold text-ink">الإجمالي</span><b className="text-success">{formatMoney(total)}</b></div>
           </div>
         </div>
       </Modal>
@@ -614,13 +614,13 @@ export const PlatformBillingPage: React.FC = () => {
       >
         {detail && (
           <div className="space-y-3">
-            <div className="grid gap-2 rounded-xl bg-slate-50 p-3 text-[11.5px] sm:grid-cols-3">
-              <div><span className="text-slate-500">الحالة:</span> <StatusBadge value={detail.status} label={PLATFORM_INVOICE_STATUS_LABELS[detail.status]} /></div>
-              <div><span className="text-slate-500">الإصدار:</span> <b>{formatDate(detail.issueDate)}</b></div>
-              <div><span className="text-slate-500">الاستحقاق:</span> <b>{formatDate(detail.dueDate)}</b></div>
-              <div><span className="text-slate-500">الإجمالي:</span> <b>{formatMoney(detail.total, detail.currency)}</b></div>
-              <div><span className="text-slate-500">المدفوع:</span> <b className="text-emerald-700">{formatMoney(detail.paidAmount, detail.currency)}</b></div>
-              <div><span className="text-slate-500">المتبقي:</span> <b className="text-rose-600">{formatMoney(detail.total - detail.paidAmount, detail.currency)}</b></div>
+            <div className="grid gap-2 rounded-xl bg-surface-muted p-3 text-[11.5px] sm:grid-cols-3">
+              <div><span className="text-muted">الحالة:</span> <StatusBadge value={detail.status} label={PLATFORM_INVOICE_STATUS_LABELS[detail.status]} /></div>
+              <div><span className="text-muted">الإصدار:</span> <b>{formatDate(detail.issueDate)}</b></div>
+              <div><span className="text-muted">الاستحقاق:</span> <b>{formatDate(detail.dueDate)}</b></div>
+              <div><span className="text-muted">الإجمالي:</span> <b>{formatMoney(detail.total, detail.currency)}</b></div>
+              <div><span className="text-muted">المدفوع:</span> <b className="text-success">{formatMoney(detail.paidAmount, detail.currency)}</b></div>
+              <div><span className="text-muted">المتبقي:</span> <b className="text-danger">{formatMoney(detail.total - detail.paidAmount, detail.currency)}</b></div>
             </div>
             <DataTable
                             ariaLabel="بنود الفاتورة"
@@ -635,7 +635,7 @@ export const PlatformBillingPage: React.FC = () => {
                             ]}
                           />
 
-            {detail.notes && <p className="rounded-lg bg-amber-50 px-3 py-2 text-[11px] text-amber-800">{detail.notes}</p>}
+            {detail.notes && <p className="rounded-lg bg-warning-soft px-3 py-2 text-[11px] text-warning">{detail.notes}</p>}
           </div>
         )}
       </Modal>

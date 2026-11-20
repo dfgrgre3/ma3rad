@@ -179,106 +179,106 @@ export const SyncClientSettings: React.FC = () => {
   return (
     <div className="space-y-4">
       {/* ── دليل إرشادي سريع للربط بين المعرض والبيت ── */}
-      <div className="rounded-2xl border border-sky-200 bg-gradient-to-r from-sky-50 via-white to-sky-50/50 p-4 shadow-sm text-xs">
-        <div className="flex items-center gap-2 mb-3 font-black text-sky-900 text-sm">
-          <HelpCircle className="h-5 w-5 text-sky-600" />
+      <div className="rounded-2xl border border-accent-border bg-gradient-to-r from-primary via-white to-primary/50 p-4 shadow-sm text-xs">
+        <div className="flex items-center gap-2 mb-3 font-black text-primary text-sm">
+          <HelpCircle className="h-5 w-5 text-primary" />
           <span>دليل إعداد المزامنة بين الأجهزة (المعرض والبيت):</span>
         </div>
-        <div className="grid gap-3 md:grid-cols-2 text-slate-700 leading-relaxed">
+        <div className="grid gap-3 md:grid-cols-2 text-ink leading-relaxed">
           {/* المعرض */}
-          <div className="rounded-xl border border-sky-100 bg-white p-3.5 shadow-xs">
-            <span className="font-bold text-sky-800 block mb-2 text-xs border-b border-sky-50 pb-1.5">
+          <div className="rounded-xl border border-accent-border bg-surface p-3.5 shadow-xs">
+            <span className="font-bold text-primary block mb-2 text-xs border-b border-accent-border pb-1.5">
               1️⃣ على جهاز المعرض (الرئيسي):
             </span>
-            <ul className="list-disc list-inside space-y-1.5 text-slate-600 text-[11px]">
+            <ul className="list-disc list-inside space-y-1.5 text-ink-secondary text-[11px]">
               <li>ضع الـ <strong>Auth Key</strong> واضغط زر <strong>"ربط وتنشيط الاتصال"</strong>.</li>
               <li>اضغط زر <strong>"نسخ الرابط"</strong> لعنوان الخادم الأزرق الظاهر أمامك.</li>
               <li>في خانة <strong>عنوان خادم المعرض</strong>: الصق الرابط الذي تم نسخه.</li>
               <li>في خانة <strong>معرّف المؤسسة</strong>: اكتب اسماً للمؤسسة (حروف إنجليزية).</li>
               <li>في خانة <strong>الرمز السري</strong>: اكتب رمز توثيق سري من اختيارك.</li>
-              <li>في خانة <strong>معرّف الفرع</strong>: اكتب رمزاً للفرع الرئيسي (مثل: <code className="bg-slate-100 px-1 rounded font-mono">main</code>).</li>
-              <li>في خانة <strong>معرّف هذا الجهاز</strong>: اكتب اسماً للجهاز (مثل: <code className="bg-slate-100 px-1 rounded font-mono">cashier_1</code>).</li>
+              <li>في خانة <strong>معرّف الفرع</strong>: اكتب رمزاً للفرع الرئيسي (مثل: <code className="bg-surface-sunken px-1 rounded font-mono">main</code>).</li>
+              <li>في خانة <strong>معرّف هذا الجهاز</strong>: اكتب اسماً للجهاز (مثل: <code className="bg-surface-sunken px-1 rounded font-mono">cashier_1</code>).</li>
               <li>فعّل خيار ✅ <strong>جهاز الإدارة الرئيسي (صلاحية السياسات)</strong>.</li>
               <li>اضغط زر <strong>"حفظ إعداد الاتصال"</strong> ثم أعد تشغيل البرنامج.</li>
             </ul>
           </div>
 
           {/* البيت */}
-          <div className="rounded-xl border border-emerald-100 bg-white p-3.5 shadow-xs">
-            <span className="font-bold text-emerald-800 block mb-2 text-xs border-b border-emerald-50 pb-1.5">
+          <div className="rounded-xl border border-success-border bg-surface p-3.5 shadow-xs">
+            <span className="font-bold text-success block mb-2 text-xs border-b border-success-border pb-1.5">
               2️⃣ على جهاز البيت (أو الفرع الثاني):
             </span>
-            <ul className="list-disc list-inside space-y-1.5 text-slate-600 text-[11px]">
+            <ul className="list-disc list-inside space-y-1.5 text-ink-secondary text-[11px]">
               <li>ضع نفس الـ <strong>Auth Key</strong> واضغط <strong>"ربط وتنشيط الاتصال"</strong>.</li>
               <li>في خانة <strong>عنوان خادم المعرض</strong>: الصق نفس رابط المعرض الذي تم نسخه هناك.</li>
               <li>في خانة <strong>معرّف المؤسسة</strong>: اكتب <strong>نفس</strong> معرّف المؤسسة تماماً.</li>
               <li>في خانة <strong>الرمز السري</strong>: اكتب <strong>نفس</strong> الرمز السري تماماً.</li>
-              <li>في خانة <strong>معرّف الفرع</strong>: اكتب رمزاً لهذا المكان (مثل: <code className="bg-slate-100 px-1 rounded font-mono">home</code>).</li>
-              <li>في خانة <strong>معرّف هذا الجهاز</strong>: اكتب اسماً لهذا الجهاز (مثل: <code className="bg-slate-100 px-1 rounded font-mono">laptop</code>).</li>
+              <li>في خانة <strong>معرّف الفرع</strong>: اكتب رمزاً لهذا المكان (مثل: <code className="bg-surface-sunken px-1 rounded font-mono">home</code>).</li>
+              <li>في خانة <strong>معرّف هذا الجهاز</strong>: اكتب اسماً لهذا الجهاز (مثل: <code className="bg-surface-sunken px-1 rounded font-mono">laptop</code>).</li>
               <li>اضغط زر <strong>"حفظ إعداد الاتصال"</strong> ثم أعد تشغيل البرنامج.</li>
             </ul>
           </div>
         </div>
 
         {/* روابط سريعة لاستخراج المفتاح وتحميل المحرك */}
-        <div className="mt-3.5 flex flex-wrap items-center gap-2 border-t border-sky-100 pt-3">
-          <span className="text-[11px] font-bold text-slate-500">روابط مساعدة سريعة:</span>
+        <div className="mt-3.5 flex flex-wrap items-center gap-2 border-t border-accent-border pt-3">
+          <span className="text-[11px] font-bold text-muted">روابط مساعدة سريعة:</span>
           
           <button
             type="button"
             onClick={() => openExternalShare('https://login.tailscale.com/admin/settings/keys')}
-            className="flex items-center gap-1.5 rounded-lg bg-sky-100 hover:bg-sky-200 px-3 py-1.5 text-[11px] font-bold text-sky-800 transition"
+            className="flex items-center gap-1.5 rounded-lg bg-accent-soft hover:bg-accent-border px-3 py-1.5 text-[11px] font-bold text-primary transition"
           >
-            <KeyRound className="h-3.5 w-3.5 text-sky-700" />
+            <KeyRound className="h-3.5 w-3.5 text-primary" />
             <span>إنشاء واستخراج Auth Key من موقع Tailscale</span>
-            <ExternalLink className="h-3 w-3 text-sky-500" />
+            <ExternalLink className="h-3 w-3 text-primary" />
           </button>
 
           <button
             type="button"
             onClick={() => openExternalShare('https://tailscale.com/download/windows')}
-            className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 px-3 py-1.5 text-[11px] font-bold text-slate-700 transition"
+            className="flex items-center gap-1.5 rounded-lg border border-line bg-surface hover:bg-surface-muted px-3 py-1.5 text-[11px] font-bold text-ink transition"
           >
-            <DownloadCloud className="h-3.5 w-3.5 text-slate-500" />
+            <DownloadCloud className="h-3.5 w-3.5 text-muted" />
             <span>تحميل برنامج Tailscale لويندوز (إن لم يكن مثبتاً)</span>
-            <ExternalLink className="h-3 w-3 text-slate-400" />
+            <ExternalLink className="h-3 w-3 text-muted" />
           </button>
         </div>
       </div>
 
       {/* ── بطاقة شبكة Tailscale المباشرة ── */}
-      <div className="rounded-2xl border border-sky-200 bg-sky-50/60 p-4 shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-sky-200/60 pb-3">
+      <div className="rounded-2xl border border-accent-border bg-accent-soft/60 p-4 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-accent-border/60 pb-3">
           <div className="flex items-center gap-2.5">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-sky-600 text-white shadow-xs">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-white shadow-xs">
               <ShieldCheck className="h-5 w-5" />
             </div>
             <div>
-              <h3 className="text-sm font-black text-slate-900">الشبكة المشفرة المباشرة (Tailscale)</h3>
-              <p className="text-[11px] text-slate-500">يجب استخدام HTTPS بشهادة موثوقة؛ عنوان Tailscale وحده لا يثبت هوية الخادم.</p>
+              <h3 className="text-sm font-black text-ink">الشبكة المشفرة المباشرة (Tailscale)</h3>
+              <p className="text-[11px] text-muted">يجب استخدام HTTPS بشهادة موثوقة؛ عنوان Tailscale وحده لا يثبت هوية الخادم.</p>
             </div>
           </div>
 
           {/* عنوان جهاز المعرض مع زر نسخ فوري */}
           {tailscale?.running && (
-            <div className="flex items-center gap-2 rounded-xl bg-white px-3 py-1.5 border border-sky-200 shadow-xs">
+            <div className="flex items-center gap-2 rounded-xl bg-surface px-3 py-1.5 border border-accent-border shadow-xs">
               {tailscale.dnsName ? (
                 <>
-                  <span className="text-[11px] font-bold text-slate-500">عنوان HTTPS لهذا الجهاز:</span>
-                  <span className="text-xs font-mono font-black text-sky-700 bg-sky-50 px-2 py-0.5 rounded" dir="ltr">
+                  <span className="text-[11px] font-bold text-muted">عنوان HTTPS لهذا الجهاز:</span>
+                  <span className="text-xs font-mono font-black text-primary bg-accent-soft px-2 py-0.5 rounded" dir="ltr">
                     https://{tailscale.dnsName}:47821
                   </span>
                   <button
                     type="button"
                     onClick={copyServerUrl}
-                    className="flex items-center gap-1 rounded-lg bg-sky-600 hover:bg-sky-700 px-2.5 py-1 text-[11px] font-bold text-white transition shadow-xs"
+                    className="flex items-center gap-1 rounded-lg bg-primary hover:bg-primary px-2.5 py-1 text-[11px] font-bold text-white transition shadow-xs"
                   >
                     {copied ? <Check className="h-3.5 w-3.5 text-white" /> : <Copy className="h-3.5 w-3.5" />}
                     <span>{copied ? 'تم النسخ!' : 'نسخ الرابط'}</span>
                   </button>
                 </>
               ) : (
-                <span className="text-[11px] font-bold text-amber-700">
+                <span className="text-[11px] font-bold text-warning">
                   لا يتوفر اسم DNS؛ لا تستخدم عنوان IP مع HTTP لإعداد المزامنة.
                 </span>
               )}
@@ -288,22 +288,22 @@ export const SyncClientSettings: React.FC = () => {
 
         <div className="mt-3 grid gap-4 sm:grid-cols-2 items-center">
           <div>
-            <div className="text-xs text-slate-700 mb-2">
+            <div className="text-xs text-ink mb-2">
               {tailscale?.running ? (
-                <span className="text-emerald-700 font-bold flex items-center gap-1.5">
-                  ✓ الجهاز متصل بالشبكة المشفرة: <span className="font-mono bg-white px-1.5 py-0.5 rounded border border-emerald-200">{tailscale.nodeName || 'المعرض'}</span>
+                <span className="text-success font-bold flex items-center gap-1.5">
+                  ✓ الجهاز متصل بالشبكة المشفرة: <span className="font-mono bg-surface px-1.5 py-0.5 rounded border border-success-border">{tailscale.nodeName || 'المعرض'}</span>
                 </span>
               ) : tailscale?.installed ? (
-                <span className="text-amber-700 font-bold">المحرك مثبت ولكن غير متصل بالشبكة بعد.</span>
+                <span className="text-warning font-bold">المحرك مثبت ولكن غير متصل بالشبكة بعد.</span>
               ) : (
-                <span className="text-slate-500">خدمة الشبكة المشفرة تعمل تلقائياً مع البرنامج.</span>
+                <span className="text-muted">خدمة الشبكة المشفرة تعمل تلقائياً مع البرنامج.</span>
               )}
             </div>
 
             {/* الأجهزة الأخرى المتصلة على نفس الشبكة */}
             {tailscale?.peers && tailscale.peers.length > 0 && (
               <div className="space-y-1">
-                <span className="text-[11px] font-bold text-slate-600 block">اختر جهازاً له اسم DNS وشهادة HTTPS موثوقة:</span>
+                <span className="text-[11px] font-bold text-ink-secondary block">اختر جهازاً له اسم DNS وشهادة HTTPS موثوقة:</span>
                 <div className="flex flex-wrap gap-1.5">
                   {tailscale.peers.map((p, idx) => (
                     <button
@@ -316,11 +316,11 @@ export const SyncClientSettings: React.FC = () => {
                           toast.success('تم اختيار الجهاز: ' + p.name);
                         }
                       }}
-                      className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-medium text-slate-700 hover:border-sky-400 hover:bg-sky-50 transition disabled:cursor-not-allowed disabled:opacity-50"
+                      className="flex items-center gap-1.5 rounded-lg border border-line bg-surface px-2 py-1 text-[11px] font-medium text-ink hover:border-primary hover:bg-accent-soft transition disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                      <span className={'h-2 w-2 rounded-full ' + (p.online ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300')} />
+                      <span className={'h-2 w-2 rounded-full ' + (p.online ? 'bg-success animate-pulse' : 'bg-surface-sunken')} />
                       <span>{p.name}</span>
-                      <span className="font-mono text-slate-400 text-[10px]" dir="ltr">({p.dnsName || p.ip || 'بدون عنوان'})</span>
+                      <span className="font-mono text-muted text-[10px]" dir="ltr">({p.dnsName || p.ip || 'بدون عنوان'})</span>
                     </button>
                   ))}
                 </div>
@@ -329,14 +329,14 @@ export const SyncClientSettings: React.FC = () => {
           </div>
 
           <div className="space-y-2">
-            <label className="text-[11px] font-bold text-slate-700 block">
+            <label className="text-[11px] font-bold text-ink block">
               مفتاح الانضمام التلقائي (Auth Key):
               <input
                 type="password"
                 value={authKey}
                 onChange={(e) => setAuthKey(e.target.value)}
                 placeholder="tskey-auth-xxxxx"
-                className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-mono shadow-xs focus:ring-2 focus:ring-sky-500 focus:outline-none"
+                className="mt-1 w-full rounded-xl border border-line-strong bg-surface px-3 py-2 text-xs font-mono shadow-xs focus:ring-2 focus:ring-primary focus:outline-none"
               />
             </label>
             <div className="flex gap-2">
@@ -344,14 +344,14 @@ export const SyncClientSettings: React.FC = () => {
                 type="button"
                 onClick={handleTsConnect}
                 disabled={tsBusy}
-                className="rounded-xl bg-sky-600 hover:bg-sky-700 px-4 py-2 text-xs font-bold text-white shadow-xs transition disabled:opacity-50"
+                className="rounded-xl bg-primary hover:bg-primary px-4 py-2 text-xs font-bold text-white shadow-xs transition disabled:opacity-50"
               >
                 {tsBusy ? 'جارٍ الاتصال...' : 'ربط وتنشيط الاتصال'}
               </button>
               <button
                 type="button"
                 onClick={loadTailscale}
-                className="rounded-xl border border-slate-300 bg-white hover:bg-slate-50 px-3 py-2 text-xs font-bold text-slate-700 transition"
+                className="rounded-xl border border-line-strong bg-surface hover:bg-surface-muted px-3 py-2 text-xs font-bold text-ink transition"
               >
                 تحديث الحالة
               </button>
@@ -361,96 +361,96 @@ export const SyncClientSettings: React.FC = () => {
       </div>
 
       {/* ── بطاقة إعدادات خادم المزامنة المحلي ── */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="rounded-2xl border border-line bg-surface p-5 shadow-sm">
         <div className="mb-4 flex items-center justify-between">
           <div>
-            <h2 className="text-sm font-black text-slate-900">بيانات خادم المزامنة</h2>
-            <p className="mt-0.5 text-xs text-slate-500">
+            <h2 className="text-sm font-black text-ink">بيانات خادم المزامنة</h2>
+            <p className="mt-0.5 text-xs text-muted">
               استخدم HTTPS مع شهادة موثوقة تطابق اسم الخادم. يُسمح بـHTTP على هذا الجهاز المحلي فقط.
             </p>
           </div>
           {restartRequired && (
-            <span className="rounded-xl bg-amber-100 border border-amber-300 px-3 py-1 text-xs font-bold text-amber-800 animate-bounce">
+            <span className="rounded-xl bg-warning-soft border border-warning px-3 py-1 text-xs font-bold text-warning animate-bounce">
               ⚠️ يلزم إعادة تشغيل البرنامج لتطبيق الإعداد الجديد
             </span>
           )}
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 text-xs">
-          <label className="font-bold text-slate-700">
+          <label className="font-bold text-ink">
             عنوان خادم المعرض (Sync URL):
             <input
               value={form.url}
               onChange={(event) => update('url', event.target.value)}
               placeholder="https://branch.example:47821"
-              className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 font-mono text-xs shadow-xs focus:ring-2 focus:ring-sky-500 focus:outline-none"
+              className="mt-1.5 w-full rounded-xl border border-line-strong bg-surface px-3 py-2 font-mono text-xs shadow-xs focus:ring-2 focus:ring-primary focus:outline-none"
               dir="ltr"
             />
           </label>
 
-          <label className="font-bold text-slate-700">
+          <label className="font-bold text-ink">
             معرّف المؤسسة (Tenant ID):
             <input
               value={form.tenantId}
               onChange={(event) => update('tenantId', event.target.value)}
               placeholder="مثال: main_ceramics"
-              className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 font-mono text-xs shadow-xs focus:ring-2 focus:ring-sky-500 focus:outline-none"
+              className="mt-1.5 w-full rounded-xl border border-line-strong bg-surface px-3 py-2 font-mono text-xs shadow-xs focus:ring-2 focus:ring-primary focus:outline-none"
               dir="ltr"
             />
           </label>
 
-          <label className="font-bold text-slate-700">
+          <label className="font-bold text-ink">
             الرمز السري (Token):
             <input
               type="password"
               value={form.token}
               onChange={(event) => update('token', event.target.value)}
               placeholder={tokenConfigured ? '•••••••• (محفوظ مشفر)' : 'رمز التوثيق المشترك'}
-              className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs shadow-xs focus:ring-2 focus:ring-sky-500 focus:outline-none"
+              className="mt-1.5 w-full rounded-xl border border-line-strong bg-surface px-3 py-2 text-xs shadow-xs focus:ring-2 focus:ring-primary focus:outline-none"
             />
           </label>
 
-          <label className="font-bold text-slate-700">
+          <label className="font-bold text-ink">
             معرّف الفرع (Branch ID):
             <input
               value={form.branchId}
               onChange={(event) => update('branchId', event.target.value)}
               placeholder="مثال: branch_1 أو home"
-              className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 font-mono text-xs shadow-xs focus:ring-2 focus:ring-sky-500 focus:outline-none"
+              className="mt-1.5 w-full rounded-xl border border-line-strong bg-surface px-3 py-2 font-mono text-xs shadow-xs focus:ring-2 focus:ring-primary focus:outline-none"
               dir="ltr"
             />
           </label>
 
-          <label className="font-bold text-slate-700">
+          <label className="font-bold text-ink">
             معرّف هذا الجهاز (Device ID):
             <input
               value={form.deviceId}
               onChange={(event) => update('deviceId', event.target.value)}
               placeholder="مثال: cashier_1 أو laptop"
-              className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 font-mono text-xs shadow-xs focus:ring-2 focus:ring-sky-500 focus:outline-none"
+              className="mt-1.5 w-full rounded-xl border border-line-strong bg-surface px-3 py-2 font-mono text-xs shadow-xs focus:ring-2 focus:ring-primary focus:outline-none"
               dir="ltr"
             />
           </label>
 
           <div className="flex items-end">
-            <label className="flex items-center gap-2 cursor-pointer pb-2 font-bold text-slate-700">
+            <label className="flex items-center gap-2 cursor-pointer pb-2 font-bold text-ink">
               <input
                 type="checkbox"
                 checked={form.canManagePolicies}
                 onChange={(event) => update('canManagePolicies', event.target.checked)}
-                className="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+                className="h-4 w-4 rounded border-line-strong text-primary focus:ring-primary"
               />
               <span>جهاز الإدارة الرئيسي (صلاحية السياسات)</span>
             </label>
           </div>
         </div>
 
-        <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
-          <div className="text-xs text-slate-500">
+        <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4">
+          <div className="text-xs text-muted">
             {configSource === 'secure-storage' ? (
-              <span className="text-emerald-700 font-bold">✓ الإعداد محفوظ ومشفّر في مخزن النظام الآمن.</span>
+              <span className="text-success font-bold">✓ الإعداد محفوظ ومشفّر في مخزن النظام الآمن.</span>
             ) : configSource === 'environment' ? (
-              <span className="text-amber-700 font-bold">يستخدم إعدادات النظام الحالية.</span>
+              <span className="text-warning font-bold">يستخدم إعدادات النظام الحالية.</span>
             ) : (
               <span>لم يتم حفظ إعداد اتصال بعد.</span>
             )}
@@ -460,7 +460,7 @@ export const SyncClientSettings: React.FC = () => {
             <button
               type="button"
               onClick={clear}
-              className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-100 transition shadow-xs"
+              className="rounded-xl border border-line-strong bg-surface px-4 py-2 text-xs font-bold text-ink hover:bg-surface-sunken transition shadow-xs"
             >
               مسح الإعداد
             </button>
@@ -468,7 +468,7 @@ export const SyncClientSettings: React.FC = () => {
               type="button"
               onClick={save}
               disabled={saving}
-              className="rounded-xl bg-sky-700 px-5 py-2 text-xs font-bold text-white hover:bg-sky-800 disabled:opacity-50 transition shadow-xs"
+              className="rounded-xl bg-primary px-5 py-2 text-xs font-bold text-white hover:bg-primary disabled:opacity-50 transition shadow-xs"
             >
               {saving ? 'جارٍ الحفظ...' : 'حفظ إعداد الاتصال'}
             </button>

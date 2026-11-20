@@ -119,38 +119,38 @@ export const PlatformUserPlatformPermissionsPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <header className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <header className="rounded-2xl border border-line bg-surface p-5 shadow-sm">
         <PageHeader
           bordered={false}
           title="منصة المستخدمين — صفحات وصلاحيات"
           description="عرض كامل لجميع صفحات المنصة وكل الصلاحيات على كل صفحة، مع التحكم الفعلي في ظهور القوائم وتعطيل الصلاحيات على مستوى العميل أو الخطة — محفوظ على السيرفر المركزي، وليس على هذا الجهاز."
           meta={
             <>
-              <p className="mt-1 text-xs text-slate-500">
+              <p className="mt-1 text-xs text-muted">
                 الصلاحيات على مستوى الموظف تُدار من صفحة «حسابات الموظفين» (grant/deny لكل حساب)، وعلى مستوى
                 الدور من مصفوفة الصلاحيات. الحماية الحقيقية تنفذها واجهات الـ API في الخادم المركزي
                 (requirePlatformPermission / requireTenantScope) وفي خدمة التفويض المحلية.
               </p>
               <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
-                <label className="font-semibold text-slate-700">مفتاح عميل/خطة:</label>
+                <label className="font-semibold text-ink">مفتاح عميل/خطة:</label>
                 <input
                   value={tenantKey}
                   onChange={(e) => setTenantKey(e.target.value || 'global')}
-                  className="rounded border border-slate-300 px-2 py-1 text-xs"
+                  className="rounded border border-line-strong px-2 py-1 text-xs"
                   placeholder="global أو tenantId أو plan:<planId>"
                 />
                 <button
                   type="button"
                   onClick={() => void load()}
                   disabled={loading}
-                  className="rounded border border-slate-300 px-2 py-1 text-xs text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                  className="rounded border border-line-strong px-2 py-1 text-xs text-ink hover:bg-surface-muted disabled:opacity-50"
                 >
                   {loading ? 'جارٍ التحميل…' : 'إعادة التحميل'}
                 </button>
               </div>
-              {error && <div role="alert" className="mt-3 rounded border border-red-200 bg-red-50 p-2 text-xs text-red-700">{error}</div>}
-              {notice && <div role="status" className="mt-3 rounded border border-emerald-200 bg-emerald-50 p-2 text-xs text-emerald-700">{notice}</div>}
-              <div className="mt-3 flex gap-4 text-xs text-slate-500">
+              {error && <div role="alert" className="mt-3 rounded border border-danger-border bg-danger-soft p-2 text-xs text-danger">{error}</div>}
+              {notice && <div role="status" className="mt-3 rounded border border-success-border bg-success-soft p-2 text-xs text-success">{notice}</div>}
+              <div className="mt-3 flex gap-4 text-xs text-muted">
                 <span>مسارات مخفية لهذا النطاق: {featurePermissions.hiddenMenus.length}</span>
                 <span>صلاحيات معطلة: {featurePermissions.disabledPermissions.length}</span>
                 <span>صلاحيات (featurePermissions): {featurePermissions.featurePermissions.length}</span>
@@ -160,9 +160,9 @@ export const PlatformUserPlatformPermissionsPage: React.FC = () => {
         />
       </header>
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-        <h2 className="mb-3 text-lg font-semibold text-slate-900">خريطة صلاحيات المسارات</h2>
-        <div className="overflow-auto max-h-72 rounded-lg border border-slate-100">
+      <section className="rounded-2xl border border-line bg-surface p-5 shadow-sm">
+        <h2 className="mb-3 text-lg font-semibold text-ink">خريطة صلاحيات المسارات</h2>
+        <div className="overflow-auto max-h-72 rounded-lg border border-line">
           <DataTable
             ariaLabel="خريطة صلاحيات المسارات"
             rows={hiddenRouteRules.map(({ rule, hidden }, i) => ({ rule, hidden, __i: i }))}
@@ -184,7 +184,7 @@ export const PlatformUserPlatformPermissionsPage: React.FC = () => {
         </div>
         <div className="mt-4 grid gap-4 md:grid-cols-2">
           <div>
-            <label htmlFor="disabled-permissions" className="mb-1 block text-xs font-semibold text-slate-700">
+            <label htmlFor="disabled-permissions" className="mb-1 block text-xs font-semibold text-ink">
               الصلاحيات المعطلة (كود صلاحية في كل سطر)
             </label>
             <textarea
@@ -193,12 +193,12 @@ export const PlatformUserPlatformPermissionsPage: React.FC = () => {
               onChange={(e) => setDisabledPermissionsText(e.target.value)}
               rows={6}
               dir="ltr"
-              className="w-full rounded border border-slate-300 p-2 font-mono text-xs"
+              className="w-full rounded border border-line-strong p-2 font-mono text-xs"
               placeholder={'sales.create\ninventory.view'}
             />
           </div>
           <div>
-            <label htmlFor="feature-permissions" className="mb-1 block text-xs font-semibold text-slate-700">
+            <label htmlFor="feature-permissions" className="mb-1 block text-xs font-semibold text-ink">
               featurePermissions (JSON)
             </label>
             <textarea
@@ -207,12 +207,12 @@ export const PlatformUserPlatformPermissionsPage: React.FC = () => {
               onChange={(e) => setFeaturePermissionsText(e.target.value)}
               rows={6}
               dir="ltr"
-              className="w-full rounded border border-slate-300 p-2 font-mono text-xs"
+              className="w-full rounded border border-line-strong p-2 font-mono text-xs"
             />
           </div>
         </div>
         <div className="mt-3 flex items-center justify-between gap-3">
-          <p className="text-[11px] text-slate-500">
+          <p className="text-[11px] text-muted">
             يحفظ إلى tenant_feature_config على السيرفر المركزي (PUT /api/v1/admin/config/feature-permissions).
             يتطلب صلاحية platform.app-configuration.update — إخفاء القائمة وحده ليس حماية للـ API.
           </p>
@@ -220,7 +220,7 @@ export const PlatformUserPlatformPermissionsPage: React.FC = () => {
             type="button"
             onClick={() => void save()}
             disabled={saving || loading}
-            className="shrink-0 rounded bg-slate-900 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-800 disabled:opacity-50"
+            className="shrink-0 rounded bg-primary px-4 py-2 text-xs font-semibold text-white hover:bg-primary disabled:opacity-50"
           >
             {saving ? 'جارٍ الحفظ…' : 'حفظ على السيرفر المركزي'}
           </button>
@@ -229,12 +229,12 @@ export const PlatformUserPlatformPermissionsPage: React.FC = () => {
 
       <section className="space-y-4">
         {byRoute.map(([route, info]) => (
-          <div key={route} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div key={route} className="rounded-2xl border border-line bg-surface p-5 shadow-sm">
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-base font-semibold text-slate-900">{route}</h3>
-              <span className="text-xs text-slate-500">{info.module} · {info.perms.length} صلاحية</span>
+              <h3 className="text-base font-semibold text-ink">{route}</h3>
+              <span className="text-xs text-muted">{info.module} · {info.perms.length} صلاحية</span>
             </div>
-            <div className="overflow-auto max-h-96 rounded-lg border border-slate-100">
+            <div className="overflow-auto max-h-96 rounded-lg border border-line">
               <DataTable
                 ariaLabel="صلاحيات المسار"
                 rows={info.perms}

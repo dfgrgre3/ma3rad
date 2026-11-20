@@ -54,8 +54,8 @@ export function useExecutiveDashboard() {
             trend: parseFloat(res.salesTrend) >= 0 ? 'up' : 'down',
             trendValue: `${res.salesTrend}% مقارنة بالأمس`,
             icon: ShoppingCart,
-            color: 'text-sky-600',
-            bg: 'bg-sky-500/10 border-sky-500/20',
+            color: 'text-primary',
+            bg: 'bg-primary/10 border-primary/20',
           },
           {
             label: 'صافي الربح',
@@ -63,8 +63,8 @@ export function useExecutiveDashboard() {
             sub: `هامش ${res.margin}%`,
             trend: res.profit >= 0 ? 'up' : 'down',
             icon: TrendingUp,
-            color: 'text-emerald-600',
-            bg: 'bg-emerald-500/10 border-emerald-500/20',
+            color: 'text-success',
+            bg: 'bg-success/10 border-success/20',
           },
           {
             label: 'المقبوضات',
@@ -72,8 +72,8 @@ export function useExecutiveDashboard() {
             sub: 'نقدي وشبكة',
             trend: 'neutral',
             icon: DollarSign,
-            color: 'text-violet-600',
-            bg: 'bg-violet-500/10 border-violet-500/20',
+            color: 'text-primary',
+            bg: 'bg-primary/10 border-primary/20',
           },
           {
             label: 'المشتريات',
@@ -81,8 +81,8 @@ export function useExecutiveDashboard() {
             sub: 'بضاعة واردة',
             trend: 'neutral',
             icon: Package,
-            color: 'text-amber-600',
-            bg: 'bg-amber-500/10 border-amber-500/20',
+            color: 'text-warning',
+            bg: 'bg-warning/10 border-warning/20',
           },
           {
             label: 'الديون المستحقة',
@@ -90,8 +90,8 @@ export function useExecutiveDashboard() {
             sub: 'ذمم العملاء',
             trend: res.totalDebt > 50000 ? 'down' : 'neutral',
             icon: AlertTriangle,
-            color: 'text-rose-600',
-            bg: 'bg-rose-500/10 border-rose-500/20',
+            color: 'text-danger',
+            bg: 'bg-danger/10 border-danger/20',
           },
         ]);
 

@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import type { BatchService } from '../../../../services/domains/inventory/BatchService';
+import { ExpiryService } from '../../../../services/domains/inventory/ExpiryService';
 import { AppConfigService } from '../../../../services/domains/config/AppConfigService';
 import { ApprovalService } from '../../../../services/domains/approvals/ApprovalService';
 import type { CashierService } from '../../../../services/domains/finance/CashierService';
@@ -75,8 +76,6 @@ interface UsePosCheckoutOptions {
   loyaltyService: LoyaltyService;
   performedBy: string;
   loadStock: (warehouseId: string) => void;
-  onInvoiceCreated: (invoiceId: string) => void;
-  validateInvoiceFields: () => void;
 }
 
 export const usePosCheckout = ({
@@ -138,8 +137,6 @@ export const usePosCheckout = ({
   loyaltyService,
   performedBy,
   loadStock,
-  onInvoiceCreated,
-  validateInvoiceFields,
 }: UsePosCheckoutOptions) => {
   const [isProcessing, setIsProcessing] = useState(false);
   // قفل متزامن داخل الذاكرة: يمنع فاتورة مكررة عند الضغط المزدوج أو F9 في اللحظة نفسها
@@ -380,7 +377,17 @@ export const usePosCheckout = ({
         setIsProcessing(false);
         return;
       }
-      validateInvoiceFields();
+      try {
+        const expiryService = new ExpiryService();
+        for (const item of cart) {
+          expiryService.assertNotExpired(item.product.id, item.quantityM2, selectedWarehouseId || undefined);
+        }
+      } catch (expiryError: any) {
+        notify(expiryError?.message || 'لا يمكن إتمام البيع — يوجد صنف منتهي الصلاحية.', 'error');
+        setIsProcessing(false);
+        inFlightRef.current = false;
+        return;
+      }
       const invoice = salesService.createSale({
         customerId: selectedCustomer.id,
         warehouseId: selectedWarehouseId,
@@ -422,7 +429,6 @@ export const usePosCheckout = ({
           ? discountApprovalRef.current.id
           : undefined,
       });
-      onInvoiceCreated(invoice.id);
 
       discountApprovalRef.current = null;
 
@@ -468,7 +474,7 @@ export const usePosCheckout = ({
     setAppliedPromotion, setCouponCode, setRedeemPoints, setShippingCost,
     setExtraFees,
     setNotes, setPaidAmount, setSuccessInvoice,
-    loadStock, setActiveShift, cashierService, notify, onInvoiceCreated, validateInvoiceFields,
+    loadStock, setActiveShift, cashierService, notify, salesRepId,
   ]);
 
   return { isProcessing, setIsProcessing, handleCheckout };

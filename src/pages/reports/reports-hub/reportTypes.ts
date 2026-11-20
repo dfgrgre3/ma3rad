@@ -19,7 +19,7 @@ export interface ReportCategory {
 }
 
 export interface ReportControl {
-  key: 'dimension' | 'productId' | 'registerId';
+  key: 'dimension' | 'productId' | 'registerId' | 'status';
   label: string;
   kind: 'dimension' | 'product' | 'register';
   options?: Array<{ value: string; label: string }>;
@@ -44,6 +44,8 @@ export interface ReportDefinition {
   legacyTab?: 'sales' | 'purchases' | 'pos' | 'finance' | 'profitLoss' | 'tax';
   /** صلاحية عرض التقرير — تتجاوز صلاحية الفئة عند sensitivity أعلى. */
   permission?: string;
+  /** إن وُجد، يُعرض التقرير ويُنفَّذ فقط لنشاط الأعمال هذا. */
+  activityOnly?: string;
   accent?: string;
   chart?: ReportChartType;
   drilldown?: ReportDrilldown;

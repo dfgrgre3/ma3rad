@@ -51,7 +51,7 @@ export const MODULE_REGISTRY: ModuleDefinition[] = [
     description: 'عروض الأسعار والطلبات والفواتير والمرتجعات وتحليلات البيع.',
     dependencies: ['customers'],
     permissions: ['sales.view'],
-    paths: ['/daily/sales', '/pos', '/restaurant', '/sales', '/sales/analytics', '/sales/cycle', '/sales/statement', '/sales/orders-deposits', '/sales/reservations', '/sales/after-sales', '/quotations', '/construction-estimate', '/orders', '/returns'],
+    paths: ['/daily/sales', '/pos', '/restaurant', '/hospitality', '/ceramics', '/sales', '/sales/analytics', '/sales/cycle', '/sales/statement', '/sales/orders-deposits', '/sales/reservations', '/sales/after-sales', '/quotations', '/construction-estimate', '/orders', '/returns', '/retail'],
     businessEvents: ['invoice.posted', 'invoice.voided', 'sales_return.posted', 'receipt.posted'],
     settings: [
       { key: 'allowCreditSales', label: 'السماح بالبيع الآجل', type: 'boolean', defaultValue: true },
@@ -65,7 +65,7 @@ export const MODULE_REGISTRY: ModuleDefinition[] = [
     description: 'الأصناف والوحدات والمخازن والحركات والجرد والتقييم.',
     dependencies: [],
     permissions: ['inventory.view'],
-    paths: ['/inventory', '/inventory/hub', '/inventory/warehouse-stock', '/inventory/showroom-stock', '/inventory/ledger', '/inventory/transfers', '/inventory/counts', '/inventory/valuation', '/inventory/adjustments', '/inventory/alerts', '/inventory/stock-reservations', '/inventory/reservations', '/inventory/reorder-planning', '/inventory/locations', '/inventory/damage-quarantine', '/inventory/reconciliation', '/products', '/products/catalog', '/categories', '/brands', '/products/attributes', '/pricing', '/promotions', '/products/barcodes'],
+    paths: ['/inventory', '/inventory/hub', '/inventory/warehouse-stock', '/inventory/showroom-stock', '/inventory/ledger', '/inventory/transfers', '/inventory/counts', '/inventory/valuation', '/inventory/adjustments', '/inventory/alerts', '/inventory/stock-reservations', '/inventory/reservations', '/inventory/reorder-planning', '/inventory/locations', '/inventory/damage-quarantine', '/inventory/reconciliation', '/inventory/expiry', '/products', '/products/catalog', '/categories', '/brands', '/products/attributes', '/pricing', '/promotions', '/products/barcodes'],
     businessEvents: ['stock.movement.posted', 'stock.count.posted', 'stock.adjusted'],
     settings: [
       { key: 'allowNegativeStock', label: 'السماح بالمخزون السالب', type: 'boolean', defaultValue: false },
@@ -79,7 +79,7 @@ export const MODULE_REGISTRY: ModuleDefinition[] = [
     description: 'العملاء وعلاقات العملاء والمشروعات المرتبطة بهم.',
     dependencies: [],
     permissions: ['customers.view'],
-    paths: ['/crm', '/crm/hub', '/crm/dashboard', '/customers', '/customers/imported-products', '/customers/ready-deliveries', '/crm/leads', '/crm/pipeline', '/crm/activities', '/crm/campaigns'],
+    paths: ['/crm', '/crm/hub', '/crm/dashboard', '/customers', '/customers/imported-products', '/customers/ready-deliveries', '/crm/leads', '/crm/pipeline', '/crm/activities', '/crm/campaigns', '/education'],
     businessEvents: ['customer.created', 'lead.converted', 'project.created'],
     settings: [
       { key: 'creditLimitEnforced', label: 'تطبيق حد الائتمان', type: 'boolean', defaultValue: true },
@@ -119,7 +119,7 @@ export const MODULE_REGISTRY: ModuleDefinition[] = [
     description: 'الفروع والمخازن والموظفون والحضور والرواتب والتوصيل.',
     dependencies: [],
     permissions: ['branches.view'],
-    paths: ['/fleet/dashboard', '/facility-management', '/branches', '/warehouses', '/deliveries', '/drivers', '/vehicles', '/operations/shifts'],
+    paths: ['/fleet/dashboard', '/facility-management', '/branches', '/warehouses', '/deliveries', '/drivers', '/vehicles', '/operations/shifts', '/workshop'],
     businessEvents: ['payroll.posted', 'attendance.recorded', 'delivery.completed'],
     settings: [
       { key: 'payrollCurrency', label: 'عملة الرواتب', type: 'string', defaultValue: '' },
@@ -168,7 +168,7 @@ export const MODULE_REGISTRY: ModuleDefinition[] = [
     description: 'مشروعات العملاء والوحدات والمنتجات والتقدم.',
     dependencies: ['customers'],
     permissions: ['projects.view'],
-    paths: ['/projects'],
+    paths: ['/projects', '/time-billing'],
     businessEvents: ['project.created', 'project.updated', 'project.completed'],
     settings: [],
     activation: {},

@@ -16,7 +16,7 @@ export const InventoryTab: React.FC<InventoryTabProps> = ({ settings, set }) => 
         <option value="FIFO">FIFO (الوارد أولاً يصرف أولاً)</option>
       </select>
     </Field>
-    <p className="text-xs text-amber-700 md:col-span-2">الرصيد الموجود عند تفعيل FIFO يبدأ بطبقة افتتاحية تقديرية حسب تكلفة الصنف الحالية؛ الدقة الفعلية للدفعات الجديدة تبدأ من تاريخ التفعيل.</p>
+    <p className="text-xs text-warning md:col-span-2">الرصيد الموجود عند تفعيل FIFO يبدأ بطبقة افتتاحية تقديرية حسب تكلفة الصنف الحالية؛ الدقة الفعلية للدفعات الجديدة تبدأ من تاريخ التفعيل.</p>
     <Field label="السماح بالمخزون السالب">
       <Toggle checked={settings.enableNegativeStock} onChange={(v) => set('enableNegativeStock', v)} label={settings.enableNegativeStock ? 'مسموح' : 'ممنوع'} />
     </Field>

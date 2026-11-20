@@ -281,7 +281,7 @@ export const ProductPicker: React.FC<ProductPickerProps> = ({
         }}
       >
         <div ref={fieldRef} className="relative min-w-0 flex-1">
-          <Search className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden="true" />
+          <Search className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" aria-hidden="true" />
           <input
             id={id}
             type="search"
@@ -305,7 +305,7 @@ export const ProductPicker: React.FC<ProductPickerProps> = ({
             aria-required={required || undefined}
             autoComplete="off"
             placeholder={placeholder}
-            className="min-h-10 w-full rounded-lg border border-slate-300 bg-white py-2 pr-9 pl-12 text-right text-sm text-slate-700 transition placeholder:text-slate-500 hover:border-sky-400 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-100 disabled:cursor-not-allowed disabled:opacity-50"
+            className="min-h-10 w-full rounded-lg border border-line-strong bg-surface py-2 pr-9 pl-12 text-right text-sm text-ink transition placeholder:text-muted hover:border-primary focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary disabled:cursor-not-allowed disabled:opacity-50"
           />
           <button
             type="button"
@@ -315,7 +315,7 @@ export const ProductPicker: React.FC<ProductPickerProps> = ({
             title={ariaLabel}
             aria-haspopup="dialog"
             aria-expanded={open}
-            className="absolute left-1 top-1/2 inline-flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 transition hover:border-sky-300 hover:bg-sky-50 hover:text-sky-700 focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 disabled:cursor-not-allowed disabled:opacity-50"
+            className="absolute left-1 top-1/2 inline-flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md border border-line bg-surface text-ink-secondary transition hover:border-accent-border hover:bg-accent-soft hover:text-primary focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-50"
           >
             <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
           </button>
@@ -336,11 +336,11 @@ export const ProductPicker: React.FC<ProductPickerProps> = ({
             >
               <div className="min-h-0 flex-1 overflow-auto">
                 {suggestionsLoading ? (
-                  <p className="flex items-center gap-2 px-3 py-3 text-sm text-slate-500" role="status">
+                  <p className="flex items-center gap-2 px-3 py-3 text-sm text-muted" role="status">
                     <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" /> جارٍ البحث عن الأصناف…
                   </p>
                 ) : suggestionsError ? (
-                  <p className="px-3 py-3 text-sm text-rose-700" role="alert">{suggestionsError}</p>
+                  <p className="px-3 py-3 text-sm text-danger" role="alert">{suggestionsError}</p>
                 ) : suggestions.length ? (
                   <ul id={`${id || 'product-picker'}-suggestions`} className="selection-list__options min-h-0 overflow-auto" role="listbox" aria-label="الأصناف المطابقة">
                     {suggestions.map((product, index) => (
@@ -364,7 +364,7 @@ export const ProductPicker: React.FC<ProductPickerProps> = ({
                     ))}
                   </ul>
                 ) : (
-                  <p className="px-3 py-3 text-sm text-slate-500" role="status">لا توجد أصناف مطابقة للبحث.</p>
+                  <p className="px-3 py-3 text-sm text-muted" role="status">لا توجد أصناف مطابقة للبحث.</p>
                 )}
               </div>
             </div>,
@@ -384,9 +384,9 @@ export const ProductPicker: React.FC<ProductPickerProps> = ({
       >
         <div className="space-y-4">
           {filterOptionsError && (
-            <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800" role="alert">
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-warning-border bg-warning-soft px-3 py-2 text-sm text-warning" role="alert">
               <span>{filterOptionsError} يمكنك متابعة البحث دون استخدامها.</span>
-              <button type="button" onClick={retryFilterOptions} className="rounded-md px-2 py-1 font-bold underline underline-offset-2 hover:bg-amber-100">
+              <button type="button" onClick={retryFilterOptions} className="rounded-md px-2 py-1 font-bold underline underline-offset-2 hover:bg-warning-soft">
                 إعادة تحميل الفلاتر
               </button>
             </div>
@@ -394,33 +394,33 @@ export const ProductPicker: React.FC<ProductPickerProps> = ({
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
             <label className="relative sm:col-span-2">
               <span className="sr-only">بحث بالاسم أو الكود أو الباركود أو المقاس</span>
-              <Search className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden="true" />
+              <Search className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" aria-hidden="true" />
               <input
                 autoFocus
                 type="search"
                 value={search}
                 onChange={(event) => { setSearch(event.target.value); setPage(1); }}
                 placeholder="بحث بالاسم أو الكود أو الباركود أو المقاس"
-                className="w-full rounded-lg border border-slate-300 bg-white py-2.5 pr-9 pl-3 text-sm focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-100"
+                className="w-full rounded-lg border border-line-strong bg-surface py-2.5 pr-9 pl-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary"
               />
             </label>
             <label>
               <span className="sr-only">تصفية حسب التصنيف</span>
-              <select value={categoryId} onChange={changeFilter((value) => setCategoryId(value))} className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm focus:border-sky-500 focus:outline-none">
+              <select value={categoryId} onChange={changeFilter((value) => setCategoryId(value))} className="w-full rounded-lg border border-line-strong bg-surface px-3 py-2.5 text-sm focus:border-primary focus:outline-none">
                 <option value="">كل التصنيفات</option>
                 {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
               </select>
             </label>
             <label>
               <span className="sr-only">تصفية حسب الماركة</span>
-              <select value={brandId} onChange={changeFilter((value) => setBrandId(value))} className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm focus:border-sky-500 focus:outline-none">
+              <select value={brandId} onChange={changeFilter((value) => setBrandId(value))} className="w-full rounded-lg border border-line-strong bg-surface px-3 py-2.5 text-sm focus:border-primary focus:outline-none">
                 <option value="">كل الماركات</option>
                 {brands.map((brand) => <option key={brand.id} value={brand.id}>{brand.name}</option>)}
               </select>
             </label>
             <label>
               <span className="sr-only">تصفية حسب حالة المخزون</span>
-              <select value={stockStatus} onChange={(event) => { setStockStatus(event.target.value as ProductQueryOptions['stockStatus']); setPage(1); }} className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm focus:border-sky-500 focus:outline-none">
+              <select value={stockStatus} onChange={(event) => { setStockStatus(event.target.value as ProductQueryOptions['stockStatus']); setPage(1); }} className="w-full rounded-lg border border-line-strong bg-surface px-3 py-2.5 text-sm focus:border-primary focus:outline-none">
                 <option value="all">كل حالات المخزون</option>
                 <option value="in">متوفر</option>
                 <option value="low">مخزون منخفض</option>
@@ -429,7 +429,7 @@ export const ProductPicker: React.FC<ProductPickerProps> = ({
             </label>
             <label>
               <span className="sr-only">ترتيب الأصناف</span>
-              <select value={sortBy} onChange={(event) => { setSortBy(event.target.value as ProductQueryOptions['sortBy']); setPage(1); }} className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm focus:border-sky-500 focus:outline-none">
+              <select value={sortBy} onChange={(event) => { setSortBy(event.target.value as ProductQueryOptions['sortBy']); setPage(1); }} className="w-full rounded-lg border border-line-strong bg-surface px-3 py-2.5 text-sm focus:border-primary focus:outline-none">
                 <option value="name">ترتيب بالاسم</option>
                 <option value="newest">الأحدث</option>
                 <option value="price_asc">السعر: الأقل أولاً</option>
@@ -440,22 +440,22 @@ export const ProductPicker: React.FC<ProductPickerProps> = ({
           </div>
 
           {loading ? (
-            <div className="flex min-h-48 items-center justify-center gap-2 text-sm text-slate-500" role="status" aria-live="polite">
-              <LoaderCircle className="h-5 w-5 animate-spin text-sky-600" aria-hidden="true" />
+            <div className="flex min-h-48 items-center justify-center gap-2 text-sm text-muted" role="status" aria-live="polite">
+              <LoaderCircle className="h-5 w-5 animate-spin text-primary" aria-hidden="true" />
               جارٍ تحميل الأصناف…
             </div>
           ) : loadError ? (
-            <div className="flex min-h-40 flex-col items-center justify-center gap-3 rounded-xl border border-rose-200 bg-rose-50 p-5 text-center" role="alert">
-              <p className="text-sm font-semibold text-rose-800">{loadError}</p>
-              <button type="button" onClick={() => setRetry((current) => current + 1)} className="inline-flex items-center gap-2 rounded-lg border border-rose-300 bg-white px-3 py-2 text-sm font-bold text-rose-700 hover:bg-rose-100">
+            <div className="flex min-h-40 flex-col items-center justify-center gap-3 rounded-xl border border-danger-border bg-danger-soft p-5 text-center" role="alert">
+              <p className="text-sm font-semibold text-danger">{loadError}</p>
+              <button type="button" onClick={() => setRetry((current) => current + 1)} className="inline-flex items-center gap-2 rounded-lg border border-danger bg-surface px-3 py-2 text-sm font-bold text-danger hover:bg-danger-soft">
                 <RotateCw className="h-4 w-4" aria-hidden="true" /> إعادة المحاولة
               </button>
             </div>
           ) : products.length === 0 ? (
-            <div className="flex min-h-40 flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 bg-slate-50 p-5 text-center" role="status">
-              <PackageSearch className="mb-2 h-7 w-7 text-slate-400" aria-hidden="true" />
-              <p className="text-sm font-bold text-slate-700">لا توجد أصناف مطابقة</p>
-              <p className="mt-1 text-xs text-slate-500">غيّر عبارة البحث أو الفلاتر لعرض نتائج أخرى.</p>
+            <div className="flex min-h-40 flex-col items-center justify-center rounded-xl border border-dashed border-line-strong bg-surface-muted p-5 text-center" role="status">
+              <PackageSearch className="mb-2 h-7 w-7 text-muted" aria-hidden="true" />
+              <p className="text-sm font-bold text-ink">لا توجد أصناف مطابقة</p>
+              <p className="mt-1 text-xs text-muted">غيّر عبارة البحث أو الفلاتر لعرض نتائج أخرى.</p>
             </div>
           ) : (
             <div className="selection-list overflow-hidden">
@@ -486,15 +486,15 @@ export const ProductPicker: React.FC<ProductPickerProps> = ({
                   ))}
                 </ul>
               </div>
-              <div className="flex flex-col gap-3 border-t border-slate-200 bg-slate-50 px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
-                <p className="text-xs text-slate-500" aria-live="polite">
+              <div className="flex flex-col gap-3 border-t border-line bg-surface-muted px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-xs text-muted" aria-live="polite">
                   {totalItems.toLocaleString('ar')} صنف · صفحة {page.toLocaleString('ar')} من {totalPages.toLocaleString('ar')}
                 </p>
                 <div className="flex items-center gap-2">
-                  <button type="button" onClick={() => setPage((current) => Math.max(1, current - 1))} disabled={page <= 1 || loading} className="inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-45">
+                  <button type="button" onClick={() => setPage((current) => Math.max(1, current - 1))} disabled={page <= 1 || loading} className="inline-flex items-center gap-1 rounded-lg border border-line-strong bg-surface px-3 py-1.5 text-xs font-bold text-ink hover:bg-surface-sunken disabled:cursor-not-allowed disabled:opacity-45">
                     <ChevronRight className="h-4 w-4" aria-hidden="true" /> السابق
                   </button>
-                  <button type="button" onClick={() => setPage((current) => Math.min(totalPages, current + 1))} disabled={page >= totalPages || loading} className="inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-45">
+                  <button type="button" onClick={() => setPage((current) => Math.min(totalPages, current + 1))} disabled={page >= totalPages || loading} className="inline-flex items-center gap-1 rounded-lg border border-line-strong bg-surface px-3 py-1.5 text-xs font-bold text-ink hover:bg-surface-sunken disabled:cursor-not-allowed disabled:opacity-45">
                     التالي <ChevronLeft className="h-4 w-4" aria-hidden="true" />
                   </button>
                 </div>

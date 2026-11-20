@@ -82,9 +82,9 @@ export const PaymentModal: React.FC<{ target: PaymentTarget; onClose: () => void
       <div className="space-y-3">
         {registersError && <LoadErrorNotice message={registersError} />}
         {!registersError && availableRegisters.length === 0 && <LoadErrorNotice message="لا توجد خزائن نشطة مرتبطة بفرع هذه المعاملة." />}
-        <div className="rounded-xl bg-slate-50 border border-slate-200 px-4 py-3 flex items-center justify-between">
-          <span className="text-xs text-slate-500">المتبقي</span>
-          <span className="text-base font-black text-rose-600">{fmt(target.remaining)}</span>
+        <div className="rounded-xl bg-surface-muted border border-line px-4 py-3 flex items-center justify-between">
+          <span className="text-xs text-muted">المتبقي</span>
+          <span className="text-base font-black text-danger">{fmt(target.remaining)}</span>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div>
@@ -121,8 +121,8 @@ export const PaymentModal: React.FC<{ target: PaymentTarget; onClose: () => void
           <input id="payment-notes" value={notes} onChange={(e) => setNotes(e.target.value)} className={input} />
         </div>
         <div className="flex justify-end gap-2 pt-2">
-          <button type="button" onClick={onClose} disabled={saving} className="px-4 py-2 text-sm font-semibold text-slate-600 rounded-lg hover:bg-slate-100 disabled:opacity-50">إلغاء</button>
-          <button type="button" onClick={save} disabled={saving || Boolean(registersError) || availableRegisters.length === 0 || target.remaining <= 0} className="flex items-center gap-1.5 px-5 py-2 bg-emerald-600 text-white rounded-lg text-sm font-bold hover:bg-emerald-700 disabled:opacity-50">
+          <button type="button" onClick={onClose} disabled={saving} className="px-4 py-2 text-sm font-semibold text-ink-secondary rounded-lg hover:bg-surface-sunken disabled:opacity-50">إلغاء</button>
+          <button type="button" onClick={save} disabled={saving || Boolean(registersError) || availableRegisters.length === 0 || target.remaining <= 0} className="flex items-center gap-1.5 px-5 py-2 bg-success text-white rounded-lg text-sm font-bold hover:bg-success disabled:opacity-50">
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} تسجيل الدفعة
           </button>
         </div>
@@ -180,10 +180,10 @@ export const DetailsModal: React.FC<{ kind: 'sale' | 'purchase'; id: string; onC
 
   return (
     <ModalShell title={`تفاصيل ${kind === 'sale' ? 'فاتورة البيع' : 'فاتورة التوريد'}`} subtitle={invoice?.invoiceNumber} onClose={onClose} wide>
-      {loading ? <div className="py-12 flex justify-center" role="status" aria-label="جارٍ تحميل التفاصيل"><Loader2 className="w-6 h-6 animate-spin text-sky-600" /></div>
+      {loading ? <div className="py-12 flex justify-center" role="status" aria-label="جارٍ تحميل التفاصيل"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>
         : loadError ? <div className="space-y-3">
           <LoadErrorNotice message={loadError} />
-          <button type="button" onClick={load} className="px-3 py-2 text-xs font-bold text-sky-700 rounded-lg hover:bg-sky-50">إعادة المحاولة</button>
+          <button type="button" onClick={load} className="px-3 py-2 text-xs font-bold text-primary rounded-lg hover:bg-accent-soft">إعادة المحاولة</button>
         </div>
         : !invoice ? <LoadErrorNotice message="لم يتم العثور على الفاتورة." /> : (
         <div className="space-y-4">
@@ -193,18 +193,18 @@ export const DetailsModal: React.FC<{ kind: 'sale' | 'purchase'; id: string; onC
               ['المدفوع', invoice.paidAmount],
               ['المتبقي', invoice.remainingAmount],
             ].map(([labelText, value]) => (
-              <div key={String(labelText)} className="rounded-lg bg-slate-50 border border-slate-200 px-3 py-2">
-                <p className="text-[10px] text-slate-500">{labelText}</p>
-                <p className="text-sm font-black text-slate-900">{fmt(Number(value))}</p>
+              <div key={String(labelText)} className="rounded-lg bg-surface-muted border border-line px-3 py-2">
+                <p className="text-[10px] text-muted">{labelText}</p>
+                <p className="text-sm font-black text-ink">{fmt(Number(value))}</p>
               </div>
             ))}
-            <div className="rounded-lg bg-slate-50 border border-slate-200 px-3 py-2">
-              <p className="text-[10px] text-slate-500">الحالة</p>
-              <p className="text-sm font-black text-slate-900">{invoice.paymentStatus}</p>
+            <div className="rounded-lg bg-surface-muted border border-line px-3 py-2">
+              <p className="text-[10px] text-muted">الحالة</p>
+              <p className="text-sm font-black text-ink">{invoice.paymentStatus}</p>
             </div>
           </div>
 
-          <div className="rounded-xl border border-slate-200 overflow-x-auto">
+          <div className="rounded-xl border border-line overflow-x-auto">
             <DataTable
               ariaLabel="أصناف الفاتورة"
               rows={invoice.items || []}
@@ -222,16 +222,16 @@ export const DetailsModal: React.FC<{ kind: 'sale' | 'purchase'; id: string; onC
           </div>
 
           {kind === 'sale' && (
-            <div className="rounded-xl border border-slate-200 overflow-hidden">
-              <div className="px-3 py-2 bg-slate-50 text-xs font-bold text-slate-700">سندات التحصيل</div>
-              {payments.length === 0 ? <p className="p-4 text-xs text-slate-400 text-center">لا توجد دفعات مسجلة</p> : (
-                <div className="divide-y divide-slate-100">
+            <div className="rounded-xl border border-line overflow-hidden">
+              <div className="px-3 py-2 bg-surface-muted text-xs font-bold text-ink">سندات التحصيل</div>
+              {payments.length === 0 ? <p className="p-4 text-xs text-muted text-center">لا توجد دفعات مسجلة</p> : (
+                <div className="divide-y divide-line-strong">
                   {payments.map((payment) => (
                     <div key={payment.id} className="flex items-center justify-between px-3 py-2 text-xs">
-                      <span className="font-mono text-emerald-600">{payment.receiptNumber}</span>
+                      <span className="font-mono text-success">{payment.receiptNumber}</span>
                       <span>{fmt(payment.amount)}</span>
-                      <span className="text-slate-500">{payment.paymentType}</span>
-                      {canReversePayment && <button onClick={() => removePayment(payment.id)} className="p-1 text-rose-500 hover:bg-rose-50 rounded"><Trash2 className="w-3.5 h-3.5" /></button>}
+                      <span className="text-muted">{payment.paymentType}</span>
+                      {canReversePayment && <button onClick={() => removePayment(payment.id)} className="p-1 text-danger hover:bg-danger-soft rounded"><Trash2 className="w-3.5 h-3.5" /></button>}
                     </div>
                   ))}
                 </div>
@@ -269,7 +269,7 @@ export const VoidModal: React.FC<{ target: { kind: 'sale' | 'purchase'; id: stri
   return (
     <ModalShell title={target.kind === 'sale' ? 'إلغاء فاتورة بيع' : 'حذف فاتورة توريد'} subtitle={target.name} onClose={onClose} busy={saving}>
       <div className="space-y-3">
-        <div className="flex items-start gap-2 rounded-xl bg-amber-50 border border-amber-200 p-3 text-[11px] text-amber-700">
+        <div className="flex items-start gap-2 rounded-xl bg-warning-soft border border-warning-border p-3 text-[11px] text-warning">
           <AlertTriangle className="w-4 h-4 shrink-0" />
           <p>
             {target.kind === 'sale'
@@ -282,8 +282,8 @@ export const VoidModal: React.FC<{ target: { kind: 'sale' | 'purchase'; id: stri
           <textarea id="void-reason" value={reason} onChange={(e) => setReason(e.target.value)} rows={3} className={input} />
         </div>
         <div className="flex justify-end gap-2">
-          <button type="button" onClick={onClose} disabled={saving} className="px-4 py-2 text-sm font-semibold text-slate-600 rounded-lg hover:bg-slate-100 disabled:opacity-50">رجوع</button>
-          <button type="button" onClick={save} disabled={saving || !reason.trim()} className="flex items-center gap-1.5 px-5 py-2 bg-rose-600 text-white rounded-lg text-sm font-bold hover:bg-rose-700 disabled:opacity-50">
+          <button type="button" onClick={onClose} disabled={saving} className="px-4 py-2 text-sm font-semibold text-ink-secondary rounded-lg hover:bg-surface-sunken disabled:opacity-50">رجوع</button>
+          <button type="button" onClick={save} disabled={saving || !reason.trim()} className="flex items-center gap-1.5 px-5 py-2 bg-danger text-white rounded-lg text-sm font-bold hover:bg-danger disabled:opacity-50">
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />} تأكيد
           </button>
         </div>

@@ -24,11 +24,11 @@ export const ExecutiveSalesChart: React.FC<Props> = ({ dailySales, branchData, r
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
       {/* Sales Line Chart — 2/3 width */}
-      <div className="min-w-0 lg:col-span-2 bg-white rounded-xl border border-slate-200 p-3 sm:p-4 dark:bg-slate-800 dark:border-slate-700">
-        <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-4">المبيعات والأرباح — {RANGE_LABELS[range]}</h3>
+      <div className="min-w-0 lg:col-span-2 bg-surface rounded-xl border border-line p-3 sm:p-4 ">
+        <h3 className="text-sm font-bold text-ink dark:text-white mb-4">المبيعات والأرباح — {RANGE_LABELS[range]}</h3>
         {isSinglePoint && dailySales.length === 1 ? (
           <div className="h-48 flex items-center justify-center">
-            <div className="text-center text-slate-500 dark:text-slate-400">
+            <div className="text-center text-muted ">
               <p className="font-medium">نقطة بيانات واحدة</p>
               <p className="text-sm mt-1">مبيعات اليوم: {formatCurrency(dailySales[0].sales)}</p>
               <p className="text-sm">ربح اليوم: {formatCurrency(dailySales[0].profit)}</p>
@@ -54,10 +54,10 @@ export const ExecutiveSalesChart: React.FC<Props> = ({ dailySales, branchData, r
       </div>
 
       {/* Branch Pie — 1/3 width */}
-      <div className="min-w-0 bg-white rounded-xl border border-slate-200 p-3 sm:p-4 dark:bg-slate-800 dark:border-slate-700">
-        <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-4">توزيع المبيعات بالفروع</h3>
+      <div className="min-w-0 bg-surface rounded-xl border border-line p-3 sm:p-4 ">
+        <h3 className="text-sm font-bold text-ink dark:text-white mb-4">توزيع المبيعات بالفروع</h3>
         {branchData.length === 0 ? (
-          <div className="h-48 flex items-center justify-center text-slate-500 dark:text-slate-400 text-sm">لا توجد بيانات للفروع</div>
+          <div className="h-48 flex items-center justify-center text-muted text-sm">لا توجد بيانات للفروع</div>
         ) : (
           <>
             <ResponsiveContainer width="100%" height={200}>
@@ -77,8 +77,8 @@ export const ExecutiveSalesChart: React.FC<Props> = ({ dailySales, branchData, r
               {branchData.map((b, i) => (
                 <div key={i} className="flex items-center gap-2 text-xs">
                   <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: CHART_COLORS[i % CHART_COLORS.length] }} />
-                  <span className="text-slate-500 dark:text-slate-400 truncate">{b.name}</span>
-                  <span className="text-slate-700 dark:text-slate-200 font-semibold mr-auto">{formatCurrency(b.value)}</span>
+                  <span className="text-muted truncate">{b.name}</span>
+                  <span className="text-ink font-semibold mr-auto">{formatCurrency(b.value)}</span>
                 </div>
               ))}
             </div>

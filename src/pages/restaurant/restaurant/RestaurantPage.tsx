@@ -292,43 +292,43 @@ export const RestaurantPage: React.FC = () => {
         title="إدارة المطعم"
         description="الطاولات والطلبات والمطبخ والوصفات والمخزون."
         actions={
-          <button onClick={load} className="inline-flex items-center gap-2 rounded border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50">
+          <button onClick={load} className="inline-flex items-center gap-2 rounded border border-line-strong px-3 py-2 text-sm hover:bg-surface-muted">
             <RefreshCw className="h-4 w-4" /> تحديث
           </button>
         }
       />
       {getProfileWorkflows(getEffectiveBusinessType()).length > 0 && (
-        <div className="rounded-xl border border-slate-200 bg-white p-3 text-xs dark:border-slate-700 dark:bg-slate-900">
-          <span className="font-bold text-slate-500">سير عمل النشاط: </span>
+        <div className="rounded-xl border border-line bg-surface p-3 text-xs ">
+          <span className="font-bold text-muted">سير عمل النشاط: </span>
           {getProfileWorkflows(getEffectiveBusinessType()).map((w) => (
-            <span key={w.id} className="ml-2 inline-block rounded-full bg-slate-100 px-2 py-0.5 dark:bg-slate-800" title={w.steps.join(' → ')}>{w.label.ar}</span>
+            <span key={w.id} className="ml-2 inline-block rounded-full bg-surface-sunken px-2 py-0.5 " title={w.steps.join(' → ')}>{w.label.ar}</span>
           ))}
         </div>
       )}
 
-      <nav className="flex flex-wrap gap-2 border-b border-slate-200 pb-2">
-        <button onClick={() => setTab('floor')} className={`rounded px-3 py-2 text-sm ${tab === 'floor' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-700'}`}>الصالة والطلبات</button>
-        <button onClick={() => setTab('kitchen')} className={`rounded px-3 py-2 text-sm ${tab === 'kitchen' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-700'}`}>شاشة المطبخ ({orders.length})</button>
-        {canViewRecipes && <button onClick={() => setTab('recipes')} className={`rounded px-3 py-2 text-sm ${tab === 'recipes' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-700'}`}>الوصفات</button>}
+      <nav className="flex flex-wrap gap-2 border-b border-line pb-2">
+        <button onClick={() => setTab('floor')} className={`rounded px-3 py-2 text-sm ${tab === 'floor' ? 'bg-success text-white' : 'bg-surface-sunken text-ink'}`}>الصالة والطلبات</button>
+        <button onClick={() => setTab('kitchen')} className={`rounded px-3 py-2 text-sm ${tab === 'kitchen' ? 'bg-success text-white' : 'bg-surface-sunken text-ink'}`}>شاشة المطبخ ({orders.length})</button>
+        {canViewRecipes && <button onClick={() => setTab('recipes')} className={`rounded px-3 py-2 text-sm ${tab === 'recipes' ? 'bg-success text-white' : 'bg-surface-sunken text-ink'}`}>الوصفات</button>}
       </nav>
 
       {loading ? (
-        <div className="rounded border border-slate-200 bg-white p-8 text-center text-sm text-slate-500">جارٍ تحميل بيانات المطعم…</div>
+        <div className="rounded border border-line bg-surface p-8 text-center text-sm text-muted">جارٍ تحميل بيانات المطعم…</div>
       ) : tab === 'floor' ? (
         <div className="grid gap-5 xl:grid-cols-[minmax(0,1.1fr)_minmax(360px,0.9fr)]">
           <section className="space-y-4">
             <div className="flex items-center justify-between">
-              <h2 className="font-semibold text-slate-800">الطاولات</h2>
-              <span className="text-xs text-slate-500">{tables.filter((table) => table.isActive).length} نشطة</span>
+              <h2 className="font-semibold text-ink">الطاولات</h2>
+              <span className="text-xs text-muted">{tables.filter((table) => table.isActive).length} نشطة</span>
             </div>
             <div className="grid grid-cols-1  gap-3 sm:grid-cols-3 lg:grid-cols-4">
               {tables.map((table) => (
-                <article key={table.id} className={`rounded border p-3 ${table.occupied ? 'border-amber-300 bg-amber-50' : table.isActive ? 'border-emerald-200 bg-white' : 'border-slate-200 bg-slate-100 opacity-60'}`}>
+                <article key={table.id} className={`rounded border p-3 ${table.occupied ? 'border-warning bg-warning-soft' : table.isActive ? 'border-success-border bg-surface' : 'border-line bg-surface-sunken opacity-60'}`}>
                   <div className="flex items-center justify-between">
                     <span className="font-bold">طاولة {table.tableNumber}</span>
-                    <Coffee className={`h-4 w-4 ${table.occupied ? 'text-amber-600' : 'text-emerald-600'}`} />
+                    <Coffee className={`h-4 w-4 ${table.occupied ? 'text-warning' : 'text-success'}`} />
                   </div>
-                  <div className="mt-1 text-xs text-slate-500">السعة {table.capacity} · {table.occupied ? 'مشغولة' : table.isActive ? 'متاحة' : 'متوقفة'}</div>
+                  <div className="mt-1 text-xs text-muted">السعة {table.capacity} · {table.occupied ? 'مشغولة' : table.isActive ? 'متاحة' : 'متوقفة'}</div>
                   {canUpdate && !table.occupied && (
                     <button
                       onClick={() => {
@@ -339,36 +339,36 @@ export const RestaurantPage: React.FC = () => {
                           toast.error('تعذر تحديث الطاولة', error instanceof Error ? error.message : undefined);
                         }
                       }}
-                      className="mt-2 text-xs text-sky-700 hover:underline"
+                      className="mt-2 text-xs text-primary hover:underline"
                     >{table.isActive ? 'إيقاف' : 'تفعيل'}</button>
                   )}
                 </article>
               ))}
-              {tables.length === 0 && <p className="col-span-full rounded border border-dashed p-6 text-center text-sm text-slate-500">أضف الطاولات لبدء إدارة الصالة.</p>}
+              {tables.length === 0 && <p className="col-span-full rounded border border-dashed p-6 text-center text-sm text-muted">أضف الطاولات لبدء إدارة الصالة.</p>}
             </div>
 
             {canCreate && (
-              <form onSubmit={addTable} className="flex flex-wrap items-end gap-2 rounded border border-slate-200 bg-white p-3">
-                <label className="text-xs text-slate-600">رقم الطاولة<input required type="number" min="1" value={tableNumber} onChange={(event) => setTableNumber(event.target.value)} className="mt-1 block w-28 rounded border px-2 py-1.5 text-sm" /></label>
-                <label className="text-xs text-slate-600">السعة<input required type="number" min="1" value={tableCapacity} onChange={(event) => setTableCapacity(event.target.value)} className="mt-1 block w-24 rounded border px-2 py-1.5 text-sm" /></label>
-                <button className="rounded bg-slate-800 px-3 py-2 text-sm text-white">إضافة طاولة</button>
+              <form onSubmit={addTable} className="flex flex-wrap items-end gap-2 rounded border border-line bg-surface p-3">
+                <label className="text-xs text-ink-secondary">رقم الطاولة<input required type="number" min="1" value={tableNumber} onChange={(event) => setTableNumber(event.target.value)} className="mt-1 block w-28 rounded border px-2 py-1.5 text-sm" /></label>
+                <label className="text-xs text-ink-secondary">السعة<input required type="number" min="1" value={tableCapacity} onChange={(event) => setTableCapacity(event.target.value)} className="mt-1 block w-24 rounded border px-2 py-1.5 text-sm" /></label>
+                <button className="rounded bg-primary px-3 py-2 text-sm text-white">إضافة طاولة</button>
               </form>
             )}
 
-            <section className="space-y-3 rounded border border-slate-200 bg-white p-3">
+            <section className="space-y-3 rounded border border-line bg-surface p-3">
               <div>
-                <h2 className="font-semibold text-slate-800">قائمة الطعام لهذا الفرع</h2>
-                <p className="mt-1 text-xs text-slate-500">تظهر الأصناف المفعّلة فقط عند تسجيل الطلب.</p>
+                <h2 className="font-semibold text-ink">قائمة الطعام لهذا الفرع</h2>
+                <p className="mt-1 text-xs text-muted">تظهر الأصناف المفعّلة فقط عند تسجيل الطلب.</p>
               </div>
               <div className="grid gap-2 sm:grid-cols-2">
                 {branchMenuItems.map((item) => (
-                  <div key={item.id} className="flex items-center justify-between gap-2 rounded bg-slate-50 px-3 py-2">
+                  <div key={item.id} className="flex items-center justify-between gap-2 rounded bg-surface-muted px-3 py-2">
                     <span className="min-w-0 truncate text-sm">{item.productName} · {currency.format(item.unitPrice)}</span>
-                    <span className={`shrink-0 text-xs ${item.isAvailable ? 'text-emerald-700' : 'text-slate-400'}`}>{item.isAvailable ? 'متاح' : 'متوقف'}</span>
-                    {canUpdate && <button type="button" onClick={() => toggleMenuItem(item)} className="shrink-0 text-xs text-sky-700 hover:underline">{item.isAvailable ? 'إيقاف' : 'تفعيل'}</button>}
+                    <span className={`shrink-0 text-xs ${item.isAvailable ? 'text-success' : 'text-muted'}`}>{item.isAvailable ? 'متاح' : 'متوقف'}</span>
+                    {canUpdate && <button type="button" onClick={() => toggleMenuItem(item)} className="shrink-0 text-xs text-primary hover:underline">{item.isAvailable ? 'إيقاف' : 'تفعيل'}</button>}
                   </div>
                 ))}
-                {branchMenuItems.length === 0 && <p className="text-sm text-slate-500">لا توجد أصناف في القائمة بعد.</p>}
+                {branchMenuItems.length === 0 && <p className="text-sm text-muted">لا توجد أصناف في القائمة بعد.</p>}
               </div>
               {canCreateOrder && (
                 <form onSubmit={addMenuItem} className="flex flex-wrap gap-2">
@@ -383,37 +383,37 @@ export const RestaurantPage: React.FC = () => {
                     onChange={setMenuProductId}
                     className="min-w-0 flex-1"
                   />
-                  <button disabled={!warehouseId || !addableMenuProducts.length} className="rounded bg-slate-800 px-3 py-2 text-sm text-white disabled:opacity-50">إضافة للقائمة</button>
+                  <button disabled={!warehouseId || !addableMenuProducts.length} className="rounded bg-primary px-3 py-2 text-sm text-white disabled:opacity-50">إضافة للقائمة</button>
                 </form>
               )}
             </section>
           </section>
 
-          <section className="rounded border border-slate-200 bg-white p-4">
-            <h2 className="mb-4 font-semibold text-slate-800">طلب جديد</h2>
+          <section className="rounded border border-line bg-surface p-4">
+            <h2 className="mb-4 font-semibold text-ink">طلب جديد</h2>
             {!canCreateOrder ? (
-              <p className="text-sm text-slate-500">لا تملك صلاحية إنشاء طلب مطعم.</p>
+              <p className="text-sm text-muted">لا تملك صلاحية إنشاء طلب مطعم.</p>
             ) : (
               <form onSubmit={createOrder} className="space-y-3">
                 <div className="grid gap-3 sm:grid-cols-2">
-                  <label className="text-xs text-slate-600">نوع الخدمة
+                  <label className="text-xs text-ink-secondary">نوع الخدمة
                     <select value={serviceMode} onChange={(event) => setServiceMode(event.target.value as RestaurantServiceMode)} className="mt-1 block w-full rounded border px-2 py-2 text-sm">
                       {Object.entries(SERVICE_MODE_LABEL).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
                     </select>
                   </label>
-                  {serviceMode === 'DINE_IN' && <label className="text-xs text-slate-600">الطاولة
+                  {serviceMode === 'DINE_IN' && <label className="text-xs text-ink-secondary">الطاولة
                     <select required value={tableId} onChange={(event) => setTableId(event.target.value)} className="mt-1 block w-full rounded border px-2 py-2 text-sm">
                       <option value="">اختر طاولة</option>
                       {availableTables.map((table) => <option key={table.id} value={table.id}>طاولة {table.tableNumber} · {table.capacity} مقاعد</option>)}
                     </select>
                   </label>}
-                  <label className="text-xs text-slate-600">العميل
+                  <label className="text-xs text-ink-secondary">العميل
                     <select required value={customerId} onChange={(event) => setCustomerId(event.target.value)} className="mt-1 block w-full rounded border px-2 py-2 text-sm">
                       <option value="">اختر العميل</option>
                       {customers.map((customer) => <option key={customer.id} value={customer.id}>{customer.name}</option>)}
                     </select>
                   </label>
-                  <label className="text-xs text-slate-600">مخزن المكونات
+                  <label className="text-xs text-ink-secondary">مخزن المكونات
                     <select required value={warehouseId} onChange={(event) => setWarehouseId(event.target.value)} className="mt-1 block w-full rounded border px-2 py-2 text-sm">
                       <option value="">اختر المخزن</option>
                       {warehouses.map((warehouse) => <option key={warehouse.id} value={warehouse.id}>{warehouse.name}</option>)}
@@ -423,7 +423,7 @@ export const RestaurantPage: React.FC = () => {
 
                 <div className="space-y-2">
                   {orderLines.map((line, index) => (
-                    <div key={index} className="grid gap-2 rounded bg-slate-50 p-2 sm:grid-cols-[minmax(0,1fr)_90px_minmax(0,0.8fr)_auto]">
+                    <div key={index} className="grid gap-2 rounded bg-surface-muted p-2 sm:grid-cols-[minmax(0,1fr)_90px_minmax(0,0.8fr)_auto]">
                       <ProductPicker
                         required
                         value={line.productId}
@@ -436,18 +436,18 @@ export const RestaurantPage: React.FC = () => {
                       />
                       <input aria-label="الكمية" required type="number" min="0.001" step="0.001" value={line.quantity} onChange={(event) => setOrderLines((previous) => previous.map((item, i) => i === index ? { ...item, quantity: event.target.value } : item))} className="rounded border px-2 py-2 text-sm" />
                       <input aria-label="ملاحظة الصنف" value={line.notes} onChange={(event) => setOrderLines((previous) => previous.map((item, i) => i === index ? { ...item, notes: event.target.value } : item))} placeholder="ملاحظة للمطبخ" className="rounded border px-2 py-2 text-sm" />
-                      <button type="button" onClick={() => setOrderLines((previous) => previous.length > 1 ? previous.filter((_, i) => i !== index) : previous)} className="rounded px-2 text-xs text-red-600" aria-label="حذف الصنف">حذف</button>
+                      <button type="button" onClick={() => setOrderLines((previous) => previous.length > 1 ? previous.filter((_, i) => i !== index) : previous)} className="rounded px-2 text-xs text-danger" aria-label="حذف الصنف">حذف</button>
                     </div>
                   ))}
-                  <button type="button" onClick={() => setOrderLines((previous) => [...previous, { productId: '', quantity: '1', notes: '' }])} className="inline-flex items-center gap-1 text-sm text-emerald-700">
+                  <button type="button" onClick={() => setOrderLines((previous) => [...previous, { productId: '', quantity: '1', notes: '' }])} className="inline-flex items-center gap-1 text-sm text-success">
                     <CirclePlus className="h-4 w-4" /> إضافة صنف
                   </button>
                 </div>
 
-                <label className="block text-xs text-slate-600">ملاحظات الطلب
+                <label className="block text-xs text-ink-secondary">ملاحظات الطلب
                   <textarea rows={2} value={orderNotes} onChange={(event) => setOrderNotes(event.target.value)} className="mt-1 block w-full rounded border px-2 py-2 text-sm" />
                 </label>
-                <button disabled={busy || (serviceMode === 'DINE_IN' && !availableTables.length)} className="w-full rounded bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50">
+                <button disabled={busy || (serviceMode === 'DINE_IN' && !availableTables.length)} className="w-full rounded bg-success px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50">
                   إرسال الطلب للمطبخ
                 </button>
               </form>
@@ -460,32 +460,32 @@ export const RestaurantPage: React.FC = () => {
             const total = order.items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
             const canBill = order.items.length > 0 && order.items.every((item) => item.kitchenStatus === 'SERVED');
             return (
-              <article key={order.id} className="rounded border border-slate-200 bg-white">
-                <header className="flex items-start justify-between border-b border-slate-100 p-3">
+              <article key={order.id} className="rounded border border-line bg-surface">
+                <header className="flex items-start justify-between border-b border-line p-3">
                   <div>
-                    <div className="font-semibold text-slate-800">{order.orderNumber} · {order.tableNumber ? `طاولة ${order.tableNumber}` : SERVICE_MODE_LABEL[order.serviceMode]}</div>
-                    <div className="mt-1 text-xs text-slate-500">{order.customerName} · {order.warehouseName}</div>
+                    <div className="font-semibold text-ink">{order.orderNumber} · {order.tableNumber ? `طاولة ${order.tableNumber}` : SERVICE_MODE_LABEL[order.serviceMode]}</div>
+                    <div className="mt-1 text-xs text-muted">{order.customerName} · {order.warehouseName}</div>
                   </div>
                   <span className="text-sm font-semibold">{currency.format(total)}</span>
                 </header>
                 <div className="space-y-3 p-3">
                   {order.items.map((item) => (
-                    <div key={item.id} className="flex items-start justify-between gap-3 rounded bg-slate-50 p-2.5">
+                    <div key={item.id} className="flex items-start justify-between gap-3 rounded bg-surface-muted p-2.5">
                       <div className="min-w-0">
                         <div className="font-medium">{item.productName} × {item.quantity} {item.baseUnit}</div>
-                        <div className="mt-1 text-xs text-slate-500">{KITCHEN_LABEL[item.kitchenStatus]}{item.notes ? ` · ${item.notes}` : ''}</div>
+                        <div className="mt-1 text-xs text-muted">{KITCHEN_LABEL[item.kitchenStatus]}{item.notes ? ` · ${item.notes}` : ''}</div>
                       </div>
                       {canUpdate && item.kitchenStatus !== 'SERVED' && (
-                        <button disabled={busy} onClick={() => updateKitchen(item.id, KITCHEN_ACTION[item.kitchenStatus].next)} className="shrink-0 rounded bg-slate-800 px-2.5 py-1.5 text-xs text-white disabled:opacity-50">
+                        <button disabled={busy} onClick={() => updateKitchen(item.id, KITCHEN_ACTION[item.kitchenStatus].next)} className="shrink-0 rounded bg-primary px-2.5 py-1.5 text-xs text-white disabled:opacity-50">
                           {KITCHEN_ACTION[item.kitchenStatus].label}
                         </button>
                       )}
                     </div>
                   ))}
-                  {order.notes && <p className="text-xs text-slate-500">ملاحظة: {order.notes}</p>}
-                  <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3">
+                  {order.notes && <p className="text-xs text-muted">ملاحظة: {order.notes}</p>}
+                  <div className="flex flex-wrap items-center gap-2 border-t border-line pt-3">
                     {canBill && can('sales.create') && (
-                      <label className="text-xs text-slate-600">التحصيل
+                      <label className="text-xs text-ink-secondary">التحصيل
                         <select value={paymentType} onChange={(event) => setPaymentType(event.target.value as PaymentType)} className="mr-2 rounded border px-2 py-1.5 text-xs">
                           <option value="CASH">نقدي</option>
                           <option value="CARD">بطاقة</option>
@@ -493,22 +493,22 @@ export const RestaurantPage: React.FC = () => {
                         </select>
                       </label>
                     )}
-                    {canBill && can('sales.create') && <button disabled={busy} onClick={() => billOrder(order.id)} className="rounded bg-emerald-600 px-3 py-2 text-sm text-white disabled:opacity-50">إصدار الفاتورة وتحصيلها</button>}
-                    {canUpdate && order.items.every((item) => item.kitchenStatus === 'NEW') && <button disabled={busy} onClick={() => cancelOrder(order.id)} className="rounded border border-red-200 px-3 py-2 text-sm text-red-700 disabled:opacity-50">إلغاء الطلب</button>}
-                    <span className="mr-auto text-xs text-slate-500">{order.items.filter((item) => item.kitchenStatus === 'SERVED').length}/{order.items.length} أصناف مقدمة</span>
+                    {canBill && can('sales.create') && <button disabled={busy} onClick={() => billOrder(order.id)} className="rounded bg-success px-3 py-2 text-sm text-white disabled:opacity-50">إصدار الفاتورة وتحصيلها</button>}
+                    {canUpdate && order.items.every((item) => item.kitchenStatus === 'NEW') && <button disabled={busy} onClick={() => cancelOrder(order.id)} className="rounded border border-danger-border px-3 py-2 text-sm text-danger disabled:opacity-50">إلغاء الطلب</button>}
+                    <span className="mr-auto text-xs text-muted">{order.items.filter((item) => item.kitchenStatus === 'SERVED').length}/{order.items.length} أصناف مقدمة</span>
                   </div>
                 </div>
               </article>
             );
           })}
-          {orders.length === 0 && <div className="col-span-full rounded border border-dashed border-slate-300 bg-white p-10 text-center text-sm text-slate-500">لا توجد طلبات مفتوحة للمطبخ.</div>}
+          {orders.length === 0 && <div className="col-span-full rounded border border-dashed border-line-strong bg-surface p-10 text-center text-sm text-muted">لا توجد طلبات مفتوحة للمطبخ.</div>}
         </section>
       ) : (
         <section className="grid gap-5 xl:grid-cols-[minmax(340px,0.8fr)_minmax(0,1.2fr)]">
           {canManageRecipes && (
-            <form onSubmit={saveRecipe} className="space-y-3 rounded border border-slate-200 bg-white p-4">
-              <div className="flex items-center gap-2 font-semibold text-slate-800"><ChefHat className="h-4 w-4 text-emerald-600" /> وصفة قائمة جديدة</div>
-              <label className="block text-xs text-slate-600">الصنف المُحضّر
+            <form onSubmit={saveRecipe} className="space-y-3 rounded border border-line bg-surface p-4">
+              <div className="flex items-center gap-2 font-semibold text-ink"><ChefHat className="h-4 w-4 text-success" /> وصفة قائمة جديدة</div>
+              <label className="block text-xs text-ink-secondary">الصنف المُحضّر
                 <ProductPicker
                   required
                   value={recipeProductId}
@@ -520,7 +520,7 @@ export const RestaurantPage: React.FC = () => {
                   className="mt-1"
                 />
               </label>
-              <label className="block text-xs text-slate-600">اسم الوصفة<input required value={recipeName} onChange={(event) => setRecipeName(event.target.value)} className="mt-1 block w-full rounded border px-2 py-2 text-sm" /></label>
+              <label className="block text-xs text-ink-secondary">اسم الوصفة<input required value={recipeName} onChange={(event) => setRecipeName(event.target.value)} className="mt-1 block w-full rounded border px-2 py-2 text-sm" /></label>
               <div className="space-y-2">
                 {recipeLines.map((line, index) => (
                   <div key={index} className="grid grid-cols-[minmax(0,1fr)_90px_minmax(80px,0.5fr)_auto] gap-2">
@@ -541,38 +541,38 @@ export const RestaurantPage: React.FC = () => {
                       className="min-w-0"
                     />
                     <input required aria-label="كمية المكوّن" type="number" min="0.001" step="0.001" value={line.quantity} onChange={(event) => setRecipeLines((previous) => previous.map((item, i) => i === index ? { ...item, quantity: event.target.value } : item))} className="rounded border px-2 py-2 text-xs" />
-                    <span className="self-center text-xs text-slate-500">{line.unit || 'الوحدة'}</span>
-                    <button type="button" onClick={() => setRecipeLines((previous) => previous.length > 1 ? previous.filter((_, i) => i !== index) : previous)} className="px-1 text-xs text-red-600" aria-label="حذف المكوّن">×</button>
+                    <span className="self-center text-xs text-muted">{line.unit || 'الوحدة'}</span>
+                    <button type="button" onClick={() => setRecipeLines((previous) => previous.length > 1 ? previous.filter((_, i) => i !== index) : previous)} className="px-1 text-xs text-danger" aria-label="حذف المكوّن">×</button>
                   </div>
                 ))}
-                <button type="button" onClick={() => setRecipeLines((previous) => [...previous, emptyRecipeLine()])} className="text-sm text-emerald-700">+ إضافة مكوّن</button>
+                <button type="button" onClick={() => setRecipeLines((previous) => [...previous, emptyRecipeLine()])} className="text-sm text-success">+ إضافة مكوّن</button>
               </div>
-              <p className="text-xs leading-relaxed text-slate-500">تتحول الوصفة إلى أمر إنتاج عند بدء تحضير الصنف؛ ويخصم النظام المكونات من المخزون عند اكتمال التحضير.</p>
-              <button className="w-full rounded bg-emerald-600 px-3 py-2 text-sm text-white">حفظ الوصفة كمسودة</button>
+              <p className="text-xs leading-relaxed text-muted">تتحول الوصفة إلى أمر إنتاج عند بدء تحضير الصنف؛ ويخصم النظام المكونات من المخزون عند اكتمال التحضير.</p>
+              <button className="w-full rounded bg-success px-3 py-2 text-sm text-white">حفظ الوصفة كمسودة</button>
             </form>
           )}
 
           <div className="space-y-3">
-            <h2 className="font-semibold text-slate-800">وصفات الأصناف</h2>
+            <h2 className="font-semibold text-ink">وصفات الأصناف</h2>
             {recipes.map((recipe) => (
-              <article key={recipe.id} className="rounded border border-slate-200 bg-white p-4">
+              <article key={recipe.id} className="rounded border border-line bg-surface p-4">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
                     <div className="font-medium">{recipe.productName} · {recipe.name}</div>
-                    <div className="mt-1 text-xs text-slate-500">الإصدار {recipe.version} · {recipe.status === 'ACTIVE' ? 'نشطة' : recipe.status === 'DRAFT' ? 'مسودة' : 'مؤرشفة'}</div>
+                    <div className="mt-1 text-xs text-muted">الإصدار {recipe.version} · {recipe.status === 'ACTIVE' ? 'نشطة' : recipe.status === 'DRAFT' ? 'مسودة' : 'مؤرشفة'}</div>
                   </div>
                   <div className="flex gap-2">
-                    {canManageRecipes && recipe.status === 'DRAFT' && <button onClick={() => updateRecipe(recipe.id, 'activate')} className="rounded border border-emerald-200 px-2.5 py-1.5 text-xs text-emerald-700">تفعيل</button>}
-                    {canManageRecipes && recipe.status === 'ACTIVE' && <button onClick={() => updateRecipe(recipe.id, 'archive')} className="rounded border border-slate-200 px-2.5 py-1.5 text-xs text-slate-600">أرشفة</button>}
+                    {canManageRecipes && recipe.status === 'DRAFT' && <button onClick={() => updateRecipe(recipe.id, 'activate')} className="rounded border border-success-border px-2.5 py-1.5 text-xs text-success">تفعيل</button>}
+                    {canManageRecipes && recipe.status === 'ACTIVE' && <button onClick={() => updateRecipe(recipe.id, 'archive')} className="rounded border border-line px-2.5 py-1.5 text-xs text-ink-secondary">أرشفة</button>}
                   </div>
                 </div>
-                <ul className="mt-3 space-y-1 text-sm text-slate-600">
+                <ul className="mt-3 space-y-1 text-sm text-ink-secondary">
                   {recipe.items.map((item) => <li key={item.id}>{item.componentName} — {item.quantity} {item.unit}</li>)}
                 </ul>
               </article>
             ))}
-            {recipes.length === 0 && <div className="rounded border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">لا توجد وصفات محفوظة بعد.</div>}
-            {!canManageRecipes && <p className="text-xs text-slate-500">تحتاج صلاحية إدارة التصنيع لإنشاء الوصفات وتفعيلها.</p>}
+            {recipes.length === 0 && <div className="rounded border border-dashed border-line-strong bg-surface p-8 text-center text-sm text-muted">لا توجد وصفات محفوظة بعد.</div>}
+            {!canManageRecipes && <p className="text-xs text-muted">تحتاج صلاحية إدارة التصنيع لإنشاء الوصفات وتفعيلها.</p>}
           </div>
         </section>
       )}

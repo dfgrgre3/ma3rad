@@ -103,7 +103,36 @@ export interface Delivery {
   status: 'PENDING' | 'SCHEDULED' | 'IN_TRANSIT' | 'DELIVERED' | 'FAILED' | 'CANCELLED';
   failureReason?: string | null;
   notes?: string | null;
+  warehouseId?: string | null;
+  requiresShipmentQc?: boolean;
   createdAt: string;
+}
+
+export interface DeliveryItem {
+  id: string;
+  deliveryId: string;
+  productId: string;
+  productName: string;
+  quantityM2: number;
+  boxesCount: number;
+  deliveredM2: number;
+  productBatchId?: string | null;
+  lotNumber?: string | null;
+  batchNumber?: string | null;
+  notes?: string | null;
+}
+
+export interface ShipmentQcCheck {
+  id: string;
+  deliveryId: string;
+  invoiceId?: string | null;
+  result: 'PASS' | 'FAIL' | 'CONDITIONAL';
+  packagingOk: boolean;
+  quantitiesOk: boolean;
+  findings?: string | null;
+  checkedBy?: string | null;
+  checkedByName?: string | null;
+  checkedAt: string;
 }
 
 export class OperationsService {
@@ -597,12 +626,17 @@ export class OperationsService {
       params.push(term, term, term, term);
     }
     sql += ` ORDER BY dl.date DESC, dl.created_at DESC`;
-    return this.db.query<Delivery>(sql, params).map((row) => unscaleMoneyRow(row, ['delivery_fee']));
+    return this.db.query<any>(sql, params).map((row) => ({
+      ...unscaleMoneyRow(row, ['delivery_fee']),
+      warehouseId: row.warehouse_id ?? row.warehouseId,
+      requiresShipmentQc: !!(row.requires_shipment_qc ?? row.requiresShipmentQc),
+    }));
   }
 
   public createDelivery(input: {
     customerId: string; address: string; city?: string; date?: string;
     driverId?: string; vehicleId?: string; scheduledAt?: string; deliveryFee?: number; notes?: string;
+    requiresShipmentQc?: boolean;
   }): Delivery {
     ModuleRegistryService.assertModuleEnabled('operations');
     this.requireManage('deliveries.manage');
@@ -618,13 +652,13 @@ export class OperationsService {
       const deliveryNumber = db.nextNumber('DLV');
       db.run(
         `INSERT INTO deliveries (id, delivery_number, date, customer_id, warehouse_id, driver_id, vehicle_id,
-          address, city, scheduled_at, delivery_fee, status, notes, created_by, branch_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ROUND(?*100), 'PENDING', ?, ?, ?)`,
+          address, city, scheduled_at, delivery_fee, status, notes, created_by, branch_id, requires_shipment_qc)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ROUND(?*100), 'PENDING', ?, ?, ?, ?)`,
         [
           id, deliveryNumber, input.date || localDateString(), input.customerId,
           warehouse.id, input.driverId || null, input.vehicleId || null, input.address.trim(),
           input.city || null, input.scheduledAt || null, input.deliveryFee || 0, input.notes || null, actor.id,
-          this.branchAccess.getCurrentBranchId(actor),
+          this.branchAccess.getCurrentBranchId(actor), input.requiresShipmentQc ? 1 : 0,
         ]
       );
       return this.getDeliveries().find((d) => d.id === id)!;
@@ -634,6 +668,19 @@ export class OperationsService {
   public updateDeliveryStatus(id: string, status: Delivery['status'], failureReason?: string): void {
     ModuleRegistryService.assertModuleEnabled('operations');
     this.requireManage('deliveries.manage');
+    if (status === 'IN_TRANSIT' || status === 'DELIVERED') {
+      const delivery = this.db.query<{ requiresShipmentQc: number }>(
+        `SELECT requires_shipment_qc AS requiresShipmentQc FROM deliveries WHERE id = ?`, [id]
+      )[0];
+      if (delivery?.requiresShipmentQc) {
+        const latest = this.db.query<{ result: string }>(
+          `SELECT result FROM shipment_qc_checks WHERE delivery_id = ? ORDER BY checked_at DESC, created_at DESC LIMIT 1`, [id]
+        )[0];
+        if (latest?.result !== 'PASS') {
+          throw new Error('لا يمكن بدء/تأكيد الشحنة قبل اجتياز فحص ما قبل الشحن بنجاح.');
+        }
+      }
+    }
     this.db.run(
       `UPDATE deliveries SET status = ?, failure_reason = ?, delivered_at = ?, updated_at = ? WHERE id = ?`,
       [
@@ -648,5 +695,149 @@ export class OperationsService {
         this.db.run(`UPDATE vehicles SET status = ? WHERE id = ?`, [status === 'DELIVERED' ? 'AVAILABLE' : 'ON_DELIVERY', vehicle.vehicleId]);
       }
     }
+  }
+
+  // ── Packing manifest & pre-shipment QC ────────────────────────────────────
+
+  private getDeliveryRow(id: string): any {
+    const row = this.db.query<any>(`SELECT * FROM deliveries WHERE id = ?`, [id])[0];
+    if (!row) throw new Error('أمر التسليم غير موجود.');
+    return row;
+  }
+
+  /** Available tracked batches (lots) for packing a delivery line. */
+  public getShippableBatches(productId: string, warehouseId?: string | null): Array<{ id: string; batchNumber: string; quantityRemainingM2: number; productionDate?: string | null }> {
+    PermissionService.require(AuthService.requireAuth(), 'operations.view');
+    return this.db.query<any>(
+      `SELECT id, batch_number AS batchNumber, quantity_remaining_m2 AS quantityRemainingM2, production_date AS productionDate
+       FROM product_batches
+       WHERE product_id = ? AND quantity_remaining_m2 > 0.001
+         AND (? IS NULL OR warehouse_id = ?)
+       ORDER BY created_at ASC`,
+      [productId, warehouseId || null, warehouseId || null]
+    );
+  }
+
+  public addDeliveryItem(deliveryId: string, input: {
+    productId: string; quantityM2: number; boxesCount?: number;
+    productBatchId?: string; notes?: string;
+  }): DeliveryItem {
+    ModuleRegistryService.assertModuleEnabled('operations');
+    this.requireManage('deliveries.manage');
+    const delivery = this.getDeliveryRow(deliveryId);
+    if (['DELIVERED', 'CANCELLED', 'FAILED'].includes(delivery.status)) {
+      throw new Error('لا يمكن تعديل تعبئة أمر تسليم منتهي.');
+    }
+    const product = this.db.query<{ id: string; name: string }>(`SELECT id, name FROM products WHERE id = ?`, [input.productId])[0];
+    if (!product) throw new Error('المنتج المحدد غير موجود.');
+    const quantity = Number(input.quantityM2);
+    if (!Number.isFinite(quantity) || quantity <= 0) throw new Error('كمية التعبئة يجب أن تكون أكبر من صفر.');
+
+    let lotNumber: string | null = null;
+    if (input.productBatchId) {
+      const batch = this.db.query<{ id: string; productId: string; warehouseId: string; batchNumber: string; quantityRemainingM2: number }>(
+        `SELECT id, product_id AS productId, warehouse_id AS warehouseId, batch_number AS batchNumber,
+                quantity_remaining_m2 AS quantityRemainingM2
+         FROM product_batches WHERE id = ?`, [input.productBatchId]
+      )[0];
+      if (!batch) throw new Error('التشغيلة/الدفعة المحددة غير موجودة.');
+      if (batch.productId !== input.productId) throw new Error('التشغيلة المحددة لا تخص هذا المنتج.');
+      if (delivery.warehouse_id && batch.warehouseId !== delivery.warehouse_id) {
+        throw new Error('التشغيلة المحددة ليست من مستودع أمر التسليم.');
+      }
+      if (quantity > batch.quantityRemainingM2 + 0.001) {
+        throw new Error(`الكمية تتجاوز الرصيد المتاح في التشغيلة (${batch.quantityRemainingM2}).`);
+      }
+      lotNumber = batch.batchNumber;
+    }
+
+    const id = `dit_${uuidv4().substring(0, 8)}`;
+    this.db.run(
+      `INSERT INTO delivery_items (id, delivery_id, product_id, product_name, quantity_m2, boxes_count, product_batch_id, lot_number, notes)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id, deliveryId, input.productId, product.name, quantity, input.boxesCount || 0,
+       input.productBatchId || null, lotNumber, input.notes || null]
+    );
+    return this.getDeliveryItems(deliveryId).find((item) => item.id === id)!;
+  }
+
+  public getDeliveryItems(deliveryId: string): DeliveryItem[] {
+    PermissionService.require(AuthService.requireAuth(), 'operations.view');
+    return this.db.query<DeliveryItem>(
+      `SELECT di.id, di.delivery_id AS deliveryId, di.product_id AS productId, di.product_name AS productName,
+              di.quantity_m2 AS quantityM2, di.boxes_count AS boxesCount, di.delivered_m2 AS deliveredM2,
+              di.product_batch_id AS productBatchId, di.lot_number AS lotNumber,
+              pb.batch_number AS batchNumber, di.notes
+       FROM delivery_items di
+       LEFT JOIN product_batches pb ON pb.id = di.product_batch_id
+       WHERE di.delivery_id = ?
+       ORDER BY di.id`,
+      [deliveryId]
+    );
+  }
+
+  public removeDeliveryItem(deliveryId: string, itemId: string): void {
+    ModuleRegistryService.assertModuleEnabled('operations');
+    this.requireManage('deliveries.manage');
+    const delivery = this.getDeliveryRow(deliveryId);
+    if (['DELIVERED', 'CANCELLED', 'FAILED'].includes(delivery.status)) {
+      throw new Error('لا يمكن تعديل تعبئة أمر تسليم منتهي.');
+    }
+    this.db.run(`DELETE FROM delivery_items WHERE id = ? AND delivery_id = ?`, [itemId, deliveryId]);
+  }
+
+  public recordShipmentQc(deliveryId: string, input: {
+    result: 'PASS' | 'FAIL' | 'CONDITIONAL'; packagingOk?: boolean; quantitiesOk?: boolean;
+    findings?: string; invoiceId?: string;
+  }): ShipmentQcCheck {
+    ModuleRegistryService.assertModuleEnabled('operations');
+    this.requireManage('deliveries.manage');
+    this.getDeliveryRow(deliveryId);
+    if (!['PASS', 'FAIL', 'CONDITIONAL'].includes(input.result)) throw new Error('نتيجة الفحص غير صالحة.');
+    const actor = AuthService.requireAuth();
+    const id = `sqc_${uuidv4().substring(0, 8)}`;
+    this.db.run(
+      `INSERT INTO shipment_qc_checks
+        (id, delivery_id, invoice_id, result, packaging_ok, quantities_ok, findings, checked_by, checked_at, branch_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id, deliveryId, input.invoiceId || null, input.result,
+       input.packagingOk === false ? 0 : 1, input.quantitiesOk === false ? 0 : 1,
+       input.findings?.trim() || null, actor.id, new Date().toISOString(),
+       this.branchAccess.getCurrentBranchId(actor)]
+    );
+    return this.getShipmentQcChecks(deliveryId)[0];
+  }
+
+  public getShipmentQcChecks(deliveryId?: string): ShipmentQcCheck[] {
+    PermissionService.require(AuthService.requireAuth(), 'operations.view');
+    const rows = deliveryId
+      ? this.db.query<any>(
+          `SELECT q.id, q.delivery_id AS deliveryId, q.invoice_id AS invoiceId, q.result,
+                  q.packaging_ok AS packagingOk, q.quantities_ok AS quantitiesOk,
+                  q.findings, q.checked_by AS checkedBy, u.full_name AS checkedByName,
+                  q.checked_at AS checkedAt
+           FROM shipment_qc_checks q
+           LEFT JOIN users u ON u.id = q.checked_by
+           WHERE q.delivery_id = ? ORDER BY q.checked_at DESC, q.created_at DESC`, [deliveryId])
+      : this.db.query<any>(
+          `SELECT q.id, q.delivery_id AS deliveryId, q.invoice_id AS invoiceId, q.result,
+                  q.packaging_ok AS packagingOk, q.quantities_ok AS quantitiesOk,
+                  q.findings, q.checked_by AS checkedBy, u.full_name AS checkedByName,
+                  q.checked_at AS checkedAt, d.delivery_number AS deliveryNumber
+           FROM shipment_qc_checks q
+           JOIN deliveries d ON d.id = q.delivery_id
+           LEFT JOIN users u ON u.id = q.checked_by
+           ORDER BY q.checked_at DESC LIMIT 200`);
+    return rows.map((row) => ({ ...row, packagingOk: !!row.packagingOk, quantitiesOk: !!row.quantitiesOk }));
+  }
+
+  public setDeliveryShipmentQcRequired(deliveryId: string, required: boolean): void {
+    ModuleRegistryService.assertModuleEnabled('operations');
+    this.requireManage('deliveries.manage');
+    const delivery = this.getDeliveryRow(deliveryId);
+    if (['DELIVERED', 'CANCELLED'].includes(delivery.status)) {
+      throw new Error('لا يمكن تغيير متطلبات الجودة لأمر تسليم منتهي.');
+    }
+    this.db.run(`UPDATE deliveries SET requires_shipment_qc = ? WHERE id = ?`, [required ? 1 : 0, deliveryId]);
   }
 }

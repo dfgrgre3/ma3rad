@@ -29,33 +29,33 @@ export const TasksTab: FC<TasksTabProps> = ({
     <div className="flex flex-wrap gap-2">
       {canManage && (
         <>
-          <button type="button" onClick={onNewTask} className="inline-flex items-center gap-2 rounded-xl bg-cyan-700 px-3 py-2 text-xs font-bold text-white hover:bg-cyan-800">
+          <button type="button" onClick={onNewTask} className="inline-flex items-center gap-2 rounded-xl bg-primary px-3 py-2 text-xs font-bold text-white hover:bg-primary">
             <Plus className="h-4 w-4" /> مهمة جديدة
           </button>
-          <button type="button" onClick={() => runAction(() => service.generateDefaultPeriodTasks(selectedPeriod!.id), 'تم توليد مهام الإقفال القياسية.')} className="rounded-xl border border-slate-300 px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50">
+          <button type="button" onClick={() => runAction(() => service.generateDefaultPeriodTasks(selectedPeriod!.id), 'تم توليد مهام الإقفال القياسية.')} className="rounded-xl border border-line-strong px-3 py-2 text-xs font-bold text-ink hover:bg-surface-muted">
             توليد المهام القياسية
           </button>
         </>
       )}
     </div>
-    {tasks.length === 0 && <p className="text-sm text-slate-500">لا توجد مهام لهذه الفترة بعد.</p>}
+    {tasks.length === 0 && <p className="text-sm text-muted">لا توجد مهام لهذه الفترة بعد.</p>}
     <div className="space-y-2">
       {tasks.map((task) => (
-        <article key={task.id} className="rounded-xl border border-slate-200 p-3">
+        <article key={task.id} className="rounded-xl border border-line p-3">
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div>
-              <p className="font-bold text-slate-800">{task.title}</p>
-              <p className="mt-1 text-xs text-slate-500">{task.department || 'بدون قسم'} · {task.assigneeName || 'غير مسندة'} · استحقاق {task.dueDate ? formatDate(task.dueDate) : 'غير محدد'}</p>
-              {task.notes && <p className="mt-1 text-xs text-slate-500">{task.notes}</p>}
+              <p className="font-bold text-ink">{task.title}</p>
+              <p className="mt-1 text-xs text-muted">{task.department || 'بدون قسم'} · {task.assigneeName || 'غير مسندة'} · استحقاق {task.dueDate ? formatDate(task.dueDate) : 'غير محدد'}</p>
+              {task.notes && <p className="mt-1 text-xs text-muted">{task.notes}</p>}
             </div>
             <div className="flex flex-wrap items-center gap-1.5">
-              <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-bold text-slate-700">{priorityLabel[task.priority]}</span>
-              <span className="rounded-full border border-cyan-200 bg-cyan-50 px-2 py-1 text-[11px] font-bold text-cyan-800">{taskStatusLabel[task.status]}</span>
+              <span className="rounded-full border border-line bg-surface-muted px-2 py-1 text-[11px] font-bold text-ink">{priorityLabel[task.priority]}</span>
+              <span className="rounded-full border border-accent-border bg-accent-soft px-2 py-1 text-[11px] font-bold text-primary">{taskStatusLabel[task.status]}</span>
               {canManage && task.status !== 'APPROVED' && task.status !== 'CANCELLED' && (
                 <select
                   value={task.status}
                   onChange={(event) => runAction(() => service.updatePeriodCloseTask(task.id, { status: event.target.value as any }), 'تم تحديث حالة المهمة.')}
-                  className="rounded-lg border border-slate-300 px-2 py-1 text-xs"
+                  className="rounded-lg border border-line-strong px-2 py-1 text-xs"
                 >
                   {Object.entries(taskStatusLabel).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
                 </select>

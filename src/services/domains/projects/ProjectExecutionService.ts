@@ -250,6 +250,217 @@ export class ProjectExecutionService {
     return { id };
   }
 
+  /** Projects the actor may view, used to scope cross-project execution lists. */
+  public getVisibleProjects() {
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'ui.projects.list.view');
+    return this.projects.getProjects();
+  }
+
+  private scopedProjectIds(): string[] {
+    return this.getVisibleProjects().map((project) => project.id);
+  }
+
+  public getContractsAcrossProjects() {
+    const ids = this.scopedProjectIds();
+    if (!ids.length) return [];
+    const placeholders = ids.map(() => '?').join(',');
+    return this.db.query<any>(
+      `SELECT c.*, p.name AS projectName, p.code AS projectCode, v.version_number AS versionNumber,
+              q.quotation_number AS quotationNumber
+       FROM project_estimate_contracts c
+       JOIN projects p ON p.id = c.project_id
+       JOIN project_apartment_estimate_versions v ON v.id = c.estimate_version_id
+       LEFT JOIN quotations q ON q.id = c.quotation_id
+       WHERE c.project_id IN (${placeholders})
+       ORDER BY c.created_at DESC`, ids
+    ).map((row) => unscaleMoneyRow(row, CONTRACT_MONEY_FIELDS));
+  }
+
+  public getCertificatesAcrossProjects() {
+    const ids = this.scopedProjectIds();
+    if (!ids.length) return [];
+    const placeholders = ids.map(() => '?').join(',');
+    return this.db.query<any>(
+      `SELECT c.*, p.name AS projectName, p.code AS projectCode, v.version_number AS versionNumber
+       FROM project_payment_certificates c
+       JOIN projects p ON p.id = c.project_id
+       JOIN project_apartment_estimate_versions v ON v.id = c.estimate_version_id
+       WHERE c.project_id IN (${placeholders})
+       ORDER BY c.certificate_date DESC, c.created_at DESC`, ids
+    ).map((row) => unscaleMoneyRow(row, CERTIFICATE_MONEY_FIELDS));
+  }
+
+  public getActualCostsAcrossProjects() {
+    const ids = this.scopedProjectIds();
+    if (!ids.length) return [];
+    const placeholders = ids.map(() => '?').join(',');
+    return this.db.query<any>(
+      `SELECT c.*, p.name AS projectName, p.code AS projectCode, v.version_number AS versionNumber
+       FROM project_actual_cost_entries c
+       JOIN projects p ON p.id = c.project_id
+       LEFT JOIN project_apartment_estimate_versions v ON v.id = c.estimate_version_id
+       WHERE c.project_id IN (${placeholders})
+       ORDER BY c.cost_date DESC, c.created_at DESC`, ids
+    ).map((row) => unscaleMoneyRow(row, COST_ENTRY_MONEY_FIELDS));
+  }
+
+  /** Latest APPROVED estimate version per estimate — the only inputs createContract/createCertificate accept. */
+  public getApprovedEstimateOptions(projectId: string) {
+    this.requireView(projectId);
+    return this.db.query<{ estimateId: string; estimateName: string; versionId: string; versionNumber: number }>(
+      `SELECT e.id AS estimateId, e.name AS estimateName, v.id AS versionId, v.version_number AS versionNumber
+       FROM project_apartment_estimate_versions v
+       JOIN project_apartment_estimates e ON e.id = v.estimate_id
+       WHERE e.project_id = ? AND v.status = 'APPROVED'
+         AND v.id = (SELECT id FROM project_apartment_estimate_versions WHERE estimate_id = e.id ORDER BY version_number DESC LIMIT 1)
+       ORDER BY e.updated_at DESC`,
+      [projectId]
+    );
+  }
+
+  /** Executed quantities per BOQ line of an approved estimate version. */
+  public getLineProgress(estimateId: string, projectId: string, versionId?: string) {
+    const estimate = this.requireApprovedEstimate(estimateId, projectId, versionId);
+    const snapshot = JSON.parse(estimate.snapshotJson) as ApartmentEstimateVersion['snapshot'];
+    const lines = snapshot.costLines || [];
+    const quantities = snapshot.lineQuantities || {};
+    const rows = this.db.query<any>(
+      'SELECT * FROM project_estimate_line_progress WHERE estimate_version_id = ?', [estimate.versionId]
+    );
+    const byLine = new Map<string, any>(rows.map((row) => [row.line_id, row]));
+    return lines.map((line) => {
+      const planned = Number(quantities[line.id] ?? line.manualQuantity ?? 0) || 0;
+      const row = byLine.get(line.id);
+      const executed = row ? Number(row.executed_quantity) || 0 : 0;
+      return {
+        lineId: line.id,
+        name: line.name,
+        unit: line.unit,
+        category: line.category,
+        phase: line.phase || null,
+        plannedQuantity: planned,
+        executedQuantity: executed,
+        percent: planned > 0 ? Math.min(100, (executed / planned) * 100) : 0,
+        measuredAt: row?.measured_at || null,
+        note: row?.note || null,
+      };
+    });
+  }
+
+  public recordLineProgress(input: { estimateId: string; projectId: string; versionId?: string; lineId: string; executedQuantity: number; measuredAt?: string; note?: string }) {
+    const actor = this.requireWrite(input.projectId);
+    const estimate = this.requireApprovedEstimate(input.estimateId, input.projectId, input.versionId);
+    const snapshot = JSON.parse(estimate.snapshotJson) as ApartmentEstimateVersion['snapshot'];
+    const line = (snapshot.costLines || []).find((item) => item.id === input.lineId);
+    if (!line) throw new Error('البند غير موجود في إصدار المقايسة المعتمد.');
+    if (!Number.isFinite(input.executedQuantity) || input.executedQuantity < 0) throw new Error('الكمية المنفذة غير صالحة.');
+    const quantities = snapshot.lineQuantities || {};
+    const planned = Number(quantities[line.id] ?? line.manualQuantity ?? 0) || 0;
+    const id = `plp_${uuidv4().replace(/-/g, '').slice(0, 12)}`;
+    this.db.run(
+      `INSERT INTO project_estimate_line_progress
+       (id, project_id, estimate_version_id, line_id, line_name, unit, planned_quantity, executed_quantity, measured_at, note, created_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(estimate_version_id, line_id) DO UPDATE SET
+         executed_quantity = excluded.executed_quantity,
+         measured_at = excluded.measured_at,
+         note = excluded.note,
+         updated_at = CURRENT_TIMESTAMP`,
+      [id, input.projectId, estimate.versionId, line.id, line.name, line.unit || null,
+       planned, input.executedQuantity, input.measuredAt || new Date().toISOString().slice(0, 10),
+       input.note?.trim() || null, actor.id]
+    );
+    this.audit('تسجيل كمية منفذة لبند مقايَسة', line.id, { projectId: input.projectId, versionId: estimate.versionId, executedQuantity: input.executedQuantity });
+    return { id, plannedQuantity: planned };
+  }
+
+  /**
+   * Earned value of executed quantities minus already-certified amounts —
+   * the suggested next progress-certificate value. Per-unit sale rate mirrors
+   * getRoomLineTotal: (material*(1+waste) + labor + equipment + expense)
+   * * (1+profit%) * (1-discount%).
+   */
+  public getCertificateSuggestion(estimateId: string, projectId: string, versionId?: string) {
+    const estimate = this.requireApprovedEstimate(estimateId, projectId, versionId);
+    const snapshot = JSON.parse(estimate.snapshotJson) as ApartmentEstimateVersion['snapshot'];
+    const lines = snapshot.costLines || [];
+    const quantities = snapshot.lineQuantities || {};
+    const progressRows = this.db.query<{ line_id: string; executed_quantity: number }>(
+      'SELECT line_id, executed_quantity FROM project_estimate_line_progress WHERE estimate_version_id = ?', [estimate.versionId]
+    );
+    const executedByLine = new Map(progressRows.map((row) => [row.line_id, Number(row.executed_quantity) || 0]));
+    let earned = 0;
+    let planned = 0;
+    const linesDetail = lines.map((line) => {
+      const plannedQty = Number(quantities[line.id] ?? line.manualQuantity ?? 0) || 0;
+      const executedQty = executedByLine.get(line.id) || 0;
+      const unitCost =
+        (1 + Math.max(0, Number(line.wastePercent) || 0) / 100) * Math.max(0, Number(line.materialRate) || 0)
+        + Math.max(0, Number(line.laborRate) || 0)
+        + Math.max(0, Number(line.equipmentRate) || 0)
+        + Math.max(0, Number(line.expenseRate) || 0);
+      const unitSale = unitCost
+        * (1 + Math.max(0, Number(line.profitPercent) || 0) / 100)
+        * (1 - Math.min(100, Math.max(0, Number(line.discountPercent) || 0)) / 100);
+      const lineEarned = executedQty * unitSale;
+      earned += lineEarned;
+      planned += plannedQty * unitSale;
+      return { lineId: line.id, name: line.name, unit: line.unit, executedQuantity: executedQty, plannedQuantity: plannedQty, earnedAmount: Number(lineEarned.toFixed(2)) };
+    });
+    const certified = this.db.query<{ amount: number }>(
+      `SELECT COALESCE(SUM(approved_amount),0) / 100.0 AS amount FROM project_payment_certificates
+       WHERE project_id = ? AND status IN ('APPROVED','PAID')`, [projectId]
+    )[0]?.amount || 0;
+    return {
+      earnedAmount: Number(earned.toFixed(2)),
+      plannedAmount: Number(planned.toFixed(2)),
+      earnedPercent: planned > 0 ? Math.min(100, (earned / planned) * 100) : 0,
+      certifiedAmount: Number(certified),
+      suggestedAmount: Number(Math.max(0, earned - certified).toFixed(2)),
+      lines: linesDetail.filter((line) => line.executedQuantity > 0),
+    };
+  }
+
+  /** Per-project execution rollup across all visible projects — the construction portfolio view. */
+  public getPortfolioSummary() {
+    const ids = this.scopedProjectIds();
+    if (!ids.length) return [];
+    const placeholders = ids.map(() => '?').join(',');
+    const rows = this.db.query<any>(
+      `SELECT p.id, p.name, p.code, p.status, p.project_type AS projectType,
+              p.start_date AS startDate, p.expected_end_date AS expectedEndDate,
+              c.name AS customerName,
+              p.contract_value / 100.0 AS contractValue,
+              (SELECT COALESCE(SUM(b.planned_amount),0) / 100.0 FROM project_budget_lines b WHERE b.project_id = p.id) AS plannedCost,
+              (SELECT COALESCE(SUM(b.actual_amount),0) / 100.0 FROM project_budget_lines b WHERE b.project_id = p.id) AS budgetActual,
+              (SELECT COALESCE(SUM(e.amount),0) / 100.0 FROM project_actual_cost_entries e WHERE e.project_id = p.id) AS actualCost,
+              (SELECT COALESCE(SUM(e2.amount),0) / 100.0 FROM project_actual_cost_entries e2 WHERE e2.project_id = p.id
+                 AND e2.source_type = 'PURCHASE') AS purchaseCost,
+              (SELECT COALESCE(SUM(ct.approved_amount),0) / 100.0 FROM project_payment_certificates ct
+                 WHERE ct.project_id = p.id AND ct.status IN ('APPROVED','PAID')) AS certifiedAmount,
+              (SELECT COALESCE(SUM(ct.paid_amount),0) / 100.0 FROM project_payment_certificates ct
+                 WHERE ct.project_id = p.id) AS paidAmount,
+              (SELECT COUNT(*) FROM project_payment_certificates ct
+                 WHERE ct.project_id = p.id AND ct.status = 'SUBMITTED') AS pendingCertificates,
+              (SELECT COUNT(*) FROM project_site_daily_reports r
+                 WHERE r.project_id = p.id AND r.report_date = date('now')) AS todayReports
+       FROM projects p JOIN customers c ON c.id = p.customer_id
+       WHERE p.id IN (${placeholders})
+       ORDER BY CASE p.status WHEN 'ACTIVE' THEN 0 WHEN 'ON_HOLD' THEN 1 WHEN 'PLANNED' THEN 2 ELSE 3 END, p.name`,
+      ids
+    );
+    return rows.map((row: any) => ({
+      ...row,
+      costVariance: Number(row.plannedCost || 0) - Number(row.actualCost || 0),
+      completionPercent: Number(row.plannedCost) > 0
+        ? Math.min(100, (Number(row.actualCost || 0) / Number(row.plannedCost)) * 100)
+        : 0,
+      collectionGap: Number(row.certifiedAmount || 0) - Number(row.paidAmount || 0),
+      isOverdue: row.status === 'ACTIVE' && row.expectedEndDate && String(row.expectedEndDate).slice(0, 10) < new Date().toISOString().slice(0, 10),
+    }));
+  }
+
   public getSummary(projectId: string): ProjectExecutionSummary {
     this.requireView(projectId);
     const budget = this.projects.getBudgetLines(projectId);

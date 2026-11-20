@@ -48,8 +48,8 @@ export const LineChart: React.FC<ChartProps> = ({
 }) => {
   if (data.length === 0) {
     return (
-      <div className={`w-full flex items-center justify-center rounded-lg bg-slate-50 ${className}`} style={{ height }} role="img" aria-label={ariaLabel}>
-        <p className="text-slate-400 text-sm">لا توجد بيانات للعرض</p>
+      <div className={`w-full flex items-center justify-center rounded-lg bg-surface-muted ${className}`} style={{ height }} role="img" aria-label={ariaLabel}>
+        <p className="text-muted text-sm">لا توجد بيانات للعرض</p>
       </div>
     );
   }
@@ -173,12 +173,12 @@ export const DonutChart: React.FC<{
   if (total <= 0) {
     return (
       <div
-        className={`flex items-center justify-center rounded-lg bg-slate-50 ${className}`}
+        className={`flex items-center justify-center rounded-lg bg-surface-muted ${className}`}
         style={{ width: size, height: size }}
         role="img"
         aria-label={ariaLabel}
       >
-        <p className="text-slate-400 text-xs">لا توجد بيانات</p>
+        <p className="text-muted text-xs">لا توجد بيانات</p>
       </div>
     );
   }
@@ -217,8 +217,8 @@ export const DonutChart: React.FC<{
       </svg>
       {(centerLabel || centerValue) && (
         <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-          {centerValue && <span className="text-lg font-black text-slate-800">{centerValue}</span>}
-          {centerLabel && <span className="text-[10px] font-semibold text-slate-500">{centerLabel}</span>}
+          {centerValue && <span className="text-lg font-black text-ink">{centerValue}</span>}
+          {centerLabel && <span className="text-[10px] font-semibold text-muted">{centerLabel}</span>}
         </div>
       )}
     </div>
@@ -226,12 +226,12 @@ export const DonutChart: React.FC<{
 };
 
 const TONE_STYLES = {
-  default: { icon: 'bg-slate-100 text-slate-600', border: 'border-slate-200' },
-  success: { icon: 'bg-emerald-50 text-emerald-600', border: 'border-emerald-200' },
-  warning: { icon: 'bg-amber-50 text-amber-600', border: 'border-amber-200' },
-  danger: { icon: 'bg-rose-50 text-rose-600', border: 'border-rose-200' },
-  info: { icon: 'bg-sky-50 text-sky-600', border: 'border-sky-200' },
-  violet: { icon: 'bg-violet-50 text-violet-600', border: 'border-violet-200' },
+  default: { icon: 'bg-surface-sunken text-ink-secondary', border: 'border-line' },
+  success: { icon: 'bg-success-soft text-success', border: 'border-success-border' },
+  warning: { icon: 'bg-warning-soft text-warning', border: 'border-warning-border' },
+  danger: { icon: 'bg-danger-soft text-danger', border: 'border-danger-border' },
+  info: { icon: 'bg-accent-soft text-primary', border: 'border-accent-border' },
+  violet: { icon: 'bg-accent-soft text-primary', border: 'border-accent-border' },
 } as const;
 
 type Tone = keyof typeof TONE_STYLES;
@@ -252,7 +252,7 @@ export const MetricCard: React.FC<{
 
   return (
     <div
-      className={`rounded-xl border ${toneStyle.border} bg-white p-4 shadow-sm transition ${isClickable ? 'hover:border-emerald-300 hover:shadow cursor-pointer' : 'hover:border-slate-300 hover:shadow'} ${className}`}
+      className={`rounded-xl border ${toneStyle.border} bg-surface p-4 shadow-sm transition ${isClickable ? 'hover:border-success hover:shadow cursor-pointer' : 'hover:border-line-strong hover:shadow'} ${className}`}
       onClick={onClick}
       role={isClickable ? 'button' : undefined}
       tabIndex={isClickable ? 0 : undefined}
@@ -260,8 +260,8 @@ export const MetricCard: React.FC<{
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <p className="text-[11.5px] font-semibold text-slate-500">{label}</p>
-          <p className="mt-1 truncate text-[22px] font-black leading-tight text-slate-900">
+          <p className="text-[11.5px] font-semibold text-muted">{label}</p>
+          <p className="mt-1 truncate text-[22px] font-black leading-tight text-ink">
             {typeof value === 'number' ? value.toLocaleString('ar-EG') : value}
           </p>
           {comparison && (
@@ -269,17 +269,17 @@ export const MetricCard: React.FC<{
               <span
                 className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full ${
                   comparison.trend === 'up'
-                    ? 'bg-emerald-50 text-emerald-700'
+                    ? 'bg-success-soft text-success'
                     : comparison.trend === 'down'
-                    ? 'bg-rose-50 text-rose-700'
-                    : 'bg-slate-100 text-slate-600'
+                    ? 'bg-danger-soft text-danger'
+                    : 'bg-surface-sunken text-ink-secondary'
                 }`}
               >
                 {comparison.trend === 'up' && <span className="h-2.5 w-2.5">▲</span>}
                 {comparison.trend === 'down' && <span className="h-2.5 w-2.5">▼</span>}
                 {comparison.trend === 'flat' && <span className="h-2.5 w-2.5">■</span>}
                 <span>{comparison.changePercent >= 0 ? '+' : ''}{comparison.changePercent.toFixed(1)}%</span>
-                <span className="text-slate-400">vs الفترة السابقة</span>
+                <span className="text-muted">vs الفترة السابقة</span>
               </span>
             </div>
           )}
@@ -322,14 +322,14 @@ export const Panel: React.FC<{
   action?: React.ReactNode;
   children: React.ReactNode;
   className?: string;
-}> = ({ title, subtitle, icon, iconClass = 'bg-slate-100 text-slate-600', action, children, className = '' }) => (
-  <section className={`rounded-xl border border-slate-200 bg-white shadow-sm ${className}`}>
-    <header className="flex items-center justify-between gap-2 border-b border-slate-100 px-4 py-3">
+}> = ({ title, subtitle, icon, iconClass = 'bg-surface-sunken text-ink-secondary', action, children, className = '' }) => (
+  <section className={`rounded-xl border border-line bg-surface shadow-sm ${className}`}>
+    <header className="flex items-center justify-between gap-2 border-b border-line px-4 py-3">
       <div className="flex min-w-0 items-center gap-2">
         {icon && <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${iconClass}`}>{icon}</span>}
         <div className="min-w-0">
-          <h3 className="truncate text-sm font-bold text-slate-900">{title}</h3>
-          {subtitle && <p className="truncate text-[10.5px] text-slate-500">{subtitle}</p>}
+          <h3 className="truncate text-sm font-bold text-ink">{title}</h3>
+          {subtitle && <p className="truncate text-[10.5px] text-muted">{subtitle}</p>}
         </div>
       </div>
       {action}
@@ -360,7 +360,7 @@ export const PeriodSelector: React.FC<{
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className={`rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[12px] font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/40 ${className}`}
+      className={`rounded-lg border border-line bg-surface px-3 py-1.5 text-[12px] font-medium text-ink focus:outline-none focus:ring-2 focus:ring-success/40 ${className}`}
       aria-label="اختر الفترة الزمنية"
     >
       {opts.map((opt) => (
@@ -381,12 +381,12 @@ export const DrillDownLink: React.FC<{
 }> = ({ label, href, icon, count, className = '' }) => (
   <Link
     to={href}
-    className={`inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-[11.5px] font-semibold text-slate-700 hover:border-emerald-300 hover:bg-emerald-50 transition ${className}`}
+    className={`inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-2 text-[11.5px] font-semibold text-ink hover:border-success hover:bg-success-soft transition ${className}`}
   >
     {icon}
     {label}
     {count !== undefined && (
-      <span className="ml-1.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-bold">
+      <span className="ml-1.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-success-soft text-success text-[10px] font-bold">
         {count}
       </span>
     )}
@@ -408,10 +408,10 @@ export const AlertCard: React.FC<{
   onAction?: (alertId: string, action: string) => void;
 }> = ({ alert, onAction }) => {
   const severityStyles = {
-    danger: { wrap: 'border-rose-200 bg-rose-50', icon: 'bg-rose-100 text-rose-600', title: 'text-rose-800', text: 'text-rose-700', action: 'bg-rose-100 text-rose-700 hover:bg-rose-200' },
-    warning: { wrap: 'border-amber-200 bg-amber-50', icon: 'bg-amber-100 text-amber-600', title: 'text-amber-900', text: 'text-amber-800', action: 'bg-amber-100 text-amber-700 hover:bg-amber-200' },
-    info: { wrap: 'border-sky-200 bg-sky-50', icon: 'bg-sky-100 text-sky-600', title: 'text-sky-900', text: 'text-sky-800', action: 'bg-sky-100 text-sky-700 hover:bg-sky-200' },
-    success: { wrap: 'border-emerald-200 bg-emerald-50', icon: 'bg-emerald-100 text-emerald-600', title: 'text-emerald-900', text: 'text-emerald-800', action: 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' },
+    danger: { wrap: 'border-danger-border bg-danger-soft', icon: 'bg-danger-soft text-danger', title: 'text-danger', text: 'text-danger', action: 'bg-danger-soft text-danger hover:bg-danger' },
+    warning: { wrap: 'border-warning-border bg-warning-soft', icon: 'bg-warning-soft text-warning', title: 'text-warning', text: 'text-warning', action: 'bg-warning-soft text-warning hover:bg-warning' },
+    info: { wrap: 'border-accent-border bg-accent-soft', icon: 'bg-accent-soft text-primary', title: 'text-primary', text: 'text-primary', action: 'bg-accent-soft text-primary hover:bg-accent-border' },
+    success: { wrap: 'border-success-border bg-success-soft', icon: 'bg-success-soft text-success', title: 'text-success', text: 'text-success', action: 'bg-success-soft text-success hover:bg-success' },
   };
 
   const style = severityStyles[alert.severity] ?? severityStyles.info;
@@ -434,7 +434,7 @@ export const AlertCard: React.FC<{
         <div className="flex items-start justify-between gap-2">
           <p className={`text-[12px] font-bold ${style.title}`}>{alert.title}</p>
           {alert.actionRequired && (
-            <span className="shrink-0 rounded-full bg-rose-100 px-1.5 py-0.5 text-[9px] font-bold text-rose-700">يتطلب إجراء</span>
+            <span className="shrink-0 rounded-full bg-danger-soft px-1.5 py-0.5 text-[9px] font-bold text-danger">يتطلب إجراء</span>
           )}
         </div>
         <p className={`mt-0.5 text-[10.5px] leading-5 ${style.text}`}>{alert.description}</p>
@@ -453,7 +453,7 @@ export const AlertCard: React.FC<{
           </div>
         )}
         {alert.link && !onAction && (
-          <Link to={alert.link} className="mt-2 inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 hover:underline">
+          <Link to={alert.link} className="mt-2 inline-flex items-center gap-1 text-[11px] font-bold text-success hover:underline">
             عرض التفاصيل
             <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" /></svg>
           </Link>

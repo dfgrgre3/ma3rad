@@ -77,12 +77,12 @@ const ENTITY_LABELS: Record<string, string> = {
 };
 
 const TONES = {
-  default: { icon: 'bg-slate-100 text-slate-600', bar: 'bg-slate-400' },
-  success: { icon: 'bg-emerald-50 text-emerald-600', bar: 'bg-emerald-500' },
-  warning: { icon: 'bg-amber-50 text-amber-600', bar: 'bg-amber-500' },
-  danger: { icon: 'bg-rose-50 text-rose-600', bar: 'bg-rose-500' },
-  info: { icon: 'bg-sky-50 text-sky-600', bar: 'bg-sky-500' },
-  violet: { icon: 'bg-violet-50 text-violet-600', bar: 'bg-violet-500' },
+  default: { icon: 'bg-surface-sunken text-ink-secondary', bar: 'bg-line-strong' },
+  success: { icon: 'bg-success-soft text-success', bar: 'bg-success' },
+  warning: { icon: 'bg-warning-soft text-warning', bar: 'bg-warning' },
+  danger: { icon: 'bg-danger-soft text-danger', bar: 'bg-danger' },
+  info: { icon: 'bg-accent-soft text-primary', bar: 'bg-primary' },
+  violet: { icon: 'bg-accent-soft text-primary', bar: 'bg-primary' },
 } as const;
 
 type Tone = keyof typeof TONES;
@@ -97,12 +97,12 @@ const MetricCard: React.FC<{
   to?: string;
 }> = ({ label, value, hint, sub, icon, tone = 'default', to }) => {
   const body = (
-    <div className="flex h-full items-start justify-between gap-2 rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-slate-300 hover:shadow">
+    <div className="flex h-full items-start justify-between gap-2 rounded-xl border border-line bg-surface p-4 shadow-sm transition hover:border-line-strong hover:shadow">
       <div className="min-w-0">
-        <p className="text-[11.5px] font-semibold text-slate-500">{label}</p>
-        <p className="mt-1 truncate text-[22px] font-black leading-tight text-slate-900">{value}</p>
-        {hint && <p className="mt-1 text-[11px] text-slate-500">{hint}</p>}
-        {sub && <p className="mt-0.5 text-[10.5px] font-semibold text-slate-400">{sub}</p>}
+        <p className="text-[11.5px] font-semibold text-muted">{label}</p>
+        <p className="mt-1 truncate text-[22px] font-black leading-tight text-ink">{value}</p>
+        {hint && <p className="mt-1 text-[11px] text-muted">{hint}</p>}
+        {sub && <p className="mt-0.5 text-[10.5px] font-semibold text-muted">{sub}</p>}
       </div>
       <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${TONES[tone].icon}`}>{icon}</span>
     </div>
@@ -118,14 +118,14 @@ const Panel: React.FC<{
   action?: React.ReactNode;
   children: React.ReactNode;
   className?: string;
-}> = ({ title, subtitle, icon, iconClass = 'bg-slate-100 text-slate-600', action, children, className = '' }) => (
-  <section className={`rounded-xl border border-slate-200 bg-white shadow-sm ${className}`}>
-    <header className="flex items-center justify-between gap-2 border-b border-slate-100 px-4 py-3">
+}> = ({ title, subtitle, icon, iconClass = 'bg-surface-sunken text-ink-secondary', action, children, className = '' }) => (
+  <section className={`rounded-xl border border-line bg-surface shadow-sm ${className}`}>
+    <header className="flex items-center justify-between gap-2 border-b border-line px-4 py-3">
       <div className="flex min-w-0 items-center gap-2">
         <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${iconClass}`}>{icon}</span>
         <div className="min-w-0">
-          <h3 className="truncate text-sm font-bold text-slate-900">{title}</h3>
-          {subtitle && <p className="truncate text-[10.5px] text-slate-500">{subtitle}</p>}
+          <h3 className="truncate text-sm font-bold text-ink">{title}</h3>
+          {subtitle && <p className="truncate text-[10.5px] text-muted">{subtitle}</p>}
         </div>
       </div>
       {action}
@@ -135,10 +135,10 @@ const Panel: React.FC<{
 );
 
 const ALERT_TONES = {
-  danger: { wrap: 'border-rose-200 bg-rose-50', icon: 'bg-rose-100 text-rose-600', title: 'text-rose-800', text: 'text-rose-700' },
-  warning: { wrap: 'border-amber-200 bg-amber-50', icon: 'bg-amber-100 text-amber-600', title: 'text-amber-900', text: 'text-amber-800' },
-  info: { wrap: 'border-sky-200 bg-sky-50', icon: 'bg-sky-100 text-sky-600', title: 'text-sky-900', text: 'text-sky-800' },
-  success: { wrap: 'border-emerald-200 bg-emerald-50', icon: 'bg-emerald-100 text-emerald-600', title: 'text-emerald-900', text: 'text-emerald-800' },
+  danger: { wrap: 'border-danger-border bg-danger-soft', icon: 'bg-danger-soft text-danger', title: 'text-danger', text: 'text-danger' },
+  warning: { wrap: 'border-warning-border bg-warning-soft', icon: 'bg-warning-soft text-warning', title: 'text-warning', text: 'text-warning' },
+  info: { wrap: 'border-accent-border bg-accent-soft', icon: 'bg-accent-soft text-primary', title: 'text-primary', text: 'text-primary' },
+  success: { wrap: 'border-success-border bg-success-soft', icon: 'bg-success-soft text-success', title: 'text-success', text: 'text-success' },
 } as const;
 
 export const PlatformDashboardPage: React.FC = () => {
@@ -164,14 +164,14 @@ export const PlatformDashboardPage: React.FC = () => {
 
   if (error) {
     return (
-      <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">
+      <div role="alert" className="rounded-xl border border-danger-border bg-danger-soft px-4 py-3 text-sm font-semibold text-danger">
         {error}
       </div>
     );
   }
 
   if (!overview) {
-    return <div className="py-16 text-center text-sm font-semibold text-slate-500">جارٍ تحميل بيانات المنصة...</div>;
+    return <div className="py-16 text-center text-sm font-semibold text-muted">جارٍ تحميل بيانات المنصة...</div>;
   }
 
   const latestRelease = overview.releases[0] ?? null;
@@ -182,37 +182,37 @@ export const PlatformDashboardPage: React.FC = () => {
   return (
     <div className="space-y-5">
       {/* Hero */}
-      <section className="overflow-hidden rounded-2xl bg-gradient-to-l from-slate-900 via-slate-800 to-emerald-900 p-5 text-white shadow-lg md:p-6">
+      <section className="overflow-hidden rounded-2xl bg-gradient-to-l from-ink via-ink to-success p-5 text-white shadow-lg md:p-6">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="min-w-0">
-            <p className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-emerald-300">
+            <p className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-success">
               <ShieldCheck className="h-4 w-4" /> لوحة مالك المنصة
             </p>
             <h2 className="mt-2 text-2xl font-black">مرحباً، {overview.currentInstallation?.companyName || 'سيراميسي'}</h2>
-            <p className="mt-1 max-w-2xl text-xs leading-6 text-slate-300">
+            <p className="mt-1 max-w-2xl text-xs leading-6 text-muted">
               تحكم كامل في المنتج، عملاء المنصة، التراخيص، الاشتراكات والمبيعات — من حساب مالك واحد داخل نفس المشروع.
             </p>
             {latestRelease && (
-              <p className="mt-2 inline-flex flex-wrap items-center gap-2 rounded-lg bg-white/10 px-2.5 py-1 text-[10.5px] font-semibold text-slate-200">
-                <Rocket className="h-3.5 w-3.5 text-emerald-300" />
+              <p className="mt-2 inline-flex flex-wrap items-center gap-2 rounded-lg bg-surface/10 px-2.5 py-1 text-[10.5px] font-semibold text-muted">
+                <Rocket className="h-3.5 w-3.5 text-success" />
                 آخر إصدار: <span dir="ltr" className="font-mono">v{latestRelease.version}</span>
-                <span className="rounded-full bg-emerald-400/20 px-2 py-0.5 text-emerald-200">{CHANNEL_LABELS[latestRelease.channel]}</span>
-                <span className="text-slate-400">· {formatDate(latestRelease.releasedAt || latestRelease.createdAt)}</span>
+                <span className="rounded-full bg-success/20 px-2 py-0.5 text-success">{CHANNEL_LABELS[latestRelease.channel]}</span>
+                <span className="text-muted">· {formatDate(latestRelease.releasedAt || latestRelease.createdAt)}</span>
               </p>
             )}
           </div>
-          <div className="grid grid-cols-3 gap-3 rounded-xl bg-white/10 p-3 text-center backdrop-blur">
+          <div className="grid grid-cols-3 gap-3 rounded-xl bg-surface/10 p-3 text-center backdrop-blur">
             <div>
-              <p className="text-[10px] text-slate-300">العملاء النشطون</p>
-              <p className="text-lg font-black text-emerald-300">{formatNumber(overview.tenants.active)}</p>
+              <p className="text-[10px] text-muted">العملاء النشطون</p>
+              <p className="text-lg font-black text-success">{formatNumber(overview.tenants.active)}</p>
             </div>
             <div>
-              <p className="text-[10px] text-slate-300">تراخيص سارية</p>
-              <p className="text-lg font-black text-sky-300">{formatNumber(overview.licenses.active)}</p>
+              <p className="text-[10px] text-muted">تراخيص سارية</p>
+              <p className="text-lg font-black text-primary">{formatNumber(overview.licenses.active)}</p>
             </div>
             <div>
-              <p className="text-[10px] text-slate-300">الإيراد الكلي</p>
-              <p className="text-lg font-black text-amber-300">{formatMoney(overview.billing.revenueTotal)}</p>
+              <p className="text-[10px] text-muted">الإيراد الكلي</p>
+              <p className="text-lg font-black text-warning">{formatMoney(overview.billing.revenueTotal)}</p>
             </div>
           </div>
         </div>
@@ -327,10 +327,10 @@ export const PlatformDashboardPage: React.FC = () => {
         title="تنبيهات الأمان والتراخيص"
         subtitle={alerts.length === 0 ? 'لا توجد تنبيهات حالياً' : `${alerts.length} تنبيه يحتاج متابعة`}
         icon={<ShieldAlert className="h-4 w-4" />}
-        iconClass="bg-rose-50 text-rose-600"
+        iconClass="bg-danger-soft text-danger"
       >
         {alerts.length === 0 ? (
-          <div className="flex items-center gap-2 px-4 py-5 text-[12px] font-semibold text-emerald-700">
+          <div className="flex items-center gap-2 px-4 py-5 text-[12px] font-semibold text-success">
             <CheckCircle2 className="h-4 w-4" /> كل التراخيص والاشتراكات في وضع سليم.
           </div>
         ) : (
@@ -362,9 +362,9 @@ export const PlatformDashboardPage: React.FC = () => {
           title="تراخيص تقترب من الانتهاء"
           subtitle="خلال 60 يوماً — تحتاج تجديداً"
           icon={<KeyRound className="h-4 w-4" />}
-          iconClass="bg-amber-50 text-amber-600"
+          iconClass="bg-warning-soft text-warning"
           action={
-            <Link to="/platform/licenses" className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 hover:underline">
+            <Link to="/platform/licenses" className="inline-flex items-center gap-1 text-[11px] font-bold text-success hover:underline">
               إدارة <ArrowLeft className="h-3 w-3" />
             </Link>
           }
@@ -372,16 +372,16 @@ export const PlatformDashboardPage: React.FC = () => {
           {overview.expiringLicenses.length === 0 ? (
             <EmptyState icon={<KeyRound className="h-5 w-5" />} title="لا توجد تراخيص قريبة الانتهاء" />
           ) : (
-            <ul className="divide-y divide-slate-100">
+            <ul className="divide-y divide-line-strong">
               {overview.expiringLicenses.map((license) => (
                 <li key={license.id} className="flex items-center justify-between gap-3 px-4 py-3">
                   <div className="min-w-0">
-                    <p className="truncate text-[12.5px] font-bold text-slate-800">{license.tenantName}</p>
-                    <p dir="ltr" className="truncate text-right font-mono text-[10.5px] text-slate-500">{license.licenseKey}</p>
+                    <p className="truncate text-[12.5px] font-bold text-ink">{license.tenantName}</p>
+                    <p dir="ltr" className="truncate text-right font-mono text-[10.5px] text-muted">{license.licenseKey}</p>
                   </div>
                   <div className="shrink-0 text-left">
                     <StatusBadge value="EXPIRING" label={formatDate(license.expiresAt)} />
-                    <p className="mt-1 text-[10px] text-slate-500">{license.planName || '—'}</p>
+                    <p className="mt-1 text-[10px] text-muted">{license.planName || '—'}</p>
                   </div>
                 </li>
               ))}
@@ -393,9 +393,9 @@ export const PlatformDashboardPage: React.FC = () => {
           title="اشتراكات تقترب من الانتهاء"
           subtitle={`${formatNumber(overview.subscriptions.expiringSoon)} اشتراك خلال 30 يوماً`}
           icon={<CalendarClock className="h-4 w-4" />}
-          iconClass="bg-sky-50 text-sky-600"
+          iconClass="bg-accent-soft text-primary"
           action={
-            <Link to="/platform/tenants" className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 hover:underline">
+            <Link to="/platform/tenants" className="inline-flex items-center gap-1 text-[11px] font-bold text-success hover:underline">
               العملاء <ArrowLeft className="h-3 w-3" />
             </Link>
           }
@@ -403,18 +403,18 @@ export const PlatformDashboardPage: React.FC = () => {
           {overview.expiringSubscriptions.length === 0 ? (
             <EmptyState icon={<CalendarClock className="h-5 w-5" />} title="لا توجد اشتراكات قريبة الانتهاء" />
           ) : (
-            <ul className="divide-y divide-slate-100">
+            <ul className="divide-y divide-line-strong">
               {overview.expiringSubscriptions.map((subscription) => (
                 <li key={subscription.id} className="flex items-center justify-between gap-3 px-4 py-3">
                   <div className="min-w-0">
-                    <p className="truncate text-[12.5px] font-bold text-slate-800">{subscription.tenantName || '—'}</p>
-                    <p className="text-[10.5px] text-slate-500">
+                    <p className="truncate text-[12.5px] font-bold text-ink">{subscription.tenantName || '—'}</p>
+                    <p className="text-[10.5px] text-muted">
                       {subscription.planName || '—'} · {formatMoney(subscription.price)} · {formatNumber(subscription.seats)} مستخدم
                     </p>
                   </div>
                   <div className="shrink-0 text-left">
                     <StatusBadge value={subscription.status} label={StatusLabel[subscription.status]} />
-                    <p className="mt-1 text-[10px] text-slate-500">{formatDate(subscription.endDate)}</p>
+                    <p className="mt-1 text-[10px] text-muted">{formatDate(subscription.endDate)}</p>
                   </div>
                 </li>
               ))}
@@ -429,7 +429,7 @@ export const PlatformDashboardPage: React.FC = () => {
           title="إحصائيات استخدام الوحدات"
           subtitle="الوحدات المتضمنة في التراخيص السارية"
           icon={<Boxes className="h-4 w-4" />}
-          iconClass="bg-violet-50 text-violet-600"
+          iconClass="bg-accent-soft text-primary"
           className="xl:col-span-2"
         >
           {overview.moduleUsage.length === 0 ? (
@@ -439,14 +439,14 @@ export const PlatformDashboardPage: React.FC = () => {
               {overview.moduleUsage.map((module) => (
                 <div key={module.code}>
                   <div className="mb-1 flex items-center justify-between gap-2">
-                    <span className="truncate text-[11.5px] font-semibold text-slate-700">{module.name}</span>
-                    <span className="shrink-0 text-[10px] font-bold text-slate-500">
+                    <span className="truncate text-[11.5px] font-semibold text-ink">{module.name}</span>
+                    <span className="shrink-0 text-[10px] font-bold text-muted">
                       {formatNumber(module.tenantCount)} عميل · {formatNumber(module.licenseCount)} ترخيص
                     </span>
                   </div>
-                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-sunken">
                     <div
-                      className={`h-full rounded-full ${module.enabled ? 'bg-emerald-500' : 'bg-slate-300'}`}
+                      className={`h-full rounded-full ${module.enabled ? 'bg-success' : 'bg-surface-sunken'}`}
                       style={{ width: `${Math.round((module.licenseCount / maxModuleAdoption) * 100)}%` }}
                     />
                   </div>
@@ -460,9 +460,9 @@ export const PlatformDashboardPage: React.FC = () => {
           title="إصدارات البرنامج"
           subtitle="الإصدارات المسجلة على المنصة"
           icon={<Rocket className="h-4 w-4" />}
-          iconClass="bg-sky-50 text-sky-600"
+          iconClass="bg-accent-soft text-primary"
           action={
-            <Link to="/platform/product" className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 hover:underline">
+            <Link to="/platform/product" className="inline-flex items-center gap-1 text-[11px] font-bold text-success hover:underline">
               الإدارة <ArrowLeft className="h-3 w-3" />
             </Link>
           }
@@ -470,17 +470,17 @@ export const PlatformDashboardPage: React.FC = () => {
           {overview.releases.length === 0 ? (
             <EmptyState icon={<Rocket className="h-5 w-5" />} title="لا توجد إصدارات مسجلة" />
           ) : (
-            <ul className="divide-y divide-slate-100">
+            <ul className="divide-y divide-line-strong">
               {overview.releases.map((release) => (
                 <li key={release.id} className="flex items-center justify-between gap-2 px-4 py-2.5">
                   <div className="min-w-0">
-                    <p className="flex items-center gap-1.5 text-[12px] font-bold text-slate-800">
+                    <p className="flex items-center gap-1.5 text-[12px] font-bold text-ink">
                       <span dir="ltr" className="font-mono">v{release.version}</span>
-                      <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[9px] font-bold text-slate-600">
+                      <span className="rounded-full bg-surface-sunken px-1.5 py-0.5 text-[9px] font-bold text-ink-secondary">
                         {CHANNEL_LABELS[release.channel]}
                       </span>
                     </p>
-                    <p className="text-[10px] text-slate-500">{formatDate(release.releasedAt || release.createdAt)}</p>
+                    <p className="text-[10px] text-muted">{formatDate(release.releasedAt || release.createdAt)}</p>
                   </div>
                   <StatusBadge value={release.status ?? ''} label={StatusLabel[release.status ?? ''] || release.status || ''} />
                 </li>
@@ -496,9 +496,9 @@ export const PlatformDashboardPage: React.FC = () => {
           title="أحدث العملاء"
           subtitle="آخر المنشآت المسجلة على المنصة"
           icon={<Building2 className="h-4 w-4" />}
-          iconClass="bg-sky-50 text-sky-600"
+          iconClass="bg-accent-soft text-primary"
           action={
-            <Link to="/platform/tenants" className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 hover:underline">
+            <Link to="/platform/tenants" className="inline-flex items-center gap-1 text-[11px] font-bold text-success hover:underline">
               عرض الكل <ArrowLeft className="h-3 w-3" />
             </Link>
           }
@@ -510,12 +510,12 @@ export const PlatformDashboardPage: React.FC = () => {
               description="أضف أول عميل للمنصة وابدأ بإصدار ترخيص له."
             />
           ) : (
-            <ul className="divide-y divide-slate-100">
+            <ul className="divide-y divide-line-strong">
               {overview.recentTenants.map((tenant) => (
                 <li key={tenant.id} className="flex items-center justify-between gap-3 px-4 py-3">
                   <div className="min-w-0">
-                    <p className="truncate text-[12.5px] font-bold text-slate-800">{tenant.name}</p>
-                    <p className="text-[10.5px] text-slate-500">
+                    <p className="truncate text-[12.5px] font-bold text-ink">{tenant.name}</p>
+                    <p className="text-[10.5px] text-muted">
                       {tenant.code} · {tenant.planName || 'بدون خطة'} · {formatDate(tenant.createdAt)}
                     </p>
                   </div>
@@ -530,9 +530,9 @@ export const PlatformDashboardPage: React.FC = () => {
           title="أحدث المدفوعات"
           subtitle="حركة التحصيل على مستوى المنصة"
           icon={<ReceiptText className="h-4 w-4" />}
-          iconClass="bg-emerald-50 text-emerald-600"
+          iconClass="bg-success-soft text-success"
           action={
-            <Link to="/platform/billing" className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 hover:underline">
+            <Link to="/platform/billing" className="inline-flex items-center gap-1 text-[11px] font-bold text-success hover:underline">
               الفواتير <ArrowLeft className="h-3 w-3" />
             </Link>
           }
@@ -547,10 +547,10 @@ export const PlatformDashboardPage: React.FC = () => {
                 rowKey={(payment: any) => String(payment.id)}
                 dense
                 columns={[
-                  { key: 'tenant', header: 'العميل', render: (payment: any) => <span className="text-[12px] font-semibold text-slate-700">{payment.tenantName}</span> },
-                  { key: 'invoice', header: 'الفاتورة', render: (payment: any) => <span className="text-[11px] text-slate-500" dir="ltr">{payment.invoiceNumber || '—'}</span> },
-                  { key: 'amount', header: 'المبلغ', render: (payment: any) => <span className="text-[12px] font-bold text-emerald-700">{formatMoney(payment.amount)}</span> },
-                  { key: 'date', header: 'التاريخ', render: (payment: any) => <span className="text-[11px] text-slate-500">{formatDate(payment.paidAt)}</span> },
+                  { key: 'tenant', header: 'العميل', render: (payment: any) => <span className="text-[12px] font-semibold text-ink">{payment.tenantName}</span> },
+                  { key: 'invoice', header: 'الفاتورة', render: (payment: any) => <span className="text-[11px] text-muted" dir="ltr">{payment.invoiceNumber || '—'}</span> },
+                  { key: 'amount', header: 'المبلغ', render: (payment: any) => <span className="text-[12px] font-bold text-success">{formatMoney(payment.amount)}</span> },
+                  { key: 'date', header: 'التاريخ', render: (payment: any) => <span className="text-[11px] text-muted">{formatDate(payment.paidAt)}</span> },
                 ]}
               />
             </div>
@@ -563,9 +563,9 @@ export const PlatformDashboardPage: React.FC = () => {
         title="آخر العمليات على المنصة"
         subtitle="أحدث الإجراءات الإدارية المسجلة"
         icon={<ScrollText className="h-4 w-4" />}
-        iconClass="bg-slate-100 text-slate-600"
+        iconClass="bg-surface-sunken text-ink-secondary"
         action={
-          <Link to="/platform/audit" className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 hover:underline">
+          <Link to="/platform/audit" className="inline-flex items-center gap-1 text-[11px] font-bold text-success hover:underline">
             السجل الكامل <ArrowLeft className="h-3 w-3" />
           </Link>
         }
@@ -573,15 +573,15 @@ export const PlatformDashboardPage: React.FC = () => {
         {overview.recentAudit.length === 0 ? (
           <EmptyState icon={<ScrollText className="h-5 w-5" />} title="لا توجد عمليات مسجلة بعد" />
         ) : (
-          <ol className="divide-y divide-slate-100">
+          <ol className="divide-y divide-line-strong">
             {overview.recentAudit.map((entry) => (
               <li key={entry.id} className="flex flex-wrap items-center gap-2 px-4 py-2.5">
-                <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[9.5px] font-bold text-slate-600">
+                <span className="shrink-0 rounded-full bg-surface-sunken px-2 py-0.5 text-[9.5px] font-bold text-ink-secondary">
                   {ENTITY_LABELS[entry.entityType] || entry.entityType}
                 </span>
-                <p className="min-w-0 flex-1 truncate text-[12px] font-semibold text-slate-800">{entry.action}</p>
-                <span className="shrink-0 text-[10px] text-slate-500">{entry.actorName || 'النظام'}</span>
-                <span className="shrink-0 text-[10px] text-slate-400">{formatDateTime(entry.createdAt)}</span>
+                <p className="min-w-0 flex-1 truncate text-[12px] font-semibold text-ink">{entry.action}</p>
+                <span className="shrink-0 text-[10px] text-muted">{entry.actorName || 'النظام'}</span>
+                <span className="shrink-0 text-[10px] text-muted">{formatDateTime(entry.createdAt)}</span>
               </li>
             ))}
           </ol>
@@ -594,41 +594,41 @@ export const PlatformDashboardPage: React.FC = () => {
           title="المنشأة الحالية"
           subtitle="بيانات المنشأة المرتبطة بهذا المشروع"
           icon={<TrendingUp className="h-4 w-4" />}
-          iconClass="bg-emerald-50 text-emerald-600"
+          iconClass="bg-success-soft text-success"
           className="xl:col-span-2"
         >
           <dl className="grid grid-cols-2 gap-2 p-4 sm:grid-cols-4">
-            <div className="rounded-lg bg-slate-50 p-2.5">
-              <dt className="flex items-center gap-1 text-[10.5px] text-slate-500"><Users className="h-3 w-3" /> المستخدمون</dt>
-              <dd className="mt-0.5 text-lg font-black text-slate-800">{formatNumber(overview.currentInstallation?.users ?? 0)}</dd>
+            <div className="rounded-lg bg-surface-muted p-2.5">
+              <dt className="flex items-center gap-1 text-[10.5px] text-muted"><Users className="h-3 w-3" /> المستخدمون</dt>
+              <dd className="mt-0.5 text-lg font-black text-ink">{formatNumber(overview.currentInstallation?.users ?? 0)}</dd>
             </div>
-            <div className="rounded-lg bg-slate-50 p-2.5">
-              <dt className="flex items-center gap-1 text-[10.5px] text-slate-500"><Package className="h-3 w-3" /> الأصناف</dt>
-              <dd className="mt-0.5 text-lg font-black text-slate-800">{formatNumber(overview.currentInstallation?.products ?? 0)}</dd>
+            <div className="rounded-lg bg-surface-muted p-2.5">
+              <dt className="flex items-center gap-1 text-[10.5px] text-muted"><Package className="h-3 w-3" /> الأصناف</dt>
+              <dd className="mt-0.5 text-lg font-black text-ink">{formatNumber(overview.currentInstallation?.products ?? 0)}</dd>
             </div>
-            <div className="rounded-lg bg-slate-50 p-2.5">
-              <dt className="flex items-center gap-1 text-[10.5px] text-slate-500"><ReceiptText className="h-3 w-3" /> فواتير البيع</dt>
-              <dd className="mt-0.5 text-lg font-black text-slate-800">{formatNumber(overview.currentInstallation?.invoices ?? 0)}</dd>
+            <div className="rounded-lg bg-surface-muted p-2.5">
+              <dt className="flex items-center gap-1 text-[10.5px] text-muted"><ReceiptText className="h-3 w-3" /> فواتير البيع</dt>
+              <dd className="mt-0.5 text-lg font-black text-ink">{formatNumber(overview.currentInstallation?.invoices ?? 0)}</dd>
             </div>
-            <div className="rounded-lg bg-slate-50 p-2.5">
-              <dt className="flex items-center gap-1 text-[10.5px] text-slate-500"><Building2 className="h-3 w-3" /> العملاء</dt>
-              <dd className="mt-0.5 text-lg font-black text-slate-800">{formatNumber(overview.currentInstallation?.customers ?? 0)}</dd>
+            <div className="rounded-lg bg-surface-muted p-2.5">
+              <dt className="flex items-center gap-1 text-[10.5px] text-muted"><Building2 className="h-3 w-3" /> العملاء</dt>
+              <dd className="mt-0.5 text-lg font-black text-ink">{formatNumber(overview.currentInstallation?.customers ?? 0)}</dd>
             </div>
-            <div className="rounded-lg bg-slate-50 p-2.5">
-              <dt className="flex items-center gap-1 text-[10.5px] text-slate-500"><GitBranch className="h-3 w-3" /> الفروع</dt>
-              <dd className="mt-0.5 text-lg font-black text-slate-800">{formatNumber(overview.branches.installationBranches)}</dd>
+            <div className="rounded-lg bg-surface-muted p-2.5">
+              <dt className="flex items-center gap-1 text-[10.5px] text-muted"><GitBranch className="h-3 w-3" /> الفروع</dt>
+              <dd className="mt-0.5 text-lg font-black text-ink">{formatNumber(overview.branches.installationBranches)}</dd>
             </div>
-            <div className="rounded-lg bg-slate-50 p-2.5">
-              <dt className="flex items-center gap-1 text-[10.5px] text-slate-500"><Layers3 className="h-3 w-3" /> الأجهزة</dt>
-              <dd className="mt-0.5 text-lg font-black text-slate-800">{formatNumber(overview.devices.devicesLimit)}</dd>
+            <div className="rounded-lg bg-surface-muted p-2.5">
+              <dt className="flex items-center gap-1 text-[10.5px] text-muted"><Layers3 className="h-3 w-3" /> الأجهزة</dt>
+              <dd className="mt-0.5 text-lg font-black text-ink">{formatNumber(overview.devices.devicesLimit)}</dd>
             </div>
-            <div className="rounded-lg bg-slate-50 p-2.5">
-              <dt className="flex items-center gap-1 text-[10.5px] text-slate-500"><Sparkles className="h-3 w-3" /> المزايا المفعّلة</dt>
-              <dd className="mt-0.5 text-lg font-black text-slate-800">{formatNumber(overview.moduleUsage.filter((item) => item.enabled).length)}</dd>
+            <div className="rounded-lg bg-surface-muted p-2.5">
+              <dt className="flex items-center gap-1 text-[10.5px] text-muted"><Sparkles className="h-3 w-3" /> المزايا المفعّلة</dt>
+              <dd className="mt-0.5 text-lg font-black text-ink">{formatNumber(overview.moduleUsage.filter((item) => item.enabled).length)}</dd>
             </div>
-            <div className="rounded-lg bg-slate-50 p-2.5">
-              <dt className="flex items-center gap-1 text-[10.5px] text-slate-500"><Wallet className="h-3 w-3" /> العملة</dt>
-              <dd className="mt-0.5 text-lg font-black text-slate-800">{overview.currentInstallation?.currency || 'EGP'}</dd>
+            <div className="rounded-lg bg-surface-muted p-2.5">
+              <dt className="flex items-center gap-1 text-[10.5px] text-muted"><Wallet className="h-3 w-3" /> العملة</dt>
+              <dd className="mt-0.5 text-lg font-black text-ink">{overview.currentInstallation?.currency || 'EGP'}</dd>
             </div>
           </dl>
         </Panel>
@@ -636,19 +636,19 @@ export const PlatformDashboardPage: React.FC = () => {
         <Panel
           title="إجراءات سريعة"
           icon={<Layers3 className="h-4 w-4" />}
-          iconClass="bg-violet-50 text-violet-600"
+          iconClass="bg-accent-soft text-primary"
         >
           <div className="grid gap-2 p-4">
-            <Link to="/platform/tenants" className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2 text-[11.5px] font-semibold text-slate-700 hover:border-emerald-300 hover:bg-emerald-50">
+            <Link to="/platform/tenants" className="flex items-center justify-between rounded-lg border border-line px-3 py-2 text-[11.5px] font-semibold text-ink hover:border-success hover:bg-success-soft">
               إضافة عميل جديد <ArrowLeft className="h-3.5 w-3.5" />
             </Link>
-            <Link to="/platform/licenses" className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2 text-[11.5px] font-semibold text-slate-700 hover:border-emerald-300 hover:bg-emerald-50">
+            <Link to="/platform/licenses" className="flex items-center justify-between rounded-lg border border-line px-3 py-2 text-[11.5px] font-semibold text-ink hover:border-success hover:bg-success-soft">
               إصدار ترخيص <ArrowLeft className="h-3.5 w-3.5" />
             </Link>
-            <Link to="/platform/billing" className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2 text-[11.5px] font-semibold text-slate-700 hover:border-emerald-300 hover:bg-emerald-50">
+            <Link to="/platform/billing" className="flex items-center justify-between rounded-lg border border-line px-3 py-2 text-[11.5px] font-semibold text-ink hover:border-success hover:bg-success-soft">
               إنشاء فاتورة <ArrowLeft className="h-3.5 w-3.5" />
             </Link>
-            <Link to="/platform/product" className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2 text-[11.5px] font-semibold text-slate-700 hover:border-emerald-300 hover:bg-emerald-50">
+            <Link to="/platform/product" className="flex items-center justify-between rounded-lg border border-line px-3 py-2 text-[11.5px] font-semibold text-ink hover:border-success hover:bg-success-soft">
               إدارة المنتج والمزايا <ArrowLeft className="h-3.5 w-3.5" />
             </Link>
           </div>

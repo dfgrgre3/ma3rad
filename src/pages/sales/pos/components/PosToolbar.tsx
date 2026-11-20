@@ -25,7 +25,7 @@ export interface PosToolbarProps {
 }
 
 export const PosToolbar: React.FC<PosToolbarProps> = (props) => (
-  <div className={`flex shrink-0 items-center justify-between gap-2 border-b border-slate-200 bg-white px-3 py-2 ${props.isToolbarStacked ? 'flex-col items-stretch' : ''}`}>
+  <div className={`flex shrink-0 items-center justify-between gap-2 border-b border-line bg-surface px-3 py-2 ${props.isToolbarStacked ? 'flex-col items-stretch' : ''}`}>
     <PosShiftStatus activeShift={props.activeShift} />
     <PosToolbarActions {...props} />
   </div>

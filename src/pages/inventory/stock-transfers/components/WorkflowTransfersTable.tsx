@@ -15,7 +15,7 @@ export const WorkflowTransfersTable: React.FC<WorkflowTransfersTableProps> = ({
   onDispatch,
   onOpenReceive,
 }) => (
-  <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+  <div className="bg-surface rounded-2xl border border-line shadow-sm overflow-hidden">
     <DataTable
       ariaLabel="أوامر تحويل المخزون"
       rows={transfers}
@@ -27,22 +27,22 @@ export const WorkflowTransfersTable: React.FC<WorkflowTransfersTableProps> = ({
           key: 'num', header: 'رقم التحويل / التاريخ',
           render: (t: any) => (
             <span className="block">
-              <span className="block font-mono font-black text-slate-900">{t.transferNumber}</span>
-              <span className="block text-[10px] font-bold text-slate-400">{t.date}</span>
+              <span className="block font-mono font-black text-ink">{t.transferNumber}</span>
+              <span className="block text-[10px] font-bold text-muted">{t.date}</span>
             </span>
           ),
         },
-        { key: 'from', header: 'من مخزن', render: (t: any) => <span className="font-bold text-slate-800">{t.fromWarehouseName}</span> },
-        { key: 'to', header: 'إلى مخزن', render: (t: any) => <span className="font-bold text-sky-700">{t.toWarehouseName}</span> },
-        { key: 'items', header: 'عدد الأصناف', align: 'center', render: (t: any) => <span className="font-bold text-slate-600">{t.itemsCount} صنف</span> },
-        { key: 'qty', header: 'الكمية المطلوبة', align: 'center', render: (t: any) => <span className="font-mono font-black text-slate-900">{t.quantitySummary}</span> },
+        { key: 'from', header: 'من مخزن', render: (t: any) => <span className="font-bold text-ink">{t.fromWarehouseName}</span> },
+        { key: 'to', header: 'إلى مخزن', render: (t: any) => <span className="font-bold text-primary">{t.toWarehouseName}</span> },
+        { key: 'items', header: 'عدد الأصناف', align: 'center', render: (t: any) => <span className="font-bold text-ink-secondary">{t.itemsCount} صنف</span> },
+        { key: 'qty', header: 'الكمية المطلوبة', align: 'center', render: (t: any) => <span className="font-mono font-black text-ink">{t.quantitySummary}</span> },
         {
           key: 'ship', header: 'المشحون / المستلم', align: 'center',
           render: (t: any) => (
             <span className="block font-mono">
               <span className="block">مشحون: {t.shippedSummary}</span>
-              <span className="block font-bold text-emerald-700">مستلم: {t.receivedSummary}</span>
-              {t.totalLostM2 > 0 && <span className="block text-[10px] font-bold text-rose-600">فقد: {t.lostSummary}</span>}
+              <span className="block font-bold text-success">مستلم: {t.receivedSummary}</span>
+              {t.totalLostM2 > 0 && <span className="block text-[10px] font-bold text-danger">فقد: {t.lostSummary}</span>}
             </span>
           ),
         },
@@ -51,38 +51,38 @@ export const WorkflowTransfersTable: React.FC<WorkflowTransfersTableProps> = ({
           key: 'actions', header: 'الإجراءات والمراحل', align: 'center',
           render: (t: any) => (
             <span className="flex flex-wrap items-center justify-center gap-1.5">
-              <button onClick={() => onViewDetails(t)} className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-bold text-slate-600 hover:bg-slate-100">
+              <button onClick={() => onViewDetails(t)} className="rounded-lg border border-line px-2.5 py-1 text-xs font-bold text-ink-secondary hover:bg-surface-sunken">
                 التفاصيل
               </button>
               {t.status === 'REQUESTED' && canApprove && (
                 <>
-                  <button onClick={() => onApprove(t.id)} className="rounded-lg bg-blue-600 px-2.5 py-1 text-xs font-bold text-white hover:bg-blue-500">
+                  <button onClick={() => onApprove(t.id)} className="rounded-lg bg-primary px-2.5 py-1 text-xs font-bold text-white hover:bg-primary">
                     اعتماد
                   </button>
-                  <button onClick={() => onReject(t.id)} className="rounded-lg bg-rose-50 px-2.5 py-1 text-xs font-bold text-rose-700 hover:bg-rose-100">
+                  <button onClick={() => onReject(t.id)} className="rounded-lg bg-danger-soft px-2.5 py-1 text-xs font-bold text-danger hover:bg-danger-soft">
                     رفض
                   </button>
                 </>
               )}
               {t.status === 'APPROVED' && canExecute && (
-                <button onClick={() => onPrepare(t.id)} className="rounded-lg bg-indigo-600 px-2.5 py-1 text-xs font-bold text-white hover:bg-indigo-500">
+                <button onClick={() => onPrepare(t.id)} className="rounded-lg bg-primary px-2.5 py-1 text-xs font-bold text-white hover:bg-primary">
                   بدء التجهيز
                 </button>
               )}
               {t.status === 'PREPARING' && canExecute && (
-                <button onClick={() => onDispatch(t.id)} className="rounded-lg bg-purple-600 px-2.5 py-1 text-xs font-bold text-white hover:bg-purple-500">
+                <button onClick={() => onDispatch(t.id)} className="rounded-lg bg-primary px-2.5 py-1 text-xs font-bold text-white hover:bg-primary">
                   إرسال وشحن
                 </button>
               )}
               {t.status === 'IN_TRANSIT' && (
                 <>
                   {canReceive && (
-                    <button onClick={() => onOpenReceive(t)} className="rounded-lg bg-emerald-600 px-3 py-1 text-xs font-bold text-white hover:bg-emerald-500">
+                    <button onClick={() => onOpenReceive(t)} className="rounded-lg bg-success px-3 py-1 text-xs font-bold text-white hover:bg-success">
                       استلام البضاعة
                     </button>
                   )}
                   {canApprove && (
-                    <button onClick={() => onReject(t.id)} className="rounded-lg bg-rose-50 px-2.5 py-1 text-xs font-bold text-rose-700" title="رفض وإرجاع للمصدر">
+                    <button onClick={() => onReject(t.id)} className="rounded-lg bg-danger-soft px-2.5 py-1 text-xs font-bold text-danger" title="رفض وإرجاع للمصدر">
                       رفض
                     </button>
                   )}

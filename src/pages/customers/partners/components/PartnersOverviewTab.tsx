@@ -6,16 +6,16 @@ import type { PartnersPageVm } from '../../../../hooks/pages/customers/partners/
 export const PartnersOverviewTab: React.FC<{ vm: PartnersPageVm }> = ({ vm }) => {
   const { partners, overview, selectPartner, activeOwnership, activeProfitShare, outstandingLoans } = vm;
   return (
-    <section className="overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 px-4 py-3 dark:border-slate-700">
+    <section className="overflow-hidden rounded-xl border border-line bg-surface ">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-4 py-3 ">
         <div>
-          <h3 className="font-extrabold text-slate-800 dark:text-slate-100">أرصدة جميع الشركاء</h3>
-          <p className="text-xs text-slate-500">
+          <h3 className="font-extrabold text-ink ">أرصدة جميع الشركاء</h3>
+          <p className="text-xs text-muted">
             الملكية النشطة: {formatNumber.format(activeOwnership)}% · مشاركة الأرباح النشطة: {formatNumber.format(activeProfitShare)}%.
           </p>
         </div>
         {(Math.abs(activeOwnership - 100) > 0.005 || Math.abs(activeProfitShare - 100) > 0.005) && (
-          <span className="rounded-lg bg-amber-50 px-2 py-1 text-xs font-bold text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
+          <span className="rounded-lg bg-warning-soft px-2 py-1 text-xs font-bold text-warning dark:bg-warning/40 ">
             راجع مجموع نسب الملكية ومشاركة الأرباح
           </span>
         )}
@@ -25,7 +25,7 @@ export const PartnersOverviewTab: React.FC<{ vm: PartnersPageVm }> = ({ vm }) =>
           ariaLabel="الشركاء"
           rows={[...partners, { __total: true } as any]}
           rowKey={(partner: any) => partner.__total ? '__total__' : partner.id}
-          rowClassName={(partner: any) => partner.__total ? 'font-extrabold text-slate-800 dark:text-slate-100 bg-slate-50 dark:bg-slate-800' : 'cursor-pointer text-slate-700 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800/50'}
+          rowClassName={(partner: any) => partner.__total ? 'font-extrabold text-ink bg-surface-muted ' : 'cursor-pointer text-ink hover:bg-surface-muted dark:hover:bg-primary/50'}
           minWidth={1320}
           dense
           columns={[
@@ -42,7 +42,7 @@ export const PartnersOverviewTab: React.FC<{ vm: PartnersPageVm }> = ({ vm }) =>
             { key: 'due', header: 'الأرباح المستحقة', render: (partner: any) => partner.__total ? formatMoney(overview.totalProfitsDue) : formatMoney(partner.profitsDue) },
             { key: 'distributed', header: 'المصروفة', render: (partner: any) => partner.__total ? formatMoney(overview.totalProfitsDistributed) : formatMoney(partner.profitsDistributed) },
             { key: 'adjust', header: 'التسويات', render: (partner: any) => partner.__total ? formatMoney(overview.totalAdjustments) : formatMoney(partner.adjustments) },
-            { key: 'net', header: 'صافي الرصيد', render: (partner: any) => partner.__total ? formatMoney(overview.totalNetBalance) : <span className={partner.netBalance < 0 ? 'font-extrabold text-rose-600' : 'font-extrabold'}>{formatMoney(partner.netBalance)}</span> },
+            { key: 'net', header: 'صافي الرصيد', render: (partner: any) => partner.__total ? formatMoney(overview.totalNetBalance) : <span className={partner.netBalance < 0 ? 'font-extrabold text-danger' : 'font-extrabold'}>{formatMoney(partner.netBalance)}</span> },
             { key: 'status', header: 'الحالة', render: (partner: any) => partner.__total ? '—' : (partner.isActive ? 'نشط' : 'غير نشط') },
           ]}
           emptyTitle="لا توجد بيانات شركاء."

@@ -33,10 +33,10 @@ interface RunDetail {
 }
 
 const STATUS_STYLE: Record<string, string> = {
-  PASSED: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-  DISCREPANCY: 'bg-amber-50 text-amber-700 border-amber-200',
-  FAILED: 'bg-red-50 text-red-700 border-red-200',
-  RUNNING: 'bg-slate-50 text-slate-600 border-slate-200',
+  PASSED: 'bg-success-soft text-success border-success-border',
+  DISCREPANCY: 'bg-warning-soft text-warning border-warning-border',
+  FAILED: 'bg-danger-soft text-danger border-danger-border',
+  RUNNING: 'bg-surface-muted text-ink-secondary border-line',
 };
 
 const CHECK_LABELS: Record<string, string> = {
@@ -117,13 +117,13 @@ export const ConsistencyAuditPage: React.FC = () => {
 
   if (!canView) {
     return (
-      <div className="p-6 text-sm text-slate-500">لا تملك صلاحية عرض التدقيق المالي.</div>
+      <div className="p-6 text-sm text-muted">لا تملك صلاحية عرض التدقيق المالي.</div>
     );
   }
 
   return (
-    <div className="p-3 lg:p-4 bg-slate-50 min-h-0 text-slate-900 space-y-4">
-      <div className="bg-white px-5 py-3 rounded-2xl border border-slate-200 shadow-sm">
+    <div className="p-3 lg:p-4 bg-surface-muted min-h-0 text-ink space-y-4">
+      <div className="bg-surface px-5 py-3 rounded-2xl border border-line shadow-sm">
         <PageHeader
           icon={<ShieldCheck className="h-5 w-5" />}
           title="تدقيق اتساق البيانات المالية والمخزون"
@@ -132,7 +132,7 @@ export const ConsistencyAuditPage: React.FC = () => {
             <button
               type="button"
               onClick={loadRuns}
-              className="p-2.5 text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-xl transition"
+              className="p-2.5 text-ink-secondary hover:text-ink bg-surface-sunken hover:bg-surface-sunken rounded-xl transition"
               title="تحديث"
             >
               <RefreshCw className="w-4 h-4" />
@@ -141,7 +141,7 @@ export const ConsistencyAuditPage: React.FC = () => {
               type="button"
               onClick={runNow}
               disabled={running}
-              className="flex items-center gap-1.5 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-xl text-xs font-semibold transition"
+              className="flex items-center gap-1.5 px-4 py-2.5 bg-success hover:bg-success disabled:opacity-50 text-white rounded-xl text-xs font-semibold transition"
             >
               {running ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
               {running ? 'جارٍ التدقيق...' : 'تشغيل التدقيق الآن'}
@@ -150,13 +150,13 @@ export const ConsistencyAuditPage: React.FC = () => {
         />
       </div>
 
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      <div className="bg-surface rounded-2xl border border-line shadow-sm overflow-hidden">
         {loading ? (
-          <div className="p-10 flex items-center justify-center text-slate-400">
+          <div className="p-10 flex items-center justify-center text-muted">
             <Loader2 className="w-5 h-5 animate-spin ml-2" /> جارٍ التحميل...
           </div>
         ) : runs.length === 0 ? (
-          <div className="p-10 text-center text-sm text-slate-400">لا توجد عمليات تدقيق مسجلة بعد.</div>
+          <div className="p-10 text-center text-sm text-muted">لا توجد عمليات تدقيق مسجلة بعد.</div>
         ) : (
           <DataTable
             ariaLabel="عمليات التدقيق"
@@ -165,12 +165,12 @@ export const ConsistencyAuditPage: React.FC = () => {
             loading={loading}
             onRowClick={(run) => toggleRun(run.id)}
             isRowExpanded={(run) => expanded === run.id}
-            expandedRowClassName="bg-slate-50/60"
-            rowClassName={() => 'border-t border-slate-100 hover:bg-slate-50 cursor-pointer'}
+            expandedRowClassName="bg-surface-muted/60"
+            rowClassName={() => 'border-t border-line hover:bg-surface-muted cursor-pointer'}
             columns={[
-              { key: 'time', header: 'وقت التشغيل', render: (run) => <span className="text-slate-700">{fmtDateTime(run.startedAt)}</span> },
-              { key: 'type', header: 'النوع', render: (run) => <span className="text-slate-600">{run.runType}</span> },
-              { key: 'scope', header: 'النطاق', render: (run) => <span className="text-slate-600">{run.scope}</span> },
+              { key: 'time', header: 'وقت التشغيل', render: (run) => <span className="text-ink">{fmtDateTime(run.startedAt)}</span> },
+              { key: 'type', header: 'النوع', render: (run) => <span className="text-ink-secondary">{run.runType}</span> },
+              { key: 'scope', header: 'النطاق', render: (run) => <span className="text-ink-secondary">{run.scope}</span> },
               {
                 key: 'status', header: 'الحالة',
                 render: (run) => (
@@ -187,31 +187,31 @@ export const ConsistencyAuditPage: React.FC = () => {
             renderExpandedRow={(run) => (
               <div className="px-4 py-4">
                 {!details[run.id] ? (
-                  <div className="text-xs text-slate-400 flex items-center gap-2">
+                  <div className="text-xs text-muted flex items-center gap-2">
                     <Loader2 className="w-4 h-4 animate-spin" /> جارٍ تحميل التفاصيل...
                   </div>
                 ) : (
                   <div className="space-y-3">
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
                       {Object.entries(details[run.id].summary || {}).map(([key, result]) => (
-                        <div key={key} className="bg-white border border-slate-200 rounded-xl p-3">
+                        <div key={key} className="bg-surface border border-line rounded-xl p-3">
                           <div className="flex items-center justify-between">
-                            <span className="text-xs font-semibold text-slate-700">
+                            <span className="text-xs font-semibold text-ink">
                               {CHECK_LABELS[key] || result.check || key}
                             </span>
                             <span
                               className={`text-[10px] px-1.5 py-0.5 rounded ${
                                 result.status === 'PASS'
-                                  ? 'bg-emerald-50 text-emerald-700'
+                                  ? 'bg-success-soft text-success'
                                   : result.status === 'DISCREPANCY'
-                                    ? 'bg-amber-50 text-amber-700'
-                                    : 'bg-red-50 text-red-700'
+                                    ? 'bg-warning-soft text-warning'
+                                    : 'bg-danger-soft text-danger'
                               }`}
                             >
                               {result.status}
                             </span>
                           </div>
-                          <div className="text-[10px] text-slate-400 mt-1">
+                          <div className="text-[10px] text-muted mt-1">
                             مفحوص: {result.scanned}
                             {result.error ? ` — ${result.error}` : ''}
                           </div>
@@ -219,8 +219,8 @@ export const ConsistencyAuditPage: React.FC = () => {
                       ))}
                     </div>
                     {(details[run.id].discrepancies || []).length > 0 && (
-                      <div className="bg-white border border-amber-200 rounded-xl overflow-hidden">
-                        <div className="px-3 py-2 bg-amber-50 text-amber-800 text-xs font-semibold">
+                      <div className="bg-surface border border-warning-border rounded-xl overflow-hidden">
+                        <div className="px-3 py-2 bg-warning-soft text-warning text-xs font-semibold">
                           الفروقات ({details[run.id].discrepancies.length})
                         </div>
                         <div className="max-h-64 overflow-auto">
@@ -231,11 +231,11 @@ export const ConsistencyAuditPage: React.FC = () => {
                                       dense
                                       tableClassName="text-[11px]"
                                       columns={[
-                                        { key: 'check', header: 'الفحص', render: (d) => <span className="text-slate-600">{CHECK_LABELS[d.check] || d.check}</span> },
-                                        { key: 'key', header: 'المفتاح', render: (d) => <span className="text-slate-500" dir="ltr">{d.key || '—'}</span> },
-                                        { key: 'expected', header: 'متوقع', render: (d) => <span className="text-slate-600" dir="ltr">{String(d.expected ?? '—')}</span> },
-                                        { key: 'actual', header: 'فعلي', render: (d) => <span className="text-slate-600" dir="ltr">{String(d.actual ?? '—')}</span> },
-                                        { key: 'variance', header: 'الفرق', render: (d) => <span className="text-slate-600" dir="ltr">{String(d.variance ?? '—')}</span> },
+                                        { key: 'check', header: 'الفحص', render: (d) => <span className="text-ink-secondary">{CHECK_LABELS[d.check] || d.check}</span> },
+                                        { key: 'key', header: 'المفتاح', render: (d) => <span className="text-muted" dir="ltr">{d.key || '—'}</span> },
+                                        { key: 'expected', header: 'متوقع', render: (d) => <span className="text-ink-secondary" dir="ltr">{String(d.expected ?? '—')}</span> },
+                                        { key: 'actual', header: 'فعلي', render: (d) => <span className="text-ink-secondary" dir="ltr">{String(d.actual ?? '—')}</span> },
+                                        { key: 'variance', header: 'الفرق', render: (d) => <span className="text-ink-secondary" dir="ltr">{String(d.variance ?? '—')}</span> },
                                       ]}
                                     />
                         </div>

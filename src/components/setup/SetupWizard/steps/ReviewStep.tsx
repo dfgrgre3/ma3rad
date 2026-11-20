@@ -15,11 +15,11 @@ const MONTH_NAMES = ['يناير', 'فبراير', 'مارس', 'أبريل', 'م
 
 export const ReviewStep: React.FC<ReviewStepProps> = ({ options, form, businessConfig, security, currencySymbol }) => (
   <div className="space-y-3">
-    <div className="flex items-center justify-center w-16 h-16 rounded-2xl bg-emerald-50 text-emerald-600 mx-auto">
+    <div className="flex items-center justify-center w-16 h-16 rounded-2xl bg-success-soft text-success mx-auto">
       <CheckCircle2 className="w-8 h-8" />
     </div>
-    <h2 className="text-center text-base font-black text-slate-900 dark:text-slate-100">كل شيء جاهز</h2>
-    <p className="text-center text-xs text-slate-500 dark:text-slate-400">راجع الملخص ثم اضغط «بدء الاستخدام».</p>
+    <h2 className="text-center text-base font-black text-ink ">كل شيء جاهز</h2>
+    <p className="text-center text-xs text-muted ">راجع الملخص ثم اضغط «بدء الاستخدام».</p>
     <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
       {[
         ['المعرض', options.company ? form.showroomName || '—' : 'تم تخطيها'],
@@ -45,13 +45,13 @@ export const ReviewStep: React.FC<ReviewStepProps> = ({ options, form, businessC
         ['تنبيه المخزون', options.inventory ? `${form.lowStockThreshold || 0} بوحدة الصنف` : 'تم تخطيه'],
         ['حد اعتماد الخصم', options.accounting ? `${form.discountThreshold || 0}%` : 'تم تخطيه'],
       ].map(([label, value]) => (
-        <div key={label} className="flex min-w-0 items-center justify-between gap-2 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2.5 dark:border-slate-800 dark:bg-slate-800/50">
-          <span className="min-w-0 truncate text-[11px] text-slate-500 dark:text-slate-400">{label}</span>
-          <span className="min-w-0 max-w-[60%] truncate text-xs font-bold text-slate-900 dark:text-slate-100" title={value}>{value}</span>
+        <div key={label} className="flex min-w-0 items-center justify-between gap-2 rounded-lg border border-line bg-surface-muted px-3 py-2.5 dark:bg-primary/50">
+          <span className="min-w-0 truncate text-[11px] text-muted ">{label}</span>
+          <span className="min-w-0 max-w-[60%] truncate text-xs font-bold text-ink " title={value}>{value}</span>
         </div>
       ))}
     </div>
-    <div className="rounded-xl border border-sky-100 bg-sky-50 p-3 text-xs leading-relaxed text-sky-900 dark:border-sky-800 dark:bg-sky-950/30 dark:text-sky-200">
+    <div className="rounded-xl border border-accent-border bg-accent-soft p-3 text-xs leading-relaxed text-primary dark:bg-primary/30 ">
       <p className="font-bold">البيانات والحسابات</p>
       <p className="mt-1">سيُجهّز دليل الحسابات الافتراضي. استيراد الأصناف والعملاء والموردين اختياري ويمكن تنفيذه بعد الدخول من صفحة استيراد البيانات، ثم إدخال الأرصدة الافتتاحية من شاشاتها المخصصة.</p>
     </div>

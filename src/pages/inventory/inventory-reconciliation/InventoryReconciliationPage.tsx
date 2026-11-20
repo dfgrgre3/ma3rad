@@ -73,9 +73,9 @@ export const InventoryReconciliationPage: React.FC = () => {
     && reconciliation?.ledgerComparable === true;
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
+    <div className="h-full flex flex-col bg-surface-muted text-ink overflow-hidden">
       {/* Header */}
-      <div className="bg-white px-6 pt-4">
+      <div className="bg-surface px-6 pt-4">
         <PageHeader
           icon={<Scale className="w-5 h-5" />}
           title="مطابقة المخزون مع الأستاذ العام ودفتر التكلفة"
@@ -84,7 +84,7 @@ export const InventoryReconciliationPage: React.FC = () => {
             <select
               value={selectedWarehouseId}
               onChange={(e) => setSelectedWarehouseId(e.target.value)}
-              className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              className="px-3 py-2 bg-surface-muted border border-line rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-success"
             >
               <option value="">جميع المخازن الموحدة</option>
               {warehouses.map(w => (
@@ -95,7 +95,7 @@ export const InventoryReconciliationPage: React.FC = () => {
             {canManage && (
               <button
                 onClick={() => setShowSaveModal(true)}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black shadow-md shadow-emerald-600/20 transition active:scale-95"
+                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-success hover:bg-success text-white text-xs font-black shadow-md shadow-success/20 transition active:scale-95"
               >
                 <BookmarkCheck className="w-4 h-4" />
                 توثيق محضر مطابقة دوري
@@ -104,7 +104,7 @@ export const InventoryReconciliationPage: React.FC = () => {
 
             <button
               onClick={loadData}
-              className="p-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 transition"
+              className="p-2 rounded-xl border border-line bg-surface hover:bg-surface-muted text-ink-secondary transition"
               title="إعادة الفحص والمطابقة"
             >
               <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
@@ -117,25 +117,25 @@ export const InventoryReconciliationPage: React.FC = () => {
         {/* Triangular Status Card */}
         <div className={`p-6 rounded-3xl border shadow-sm transition ${
           isBalanced 
-            ? 'bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-transparent border-emerald-300' 
-            : 'bg-gradient-to-br from-amber-500/10 via-rose-500/5 to-transparent border-amber-300'
+            ? 'bg-gradient-to-br from-success/10 via-success/5 to-transparent border-success' 
+            : 'bg-gradient-to-br from-warning/10 via-danger/5 to-transparent border-warning'
         }`}>
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               {isBalanced ? (
-                <div className="w-12 h-12 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shadow-lg shadow-emerald-600/30">
+                <div className="w-12 h-12 rounded-2xl bg-success text-white flex items-center justify-center shadow-lg shadow-success/30">
                   <CheckCircle2 className="w-7 h-7" />
                 </div>
               ) : (
-                <div className="w-12 h-12 rounded-2xl bg-amber-600 text-white flex items-center justify-center shadow-lg shadow-amber-600/30">
+                <div className="w-12 h-12 rounded-2xl bg-warning text-white flex items-center justify-center shadow-lg shadow-warning/30">
                   <AlertTriangle className="w-7 h-7" />
                 </div>
               )}
               <div>
-                <h2 className="text-lg font-black text-slate-900">
+                <h2 className="text-lg font-black text-ink">
                   {isBalanced ? 'المطابقة الثلاثية متطابقة بالكامل وموزونة 100%' : 'تنبيه: تم رصد فروقات بين سجلات المخزون والحسابات'}
                 </h2>
-                <p className="text-xs text-slate-600 font-medium">
+                <p className="text-xs text-ink-secondary font-medium">
                   {isBalanced
                     ? 'لا توجد فروقات بين أرصدة البضاعة الفعلية ودفتر طبقات التكلفة FIFO وحساب الأستاذ العام (1104).'
                     : reconciliation?.ledgerComparable === false
@@ -148,50 +148,50 @@ export const InventoryReconciliationPage: React.FC = () => {
             </div>
 
             <div className="flex items-center gap-4 text-xs font-bold">
-              <span className="text-slate-500">تاريخ آخر مطابقة: {reconciliation?.reconciliationDate}</span>
-              <span className="text-slate-500">المحقق: {reconciliation?.performedByName || 'النظام'}</span>
+              <span className="text-muted">تاريخ آخر مطابقة: {reconciliation?.reconciliationDate}</span>
+              <span className="text-muted">المحقق: {reconciliation?.performedByName || 'النظام'}</span>
             </div>
           </div>
 
           {/* Three Pillars */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
             {/* Pillar 1: Physical Stock */}
-            <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-sm">
+            <div className="bg-surface border border-line/80 rounded-2xl p-5 shadow-sm">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-bold text-slate-500">1. قيمة المخزون الفعلي (Physical)</span>
-                <Database className="w-4 h-4 text-sky-600" />
+                <span className="text-xs font-bold text-muted">1. قيمة المخزون الفعلي (Physical)</span>
+                <Database className="w-4 h-4 text-primary" />
               </div>
-              <div className="text-2xl font-black text-slate-900">{fmt(reconciliation?.totalPhysicalCost || 0)}</div>
-              <div className="text-xs text-slate-400 font-bold mt-1">تُعرض كميات الأصناف بوحدة كل صنف على حدة.</div>
-              <div className="text-[11px] text-slate-500 bg-slate-50 p-2 rounded-xl mt-3 font-medium">
+              <div className="text-2xl font-black text-ink">{fmt(reconciliation?.totalPhysicalCost || 0)}</div>
+              <div className="text-xs text-muted font-bold mt-1">تُعرض كميات الأصناف بوحدة كل صنف على حدة.</div>
+              <div className="text-[11px] text-muted bg-surface-muted p-2 rounded-xl mt-3 font-medium">
                 محسوب من جداول أرصدة المخازن الحالية مضروباً في سعر التكلفة لكل صنف.
               </div>
             </div>
 
             {/* Pillar 2: FIFO Cost Ledger */}
-            <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-sm">
+            <div className="bg-surface border border-line/80 rounded-2xl p-5 shadow-sm">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-bold text-slate-500">2. دفتر طبقات التكلفة (FIFO Layers)</span>
-                <Layers className="w-4 h-4 text-violet-600" />
+                <span className="text-xs font-bold text-muted">2. دفتر طبقات التكلفة (FIFO Layers)</span>
+                <Layers className="w-4 h-4 text-primary" />
               </div>
-              <div className="text-2xl font-black text-slate-900">{fmt(reconciliation?.totalFifoLayerCost || 0)}</div>
-              <div className="text-xs text-slate-400 font-bold mt-1">تُعرض كميات الطبقات بوحدة كل صنف على حدة.</div>
-              <div className="text-[11px] text-slate-500 bg-slate-50 p-2 rounded-xl mt-3 font-medium">
+              <div className="text-2xl font-black text-ink">{fmt(reconciliation?.totalFifoLayerCost || 0)}</div>
+              <div className="text-xs text-muted font-bold mt-1">تُعرض كميات الطبقات بوحدة كل صنف على حدة.</div>
+              <div className="text-[11px] text-muted bg-surface-muted p-2 rounded-xl mt-3 font-medium">
                 مجموع الدفعات الواردة غير المنصرفة (الوارد أولاً يصرف أولاً).
               </div>
             </div>
 
             {/* Pillar 3: General Ledger */}
-            <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-sm">
+            <div className="bg-surface border border-line/80 rounded-2xl p-5 shadow-sm">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-bold text-slate-500">3. حساب المخزون بالأستاذ العام (GL 1104)</span>
-                <Building2 className="w-4 h-4 text-emerald-600" />
+                <span className="text-xs font-bold text-muted">3. حساب المخزون بالأستاذ العام (GL 1104)</span>
+                <Building2 className="w-4 h-4 text-success" />
               </div>
-              <div className="text-2xl font-black text-slate-900">{fmt(reconciliation?.totalGlInventoryCost || 0)}</div>
-              <div className="text-xs text-slate-400 font-bold mt-1">
+              <div className="text-2xl font-black text-ink">{fmt(reconciliation?.totalGlInventoryCost || 0)}</div>
+              <div className="text-xs text-muted font-bold mt-1">
                 رصيد قيود اليومية المرحل لحساب 1104
               </div>
-              <div className="text-[11px] text-slate-500 bg-slate-50 p-2 rounded-xl mt-3 font-medium">
+              <div className="text-[11px] text-muted bg-surface-muted p-2 rounded-xl mt-3 font-medium">
                 النطاق المحاسبي: الفرع والشركة. {reconciliation?.ledgerComparable === false
                   ? 'غير قابل للمقارنة المباشرة بمخزون مستودع مفرد.'
                   : 'متوافق مع نطاق المخزون المعروض.'}
@@ -200,24 +200,24 @@ export const InventoryReconciliationPage: React.FC = () => {
           </div>
 
           {/* Variance Breakdown */}
-          <div className="mt-6 pt-4 border-t border-slate-200/60 grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="flex items-center justify-between bg-white/80 border border-slate-200 p-3.5 rounded-xl">
-              <span className="text-xs font-bold text-slate-700">فرق القيمة بين الفعلي وFIFO:</span>
-              <span className={`font-mono font-black text-sm ${Math.abs(reconciliation?.variancePhysicalVsFifo || 0) < 0.05 ? 'text-emerald-600' : 'text-amber-600'}`}>
+          <div className="mt-6 pt-4 border-t border-line/60 grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="flex items-center justify-between bg-surface/80 border border-line p-3.5 rounded-xl">
+              <span className="text-xs font-bold text-ink">فرق القيمة بين الفعلي وFIFO:</span>
+              <span className={`font-mono font-black text-sm ${Math.abs(reconciliation?.variancePhysicalVsFifo || 0) < 0.05 ? 'text-success' : 'text-warning'}`}>
                 {fmt(reconciliation?.variancePhysicalVsFifo || 0)}
               </span>
             </div>
 
-            <div className="flex items-center justify-between bg-white/80 border border-slate-200 p-3.5 rounded-xl">
-              <span className="text-xs font-bold text-slate-700">فرق الكمية بين الفعلي وFIFO:</span>
-              <span className={`font-mono font-black text-sm ${reconciliation?.quantityBalanced ? 'text-emerald-600' : 'text-amber-600'}`}>
+            <div className="flex items-center justify-between bg-surface/80 border border-line p-3.5 rounded-xl">
+              <span className="text-xs font-bold text-ink">فرق الكمية بين الفعلي وFIFO:</span>
+              <span className={`font-mono font-black text-sm ${reconciliation?.quantityBalanced ? 'text-success' : 'text-warning'}`}>
                 {Number(reconciliation?.variancePhysicalVsFifoQty || 0).toLocaleString('ar-EG', { maximumFractionDigits: 2 })}
               </span>
             </div>
 
-            <div className="flex items-center justify-between bg-white/80 border border-slate-200 p-3.5 rounded-xl">
-              <span className="text-xs font-bold text-slate-700">فرق FIFO / الأستاذ (1104):</span>
-              <span className={`font-mono font-black text-sm ${reconciliation?.ledgerComparable && Math.abs(reconciliation?.varianceFifoVsGl || 0) < 0.05 ? 'text-emerald-600' : 'text-amber-600'}`}>
+            <div className="flex items-center justify-between bg-surface/80 border border-line p-3.5 rounded-xl">
+              <span className="text-xs font-bold text-ink">فرق FIFO / الأستاذ (1104):</span>
+              <span className={`font-mono font-black text-sm ${reconciliation?.ledgerComparable && Math.abs(reconciliation?.varianceFifoVsGl || 0) < 0.05 ? 'text-success' : 'text-warning'}`}>
                 {reconciliation?.ledgerComparable ? fmt(reconciliation?.varianceFifoVsGl || 0) : 'غير قابل للمقارنة'}
               </span>
             </div>
@@ -225,27 +225,27 @@ export const InventoryReconciliationPage: React.FC = () => {
         </div>
 
         {/* Historical Reconciliation Logs */}
-        <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm">
+        <div className="bg-surface border border-line rounded-3xl p-6 shadow-sm">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h3 className="font-black text-slate-900 text-sm">سجل محاضر المطابقة الدورية المعتمدة</h3>
-              <p className="text-xs text-slate-400">سجل تدقيق رقابي تاريخي غير قابل للمحو لمحاضر المطابقة الشهرية والسنوية</p>
+              <h3 className="font-black text-ink text-sm">سجل محاضر المطابقة الدورية المعتمدة</h3>
+              <p className="text-xs text-muted">سجل تدقيق رقابي تاريخي غير قابل للمحو لمحاضر المطابقة الشهرية والسنوية</p>
             </div>
-            <ShieldCheck className="w-5 h-5 text-emerald-600" />
+            <ShieldCheck className="w-5 h-5 text-success" />
           </div>
 
-          <div className="overflow-x-auto rounded-2xl border border-slate-200">
+          <div className="overflow-x-auto rounded-2xl border border-line">
             <DataTable
               ariaLabel="محاضر مطابقة المخزون"
               rows={historyLogs}
               rowKey={(log: any) => String(log.id)}
               tableClassName="text-sm"
               columns={[
-                { key: 'date', header: 'تاريخ المحضر', render: (log: any) => <span className="font-bold text-slate-900">{log.reconciliationDate}</span> },
-                { key: 'wh', header: 'المستودع', render: (log: any) => <span className="text-xs font-bold text-slate-600">{log.warehouseName || 'جميع المخازن'}</span> },
-                { key: 'physical', header: 'المخزون الفعلي', align: 'center', render: (log: any) => <span className="font-mono font-bold text-slate-900">{fmt(log.totalPhysicalCost)}</span> },
-                { key: 'fifo', header: 'طبقات FIFO', align: 'center', render: (log: any) => <span className="font-mono font-bold text-violet-700">{fmt(log.totalFifoLayerCost)}</span> },
-                { key: 'gl', header: 'الأستاذ العام (1104)', align: 'center', render: (log: any) => <span className="font-mono font-bold text-emerald-700">{fmt(log.totalGlInventoryCost)}</span> },
+                { key: 'date', header: 'تاريخ المحضر', render: (log: any) => <span className="font-bold text-ink">{log.reconciliationDate}</span> },
+                { key: 'wh', header: 'المستودع', render: (log: any) => <span className="text-xs font-bold text-ink-secondary">{log.warehouseName || 'جميع المخازن'}</span> },
+                { key: 'physical', header: 'المخزون الفعلي', align: 'center', render: (log: any) => <span className="font-mono font-bold text-ink">{fmt(log.totalPhysicalCost)}</span> },
+                { key: 'fifo', header: 'طبقات FIFO', align: 'center', render: (log: any) => <span className="font-mono font-bold text-primary">{fmt(log.totalFifoLayerCost)}</span> },
+                { key: 'gl', header: 'الأستاذ العام (1104)', align: 'center', render: (log: any) => <span className="font-mono font-bold text-success">{fmt(log.totalGlInventoryCost)}</span> },
                 {
                   key: 'variance', header: 'الفروقات والنطاق', align: 'center',
                   render: (log: any) => (
@@ -254,7 +254,7 @@ export const InventoryReconciliationPage: React.FC = () => {
                       <span className="block">كمية فعلي/FIFO: {log.variancePhysicalVsFifoQty == null
                         ? 'غير مسجلة'
                         : Number(log.variancePhysicalVsFifoQty).toLocaleString('ar-EG', { maximumFractionDigits: 2 })}</span>
-                      <span className="block text-amber-700">FIFO/GL: {log.ledgerComparable
+                      <span className="block text-warning">FIFO/GL: {log.ledgerComparable
                         ? fmt(log.varianceFifoVsGl)
                         : 'نطاق الفرع/الشركة'}</span>
                     </span>
@@ -268,11 +268,11 @@ export const InventoryReconciliationPage: React.FC = () => {
                     && Math.abs(Number(log.variancePhysicalVsFifoQty)) < 0.01
                     && Math.abs(Number(log.variancePhysicalVsFifo)) < 0.05
                     && Math.abs(Number(log.varianceFifoVsGl)) < 0.05 ? (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-black text-emerald-700">
+                      <span className="inline-flex items-center gap-1 rounded-full bg-success-soft px-2 py-0.5 text-[11px] font-black text-success">
                         <Check className="h-3 w-3" /> مطابق وموزون
                       </span>
                     ) : (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-black text-amber-700">
+                      <span className="inline-flex items-center gap-1 rounded-full bg-warning-soft px-2 py-0.5 text-[11px] font-black text-warning">
                         <AlertTriangle className="h-3 w-3" /> {log.variancePhysicalVsFifoQty == null || !log.ledgerComparable
                           ? 'مطابقة غير مكتملة'
                           : 'يوجد فروقات'}
@@ -283,8 +283,8 @@ export const InventoryReconciliationPage: React.FC = () => {
                   key: 'inspector', header: 'المحقق / ملاحظات',
                   render: (log: any) => (
                     <span className="block text-xs">
-                      <span className="block font-bold text-slate-700">{log.performedByName || 'المشرف المالي'}</span>
-                      {log.notes && <span className="mt-0.5 block text-[11px] text-slate-500">{log.notes}</span>}
+                      <span className="block font-bold text-ink">{log.performedByName || 'المشرف المالي'}</span>
+                      {log.notes && <span className="mt-0.5 block text-[11px] text-muted">{log.notes}</span>}
                     </span>
                   ),
                 },
@@ -297,52 +297,52 @@ export const InventoryReconciliationPage: React.FC = () => {
 
       {/* Save Audit Stamp Modal */}
       {canManage && showSaveModal && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl border border-slate-100 animate-in fade-in zoom-in duration-150">
-            <h3 className="font-black text-slate-900 text-sm mb-2">توثيق محضر مطابقة دوري رسمي</h3>
-            <p className="text-xs text-slate-500 mb-4">
+        <div className="fixed inset-0 bg-primary/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-surface rounded-3xl p-6 w-full max-w-md shadow-2xl border border-line animate-in fade-in zoom-in duration-150">
+            <h3 className="font-black text-ink text-sm mb-2">توثيق محضر مطابقة دوري رسمي</h3>
+            <p className="text-xs text-muted mb-4">
               سيتم حفظ الأرصدة الحالية في سجل التدقيق المحاسبي غير القابل للتعديل لأغراض الرقابة وإعداد القوائم المالية.
             </p>
 
             <form onSubmit={handleSaveAuditStamp} className="space-y-3">
-              <div className="bg-slate-50 p-3 rounded-2xl border border-slate-200 text-xs space-y-1.5">
+              <div className="bg-surface-muted p-3 rounded-2xl border border-line text-xs space-y-1.5">
                 <div className="flex justify-between">
-                  <span className="text-slate-500">المخزون الفعلي:</span>
+                  <span className="text-muted">المخزون الفعلي:</span>
                   <span className="font-black">{fmt(reconciliation?.totalPhysicalCost || 0)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-500">طبقات تكلفة FIFO:</span>
+                  <span className="text-muted">طبقات تكلفة FIFO:</span>
                   <span className="font-black">{fmt(reconciliation?.totalFifoLayerCost || 0)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-500">الأستاذ العام (1104):</span>
+                  <span className="text-muted">الأستاذ العام (1104):</span>
                   <span className="font-black">{fmt(reconciliation?.totalGlInventoryCost || 0)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-500">فرق الكمية الفعلي/FIFO:</span>
+                  <span className="text-muted">فرق الكمية الفعلي/FIFO:</span>
                   <span className="font-black">{Number(reconciliation?.variancePhysicalVsFifoQty || 0).toLocaleString('ar-EG', { maximumFractionDigits: 2 })}</span>
                 </div>
                 {!reconciliation?.ledgerComparable && (
-                  <div className="border-t border-slate-200 pt-1.5 text-amber-700 font-bold">
+                  <div className="border-t border-line pt-1.5 text-warning font-bold">
                     رصيد GL بنطاق الفرع/الشركة وغير قابل للمقارنة بمستودع مفرد.
                   </div>
                 )}
-                <div className="flex justify-between border-t border-slate-200 pt-1.5 font-bold">
+                <div className="flex justify-between border-t border-line pt-1.5 font-bold">
                   <span>حالة المطابقة:</span>
-                  <span className={isBalanced ? 'text-emerald-700' : 'text-amber-700'}>
+                  <span className={isBalanced ? 'text-success' : 'text-warning'}>
                     {isBalanced ? 'متطابق بالكامل' : 'توجد فروقات'}
                   </span>
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-600 mb-1">ملاحظات المحضر وتوقيع المشرف المالي</label>
+                <label className="block text-xs font-bold text-ink-secondary mb-1">ملاحظات المحضر وتوقيع المشرف المالي</label>
                 <textarea
                   rows={3}
                   value={saveNotes}
                   onChange={(e) => setSaveNotes(e.target.value)}
                   placeholder="تمت مطابقة أرصدة نهاية الشهر وتبين تطابق الأرصدة..."
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  className="w-full px-3 py-2 bg-surface-muted border border-line rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-success"
                 />
               </div>
 
@@ -350,14 +350,14 @@ export const InventoryReconciliationPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setShowSaveModal(false)}
-                  className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50"
+                  className="px-4 py-2 rounded-xl border border-line text-xs font-bold text-ink-secondary hover:bg-surface-muted"
                 >
                   إلغاء
                 </button>
                 <button
                   type="submit"
                   disabled={reconciling}
-                  className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black shadow-md shadow-emerald-600/20 disabled:opacity-50"
+                  className="px-5 py-2 rounded-xl bg-success hover:bg-success text-white text-xs font-black shadow-md shadow-success/20 disabled:opacity-50"
                 >
                   {reconciling ? 'جارٍ التوثيق...' : 'اعتماد وتوثيق المحضر'}
                 </button>

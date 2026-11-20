@@ -83,12 +83,12 @@ export const FinanceOverviewPage: React.FC = () => {
   const fmt = (n: number) => new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 0 }).format(n) + ' ج';
 
   const cards = [
-    { label: 'إيرادات المبيعات (الشهر)', value: fmt(metrics.totalRevenue), icon: TrendingUp, color: 'text-emerald-600', bg: 'bg-emerald-500/10 border-emerald-500/20' },
-    { label: 'المصروفات والتشغيل (الشهر)', value: fmt(metrics.totalExpenses), icon: TrendingDown, color: 'text-rose-600', bg: 'bg-rose-500/10 border-rose-500/20' },
-    { label: 'صافي أرباح المعرض', value: fmt(metrics.netProfit), icon: DollarSign, color: metrics.netProfit >= 0 ? 'text-sky-600' : 'text-rose-600', bg: 'bg-sky-500/10 border-sky-500/20' },
-    { label: 'الذمم المدينة (حقوقنا لدى العملاء)', value: fmt(metrics.totalReceivables), icon: ArrowUpRight, color: 'text-amber-600', bg: 'bg-amber-500/10 border-amber-500/20' },
-    { label: 'الذمم الدائنة (مستحقات المصانع)', value: fmt(metrics.totalPayables), icon: ArrowDownRight, color: 'text-violet-600', bg: 'bg-violet-500/10 border-violet-500/20' },
-    { label: 'رصيد الخزائن النقدية', value: fmt(metrics.cashBalance), icon: Wallet, color: 'text-teal-600', bg: 'bg-teal-500/10 border-teal-500/20' },
+    { label: 'إيرادات المبيعات (الشهر)', value: fmt(metrics.totalRevenue), icon: TrendingUp, color: 'text-success', bg: 'bg-success/10 border-success/20' },
+    { label: 'المصروفات والتشغيل (الشهر)', value: fmt(metrics.totalExpenses), icon: TrendingDown, color: 'text-danger', bg: 'bg-danger/10 border-danger/20' },
+    { label: 'صافي أرباح المعرض', value: fmt(metrics.netProfit), icon: DollarSign, color: metrics.netProfit >= 0 ? 'text-primary' : 'text-danger', bg: 'bg-primary/10 border-primary/20' },
+    { label: 'الذمم المدينة (حقوقنا لدى العملاء)', value: fmt(metrics.totalReceivables), icon: ArrowUpRight, color: 'text-warning', bg: 'bg-warning/10 border-warning/20' },
+    { label: 'الذمم الدائنة (مستحقات المصانع)', value: fmt(metrics.totalPayables), icon: ArrowDownRight, color: 'text-primary', bg: 'bg-primary/10 border-primary/20' },
+    { label: 'رصيد الخزائن النقدية', value: fmt(metrics.cashBalance), icon: Wallet, color: 'text-success', bg: 'bg-success/10 border-success/20' },
   ];
 
   return (
@@ -101,7 +101,7 @@ export const FinanceOverviewPage: React.FC = () => {
           <button
             onClick={loadData}
             disabled={loading}
-            className="p-2.5 rounded-xl bg-slate-100 text-slate-700 hover:text-slate-900 border border-slate-300 transition"
+            className="p-2.5 rounded-xl bg-surface-sunken text-ink hover:text-ink border border-line-strong transition"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           </button>
@@ -109,7 +109,7 @@ export const FinanceOverviewPage: React.FC = () => {
       />
 
       {loadError && (
-        <div role="alert" className="rounded-xl border border-rose-300 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+        <div role="alert" className="rounded-xl border border-danger bg-danger-soft px-4 py-3 text-sm text-danger">
           تعذر تحميل بعض بيانات المركز المالي: {loadError}
         </div>
       )}
@@ -121,19 +121,19 @@ export const FinanceOverviewPage: React.FC = () => {
             <div key={c.label} className={`rounded-2xl border p-4 ${c.bg} shadow-sm`}>
               <Icon className={`w-5 h-5 ${c.color} mb-2`} />
               <div className={`text-base font-black ${c.color}`}>{c.value}</div>
-              <div className="text-[11px] text-slate-500 mt-1">{c.label}</div>
+              <div className="text-[11px] text-muted mt-1">{c.label}</div>
             </div>
           );
         })}
       </div>
 
-      <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+      <div className="bg-surface rounded-2xl border border-line p-6 shadow-sm">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-            <BarChart3 className="w-4 h-4 text-sky-600" />
+          <h3 className="text-sm font-bold text-ink flex items-center gap-2">
+            <BarChart3 className="w-4 h-4 text-primary" />
             تحليل الإيرادات والمصروفات الشهرية (آخر 6 أشهر)
           </h3>
-          <span className="text-xs text-slate-500">تحديث فوري من فواتير المبيعات والمصروفات</span>
+          <span className="text-xs text-muted">تحديث فوري من فواتير المبيعات والمصروفات</span>
         </div>
 
         <ResponsiveContainer width="100%" height={260}>

@@ -1,12 +1,27 @@
 {
+  "entities.customers.singular": {
+    "ar": "عميل / مهندس"
+  },
+  "entities.customers.plural": {
+    "ar": "العملاء والمهندسون"
+  },
   "entities.products.singular": {
     "ar": "بلاطة / صنف سيراميك"
   },
   "entities.products.plural": {
     "ar": "البلاط والسيراميك"
   },
-  "entities.customers.plural": {
-    "ar": "العملاء والمهندسون"
+  "entities.suppliers.singular": {
+    "ar": "مصنع / مورد"
+  },
+  "entities.suppliers.plural": {
+    "ar": "المصانع والموردون"
+  },
+  "entities.projects.singular": {
+    "ar": "مشروع تشطيب"
+  },
+  "entities.projects.plural": {
+    "ar": "مشاريع التشطيب"
   },
   "modules.inventory": {
     "ar": "مخزون المعرض"
@@ -14,7 +29,43 @@
   "modules.sales": {
     "ar": "مبيعات البلاط"
   },
+  "modules.purchasing": {
+    "ar": "مشتريات البلاط"
+  },
+  "modules.operations": {
+    "ar": "عمليات المعرض"
+  },
+  "modules.reports": {
+    "ar": "تقارير المعرض"
+  },
   "documents.salesInvoices": {
     "ar": "فواتير البلاط"
+  },
+  "documents.quotations": {
+    "ar": "مقاييسات وعروض"
+  },
+  "documents.orders": {
+    "ar": "أوامر العملاء"
+  },
+  "documents.purchaseOrders": {
+    "ar": "أوامر شراء البلاط"
+  },
+  "documents.purchaseInvoices": {
+    "ar": "فواتير شراء البلاط"
+  },
+  "entities.employees.singular": {
+    "ar": "موظف معرض"
+  },
+  "entities.employees.plural": {
+    "ar": "موظفو المعرض"
+  },
+  "modules.crm": {
+    "ar": "عملاء ومهندسون"
+  },
+  "modules.finance": {
+    "ar": "خزينة المعرض"
+  },
+  "modules.projects": {
+    "ar": "مشاريع التشطيب"
   }
 }

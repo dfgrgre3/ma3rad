@@ -44,8 +44,8 @@
     "administrativeOperationsOnly": true,
     "industrySpecificWorkflows": "not-implemented",
     "industrySpecificReports": "not-implemented",
-    "industrySpecificDocumentTemplates": "not-implemented",
-    "typedCustomFieldStorage": "not-implemented",
+    "industrySpecificDocumentTemplates": "partially-implemented",
+    "typedCustomFieldStorage": "implemented-for-profile-declared-fields",
     "clinicalAndPatientDataManagement": "not-implemented",
     "regulatoryCompliance": "not-implemented"
   },

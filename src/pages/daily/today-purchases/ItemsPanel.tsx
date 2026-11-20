@@ -18,20 +18,20 @@ export const ItemsPanel: React.FC<ItemsPanelProps> = ({ items, onDetails, fmt, p
   <div role="tabpanel" aria-label="أصناف التوريد">
     {items.length === 0 ? (
       <div className="flex flex-col items-center px-4 py-14 text-center">
-        <Package className="h-6 w-6 text-slate-400" />
-        <p className="mt-3 text-sm font-bold text-slate-700 dark:text-slate-200">لا توجد أصناف مطابقة</p>
-        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">جرّب تعديل البحث أو الفلاتر، أو سجّل فاتورة توريد جديدة.</p>
+        <Package className="h-6 w-6 text-muted" />
+        <p className="mt-3 text-sm font-bold text-ink ">لا توجد أصناف مطابقة</p>
+        <p className="mt-1 text-xs text-muted ">جرّب تعديل البحث أو الفلاتر، أو سجّل فاتورة توريد جديدة.</p>
       </div>
     ) : (
       <>
-        <div className="flex flex-wrap items-center gap-3 border-b border-slate-100 px-4 py-2 text-[11px] dark:border-slate-800">
-          <span className="font-bold text-slate-700 dark:text-slate-200">{plain(items.length)} سطر صنف</span>
-          <span className="text-slate-400">·</span>
-          <span className="text-slate-500 dark:text-slate-400">{sumItemQuantityByUnit(items).map(([unit, quantity]) => `${plain(quantity)} ${unit}`).join('، ') || '0'}</span>
-          <span className="text-slate-400">·</span>
-          <span className="text-slate-500 dark:text-slate-400">{fmt(items.reduce((sum, item) => sum + (Number(item.totalCost) || 0), 0))}</span>
-          <span className="text-slate-400">·</span>
-          <span className="text-slate-500 dark:text-slate-400">{plain(items.reduce((sum, item) => sum + (Number(item.boxesCount) || 0), 0))} كرتونة</span>
+        <div className="flex flex-wrap items-center gap-3 border-b border-line px-4 py-2 text-[11px] ">
+          <span className="font-bold text-ink ">{plain(items.length)} سطر صنف</span>
+          <span className="text-muted">·</span>
+          <span className="text-muted ">{sumItemQuantityByUnit(items).map(([unit, quantity]) => `${plain(quantity)} ${unit}`).join('، ') || '0'}</span>
+          <span className="text-muted">·</span>
+          <span className="text-muted ">{fmt(items.reduce((sum, item) => sum + (Number(item.totalCost) || 0), 0))}</span>
+          <span className="text-muted">·</span>
+          <span className="text-muted ">{plain(items.reduce((sum, item) => sum + (Number(item.boxesCount) || 0), 0))} كرتونة</span>
         </div>
         <div className="overflow-x-auto">
           <DataTable
@@ -46,25 +46,25 @@ export const ItemsPanel: React.FC<ItemsPanelProps> = ({ items, onDetails, fmt, p
                 key: 'product', header: 'الصنف',
                 render: (item: any) => (
                   <span>
-                    <span className="block font-semibold text-slate-900 dark:text-slate-100">{item.productName}</span>
-                    <span className="block text-[10px] text-slate-500 dark:text-slate-400">{item.grade}</span>
+                    <span className="block font-semibold text-ink ">{item.productName}</span>
+                    <span className="block text-[10px] text-muted ">{item.grade}</span>
                   </span>
                 ),
               },
-              { key: 'sku', header: 'الكود', render: (item: any) => <span className="whitespace-nowrap font-mono text-[11px] text-slate-500 dark:text-slate-400">{item.sku || '—'}</span> },
+              { key: 'sku', header: 'الكود', render: (item: any) => <span className="whitespace-nowrap font-mono text-[11px] text-muted ">{item.sku || '—'}</span> },
               {
                 key: 'invoice', header: 'الفاتورة',
                 render: (item: any) => (
-                  <button type="button" onClick={() => onDetails(item.purchaseId)} className="whitespace-nowrap font-mono font-bold text-orange-700 hover:underline dark:text-orange-300">
+                  <button type="button" onClick={() => onDetails(item.purchaseId)} className="whitespace-nowrap font-mono font-bold text-warning hover:underline ">
                     {item.invoiceNumber}
                   </button>
                 ),
               },
-              { key: 'supplier', header: 'المورد', render: (item: any) => <span className="text-slate-600 dark:text-slate-300">{item.supplierName || '—'}</span> },
-              { key: 'qty', header: 'الكمية', render: (item: any) => <span className="whitespace-nowrap tabular-nums text-slate-700 dark:text-slate-200">{formatProductQuantity(Number(item.quantityM2), item)}</span> },
-              { key: 'boxes', header: 'الكراتين', render: (item: any) => <span className="whitespace-nowrap tabular-nums text-slate-600 dark:text-slate-300">{plain(item.boxesCount)}</span> },
-              { key: 'unitCost', header: 'تكلفة الوحدة', render: (item: any) => <span className="whitespace-nowrap tabular-nums text-slate-600 dark:text-slate-300">{fmt(item.unitCost)}</span> },
-              { key: 'total', header: 'الإجمالي', render: (item: any) => <span className="whitespace-nowrap font-bold tabular-nums text-slate-900 dark:text-slate-100">{fmt(item.totalCost)}</span> },
+              { key: 'supplier', header: 'المورد', render: (item: any) => <span className="text-ink-secondary ">{item.supplierName || '—'}</span> },
+              { key: 'qty', header: 'الكمية', render: (item: any) => <span className="whitespace-nowrap tabular-nums text-ink ">{formatProductQuantity(Number(item.quantityM2), item)}</span> },
+              { key: 'boxes', header: 'الكراتين', render: (item: any) => <span className="whitespace-nowrap tabular-nums text-ink-secondary ">{plain(item.boxesCount)}</span> },
+              { key: 'unitCost', header: 'تكلفة الوحدة', render: (item: any) => <span className="whitespace-nowrap tabular-nums text-ink-secondary ">{fmt(item.unitCost)}</span> },
+              { key: 'total', header: 'الإجمالي', render: (item: any) => <span className="whitespace-nowrap font-bold tabular-nums text-ink ">{fmt(item.totalCost)}</span> },
               {
                 key: 'share', header: 'النسبة',
                 render: (item: any) => {

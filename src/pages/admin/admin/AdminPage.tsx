@@ -75,42 +75,42 @@ const COUNT_QUERIES: {
     label: "المستخدمون",
     table: "users",
     icon: Users,
-    color: "text-sky-600",
+    color: "text-primary",
   },
   {
     key: "products",
     label: "الأصناف",
     table: "products",
     icon: Package,
-    color: "text-amber-600",
+    color: "text-warning",
   },
   {
     key: "customers",
     label: "العملاء",
     table: "customers",
     icon: Building2,
-    color: "text-pink-600",
+    color: "text-primary",
   },
   {
     key: "invoices",
     label: "فواتير البيع",
     table: "sales_invoices",
     icon: Receipt,
-    color: "text-emerald-600",
+    color: "text-success",
   },
   {
     key: "purchases",
     label: "فواتير الشراء",
     table: "purchase_invoices",
     icon: Wallet,
-    color: "text-orange-600",
+    color: "text-warning",
   },
   {
     key: "audit",
     label: "سجلات التدقيق",
     table: "audit_logs",
     icon: Activity,
-    color: "text-violet-600",
+    color: "text-primary",
   },
 ];
 
@@ -146,13 +146,13 @@ export const AdminPage: React.FC<AdminPageProps> = ({ initialTab }) => {
   if (!canAccess) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 px-4 text-center">
-        <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-rose-200 bg-rose-50">
-          <ShieldCheck className="h-8 w-8 text-rose-500" />
+        <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-danger-border bg-danger-soft">
+          <ShieldCheck className="h-8 w-8 text-danger" />
         </div>
-        <h2 className="text-lg font-black text-slate-900 dark:text-slate-100">
+        <h2 className="text-lg font-black text-ink ">
           مركز التحكم غير متاح
         </h2>
-        <p className="max-w-md text-sm text-slate-500">
+        <p className="max-w-md text-sm text-muted">
           تحتاج صلاحية admin.view للدخول إلى مركز التحكم الإداري.
         </p>
       </div>
@@ -276,15 +276,15 @@ const Overview: React.FC<{ onNavigate: (tab: TabId) => void }> = ({
           return (
             <div
               key={item.key}
-              className="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900"
+              className="rounded-lg border border-line bg-surface p-4 "
             >
               <div className={`flex items-center gap-2 ${item.color}`}>
                 <Icon className="h-4 w-4" />
-                <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400">
+                <span className="text-[11px] font-bold text-muted ">
                   {item.label}
                 </span>
               </div>
-              <div className="mt-1 font-mono text-xl font-black text-slate-900 dark:text-slate-100">
+              <div className="mt-1 font-mono text-xl font-black text-ink ">
                 {(counts[item.key] ?? 0).toLocaleString("en-US")}
               </div>
             </div>
@@ -294,9 +294,9 @@ const Overview: React.FC<{ onNavigate: (tab: TabId) => void }> = ({
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_1.4fr]">
         <div className="space-y-4">
-          <div className="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
-            <h3 className="mb-3 flex items-center gap-2 text-sm font-extrabold text-slate-900 dark:text-slate-100">
-              <Database className="h-4 w-4 text-sky-500" /> حالة النظام
+          <div className="rounded-lg border border-line bg-surface p-4 ">
+            <h3 className="mb-3 flex items-center gap-2 text-sm font-extrabold text-ink ">
+              <Database className="h-4 w-4 text-primary" /> حالة النظام
             </h3>
             <div className="space-y-2 text-xs">
               <Row
@@ -317,27 +317,27 @@ const Overview: React.FC<{ onNavigate: (tab: TabId) => void }> = ({
                   storage ? storage.totalRows.toLocaleString("en-US") : "—"
                 }
               />
-              <div className="flex items-center justify-between rounded-xl border border-slate-200 px-3 py-2 dark:border-slate-700">
-                <span className="font-bold text-slate-500 dark:text-slate-400">
+              <div className="flex items-center justify-between rounded-xl border border-line px-3 py-2 ">
+                <span className="font-bold text-muted ">
                   سلامة القاعدة
                 </span>
                 {integrity === "ok" ? (
-                  <span className="inline-flex items-center gap-1 font-bold text-emerald-600 dark:text-emerald-400">
+                  <span className="inline-flex items-center gap-1 font-bold text-success ">
                     <CheckCircle2 className="h-3.5 w-3.5" /> سليمة
                   </span>
                 ) : integrity === "bad" ? (
-                  <span className="inline-flex items-center gap-1 font-bold text-rose-600 dark:text-rose-400">
+                  <span className="inline-flex items-center gap-1 font-bold text-danger ">
                     <AlertTriangle className="h-3.5 w-3.5" /> تحتاج مراجعة
                   </span>
                 ) : (
-                  <span className="font-bold text-slate-400">غير متاح</span>
+                  <span className="font-bold text-muted">غير متاح</span>
                 )}
               </div>
             </div>
           </div>
 
-          <div className="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
-            <h3 className="mb-2 text-sm font-extrabold text-slate-900 dark:text-slate-100">
+          <div className="rounded-lg border border-line bg-surface p-4 ">
+            <h3 className="mb-2 text-sm font-extrabold text-ink ">
               اختصارات
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -357,11 +357,11 @@ const Overview: React.FC<{ onNavigate: (tab: TabId) => void }> = ({
                 onClick={() => {
                   window.location.hash = "#/settings";
                 }}
-                className="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                className="flex items-center gap-2 rounded-xl border border-line px-3 py-2 text-xs font-bold text-ink-secondary transition hover:bg-surface-muted dark:hover:bg-primary"
               >
-                <SettingsIcon className="h-4 w-4 text-sky-500" />
+                <SettingsIcon className="h-4 w-4 text-primary" />
                 <span className="flex-1 text-right">الهوية والمظهر</span>
-                <ArrowLeft className="h-3.5 w-3.5 text-slate-400" />
+                <ArrowLeft className="h-3.5 w-3.5 text-muted" />
               </button>
               <Quick
                 label="محرر القوائم"
@@ -373,32 +373,32 @@ const Overview: React.FC<{ onNavigate: (tab: TabId) => void }> = ({
           </div>
         </div>
 
-        {canViewAudit && <div className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900">
-          <h3 className="mb-3 flex items-center gap-2 text-sm font-extrabold text-slate-900 dark:text-slate-100">
-            <ScrollText className="h-4 w-4 text-violet-500" /> أحدث العمليات
+        {canViewAudit && <div className="rounded-2xl border border-line bg-surface p-5 ">
+          <h3 className="mb-3 flex items-center gap-2 text-sm font-extrabold text-ink ">
+            <ScrollText className="h-4 w-4 text-primary" /> أحدث العمليات
           </h3>
           <div className="space-y-1">
             {recent.map((log) => (
               <div
                 key={log.id}
-                className="flex items-start gap-2 rounded-xl border border-slate-100 px-3 py-2 dark:border-slate-800"
+                className="flex items-start gap-2 rounded-xl border border-line px-3 py-2 "
               >
-                <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-sky-500" />
+                <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
                 <div className="min-w-0 flex-1">
-                  <div className="truncate text-xs font-bold text-slate-800 dark:text-slate-200">
+                  <div className="truncate text-xs font-bold text-ink ">
                     {log.action}
                   </div>
-                  <div className="text-[10px] text-slate-400">
+                  <div className="text-[10px] text-muted">
                     {log.userName} · {log.module}
                   </div>
                 </div>
-                <span className="whitespace-nowrap font-mono text-[10px] text-slate-400">
+                <span className="whitespace-nowrap font-mono text-[10px] text-muted">
                   {String(log.createdAt).slice(0, 16).replace("T", " ")}
                 </span>
               </div>
             ))}
             {recent.length === 0 && (
-              <div className="py-6 text-center text-xs text-slate-400">
+              <div className="py-6 text-center text-xs text-muted">
                 لا توجد عمليات مسجلة بعد.
               </div>
             )}
@@ -410,11 +410,11 @@ const Overview: React.FC<{ onNavigate: (tab: TabId) => void }> = ({
 };
 
 const Row: React.FC<{ label: string; value: string }> = ({ label, value }) => (
-  <div className="flex items-center justify-between rounded-xl border border-slate-200 px-3 py-2 dark:border-slate-700">
-    <span className="font-bold text-slate-500 dark:text-slate-400">
+  <div className="flex items-center justify-between rounded-xl border border-line px-3 py-2 ">
+    <span className="font-bold text-muted ">
       {label}
     </span>
-    <span className="font-mono font-bold text-slate-800 dark:text-slate-200">
+    <span className="font-mono font-bold text-ink ">
       {value}
     </span>
   </div>
@@ -428,10 +428,10 @@ const Quick: React.FC<{
 }> = ({ label, to, icon: Icon, onClick }) => (
   <button
     onClick={() => onClick(to)}
-    className="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+    className="flex items-center gap-2 rounded-xl border border-line px-3 py-2 text-xs font-bold text-ink-secondary transition hover:bg-surface-muted dark:hover:bg-primary"
   >
-    <Icon className="h-4 w-4 text-sky-500" />
+    <Icon className="h-4 w-4 text-primary" />
     <span className="flex-1 text-right">{label}</span>
-    <ArrowLeft className="h-3.5 w-3.5 text-slate-400" />
+    <ArrowLeft className="h-3.5 w-3.5 text-muted" />
   </button>
 );

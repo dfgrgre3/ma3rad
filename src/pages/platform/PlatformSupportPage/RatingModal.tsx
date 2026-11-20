@@ -32,7 +32,7 @@ export const RatingModal: React.FC<RatingModalProps> = ({
   >
     <div className="space-y-3.5 text-right">
       <div>
-        <label className="block text-xs font-semibold text-slate-300 mb-2">عدد النجوم (1 - 5)</label>
+        <label className="block text-xs font-semibold text-muted mb-2">عدد النجوم (1 - 5)</label>
         <div className="flex items-center gap-2">
           {[1, 2, 3, 4, 5].map((star) => (
             <button
@@ -43,7 +43,7 @@ export const RatingModal: React.FC<RatingModalProps> = ({
             >
               <Star
                 className={`h-7 w-7 ${
-                  star <= ratingStars ? 'text-amber-400 fill-amber-400' : 'text-slate-600'
+                  star <= ratingStars ? 'text-warning fill-warning' : 'text-ink-secondary'
                 }`}
               />
             </button>
@@ -52,7 +52,7 @@ export const RatingModal: React.FC<RatingModalProps> = ({
       </div>
 
       <div>
-        <label className="block text-xs font-semibold text-slate-300 mb-1">ملاحظات العميل</label>
+        <label className="block text-xs font-semibold text-muted mb-1">ملاحظات العميل</label>
         <textarea
           rows={3}
           value={ratingFeedback}
@@ -62,7 +62,7 @@ export const RatingModal: React.FC<RatingModalProps> = ({
         />
       </div>
 
-      <div className="flex justify-end gap-2 pt-3 border-t border-slate-800">
+      <div className="flex justify-end gap-2 pt-3 border-t border-line-strong">
         <Button variant="secondary" size="sm" onClick={onClose}>
           إلغاء
         </Button>

@@ -157,8 +157,13 @@ test('business activity capability summaries distinguish configured profiles fro
       'industrySpecificDocumentTemplates', 'typedCustomFieldStorage',
     ]);
     assert.equal(capabilities[0].status, 'implemented');
-    assert.equal(capabilities[2].status, 'not-implemented', `${profile.id} reports`);
-    assert.equal(capabilities[3].status, 'not-implemented', `${profile.id} templates`);
+    if (profile.id === 'ceramics') {
+      assert.equal(capabilities[2].status, 'implemented', `${profile.id} reports`);
+      assert.equal(capabilities[3].status, 'implemented', `${profile.id} templates`);
+    } else {
+      assert.equal(capabilities[2].status, 'not-implemented', `${profile.id} reports`);
+      assert.equal(capabilities[3].status, 'not-implemented', `${profile.id} templates`);
+    }
   }
   assert.equal(getBusinessProfileCapabilities('food')[1].status, 'not-implemented');
   assert.equal(getBusinessProfileCapabilities('manufacturing')[1].status, 'partial');
@@ -344,7 +349,7 @@ test('industry profiles materialize typed product fields and selection options',
   await manager.initialize();
   const profiles = [
     { type: 'clothing', code: 'APPAREL_SIZE', dataType: 'SELECT', optionCount: 6 },
-    { type: 'ceramics', code: 'TILE_GRADE', dataType: 'SELECT', optionCount: 3 },
+    { type: 'ceramics', code: 'TILE_GRADE', dataType: 'SELECT', optionCount: 4 },
     { type: 'electronics', code: 'WARRANTY_MONTHS', dataType: 'NUMBER', unit: 'شهر' },
     { type: 'food', code: 'PRODUCT_EXPIRY', dataType: 'DATE' },
     { type: 'cosmetics', code: 'COSMETIC_VOLUME', dataType: 'NUMBER', unit: 'مل' },
@@ -431,7 +436,7 @@ test('business terminology resolves Arabic organization overrides before profile
   assert.equal(resolveBusinessTerm(key, {
     businessType: 'ceramics',
     language: 'ar',
-  }), 'الأصناف');
+  }), 'البلاط والسيراميك');
   assert.equal(resolveBusinessTerm(key, {
     businessType: 'services',
     language: 'ar',
@@ -448,7 +453,7 @@ test('business terminology resolves Arabic organization overrides before profile
   assert.equal(resolveBusinessTerm('entities.customers.plural', {
     businessType: 'ceramics',
     language: 'ar',
-  }), 'العملاء');
+  }), 'العملاء والمهندسون');
 });
 
 test('business terminology rejects unknown keys, malformed values, and duplicate labels', () => {
@@ -494,7 +499,7 @@ test('terminology settings drive navigation labels and retain explicit navigatio
     const sales = groups.find((group) => group.id === 'sales');
     assert.equal(products?.label, 'تسمية القائمة');
     assert.equal(products?.items.find((item) => item.to === '/products')?.label, 'تسمية الدليل');
-    assert.equal(sales?.items.find((item) => item.to === '/sales')?.label, 'فواتير الخدمات');
+    assert.equal(sales?.items.find((item) => item.to === '/sales')?.label, 'أوامر الخدمة');
   } finally {
     for (const [key, value] of previous) {
       if (value === undefined) manager.run('DELETE FROM system_settings WHERE key = ?', [key]);
@@ -598,7 +603,7 @@ test('restaurant tickets consume recipe ingredients and issue one linked invoice
     assert.throws(() => restaurant.billOrder(order.id, 'CASH'), /تقديم جميع أصناف الطلب/);
 
     db.run(
-      `UPDATE warehouse_stock SET quantity_m2 = 0 WHERE warehouse_id = 'wh_main' AND product_id = ?`,
+      `UPDATE warehouse_stock SET quantity_m2 = 0, reserved_m2 = 0 WHERE warehouse_id = 'wh_main' AND product_id = ?`,
       [ingredientId]
     );
     assert.throws(() => restaurant.updateKitchenStatus(order.items[0].id, 'READY'), /غير كافٍ/);

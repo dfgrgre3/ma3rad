@@ -245,7 +245,7 @@ export const TodayPurchasesPage: React.FC = () => {
   };
 
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
+    <div className="flex h-full flex-col overflow-hidden bg-surface-muted text-ink ">
       <PurchasesHeader
         date={date}
         todayDate={todayDate}
@@ -298,7 +298,7 @@ export const TodayPurchasesPage: React.FC = () => {
                 fmt={fmt}
               />
 
-              <section className="overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
+              <section className="overflow-hidden rounded-xl border border-line bg-surface ">
                 <PurchasesTabsBar
                   tab={activeTab}
                   canViewPayments={canViewPayments}
@@ -355,7 +355,7 @@ export const TodayPurchasesPage: React.FC = () => {
                 )}
               </section>
 
-              <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-400">
+              <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-muted">
                 <span className="inline-flex items-center gap-1.5">
                   <CircleDollarSign className="h-3.5 w-3.5" />
                   جميع المبالغ بعملة {currency} — البيانات محدّثة لحظيًا من قاعدة البيانات المحلية

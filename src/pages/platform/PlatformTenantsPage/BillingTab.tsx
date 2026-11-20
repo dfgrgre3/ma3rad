@@ -13,19 +13,19 @@ interface BillingTabProps {
 export const BillingTab: React.FC<BillingTabProps> = ({ profile, tenant }) => (
               <div className="space-y-3">
                 <div className="grid gap-3 sm:grid-cols-3">
-                  <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3">
-                    <p className="flex items-center gap-1 text-[10.5px] font-semibold text-emerald-700"><Wallet className="h-3 w-3" /> إجمالي المدفوعات</p>
-                    <p className="mt-1 text-lg font-black text-emerald-800">
+                  <div className="rounded-xl border border-success-border bg-success-soft p-3">
+                    <p className="flex items-center gap-1 text-[10.5px] font-semibold text-success"><Wallet className="h-3 w-3" /> إجمالي المدفوعات</p>
+                    <p className="mt-1 text-lg font-black text-success">
                       {formatMoney(profile.payments.reduce((sum, payment) => sum + payment.amount, 0))}
                     </p>
                   </div>
-                  <div className="rounded-xl border border-rose-200 bg-rose-50 p-3">
-                    <p className="flex items-center gap-1 text-[10.5px] font-semibold text-rose-700"><CreditCard className="h-3 w-3" /> مستحقات غير محصلة</p>
-                    <p className="mt-1 text-lg font-black text-rose-800">{formatMoney(tenant.outstanding ?? 0)}</p>
+                  <div className="rounded-xl border border-danger-border bg-danger-soft p-3">
+                    <p className="flex items-center gap-1 text-[10.5px] font-semibold text-danger"><CreditCard className="h-3 w-3" /> مستحقات غير محصلة</p>
+                    <p className="mt-1 text-lg font-black text-danger">{formatMoney(tenant.outstanding ?? 0)}</p>
                   </div>
-                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                    <p className="flex items-center gap-1 text-[10.5px] font-semibold text-slate-600"><ScrollText className="h-3 w-3" /> عدد الفواتير</p>
-                    <p className="mt-1 text-lg font-black text-slate-800">{formatNumber(profile.invoices.length)}</p>
+                  <div className="rounded-xl border border-line bg-surface-muted p-3">
+                    <p className="flex items-center gap-1 text-[10.5px] font-semibold text-ink-secondary"><ScrollText className="h-3 w-3" /> عدد الفواتير</p>
+                    <p className="mt-1 text-lg font-black text-ink">{formatNumber(profile.invoices.length)}</p>
                   </div>
                 </div>
 
@@ -42,7 +42,7 @@ export const BillingTab: React.FC<BillingTabProps> = ({ profile, tenant }) => (
                       columns={[
                         { key: 'date', header: 'التاريخ', render: (payment) => <span className="text-[10.5px]">{formatDateTime(payment.paidAt)}</span> },
                         { key: 'invoice', header: 'الفاتورة', render: (payment) => <span className="font-mono text-[10.5px]" dir="ltr">{payment.invoiceNumber || '—'}</span> },
-                        { key: 'amount', header: 'المبلغ', render: (payment) => <span className="text-[11px] font-bold text-emerald-700">{formatMoney(payment.amount)}</span> },
+                        { key: 'amount', header: 'المبلغ', render: (payment) => <span className="text-[11px] font-bold text-success">{formatMoney(payment.amount)}</span> },
                         { key: 'method', header: 'الطريقة', render: (payment) => <span className="text-[10.5px]">{payment.method}</span> },
                         { key: 'ref', header: 'المرجع', render: (payment) => <span className="text-[10.5px]" dir="ltr">{payment.reference || '—'}</span> },
                       ]}

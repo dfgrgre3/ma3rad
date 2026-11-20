@@ -37,26 +37,26 @@ interface CycleStep {
 }
 
 const CYCLE_STEPS: CycleStep[] = [
-  { id: 'DRAFT', label: 'مسودة', icon: FileText, color: 'text-slate-500', bgColor: 'bg-slate-100', borderColor: 'border-slate-300', description: 'الفاتورة في مرحلة الإعداد' },
-  { id: 'PRICE_APPROVED', label: 'اعتماد السعر', icon: CheckSquare, color: 'text-blue-600', bgColor: 'bg-blue-50', borderColor: 'border-blue-300', description: 'السعر والخصم معتمدان' },
-  { id: 'RESERVED', label: 'حجز الكمية', icon: Package, color: 'text-violet-600', bgColor: 'bg-violet-50', borderColor: 'border-violet-300', description: 'الكمية محجوزة في المخزن' },
-  { id: 'ISSUED', label: 'إصدار الفاتورة', icon: Receipt, color: 'text-amber-600', bgColor: 'bg-amber-50', borderColor: 'border-amber-300', description: 'تم إصدار الفاتورة رسمياً' },
-  { id: 'PARTIAL', label: 'دفع جزئي', icon: CreditCard, color: 'text-orange-600', bgColor: 'bg-orange-50', borderColor: 'border-orange-300', description: 'تم استلام دفعة جزئية' },
-  { id: 'COLLECTED', label: 'التحصيل', icon: DollarSign, color: 'text-emerald-600', bgColor: 'bg-emerald-50', borderColor: 'border-emerald-300', description: 'تم تحصيل كامل المبلغ أو الائتمان' },
-  { id: 'DISPATCHED', label: 'الصرف والتسليم', icon: Truck, color: 'text-sky-600', bgColor: 'bg-sky-50', borderColor: 'border-sky-300', description: 'تم الصرف من المخزن والتسليم' },
+  { id: 'DRAFT', label: 'مسودة', icon: FileText, color: 'text-muted', bgColor: 'bg-surface-sunken', borderColor: 'border-line-strong', description: 'الفاتورة في مرحلة الإعداد' },
+  { id: 'PRICE_APPROVED', label: 'اعتماد السعر', icon: CheckSquare, color: 'text-primary', bgColor: 'bg-accent-soft', borderColor: 'border-accent-border', description: 'السعر والخصم معتمدان' },
+  { id: 'RESERVED', label: 'حجز الكمية', icon: Package, color: 'text-primary', bgColor: 'bg-accent-soft', borderColor: 'border-accent-border', description: 'الكمية محجوزة في المخزن' },
+  { id: 'ISSUED', label: 'إصدار الفاتورة', icon: Receipt, color: 'text-warning', bgColor: 'bg-warning-soft', borderColor: 'border-warning', description: 'تم إصدار الفاتورة رسمياً' },
+  { id: 'PARTIAL', label: 'دفع جزئي', icon: CreditCard, color: 'text-warning', bgColor: 'bg-warning-soft', borderColor: 'border-warning', description: 'تم استلام دفعة جزئية' },
+  { id: 'COLLECTED', label: 'التحصيل', icon: DollarSign, color: 'text-success', bgColor: 'bg-success-soft', borderColor: 'border-success', description: 'تم تحصيل كامل المبلغ أو الائتمان' },
+  { id: 'DISPATCHED', label: 'الصرف والتسليم', icon: Truck, color: 'text-primary', bgColor: 'bg-accent-soft', borderColor: 'border-accent-border', description: 'تم الصرف من المخزن والتسليم' },
 ];
 
 const INVOICE_STATUS_MAP: Record<string, { label: string; color: string }> = {
-  COMPLETED: { label: 'مكتملة', color: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
-  HOLD: { label: 'معلقة', color: 'bg-amber-100 text-amber-700 border-amber-200' },
-  VOID: { label: 'ملغاة', color: 'bg-rose-100 text-rose-700 border-rose-200' },
-  DRAFT: { label: 'مسودة', color: 'bg-slate-100 text-slate-600 border-slate-200' },
+  COMPLETED: { label: 'مكتملة', color: 'bg-success-soft text-success border-success-border' },
+  HOLD: { label: 'معلقة', color: 'bg-warning-soft text-warning border-warning-border' },
+  VOID: { label: 'ملغاة', color: 'bg-danger-soft text-danger border-danger-border' },
+  DRAFT: { label: 'مسودة', color: 'bg-surface-sunken text-ink-secondary border-line' },
 };
 
 const PAYMENT_STATUS_MAP: Record<string, { label: string; color: string }> = {
-  PAID: { label: 'مسددة', color: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
-  PARTIAL: { label: 'جزئية', color: 'bg-amber-100 text-amber-700 border-amber-200' },
-  UNPAID: { label: 'غير مسددة', color: 'bg-rose-100 text-rose-700 border-rose-200' },
+  PAID: { label: 'مسددة', color: 'bg-success-soft text-success border-success-border' },
+  PARTIAL: { label: 'جزئية', color: 'bg-warning-soft text-warning border-warning-border' },
+  UNPAID: { label: 'غير مسددة', color: 'bg-danger-soft text-danger border-danger-border' },
 };
 
 const PAYMENT_LABELS: Record<string, string> = {
@@ -121,32 +121,32 @@ const CollectPaymentModal: React.FC<CollectPaymentModalProps> = ({ invoice, onCl
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-md border border-slate-200 dark:border-slate-700">
-        <div className="p-5 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
+      <div className="bg-surface rounded-2xl shadow-2xl w-full max-w-md border border-line ">
+        <div className="p-5 border-b border-line flex items-center justify-between">
           <div>
-            <h2 className="font-bold text-slate-900 dark:text-slate-100">تسجيل تحصيل</h2>
-            <p className="text-xs text-slate-500 mt-0.5">فاتورة رقم {invoice.invoiceNumber}</p>
+            <h2 className="font-bold text-ink ">تسجيل تحصيل</h2>
+            <p className="text-xs text-muted mt-0.5">فاتورة رقم {invoice.invoiceNumber}</p>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 transition-colors"><X className="w-5 h-5" /></button>
+          <button onClick={onClose} className="text-muted hover:text-ink-secondary transition-colors"><X className="w-5 h-5" /></button>
         </div>
         <div className="p-5 space-y-4">
-          <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-center justify-between">
-            <span className="text-sm text-amber-700 font-medium">المبلغ المتبقي:</span>
-            <span className="font-bold text-amber-800 text-lg">{fmt(invoice.remainingAmount)}</span>
+          <div className="bg-warning-soft border border-warning-border rounded-xl p-3 flex items-center justify-between">
+            <span className="text-sm text-warning font-medium">المبلغ المتبقي:</span>
+            <span className="font-bold text-warning text-lg">{fmt(invoice.remainingAmount)}</span>
           </div>
           <div>
-            <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">المبلغ المحصّل</label>
+            <label className="block text-xs font-semibold text-ink-secondary mb-1.5">المبلغ المحصّل</label>
             <input
               type="number"
               value={amount}
               onChange={e => setAmount(e.target.value)}
-              className="w-full px-3 py-2.5 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
+              className="w-full px-3 py-2.5 rounded-xl border border-line-strong bg-surface text-ink text-sm focus:outline-none focus:ring-2 focus:ring-primary"
               min={0}
               max={invoice.remainingAmount}
             />
           </div>
           <div>
-            <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">طريقة الدفع</label>
+            <label className="block text-xs font-semibold text-ink-secondary mb-1.5">طريقة الدفع</label>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               {(['CASH', 'CARD', 'BANK_TRANSFER'] as PaymentType[]).map(pt => (
                 <button
@@ -154,8 +154,8 @@ const CollectPaymentModal: React.FC<CollectPaymentModalProps> = ({ invoice, onCl
                   onClick={() => setPaymentType(pt)}
                   className={`py-2 px-3 rounded-xl border text-xs font-semibold transition-all ${
                     paymentType === pt
-                      ? 'bg-sky-600 text-white border-sky-600 shadow-md'
-                      : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-300 dark:border-slate-600 hover:bg-slate-50'
+                      ? 'bg-primary text-white border-primary shadow-md'
+                      : 'bg-surface text-ink-secondary border-line-strong hover:bg-surface-muted'
                   }`}
                 >
                   {PAYMENT_LABELS[pt]}
@@ -165,29 +165,29 @@ const CollectPaymentModal: React.FC<CollectPaymentModalProps> = ({ invoice, onCl
           </div>
           {paymentType === 'BANK_TRANSFER' && (
             <div>
-              <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">الحساب البنكي المستلم *</label>
-              <select required value={bankAccountId} onChange={(event) => setBankAccountId(event.target.value)} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800">
+              <label className="block text-xs font-semibold text-ink-secondary mb-1.5">الحساب البنكي المستلم *</label>
+              <select required value={bankAccountId} onChange={(event) => setBankAccountId(event.target.value)} className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm ">
                 <option value="">اختر الحساب البنكي</option>
                 {bankAccounts.map((account) => <option key={account.id} value={account.id}>{account.accountName} — {account.bankName}</option>)}
               </select>
-              {bankAccounts.length === 0 && <p className="mt-1 text-xs text-rose-600">لا توجد حسابات بنكية متاحة؛ اختر وسيلة أخرى.</p>}
+              {bankAccounts.length === 0 && <p className="mt-1 text-xs text-danger">لا توجد حسابات بنكية متاحة؛ اختر وسيلة أخرى.</p>}
             </div>
           )}
           <div>
-            <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">ملاحظات</label>
+            <label className="block text-xs font-semibold text-ink-secondary mb-1.5">ملاحظات</label>
             <input
               type="text"
               value={notes}
               onChange={e => setNotes(e.target.value)}
-              className="w-full px-3 py-2.5 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
+              className="w-full px-3 py-2.5 rounded-xl border border-line-strong bg-surface text-ink text-sm focus:outline-none focus:ring-2 focus:ring-primary"
               placeholder="ملاحظات اختيارية..."
             />
           </div>
-          {error && <p className="text-xs text-rose-600 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2">{error}</p>}
+          {error && <p className="text-xs text-danger bg-danger-soft border border-danger-border rounded-lg px-3 py-2">{error}</p>}
         </div>
-        <div className="p-5 border-t border-slate-200 dark:border-slate-700 flex gap-3">
-          <button onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-slate-300 dark:border-slate-600 text-sm font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 transition-all">إلغاء</button>
-          <button onClick={handleSubmit} disabled={busy} className="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-bold shadow-lg transition-all disabled:opacity-60 flex items-center justify-center gap-2">
+        <div className="p-5 border-t border-line flex gap-3">
+          <button onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-line-strong text-sm font-semibold text-ink-secondary hover:bg-surface-muted transition-all">إلغاء</button>
+          <button onClick={handleSubmit} disabled={busy} className="flex-1 py-2.5 rounded-xl bg-success hover:bg-success text-white text-sm font-bold shadow-lg transition-all disabled:opacity-60 flex items-center justify-center gap-2">
             {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <DollarSign className="w-4 h-4" />}
             تأكيد التحصيل
           </button>
@@ -243,22 +243,22 @@ const InvoiceDetailDrawer: React.FC<InvoiceDetailDrawerProps> = ({ invoice, onCl
   return (
     <>
       <div className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="fixed inset-y-0 left-0 z-50 w-full max-w-2xl bg-white dark:bg-slate-900 shadow-2xl flex flex-col">
+      <div className="fixed inset-y-0 left-0 z-50 w-full max-w-2xl bg-surface shadow-2xl flex flex-col">
         {/* Header */}
-        <div className="p-5 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between bg-gradient-to-l from-sky-600/5 to-transparent">
+        <div className="p-5 border-b border-line flex items-center justify-between bg-gradient-to-l from-primary/5 to-transparent">
           <div>
-            <h2 className="font-bold text-lg text-slate-900 dark:text-slate-100">فاتورة {invoice.invoiceNumber}</h2>
-            <p className="text-xs text-slate-500">{invoice.customerName} • {invoice.date}</p>
+            <h2 className="font-bold text-lg text-ink ">فاتورة {invoice.invoiceNumber}</h2>
+            <p className="text-xs text-muted">{invoice.customerName} • {invoice.date}</p>
           </div>
-          <button onClick={onClose} className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
-            <X className="w-5 h-5 text-slate-500" />
+          <button onClick={onClose} className="p-2 rounded-xl hover:bg-surface-sunken dark:hover:bg-primary transition-colors">
+            <X className="w-5 h-5 text-muted" />
           </button>
         </div>
 
         <div className="flex-1 overflow-y-auto p-5 space-y-5">
           {/* Cycle Progress */}
-          <div className="bg-slate-50 dark:bg-slate-800/50 rounded-2xl p-4">
-            <p className="text-xs font-bold text-slate-500 dark:text-slate-400 mb-3 uppercase tracking-wider">دورة الفاتورة</p>
+          <div className="bg-surface-muted dark:bg-primary/50 rounded-2xl p-4">
+            <p className="text-xs font-bold text-muted mb-3 uppercase tracking-wider">دورة الفاتورة</p>
             <div className="flex items-center gap-1 flex-wrap">
               {CYCLE_STEPS.map((step, idx) => {
                 const StepIcon = step.icon;
@@ -268,14 +268,14 @@ const InvoiceDetailDrawer: React.FC<InvoiceDetailDrawerProps> = ({ invoice, onCl
                   <React.Fragment key={step.id}>
                     <div className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition-all ${
                       isCurrent ? `${step.bgColor} ${step.color} ${step.borderColor} shadow-sm` :
-                      isPast ? 'bg-emerald-50 text-emerald-600 border-emerald-200' :
-                      'bg-white dark:bg-slate-800 text-slate-400 dark:text-slate-500 border-slate-200 dark:border-slate-700'
+                      isPast ? 'bg-success-soft text-success border-success-border' :
+                      'bg-surface text-muted border-line '
                     }`}>
                       {isPast ? <CheckCircle2 className="w-3.5 h-3.5" /> : <StepIcon className="w-3.5 h-3.5" />}
                       <span className="hidden sm:inline">{step.label}</span>
                     </div>
                     {idx < CYCLE_STEPS.length - 1 && (
-                      <ArrowRight className={`w-3 h-3 shrink-0 ${isPast ? 'text-emerald-500' : 'text-slate-300 dark:text-slate-600'}`} />
+                      <ArrowRight className={`w-3 h-3 shrink-0 ${isPast ? 'text-success' : 'text-muted dark:text-ink-secondary'}`} />
                     )}
                   </React.Fragment>
                 );
@@ -285,22 +285,22 @@ const InvoiceDetailDrawer: React.FC<InvoiceDetailDrawerProps> = ({ invoice, onCl
 
           {/* Summary Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div className="bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-800/50 rounded-xl p-3 border border-slate-200 dark:border-slate-700">
-              <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium mb-1">إجمالي الفاتورة</p>
-              <p className="font-bold text-sm text-slate-900 dark:text-slate-100">{fmt(invoice.totalAmount)}</p>
+            <div className="bg-gradient-to-br from-line to-line dark:from-ink dark:to-ink/50 rounded-xl p-3 border border-line ">
+              <p className="text-[10px] text-muted font-medium mb-1">إجمالي الفاتورة</p>
+              <p className="font-bold text-sm text-ink ">{fmt(invoice.totalAmount)}</p>
             </div>
-            <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-900/20 dark:to-emerald-900/10 rounded-xl p-3 border border-emerald-200 dark:border-emerald-800">
-              <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium mb-1">المحصّل</p>
-              <p className="font-bold text-sm text-emerald-700 dark:text-emerald-300">{fmt(invoice.paidAmount)}</p>
+            <div className="bg-gradient-to-br from-success to-success dark:from-success/20 dark:to-success/10 rounded-xl p-3 border border-success-border ">
+              <p className="text-[10px] text-success font-medium mb-1">المحصّل</p>
+              <p className="font-bold text-sm text-success ">{fmt(invoice.paidAmount)}</p>
             </div>
-            <div className={`rounded-xl p-3 border ${invoice.remainingAmount > 0 ? 'bg-gradient-to-br from-rose-50 to-rose-100 dark:from-rose-900/20 dark:to-rose-900/10 border-rose-200 dark:border-rose-800' : 'bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-800/50 border-slate-200 dark:border-slate-700'}`}>
-              <p className={`text-[10px] font-medium mb-1 ${invoice.remainingAmount > 0 ? 'text-rose-500 dark:text-rose-400' : 'text-slate-500 dark:text-slate-400'}`}>المتبقي</p>
-              <p className={`font-bold text-sm ${invoice.remainingAmount > 0 ? 'text-rose-700 dark:text-rose-300' : 'text-slate-600 dark:text-slate-400'}`}>{fmt(invoice.remainingAmount)}</p>
+            <div className={`rounded-xl p-3 border ${invoice.remainingAmount > 0 ? 'bg-gradient-to-br from-danger to-danger dark:from-danger/20 dark:to-danger/10 border-danger-border dark:border-danger' : 'bg-gradient-to-br from-line to-line dark:from-ink dark:to-ink/50 border-line'}`}>
+              <p className={`text-[10px] font-medium mb-1 ${invoice.remainingAmount > 0 ? 'text-danger dark:text-danger' : 'text-muted dark:text-muted'}`}>المتبقي</p>
+              <p className={`font-bold text-sm ${invoice.remainingAmount > 0 ? 'text-danger dark:text-danger' : 'text-ink-secondary dark:text-muted'}`}>{fmt(invoice.remainingAmount)}</p>
             </div>
           </div>
 
           {/* Details */}
-          <div className="bg-white dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700 divide-y divide-slate-100 dark:divide-slate-700">
+          <div className="bg-surface dark:bg-primary/50 rounded-xl border border-line divide-y divide-line-strong dark:divide-primary">
             {[
               { label: 'العميل', value: invoice.customerName },
               { label: 'المخزن', value: invoice.warehouseName },
@@ -312,8 +312,8 @@ const InvoiceDetailDrawer: React.FC<InvoiceDetailDrawerProps> = ({ invoice, onCl
               ...(invoice.notes ? [{ label: 'ملاحظات', value: invoice.notes }] : []),
             ].map(({ label, value }) => (
               <div key={label} className="flex items-center justify-between px-4 py-2.5">
-                <span className="text-xs text-slate-500 dark:text-slate-400">{label}</span>
-                <span className="text-xs font-semibold text-slate-900 dark:text-slate-100 text-left">{value}</span>
+                <span className="text-xs text-muted ">{label}</span>
+                <span className="text-xs font-semibold text-ink text-left">{value}</span>
               </div>
             ))}
           </div>
@@ -321,17 +321,17 @@ const InvoiceDetailDrawer: React.FC<InvoiceDetailDrawerProps> = ({ invoice, onCl
           {/* Items */}
           {detail?.items && detail.items.length > 0 && (
             <div>
-              <p className="text-xs font-bold text-slate-500 dark:text-slate-400 mb-2 uppercase tracking-wider">أصناف الفاتورة ({detail.items.length})</p>
-              <div className="bg-white dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700 divide-y divide-slate-100 dark:divide-slate-700">
+              <p className="text-xs font-bold text-muted mb-2 uppercase tracking-wider">أصناف الفاتورة ({detail.items.length})</p>
+              <div className="bg-surface dark:bg-primary/50 rounded-xl border border-line divide-y divide-line-strong dark:divide-primary">
                 {detail.items.map((item) => (
                   <div key={item.id} className="px-4 py-3 flex items-center justify-between gap-2">
                     <div className="min-w-0">
-                      <p className="text-sm font-semibold text-slate-800 dark:text-slate-200 truncate">{item.productName}</p>
-                      <p className="text-xs text-slate-500">{item.size} — {formatProductQuantity(item.quantityM2, item)}</p>
+                      <p className="text-sm font-semibold text-ink truncate">{item.productName}</p>
+                      <p className="text-xs text-muted">{item.size} — {formatProductQuantity(item.quantityM2, item)}</p>
                     </div>
                     <div className="text-right shrink-0">
-                      <p className="text-sm font-bold text-slate-900 dark:text-slate-100">{fmt(item.totalPrice)}</p>
-                      <p className="text-xs text-slate-500">{fmt(item.unitPrice)} / {getProductUnitLabel(item)}</p>
+                      <p className="text-sm font-bold text-ink ">{fmt(item.totalPrice)}</p>
+                      <p className="text-xs text-muted">{fmt(item.unitPrice)} / {getProductUnitLabel(item)}</p>
                     </div>
                   </div>
                 ))}
@@ -339,21 +339,21 @@ const InvoiceDetailDrawer: React.FC<InvoiceDetailDrawerProps> = ({ invoice, onCl
             </div>
           )}
 
-          {error && <p className="text-xs text-rose-600 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2">{error}</p>}
+          {error && <p className="text-xs text-danger bg-danger-soft border border-danger-border rounded-lg px-3 py-2">{error}</p>}
         </div>
 
         {/* Actions */}
-        <div className="p-4 border-t border-slate-200 dark:border-slate-700 flex flex-wrap gap-2">
-          <button onClick={handlePrint} className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-sm font-semibold hover:bg-slate-200 dark:hover:bg-slate-700 transition-all">
+        <div className="p-4 border-t border-line flex flex-wrap gap-2">
+          <button onClick={handlePrint} className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-surface-sunken text-ink text-sm font-semibold hover:bg-surface-sunken dark:hover:bg-primary transition-all">
             <Printer className="w-4 h-4" />طباعة
           </button>
           {canCollect && invoice.remainingAmount > 0 && invoice.invoiceStatus !== 'VOID' && (
-            <button onClick={() => setShowCollect(true)} className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-bold shadow-md transition-all">
+            <button onClick={() => setShowCollect(true)} className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-success hover:bg-success text-white text-sm font-bold shadow-md transition-all">
               <DollarSign className="w-4 h-4" />تحصيل دفعة
             </button>
           )}
           {canVoid && invoice.invoiceStatus !== 'VOID' && (
-            <button onClick={handleVoid} disabled={busy} className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 text-sm font-semibold transition-all disabled:opacity-60">
+            <button onClick={handleVoid} disabled={busy} className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-danger-soft hover:bg-danger-soft text-danger border border-danger-border text-sm font-semibold transition-all disabled:opacity-60">
               <Ban className="w-4 h-4" />إلغاء الفاتورة
             </button>
           )}
@@ -488,23 +488,23 @@ export const InvoiceCyclePage: React.FC = () => {
   };
 
   if (!canView) return (
-    <div className="p-8 text-center text-slate-500 dark:text-slate-400">
-      <AlertTriangle className="w-12 h-12 mx-auto mb-3 text-amber-400" />
+    <div className="p-8 text-center text-muted ">
+      <AlertTriangle className="w-12 h-12 mx-auto mb-3 text-warning" />
       <p className="font-semibold">ليس لديك صلاحية عرض هذه الصفحة.</p>
     </div>
   );
 
   return (
-    <div className="flex flex-col h-full bg-slate-50 dark:bg-slate-950">
+    <div className="flex flex-col h-full bg-surface-muted ">
       {/* Header */}
-      <div className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 px-6 pt-4">
+      <div className="bg-surface border-b border-line px-6 pt-4">
         <PageHeader
           icon={<ArrowRight className="w-5 h-5" />}
           title="دورة الفاتورة"
           description="متابعة مراحل إغلاق الفواتير — من المسودة إلى التسليم"
           actions={<>
-            <button onClick={load} className="p-2 rounded-xl text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors" title="تحديث"><RefreshCw className="w-4 h-4" /></button>
-            <button onClick={handleExport} className="flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-600 text-sm font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all">
+            <button onClick={load} className="p-2 rounded-xl text-muted hover:bg-surface-sunken dark:hover:bg-primary transition-colors" title="تحديث"><RefreshCw className="w-4 h-4" /></button>
+            <button onClick={handleExport} className="flex items-center gap-2 px-4 py-2 rounded-xl border border-line-strong text-sm font-semibold text-ink-secondary hover:bg-surface-muted dark:hover:bg-primary transition-all">
               تصدير
             </button>
           </>}
@@ -515,19 +515,19 @@ export const InvoiceCyclePage: React.FC = () => {
       {stats && (
         <div className="px-6 py-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
           {[
-            { label: 'إجمالي الفواتير', value: stats.count, icon: Receipt, color: 'from-slate-500 to-slate-600' },
-            { label: 'الإجمالي', value: fmt(stats.totalAmount), icon: TrendingUp, color: 'from-emerald-500 to-teal-600' },
-            { label: 'المحصّل', value: fmt(stats.paidAmount), icon: DollarSign, color: 'from-sky-500 to-blue-600' },
-            { label: 'المتبقي', value: fmt(stats.remainingAmount), icon: CreditCard, color: 'from-amber-500 to-orange-600' },
-            { label: 'إجمالي الربح', value: fmt(stats.grossProfit), icon: TrendingUp, color: 'from-violet-500 to-purple-600' },
+            { label: 'إجمالي الفواتير', value: stats.count, icon: Receipt, color: 'from-muted to-ink' },
+            { label: 'الإجمالي', value: fmt(stats.totalAmount), icon: TrendingUp, color: 'from-success to-success' },
+            { label: 'المحصّل', value: fmt(stats.paidAmount), icon: DollarSign, color: 'from-primary to-primary' },
+            { label: 'المتبقي', value: fmt(stats.remainingAmount), icon: CreditCard, color: 'from-warning to-warning' },
+            { label: 'إجمالي الربح', value: fmt(stats.grossProfit), icon: TrendingUp, color: 'from-primary to-primary' },
           ].map(({ label, value, icon: Icon, color }) => (
-            <div key={label} className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 p-4 flex items-center gap-3 shadow-sm">
+            <div key={label} className="bg-surface rounded-xl border border-line p-4 flex items-center gap-3 shadow-sm">
               <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${color} flex items-center justify-center shrink-0`}>
                 <Icon className="w-4 h-4 text-white" />
               </div>
               <div className="min-w-0">
-                <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">{label}</p>
-                <p className="text-sm font-bold text-slate-900 dark:text-slate-100 truncate">{value}</p>
+                <p className="text-[10px] text-muted font-medium">{label}</p>
+                <p className="text-sm font-bold text-ink truncate">{value}</p>
               </div>
             </div>
           ))}
@@ -539,7 +539,7 @@ export const InvoiceCyclePage: React.FC = () => {
         <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-thin">
           <button
             onClick={() => setFilterStage('ALL')}
-            className={`px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap border transition-all ${filterStage === 'ALL' ? 'bg-slate-800 text-white border-slate-800 shadow' : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-300 dark:border-slate-600 hover:bg-slate-50'}`}
+            className={`px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap border transition-all ${filterStage === 'ALL' ? 'bg-primary text-white border-line-strong shadow' : 'bg-surface dark:bg-primary text-ink-secondary border-line-strong hover:bg-surface-muted'}`}
           >
             جميع المراحل
           </button>
@@ -552,7 +552,7 @@ export const InvoiceCyclePage: React.FC = () => {
                 className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap border transition-all ${
                   filterStage === step.id
                     ? `${step.bgColor} ${step.color} ${step.borderColor} shadow`
-                    : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700'
+                    : 'bg-surface text-ink-secondary border-line-strong hover:bg-surface-muted dark:hover:bg-primary'
                 }`}
               >
                 <StepIcon className="w-3 h-3" />
@@ -565,51 +565,51 @@ export const InvoiceCyclePage: React.FC = () => {
 
       {/* Filters */}
       <div className="px-6 pb-4">
-        <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 p-4">
+        <div className="bg-surface rounded-xl border border-line p-4">
           <div className="flex flex-wrap gap-3">
-            <div className="flex items-center gap-2 flex-1 min-w-48 bg-slate-50 dark:bg-slate-800 rounded-xl px-3 py-2.5 border border-slate-200 dark:border-slate-700">
-              <Search className="w-4 h-4 text-slate-400 shrink-0" />
+            <div className="flex items-center gap-2 flex-1 min-w-48 bg-surface-muted rounded-xl px-3 py-2.5 border border-line ">
+              <Search className="w-4 h-4 text-muted shrink-0" />
               <input
                 value={search}
                 onChange={e => setSearch(e.target.value)}
                 placeholder="بحث برقم الفاتورة أو العميل..."
-                className="flex-1 text-sm bg-transparent text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none"
+                className="flex-1 text-sm bg-transparent text-ink placeholder-muted focus:outline-none"
               />
             </div>
-            <select value={filterPayment} onChange={e => setFilterPayment(e.target.value)} className="px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-sky-500">
+            <select value={filterPayment} onChange={e => setFilterPayment(e.target.value)} className="px-3 py-2.5 rounded-xl border border-line bg-surface-muted text-sm text-ink focus:outline-none focus:ring-2 focus:ring-primary">
               <option value="ALL">كل حالات الدفع</option>
               <option value="PAID">مسددة</option>
               <option value="PARTIAL">جزئية</option>
               <option value="UNPAID">غير مسددة</option>
             </select>
-            <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-sky-500">
+            <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="px-3 py-2.5 rounded-xl border border-line bg-surface-muted text-sm text-ink focus:outline-none focus:ring-2 focus:ring-primary">
               <option value="ALL">كل حالات الفاتورة</option>
               <option value="COMPLETED">مكتملة</option>
               <option value="HOLD">معلقة</option>
               <option value="DRAFT">مسودة</option>
               <option value="VOID">ملغاة</option>
             </select>
-            <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-sky-500" />
-            <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-sky-500" />
+            <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="px-3 py-2.5 rounded-xl border border-line bg-surface-muted text-sm text-ink focus:outline-none focus:ring-2 focus:ring-primary" />
+            <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="px-3 py-2.5 rounded-xl border border-line bg-surface-muted text-sm text-ink focus:outline-none focus:ring-2 focus:ring-primary" />
           </div>
         </div>
       </div>
 
       {/* Table */}
       <div className="flex-1 overflow-auto px-6 pb-6">
-        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
+        <div className="bg-surface rounded-2xl border border-line shadow-sm overflow-hidden">
           {loading ? (
             <div className="flex items-center justify-center py-20">
-              <Loader2 className="w-8 h-8 animate-spin text-sky-500" />
+              <Loader2 className="w-8 h-8 animate-spin text-primary" />
             </div>
           ) : error ? (
             <div className="p-8 text-center">
-              <AlertTriangle className="w-10 h-10 mx-auto text-rose-400 mb-3" />
-              <p className="text-sm text-rose-600">{error}</p>
-              <button onClick={load} className="mt-3 px-4 py-2 bg-sky-600 text-white text-sm rounded-xl hover:bg-sky-500 transition-all">إعادة المحاولة</button>
+              <AlertTriangle className="w-10 h-10 mx-auto text-danger mb-3" />
+              <p className="text-sm text-danger">{error}</p>
+              <button onClick={load} className="mt-3 px-4 py-2 bg-primary text-white text-sm rounded-xl hover:bg-primary transition-all">إعادة المحاولة</button>
             </div>
           ) : invoices.length === 0 ? (
-            <div className="py-20 text-center text-slate-400 dark:text-slate-500">
+            <div className="py-20 text-center text-muted ">
               <Receipt className="w-14 h-14 mx-auto mb-3 opacity-30" />
               <p className="font-semibold text-sm">لا توجد فواتير تطابق المعايير المحددة</p>
             </div>
@@ -621,16 +621,16 @@ export const InvoiceCyclePage: React.FC = () => {
                 rows={invoices}
                 rowKey={(inv: any) => String(inv.id)}
                 tableClassName="text-sm"
-                rowClassName={() => 'transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/50'}
+                rowClassName={() => 'transition-colors hover:bg-surface-muted dark:hover:bg-primary/50'}
                 columns={[
-                  { key: 'num', header: 'رقم الفاتورة', render: (inv: any) => <span className="whitespace-nowrap font-bold text-sky-600 dark:text-sky-400">{inv.invoiceNumber}</span> },
-                  { key: 'date', header: 'التاريخ', render: (inv: any) => <span className="whitespace-nowrap text-xs text-slate-600 dark:text-slate-400">{inv.date}</span> },
+                  { key: 'num', header: 'رقم الفاتورة', render: (inv: any) => <span className="whitespace-nowrap font-bold text-primary ">{inv.invoiceNumber}</span> },
+                  { key: 'date', header: 'التاريخ', render: (inv: any) => <span className="whitespace-nowrap text-xs text-ink-secondary ">{inv.date}</span> },
                   {
                     key: 'customer', header: 'العميل',
                     render: (inv: any) => (
                       <div className="max-w-[160px]">
-                        <p className="truncate font-semibold text-slate-900 dark:text-slate-100">{inv.customerName}</p>
-                        {inv.customerPhone && <p className="truncate text-xs text-slate-500">{inv.customerPhone}</p>}
+                        <p className="truncate font-semibold text-ink ">{inv.customerName}</p>
+                        {inv.customerPhone && <p className="truncate text-xs text-muted">{inv.customerPhone}</p>}
                       </div>
                     ),
                   },
@@ -648,9 +648,9 @@ export const InvoiceCyclePage: React.FC = () => {
                       );
                     },
                   },
-                  { key: 'total', header: 'الإجمالي', render: (inv: any) => <span className="whitespace-nowrap font-bold text-slate-900 dark:text-slate-100">{fmt(inv.totalAmount)}</span> },
-                  { key: 'paid', header: 'المحصّل', render: (inv: any) => <span className="whitespace-nowrap font-semibold text-emerald-600 dark:text-emerald-400">{fmt(inv.paidAmount)}</span> },
-                  { key: 'rem', header: 'المتبقي', render: (inv: any) => <span className="whitespace-nowrap font-semibold text-rose-600 dark:text-rose-400">{fmt(inv.remainingAmount)}</span> },
+                  { key: 'total', header: 'الإجمالي', render: (inv: any) => <span className="whitespace-nowrap font-bold text-ink ">{fmt(inv.totalAmount)}</span> },
+                  { key: 'paid', header: 'المحصّل', render: (inv: any) => <span className="whitespace-nowrap font-semibold text-success ">{fmt(inv.paidAmount)}</span> },
+                  { key: 'rem', header: 'المتبقي', render: (inv: any) => <span className="whitespace-nowrap font-semibold text-danger ">{fmt(inv.remainingAmount)}</span> },
                   {
                     key: 'paystatus', header: 'حالة السداد',
                     render: (inv: any) => {
@@ -661,7 +661,7 @@ export const InvoiceCyclePage: React.FC = () => {
                   {
                     key: 'actions', header: 'إجراءات', align: 'center',
                     render: (inv: any) => (
-                      <button onClick={() => setSelected(inv)} className="rounded-lg p-1.5 text-slate-400 transition-all hover:bg-sky-50 hover:text-sky-600 dark:hover:bg-sky-900/20">
+                      <button onClick={() => setSelected(inv)} className="rounded-lg p-1.5 text-muted transition-all hover:bg-accent-soft hover:text-primary dark:hover:bg-primary/20">
                         <Eye className="h-4 w-4" />
                       </button>
                     ),
@@ -671,14 +671,14 @@ export const InvoiceCyclePage: React.FC = () => {
               </div>
 
               {/* Pagination */}
-              <div className="px-4 py-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
-                <p className="text-xs text-slate-500 dark:text-slate-400">إجمالي {total} فاتورة</p>
+              <div className="px-4 py-3 border-t border-line flex items-center justify-between">
+                <p className="text-xs text-muted ">إجمالي {total} فاتورة</p>
                 <div className="flex items-center gap-1">
-                  <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-40 transition-all">
+                  <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="p-1.5 rounded-lg text-muted hover:text-ink hover:bg-surface-sunken dark:hover:bg-primary disabled:opacity-40 transition-all">
                     <ChevronRight className="w-4 h-4" />
                   </button>
-                  <span className="text-xs font-semibold text-slate-600 dark:text-slate-400 px-2">{page} / {totalPages}</span>
-                  <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-40 transition-all">
+                  <span className="text-xs font-semibold text-ink-secondary px-2">{page} / {totalPages}</span>
+                  <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="p-1.5 rounded-lg text-muted hover:text-ink hover:bg-surface-sunken dark:hover:bg-primary disabled:opacity-40 transition-all">
                     <ChevronLeft className="w-4 h-4" />
                   </button>
                 </div>

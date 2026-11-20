@@ -206,21 +206,21 @@ export const HrOrganizationPage: React.FC = () => {
   };
 
   const renderTree = (nodes: DepartmentNode[], level = 0): React.ReactNode => (
-    <div className={level ? 'mr-6 border-r border-slate-200 pr-4' : ''}>
+    <div className={level ? 'mr-6 border-r border-line pr-4' : ''}>
       {nodes.map((node) => (
         <div key={node.id} className="mb-3">
-          <div className="rounded-xl border border-slate-200 bg-white p-3">
+          <div className="rounded-xl border border-line bg-surface p-3">
             <div className="flex items-center justify-between gap-2">
               <div>
-                <div className="font-bold text-slate-800">{node.name}</div>
-                <div className="text-[10px] text-slate-500">
+                <div className="font-bold text-ink">{node.name}</div>
+                <div className="text-[10px] text-muted">
                   المدير: {node.managerName || '—'} • المطلوب: {node.requiredHeadcount} • الفعلي: {node.actualHeadcount}
                   {node.requiredHeadcount > 0 && node.actualHeadcount < node.requiredHeadcount && (
-                    <span className="mr-2 font-bold text-rose-600">شاغر: {node.requiredHeadcount - node.actualHeadcount}</span>
+                    <span className="mr-2 font-bold text-danger">شاغر: {node.requiredHeadcount - node.actualHeadcount}</span>
                   )}
                 </div>
               </div>
-              <GitBranch className="h-4 w-4 text-slate-400" />
+              <GitBranch className="h-4 w-4 text-muted" />
             </div>
           </div>
           {node.children.length > 0 && renderTree(node.children, level + 1)}
@@ -244,14 +244,14 @@ export const HrOrganizationPage: React.FC = () => {
   const activeTab: Tab = canTab(tab) ? tab : (visibleTabs[0]?.id ?? tab);
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
-      <div className="bg-white border-b border-slate-200 px-6 pt-4">
+    <div className="h-full flex flex-col bg-surface-muted text-ink overflow-hidden">
+      <div className="bg-surface border-b border-line px-6 pt-4">
         <PageHeader
           icon={<Building2 className="h-5 w-5" />}
           title="الهيكل التنظيمي ودورة حياة الموظف"
           description="أقسام، درجات، مراكز تكلفة، انتقالات وأحداث دورة الحياة"
           actions={
-            <button onClick={load} className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700">
+            <button onClick={load} className="flex items-center gap-1 rounded-lg border border-line bg-surface px-3 py-2 text-xs font-bold text-ink">
               <RefreshCw className="h-3.5 w-3.5" /> تحديث
             </button>
           }
@@ -259,33 +259,33 @@ export const HrOrganizationPage: React.FC = () => {
       </div>
 
       <div className="flex-1 overflow-auto p-6 space-y-4">
-        {error && <div className="px-4 py-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold">{error}</div>}
+        {error && <div className="px-4 py-2.5 rounded-xl bg-danger-soft border border-danger-border text-danger text-xs font-semibold">{error}</div>}
         <div className="flex flex-wrap gap-2">
           {visibleTabs.map((item) => (
-            <button key={item.id} onClick={() => setTab(item.id)} className={`flex items-center gap-1 rounded-lg px-3 py-2 text-xs font-bold ${activeTab === item.id ? 'bg-teal-600 text-white' : 'border border-slate-200 bg-white text-slate-700'}`}>
+            <button key={item.id} onClick={() => setTab(item.id)} className={`flex items-center gap-1 rounded-lg px-3 py-2 text-xs font-bold ${activeTab === item.id ? 'bg-success text-white' : 'border border-line bg-surface text-ink'}`}>
               {item.icon} {item.label}
             </button>
           ))}
         </div>
 
-        {loading ? <div className="py-16 flex justify-center"><RefreshCw className="w-6 h-6 animate-spin text-teal-500" /></div> : (
+        {loading ? <div className="py-16 flex justify-center"><RefreshCw className="w-6 h-6 animate-spin text-success" /></div> : (
           <>
             {activeTab === 'structure' && canTab('structure') && (
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                <div className="bg-white border border-slate-200 rounded-xl p-4">
+                <div className="bg-surface border border-line rounded-xl p-4">
                   <h3 className="text-sm font-black mb-3">الهيكل التنظيمي</h3>
-                  {orgTree.length ? renderTree(orgTree) : <div className="text-xs text-slate-400">لا توجد أقسام.</div>}
+                  {orgTree.length ? renderTree(orgTree) : <div className="text-xs text-muted">لا توجد أقسام.</div>}
                 </div>
-                <div className="bg-white border border-slate-200 rounded-xl p-4">
+                <div className="bg-surface border border-line rounded-xl p-4">
                   <h3 className="text-sm font-black mb-3">الشواغر (المطلوب vs الفعلي)</h3>
                   <div className="space-y-2">
                     {vacancies.map((row) => (
-                      <div key={row.departmentId} className="flex items-center justify-between rounded-lg border border-slate-100 px-3 py-2 text-xs">
+                      <div key={row.departmentId} className="flex items-center justify-between rounded-lg border border-line px-3 py-2 text-xs">
                         <span className="font-bold">{row.departmentName}</span>
-                        <span>مطلوب {row.required} • فعلي {row.actual} • <b className={row.vacant > 0 ? 'text-rose-600' : 'text-emerald-600'}>{row.vacant > 0 ? `شاغر ${row.vacant}` : 'مكتمل'}</b></span>
+                        <span>مطلوب {row.required} • فعلي {row.actual} • <b className={row.vacant > 0 ? 'text-danger' : 'text-success'}>{row.vacant > 0 ? `شاغر ${row.vacant}` : 'مكتمل'}</b></span>
                       </div>
                     ))}
-                    {!vacancies.length && <div className="text-xs text-slate-400">لا توجد بيانات.</div>}
+                    {!vacancies.length && <div className="text-xs text-muted">لا توجد بيانات.</div>}
                   </div>
                 </div>
               </div>
@@ -293,56 +293,56 @@ export const HrOrganizationPage: React.FC = () => {
 
             {activeTab === 'departments' && canTab('departments') && (
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
+                <div className="bg-surface border border-line rounded-xl p-4 space-y-3">
                   <h3 className="text-sm font-black">الأقسام</h3>
                   {departments.map((dept) => (
-                    <div key={dept.id} className="flex items-center justify-between rounded-lg border border-slate-100 px-3 py-2 text-xs">
+                    <div key={dept.id} className="flex items-center justify-between rounded-lg border border-line px-3 py-2 text-xs">
                       <span className="font-bold">{dept.name}</span>
-                      <button onClick={() => { try { service.deactivateDepartment(dept.id); load(); } catch (e: any) { setError(e?.message); } }} className="text-rose-600 font-bold">تعطيل</button>
+                      <button onClick={() => { try { service.deactivateDepartment(dept.id); load(); } catch (e: any) { setError(e?.message); } }} className="text-danger font-bold">تعطيل</button>
                     </div>
                   ))}
                 </div>
-                <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
+                <div className="bg-surface border border-line rounded-xl p-4 space-y-3">
                   <h3 className="text-sm font-black">إضافة قسم</h3>
-                  <input value={departmentForm.name} onChange={(e) => setDepartmentForm((p) => ({ ...p, name: e.target.value }))} placeholder="اسم القسم" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
-                  <textarea value={departmentForm.description} onChange={(e) => setDepartmentForm((p) => ({ ...p, description: e.target.value }))} placeholder="الوصف" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" rows={2} />
-                  <select value={departmentForm.parentId} onChange={(e) => setDepartmentForm((p) => ({ ...p, parentId: e.target.value }))} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm">
+                  <input value={departmentForm.name} onChange={(e) => setDepartmentForm((p) => ({ ...p, name: e.target.value }))} placeholder="اسم القسم" className="w-full rounded-lg border border-line px-3 py-2 text-sm" />
+                  <textarea value={departmentForm.description} onChange={(e) => setDepartmentForm((p) => ({ ...p, description: e.target.value }))} placeholder="الوصف" className="w-full rounded-lg border border-line px-3 py-2 text-sm" rows={2} />
+                  <select value={departmentForm.parentId} onChange={(e) => setDepartmentForm((p) => ({ ...p, parentId: e.target.value }))} className="w-full rounded-lg border border-line px-3 py-2 text-sm">
                     <option value="">بدون قسم أب</option>
                     {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
                   </select>
-                  <input value={departmentForm.managerEmployeeId} onChange={(e) => setDepartmentForm((p) => ({ ...p, managerEmployeeId: e.target.value }))} placeholder="معرف مدير القسم (employee id)" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
-                  <input type="number" value={departmentForm.requiredHeadcount} onChange={(e) => setDepartmentForm((p) => ({ ...p, requiredHeadcount: e.target.value }))} placeholder="العدد المطلوب" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
-                  <button onClick={createDepartment} className="w-full rounded-lg bg-teal-600 px-4 py-2.5 text-xs font-bold text-white">إضافة</button>
+                  <input value={departmentForm.managerEmployeeId} onChange={(e) => setDepartmentForm((p) => ({ ...p, managerEmployeeId: e.target.value }))} placeholder="معرف مدير القسم (employee id)" className="w-full rounded-lg border border-line px-3 py-2 text-sm" />
+                  <input type="number" value={departmentForm.requiredHeadcount} onChange={(e) => setDepartmentForm((p) => ({ ...p, requiredHeadcount: e.target.value }))} placeholder="العدد المطلوب" className="w-full rounded-lg border border-line px-3 py-2 text-sm" />
+                  <button onClick={createDepartment} className="w-full rounded-lg bg-success px-4 py-2.5 text-xs font-bold text-white">إضافة</button>
                 </div>
               </div>
             )}
 
             {activeTab === 'titles' && canTab('titles') && (
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
+                <div className="bg-surface border border-line rounded-xl p-4 space-y-3">
                   <h3 className="text-sm font-black">المسميات الوظيفية</h3>
                   {jobTitles.map((title) => (
-                    <div key={title.id} className="flex items-center justify-between rounded-lg border border-slate-100 px-3 py-2 text-xs">
+                    <div key={title.id} className="flex items-center justify-between rounded-lg border border-line px-3 py-2 text-xs">
                       <span className="font-bold">{title.title}</span>
-                      <button onClick={() => { try { service.deactivateJobTitle(title.id); load(); } catch (e: any) { setError(e?.message); } }} className="text-rose-600 font-bold">تعطيل</button>
+                      <button onClick={() => { try { service.deactivateJobTitle(title.id); load(); } catch (e: any) { setError(e?.message); } }} className="text-danger font-bold">تعطيل</button>
                     </div>
                   ))}
                 </div>
-                <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
+                <div className="bg-surface border border-line rounded-xl p-4 space-y-3">
                   <h3 className="text-sm font-black">الدرجات الوظيفية</h3>
                   {jobGrades.map((grade) => (
-                    <div key={grade.id} className="flex items-center justify-between rounded-lg border border-slate-100 px-3 py-2 text-xs">
+                    <div key={grade.id} className="flex items-center justify-between rounded-lg border border-line px-3 py-2 text-xs">
                       <span className="font-bold">{grade.name} (مستوى {grade.level})</span>
                       <span>{fmt(grade.minSalary)} - {fmt(grade.maxSalary)}</span>
                     </div>
                   ))}
-                  <div className="space-y-2 pt-2 border-t border-slate-100">
-                    <input value={gradeForm.name} onChange={(e) => setGradeForm((p) => ({ ...p, name: e.target.value }))} placeholder="اسم الدرجة" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
-                    <input type="number" value={gradeForm.level} onChange={(e) => setGradeForm((p) => ({ ...p, level: e.target.value }))} placeholder="المستوى" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
-                    <input type="number" value={gradeForm.minSalary} onChange={(e) => setGradeForm((p) => ({ ...p, minSalary: e.target.value }))} placeholder="الحد الأدنى" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
-                    <input type="number" value={gradeForm.maxSalary} onChange={(e) => setGradeForm((p) => ({ ...p, maxSalary: e.target.value }))} placeholder="الحد الأعلى" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
-                    <input value={gradeForm.description} onChange={(e) => setGradeForm((p) => ({ ...p, description: e.target.value }))} placeholder="الوصف" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
-                    <button onClick={createGrade} className="w-full rounded-lg bg-teal-600 px-4 py-2.5 text-xs font-bold text-white">إضافة درجة</button>
+                  <div className="space-y-2 pt-2 border-t border-line">
+                    <input value={gradeForm.name} onChange={(e) => setGradeForm((p) => ({ ...p, name: e.target.value }))} placeholder="اسم الدرجة" className="w-full rounded-lg border border-line px-3 py-2 text-sm" />
+                    <input type="number" value={gradeForm.level} onChange={(e) => setGradeForm((p) => ({ ...p, level: e.target.value }))} placeholder="المستوى" className="w-full rounded-lg border border-line px-3 py-2 text-sm" />
+                    <input type="number" value={gradeForm.minSalary} onChange={(e) => setGradeForm((p) => ({ ...p, minSalary: e.target.value }))} placeholder="الحد الأدنى" className="w-full rounded-lg border border-line px-3 py-2 text-sm" />
+                    <input type="number" value={gradeForm.maxSalary} onChange={(e) => setGradeForm((p) => ({ ...p, maxSalary: e.target.value }))} placeholder="الحد الأعلى" className="w-full rounded-lg border border-line px-3 py-2 text-sm" />
+                    <input value={gradeForm.description} onChange={(e) => setGradeForm((p) => ({ ...p, description: e.target.value }))} placeholder="الوصف" className="w-full rounded-lg border border-line px-3 py-2 text-sm" />
+                    <button onClick={createGrade} className="w-full rounded-lg bg-success px-4 py-2.5 text-xs font-bold text-white">إضافة درجة</button>
                   </div>
                 </div>
               </div>
@@ -350,163 +350,163 @@ export const HrOrganizationPage: React.FC = () => {
 
             {activeTab === 'costCenters' && canTab('costCenters') && (
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
+                <div className="bg-surface border border-line rounded-xl p-4 space-y-3">
                   <h3 className="text-sm font-black">مراكز التكلفة</h3>
                   {costCenters.map((cc) => (
-                    <div key={cc.id} className="flex items-center justify-between rounded-lg border border-slate-100 px-3 py-2 text-xs">
+                    <div key={cc.id} className="flex items-center justify-between rounded-lg border border-line px-3 py-2 text-xs">
                       <span className="font-bold">{cc.code} - {cc.name}</span>
-                      <button onClick={() => { try { service.deactivateCostCenter(cc.id); load(); } catch (e: any) { setError(e?.message); } }} className="text-rose-600 font-bold">تعطيل</button>
+                      <button onClick={() => { try { service.deactivateCostCenter(cc.id); load(); } catch (e: any) { setError(e?.message); } }} className="text-danger font-bold">تعطيل</button>
                     </div>
                   ))}
                 </div>
-                <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
+                <div className="bg-surface border border-line rounded-xl p-4 space-y-3">
                   <h3 className="text-sm font-black">إضافة مركز تكلفة</h3>
-                  <input value={costCenterForm.code} onChange={(e) => setCostCenterForm((p) => ({ ...p, code: e.target.value }))} placeholder="الرمز" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
-                  <input value={costCenterForm.name} onChange={(e) => setCostCenterForm((p) => ({ ...p, name: e.target.value }))} placeholder="الاسم" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
-                  <button onClick={createCostCenter} className="w-full rounded-lg bg-teal-600 px-4 py-2.5 text-xs font-bold text-white">إضافة</button>
+                  <input value={costCenterForm.code} onChange={(e) => setCostCenterForm((p) => ({ ...p, code: e.target.value }))} placeholder="الرمز" className="w-full rounded-lg border border-line px-3 py-2 text-sm" />
+                  <input value={costCenterForm.name} onChange={(e) => setCostCenterForm((p) => ({ ...p, name: e.target.value }))} placeholder="الاسم" className="w-full rounded-lg border border-line px-3 py-2 text-sm" />
+                  <button onClick={createCostCenter} className="w-full rounded-lg bg-success px-4 py-2.5 text-xs font-bold text-white">إضافة</button>
                 </div>
               </div>
             )}
 
             {activeTab === 'transfers' && canTab('transfers') && (
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
+                <div className="bg-surface border border-line rounded-xl p-4 space-y-3">
                   <h3 className="text-sm font-black">الانتقالات</h3>
                   {transfers.map((tr) => (
-                    <div key={tr.id} className="rounded-lg border border-slate-100 px-3 py-2 text-xs">
+                    <div key={tr.id} className="rounded-lg border border-line px-3 py-2 text-xs">
                       <div className="font-bold">{tr.employeeId}</div>
-                      <div className="text-slate-500">{tr.transferDate} • {tr.fromDepartmentId || '—'} → {tr.toDepartmentId || '—'}</div>
+                      <div className="text-muted">{tr.transferDate} • {tr.fromDepartmentId || '—'} → {tr.toDepartmentId || '—'}</div>
                     </div>
                   ))}
-                  {!transfers.length && <div className="text-xs text-slate-400">لا توجد انتقالات.</div>}
+                  {!transfers.length && <div className="text-xs text-muted">لا توجد انتقالات.</div>}
                 </div>
-                <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
+                <div className="bg-surface border border-line rounded-xl p-4 space-y-3">
                   <h3 className="text-sm font-black">نقل موظف</h3>
-                  <input value={transferForm.employeeId} onChange={(e) => setTransferForm((p) => ({ ...p, employeeId: e.target.value }))} placeholder="معرف الموظف" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
-                  <select value={transferForm.toDepartmentId} onChange={(e) => setTransferForm((p) => ({ ...p, toDepartmentId: e.target.value }))} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm">
+                  <input value={transferForm.employeeId} onChange={(e) => setTransferForm((p) => ({ ...p, employeeId: e.target.value }))} placeholder="معرف الموظف" className="w-full rounded-lg border border-line px-3 py-2 text-sm" />
+                  <select value={transferForm.toDepartmentId} onChange={(e) => setTransferForm((p) => ({ ...p, toDepartmentId: e.target.value }))} className="w-full rounded-lg border border-line px-3 py-2 text-sm">
                     <option value="">القسم (اختياري)</option>
                     {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
                   </select>
-                  <input value={transferForm.toJobTitle} onChange={(e) => setTransferForm((p) => ({ ...p, toJobTitle: e.target.value }))} placeholder="المسمى الجديد (اختياري)" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
-                  <input type="date" value={transferForm.transferDate} onChange={(e) => setTransferForm((p) => ({ ...p, transferDate: e.target.value }))} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
-                  <textarea value={transferForm.reason} onChange={(e) => setTransferForm((p) => ({ ...p, reason: e.target.value }))} placeholder="السبب" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" rows={2} />
-                  <button onClick={createTransfer} className="w-full rounded-lg bg-teal-600 px-4 py-2.5 text-xs font-bold text-white">تنفيذ النقل</button>
+                  <input value={transferForm.toJobTitle} onChange={(e) => setTransferForm((p) => ({ ...p, toJobTitle: e.target.value }))} placeholder="المسمى الجديد (اختياري)" className="w-full rounded-lg border border-line px-3 py-2 text-sm" />
+                  <input type="date" value={transferForm.transferDate} onChange={(e) => setTransferForm((p) => ({ ...p, transferDate: e.target.value }))} className="w-full rounded-lg border border-line px-3 py-2 text-sm" />
+                  <textarea value={transferForm.reason} onChange={(e) => setTransferForm((p) => ({ ...p, reason: e.target.value }))} placeholder="السبب" className="w-full rounded-lg border border-line px-3 py-2 text-sm" rows={2} />
+                  <button onClick={createTransfer} className="w-full rounded-lg bg-success px-4 py-2.5 text-xs font-bold text-white">تنفيذ النقل</button>
                 </div>
               </div>
             )}
 
             {activeTab === 'lifecycle' && canTab('lifecycle') && (
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
+                <div className="bg-surface border border-line rounded-xl p-4 space-y-3">
                   <h3 className="text-sm font-black">أحداث دورة الحياة</h3>
                   <div className="flex gap-2">
-                    <input value={lifecycleEmployeeId} onChange={(e) => setLifecycleEmployeeId(e.target.value)} placeholder="معرف الموظف" className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm" />
-                    <button onClick={loadLifecycle} className="rounded-lg bg-slate-800 px-3 py-2 text-xs font-bold text-white">تحميل</button>
+                    <input value={lifecycleEmployeeId} onChange={(e) => setLifecycleEmployeeId(e.target.value)} placeholder="معرف الموظف" className="flex-1 rounded-lg border border-line px-3 py-2 text-sm" />
+                    <button onClick={loadLifecycle} className="rounded-lg bg-primary px-3 py-2 text-xs font-bold text-white">تحميل</button>
                   </div>
                   {lifecycleEvents.map((ev) => (
-                    <div key={ev.id} className="rounded-lg border border-slate-100 px-3 py-2 text-xs">
+                    <div key={ev.id} className="rounded-lg border border-line px-3 py-2 text-xs">
                       <div className="font-bold">{ev.eventType} • {ev.eventDate}</div>
-                      <div className="text-slate-500">{ev.fromValue || '—'} → {ev.toValue || '—'}</div>
-                      {ev.notes && <div className="text-slate-400">{ev.notes}</div>}
+                      <div className="text-muted">{ev.fromValue || '—'} → {ev.toValue || '—'}</div>
+                      {ev.notes && <div className="text-muted">{ev.notes}</div>}
                     </div>
                   ))}
                 </div>
-                <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
+                <div className="bg-surface border border-line rounded-xl p-4 space-y-3">
                   <h3 className="text-sm font-black">إضافة حدث</h3>
-                  <select value={lifecycleForm.eventType} onChange={(e) => setLifecycleForm((p) => ({ ...p, eventType: e.target.value }))} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm">
+                  <select value={lifecycleForm.eventType} onChange={(e) => setLifecycleForm((p) => ({ ...p, eventType: e.target.value }))} className="w-full rounded-lg border border-line px-3 py-2 text-sm">
                     {['HIRE', 'ONBOARDING', 'PROBATION_REVIEW', 'PROMOTION', 'TRANSFER', 'SALARY_CHANGE', 'TERMINATION', 'OFFBOARDING', 'FINAL_SETTLEMENT'].map((type) => <option key={type} value={type}>{type}</option>)}
                   </select>
-                  <input type="date" value={lifecycleForm.eventDate} onChange={(e) => setLifecycleForm((p) => ({ ...p, eventDate: e.target.value }))} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
-                  <input value={lifecycleForm.fromValue} onChange={(e) => setLifecycleForm((p) => ({ ...p, fromValue: e.target.value }))} placeholder="من (اختياري)" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
-                  <input value={lifecycleForm.toValue} onChange={(e) => setLifecycleForm((p) => ({ ...p, toValue: e.target.value }))} placeholder="إلى (اختياري)" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
-                  <textarea value={lifecycleForm.notes} onChange={(e) => setLifecycleForm((p) => ({ ...p, notes: e.target.value }))} placeholder="ملاحظات" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" rows={2} />
-                  <button onClick={addLifecycle} className="w-full rounded-lg bg-teal-600 px-4 py-2.5 text-xs font-bold text-white">إضافة حدث</button>
+                  <input type="date" value={lifecycleForm.eventDate} onChange={(e) => setLifecycleForm((p) => ({ ...p, eventDate: e.target.value }))} className="w-full rounded-lg border border-line px-3 py-2 text-sm" />
+                  <input value={lifecycleForm.fromValue} onChange={(e) => setLifecycleForm((p) => ({ ...p, fromValue: e.target.value }))} placeholder="من (اختياري)" className="w-full rounded-lg border border-line px-3 py-2 text-sm" />
+                  <input value={lifecycleForm.toValue} onChange={(e) => setLifecycleForm((p) => ({ ...p, toValue: e.target.value }))} placeholder="إلى (اختياري)" className="w-full rounded-lg border border-line px-3 py-2 text-sm" />
+                  <textarea value={lifecycleForm.notes} onChange={(e) => setLifecycleForm((p) => ({ ...p, notes: e.target.value }))} placeholder="ملاحظات" className="w-full rounded-lg border border-line px-3 py-2 text-sm" rows={2} />
+                  <button onClick={addLifecycle} className="w-full rounded-lg bg-success px-4 py-2.5 text-xs font-bold text-white">إضافة حدث</button>
                 </div>
               </div>
             
             )}
 {activeTab === 'onboarding' && canTab('onboarding') && (
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
+                <div className="bg-surface border border-line rounded-xl p-4 space-y-3">
                   <h3 className="text-sm font-black">التأهيل (Onboarding)</h3>
                   <div className="flex gap-2">
-                    <input value={procedureEmployeeId} onChange={(e) => setProcedureEmployeeId(e.target.value)} placeholder="معرف الموظف" className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm" />
-                    <button onClick={loadProcedures} className="rounded-lg bg-slate-800 px-3 py-2 text-xs font-bold text-white">تحميل</button>
-                    <button onClick={createOnboarding} className="rounded-lg bg-teal-600 px-3 py-2 text-xs font-bold text-white">إنشاء قائمة</button>
+                    <input value={procedureEmployeeId} onChange={(e) => setProcedureEmployeeId(e.target.value)} placeholder="معرف الموظف" className="flex-1 rounded-lg border border-line px-3 py-2 text-sm" />
+                    <button onClick={loadProcedures} className="rounded-lg bg-primary px-3 py-2 text-xs font-bold text-white">تحميل</button>
+                    <button onClick={createOnboarding} className="rounded-lg bg-success px-3 py-2 text-xs font-bold text-white">إنشاء قائمة</button>
                   </div>
                   {onboardingTasks.map((task) => (
-                    <div key={task.id} className="flex items-center justify-between rounded-lg border border-slate-100 px-3 py-2 text-xs">
-                      <span className={task.status === 'COMPLETED' ? 'line-through text-slate-400' : 'font-bold'}>{task.taskName}</span>
+                    <div key={task.id} className="flex items-center justify-between rounded-lg border border-line px-3 py-2 text-xs">
+                      <span className={task.status === 'COMPLETED' ? 'line-through text-muted' : 'font-bold'}>{task.taskName}</span>
                       {task.status !== 'COMPLETED' && (
-                        <button onClick={() => { try { service.completeOnboardingTask(task.id); loadProcedures(); } catch (e: any) { setError(e?.message); } }} className="text-emerald-600 font-bold">إكمال</button>
+                        <button onClick={() => { try { service.completeOnboardingTask(task.id); loadProcedures(); } catch (e: any) { setError(e?.message); } }} className="text-success font-bold">إكمال</button>
                       )}
                     </div>
                   ))}
                 </div>
-                <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
+                <div className="bg-surface border border-line rounded-xl p-4 space-y-3">
                   <h3 className="text-sm font-black">إخلاء طرف (Offboarding)</h3>
-                  <p className="text-xs text-slate-500">إنشاء طلب اعتماد إخلاء طرف (يتطلب موافقة).</p>
-                  <button onClick={requestOffboarding} className="w-full rounded-lg bg-rose-600 px-4 py-2.5 text-xs font-bold text-white">طلب إخلاء طرف</button>
-                  <button onClick={() => { if (procedureEmployeeId.trim()) { try { service.finalizeOffboarding(procedureEmployeeId.trim(), new Date().toISOString().slice(0, 10), 'إنهاء خدمة'); loadProcedures(); } catch (e: any) { setError(e?.message); } } }} className="w-full rounded-lg border border-rose-200 px-4 py-2.5 text-xs font-bold text-rose-600"> finalize (إنهاء خدمة)</button>
+                  <p className="text-xs text-muted">إنشاء طلب اعتماد إخلاء طرف (يتطلب موافقة).</p>
+                  <button onClick={requestOffboarding} className="w-full rounded-lg bg-danger px-4 py-2.5 text-xs font-bold text-white">طلب إخلاء طرف</button>
+                  <button onClick={() => { if (procedureEmployeeId.trim()) { try { service.finalizeOffboarding(procedureEmployeeId.trim(), new Date().toISOString().slice(0, 10), 'إنهاء خدمة'); loadProcedures(); } catch (e: any) { setError(e?.message); } } }} className="w-full rounded-lg border border-danger-border px-4 py-2.5 text-xs font-bold text-danger"> finalize (إنهاء خدمة)</button>
                 </div>
               </div>
             )}
 
             {activeTab === 'custody' && canTab('custody') && (
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
+                <div className="bg-surface border border-line rounded-xl p-4 space-y-3">
                   <h3 className="text-sm font-black">العهد</h3>
                   <div className="flex gap-2">
-                    <input value={procedureEmployeeId} onChange={(e) => setProcedureEmployeeId(e.target.value)} placeholder="معرف الموظف" className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm" />
-                    <button onClick={loadProcedures} className="rounded-lg bg-slate-800 px-3 py-2 text-xs font-bold text-white">تحميل</button>
+                    <input value={procedureEmployeeId} onChange={(e) => setProcedureEmployeeId(e.target.value)} placeholder="معرف الموظف" className="flex-1 rounded-lg border border-line px-3 py-2 text-sm" />
+                    <button onClick={loadProcedures} className="rounded-lg bg-primary px-3 py-2 text-xs font-bold text-white">تحميل</button>
                   </div>
                   {custodyItems.map((item) => (
-                    <div key={item.id} className="flex items-center justify-between rounded-lg border border-slate-100 px-3 py-2 text-xs">
+                    <div key={item.id} className="flex items-center justify-between rounded-lg border border-line px-3 py-2 text-xs">
                       <span className="font-bold">{item.itemName} ({item.status})</span>
                       {item.status === 'ASSIGNED' && (
-                        <button onClick={() => { try { service.returnCustodyItem(item.id, 'RETURNED'); loadProcedures(); } catch (e: any) { setError(e?.message); } }} className="text-emerald-600 font-bold">إرجاع</button>
+                        <button onClick={() => { try { service.returnCustodyItem(item.id, 'RETURNED'); loadProcedures(); } catch (e: any) { setError(e?.message); } }} className="text-success font-bold">إرجاع</button>
                       )}
                     </div>
                   ))}
                 </div>
-                <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
+                <div className="bg-surface border border-line rounded-xl p-4 space-y-3">
                   <h3 className="text-sm font-black">إسناد عهدة</h3>
-                  <input value={custodyForm.itemName} onChange={(e) => setCustodyForm((p) => ({ ...p, itemName: e.target.value }))} placeholder="اسم العنصر" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
-                  <input value={custodyForm.itemType} onChange={(e) => setCustodyForm((p) => ({ ...p, itemType: e.target.value }))} placeholder="النوع" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
-                  <input value={custodyForm.serialNumber} onChange={(e) => setCustodyForm((p) => ({ ...p, serialNumber: e.target.value }))} placeholder="الرقم التسلسلي" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
-                  <textarea value={custodyForm.notes} onChange={(e) => setCustodyForm((p) => ({ ...p, notes: e.target.value }))} placeholder="ملاحظات" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" rows={2} />
-                  <button onClick={addCustody} className="w-full rounded-lg bg-teal-600 px-4 py-2.5 text-xs font-bold text-white">إسناد</button>
+                  <input value={custodyForm.itemName} onChange={(e) => setCustodyForm((p) => ({ ...p, itemName: e.target.value }))} placeholder="اسم العنصر" className="w-full rounded-lg border border-line px-3 py-2 text-sm" />
+                  <input value={custodyForm.itemType} onChange={(e) => setCustodyForm((p) => ({ ...p, itemType: e.target.value }))} placeholder="النوع" className="w-full rounded-lg border border-line px-3 py-2 text-sm" />
+                  <input value={custodyForm.serialNumber} onChange={(e) => setCustodyForm((p) => ({ ...p, serialNumber: e.target.value }))} placeholder="الرقم التسلسلي" className="w-full rounded-lg border border-line px-3 py-2 text-sm" />
+                  <textarea value={custodyForm.notes} onChange={(e) => setCustodyForm((p) => ({ ...p, notes: e.target.value }))} placeholder="ملاحظات" className="w-full rounded-lg border border-line px-3 py-2 text-sm" rows={2} />
+                  <button onClick={addCustody} className="w-full rounded-lg bg-success px-4 py-2.5 text-xs font-bold text-white">إسناد</button>
                 </div>
               </div>
             )}
 
             {activeTab === 'probation' && canTab('probation') && (
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
+                <div className="bg-surface border border-line rounded-xl p-4 space-y-3">
                   <h3 className="text-sm font-black">تقييم فترة الاختبار</h3>
                   <div className="flex gap-2">
-                    <input value={procedureEmployeeId} onChange={(e) => setProcedureEmployeeId(e.target.value)} placeholder="معرف الموظف" className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm" />
-                    <button onClick={loadProcedures} className="rounded-lg bg-slate-800 px-3 py-2 text-xs font-bold text-white">تحميل</button>
+                    <input value={procedureEmployeeId} onChange={(e) => setProcedureEmployeeId(e.target.value)} placeholder="معرف الموظف" className="flex-1 rounded-lg border border-line px-3 py-2 text-sm" />
+                    <button onClick={loadProcedures} className="rounded-lg bg-primary px-3 py-2 text-xs font-bold text-white">تحميل</button>
                   </div>
                   {probationReviews.map((review) => (
-                    <div key={review.id} className="rounded-lg border border-slate-100 px-3 py-2 text-xs">
+                    <div key={review.id} className="rounded-lg border border-line px-3 py-2 text-xs">
                       <div className="font-bold">{review.reviewDate} • {review.rating} • {review.score}</div>
-                      <div className="text-slate-500">{review.recommendation}</div>
+                      <div className="text-muted">{review.recommendation}</div>
                     </div>
                   ))}
                 </div>
-                <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
+                <div className="bg-surface border border-line rounded-xl p-4 space-y-3">
                   <h3 className="text-sm font-black">إضافة تقييم</h3>
-                  <input type="date" value={probationForm.reviewDate} onChange={(e) => setProbationForm((p) => ({ ...p, reviewDate: e.target.value }))} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
-                  <input type="number" value={probationForm.score} onChange={(e) => setProbationForm((p) => ({ ...p, score: e.target.value }))} placeholder="الدرجة" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
-                  <select value={probationForm.rating} onChange={(e) => setProbationForm((p) => ({ ...p, rating: e.target.value }))} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm">
+                  <input type="date" value={probationForm.reviewDate} onChange={(e) => setProbationForm((p) => ({ ...p, reviewDate: e.target.value }))} className="w-full rounded-lg border border-line px-3 py-2 text-sm" />
+                  <input type="number" value={probationForm.score} onChange={(e) => setProbationForm((p) => ({ ...p, score: e.target.value }))} placeholder="الدرجة" className="w-full rounded-lg border border-line px-3 py-2 text-sm" />
+                  <select value={probationForm.rating} onChange={(e) => setProbationForm((p) => ({ ...p, rating: e.target.value }))} className="w-full rounded-lg border border-line px-3 py-2 text-sm">
                     {['EXCELLENT', 'GOOD', 'SATISFACTORY', 'NEEDS_IMPROVEMENT', 'UNSATISFACTORY'].map((r) => <option key={r} value={r}>{r}</option>)}
                   </select>
-                  <select value={probationForm.recommendation} onChange={(e) => setProbationForm((p) => ({ ...p, recommendation: e.target.value }))} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm">
+                  <select value={probationForm.recommendation} onChange={(e) => setProbationForm((p) => ({ ...p, recommendation: e.target.value }))} className="w-full rounded-lg border border-line px-3 py-2 text-sm">
                     {['CONTINUE', 'EXTEND_PROBATION', 'CONFIRM', 'TERMINATE'].map((r) => <option key={r} value={r}>{r}</option>)}
                   </select>
-                  <textarea value={probationForm.notes} onChange={(e) => setProbationForm((p) => ({ ...p, notes: e.target.value }))} placeholder="ملاحظات" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" rows={2} />
-                  <button onClick={addProbation} className="w-full rounded-lg bg-teal-600 px-4 py-2.5 text-xs font-bold text-white">إضافة تقييم</button>
+                  <textarea value={probationForm.notes} onChange={(e) => setProbationForm((p) => ({ ...p, notes: e.target.value }))} placeholder="ملاحظات" className="w-full rounded-lg border border-line px-3 py-2 text-sm" rows={2} />
+                  <button onClick={addProbation} className="w-full rounded-lg bg-success px-4 py-2.5 text-xs font-bold text-white">إضافة تقييم</button>
                 </div>
               </div>
             )}

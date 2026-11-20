@@ -55,8 +55,8 @@ export const ApprovalSettingsPage: React.FC = () => {
         <>
           <section className="erp-card space-y-3">
             <p className="text-sm text-[var(--cerami-muted)]">حالة التكامل موضحة لكل عملية. تغيير السياسة لعملية غير موصولة لا يوقف تنفيذها بعد؛ اربطها بخدمة العملية قبل تفعيل وضع المنع أو الاعتماد.</p>
-            <label className="relative block max-w-xl"><Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input className="erp-input w-full pr-9" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="ابحث عن عملية أو قسم" /></label>
-            {message && <div className={`flex items-center gap-2 text-sm ${message.ok ? 'text-emerald-700' : 'text-red-700'}`}>{message.ok ? <CheckCircle2 className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}{message.text}</div>}
+            <label className="relative block max-w-xl"><Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" /><input className="erp-input w-full pr-9" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="ابحث عن عملية أو قسم" /></label>
+            {message && <div className={`flex items-center gap-2 text-sm ${message.ok ? 'text-success' : 'text-danger'}`}>{message.ok ? <CheckCircle2 className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}{message.text}</div>}
           </section>
           {categories.map((category) => (
             <section className="erp-card space-y-4" key={category}>
@@ -73,9 +73,9 @@ export const ApprovalSettingsPage: React.FC = () => {
                   save(operation);
                 };
                 return (
-                  <article className="space-y-3 border-t border-slate-200 pt-4" key={operation.code}>
+                  <article className="space-y-3 border-t border-line pt-4" key={operation.code}>
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div><h3 className="font-semibold">{operation.label}</h3><p className={`text-xs ${operation.integrated ? 'text-emerald-700' : 'text-amber-700'}`}>{operation.integrated ? 'متصلة بالتنفيذ الفعلي' : 'إعداد فقط — ربط التنفيذ غير مكتمل'}</p></div>
+                      <div><h3 className="font-semibold">{operation.label}</h3><p className={`text-xs ${operation.integrated ? 'text-success' : 'text-warning'}`}>{operation.integrated ? 'متصلة بالتنفيذ الفعلي' : 'إعداد فقط — ربط التنفيذ غير مكتمل'}</p></div>
                       <select className="erp-input" value={policy.mode} onChange={(event) => update(operation.code, { mode: event.target.value as ApprovalPolicy['mode'] })}>
                         <option value="APPROVAL">يتطلب موافقة</option><option value="DIRECT">تنفيذ مباشر</option><option value="DISABLED">ممنوع</option>
                       </select>

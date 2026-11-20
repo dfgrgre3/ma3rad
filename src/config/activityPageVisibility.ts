@@ -14,62 +14,96 @@ import { getEffectiveBusinessType } from '../services/domains/config/BusinessTyp
 
 /** Pages hidden for every activity in a family. */
 const FAMILY_HIDDEN_PATHS: Record<string, string[]> = {
-  // Retail showrooms: no restaurant floor, manufacturing, fleets, or estimates.
+  // Retail showrooms: no restaurant floor, hotel, workshop bay, school,
+  // manufacturing, time-billing or fleets.
   retail: [
     '/restaurant',
+    '/hospitality',
+    '/workshop',
+    '/education',
+    '/time-billing',
     '/manufacturing',
     '/construction-estimate',
     '/fleet/dashboard',
     '/vehicles',
     '/drivers',
   ],
-  // Distribution/import: B2B — no counter POS, no restaurant, no manufacturing,
-  // no showroom floor (they run warehouses, not display stock).
+  // Distribution/import: B2B — no counter POS, no restaurant, hotel, workshop,
+  // school, manufacturing, or showroom floor (they run warehouses).
   distribution: [
     '/restaurant',
+    '/hospitality',
+    '/workshop',
+    '/education',
+    '/time-billing',
     '/manufacturing',
     '/pos',
     '/construction-estimate',
     '/inventory/showroom-stock',
+    '/retail',
   ],
-  // Manufacturing: produces goods — no restaurant floor or POS counter.
+  // Manufacturing: produces goods — no service-vertical pages.
   manufacturing: [
     '/restaurant',
+    '/hospitality',
+    '/workshop',
+    '/education',
+    '/time-billing',
     '/pos',
     '/construction-estimate',
     '/inventory/showroom-stock',
     '/customers/imported-products',
+    '/retail',
   ],
-  // Construction: sites & contracts — no restaurant, POS, factory floor,
-  // showroom stock, or import-tracking pages.
+  // Construction: sites & contracts — no service-vertical pages.
   construction: [
     '/restaurant',
+    '/hospitality',
+    '/workshop',
+    '/education',
+    '/time-billing',
     '/pos',
     '/manufacturing',
     '/inventory/showroom-stock',
     '/customers/imported-products',
+    '/promotions',
+    '/products/barcodes',
+    '/retail',
   ],
-  // Transport (workshop): service bay — no restaurant, factory floor,
-  // showroom stock, or import tracking.
+  // Transport (workshop): service bay — keeps /workshop, hides the rest.
   transport: [
     '/restaurant',
+    '/hospitality',
+    '/education',
+    '/time-billing',
     '/manufacturing',
     '/construction-estimate',
     '/inventory/showroom-stock',
     '/customers/imported-products',
+    '/retail',
   ],
-  // Hospitality (hotels & restaurants): no showroom floor or import tracking —
-  // they sell stays, meals, and services, not displayed import goods.
+  // Hospitality (hotels & restaurants): keeps /hospitality for hotels;
+  // restaurants hide it via ACTIVITY_HIDDEN_PATHS. No workshop/school pages.
   hospitality: [
     '/inventory/showroom-stock',
     '/customers/imported-products',
+    '/manufacturing',
+    '/construction-estimate',
+    '/fleet/dashboard',
+    '/vehicles',
+    '/drivers',
+    '/workshop',
+    '/education',
+    '/retail',
   ],
-  // Professional services: offices — no restaurant, POS, factory, fleet,
-  // promotions, or partner accounting.
+  // Professional services: offices — keeps /time-billing, hides the rest.
   professional_services: [
     '/restaurant',
     '/manufacturing',
     '/pos',
+    '/hospitality',
+    '/workshop',
+    '/education',
     '/construction-estimate',
     '/fleet/dashboard',
     '/vehicles',
@@ -79,12 +113,16 @@ const FAMILY_HIDDEN_PATHS: Record<string, string[]> = {
     '/deliveries',
     '/inventory/showroom-stock',
     '/customers/imported-products',
+    '/retail',
   ],
   // Healthcare: clinics — same office-only surface as professional services.
   healthcare: [
     '/restaurant',
     '/manufacturing',
     '/pos',
+    '/hospitality',
+    '/workshop',
+    '/education',
     '/construction-estimate',
     '/fleet/dashboard',
     '/vehicles',
@@ -94,12 +132,16 @@ const FAMILY_HIDDEN_PATHS: Record<string, string[]> = {
     '/deliveries',
     '/inventory/showroom-stock',
     '/customers/imported-products',
+    '/retail',
   ],
-  // Education: schools — same office-only surface.
+  // Education: schools — keeps /education, hides the rest.
   education: [
     '/restaurant',
     '/manufacturing',
     '/pos',
+    '/hospitality',
+    '/workshop',
+    '/time-billing',
     '/construction-estimate',
     '/fleet/dashboard',
     '/vehicles',
@@ -109,25 +151,46 @@ const FAMILY_HIDDEN_PATHS: Record<string, string[]> = {
     '/deliveries',
     '/inventory/showroom-stock',
     '/customers/imported-products',
+    '/retail',
   ],
 };
 
 /** Extra pages hidden for a specific activity on top of its family rules. */
 const ACTIVITY_HIDDEN_PATHS: Record<string, string[]> = {
-  food: [],
-  ecommerce: [],
+  // Ceramics showroom: tiles/porcelain never expire, and imported-customer
+  // product tracking belongs to the import/export workflow, not a showroom.
+  ceramics: ['/inventory/expiry', '/customers/imported-products', '/retail'],
+  // Supermarkets & online stores sell from the warehouse — no display floor.
+  food: ['/inventory/showroom-stock'],
+  ecommerce: ['/inventory/showroom-stock'],
+  // Restaurants keep no display stock — ingredients live in the store room.
+  restaurant: ['/inventory/showroom-stock', '/hospitality'],
+  // Import/export traders run no delivery fleet of their own.
+  import_export: ['/fleet/dashboard', '/vehicles', '/drivers'],
   // Hotels run rooms & services — the restaurant floor (tables, kitchen
-  // display) only applies to the restaurant activity.
+  // display) does not apply to them.
   hospitality: ['/restaurant'],
   // Pure logistics/warehousing: no import-document tracking page.
   logistics: ['/customers/imported-products'],
-  // Import/export keeps that page — it is core to their workflow.
-  import_export: [],
+  // Import/export keeps the import-tracking page — it is core to their workflow.
+};
+
+/**
+ * Pages that belong to a single activity only — hidden for every other
+ * activity regardless of family (e.g. the ceramics showroom page is meaningless
+ * for a restaurant or an accounting office).
+ */
+const ACTIVITY_EXCLUSIVE_PATHS: Record<string, string[]> = {
+  '/ceramics': ['ceramics'],
 };
 
 function resolveHiddenPaths(businessType: string): string[] {
   const familyId = getBusinessProfile(businessType).familyId;
+  const exclusive = Object.entries(ACTIVITY_EXCLUSIVE_PATHS)
+    .filter(([, allowed]) => !allowed.includes(businessType))
+    .map(([path]) => path);
   return [
+    ...exclusive,
     ...(ACTIVITY_HIDDEN_PATHS[businessType] ?? []),
     ...(familyId ? FAMILY_HIDDEN_PATHS[familyId] ?? [] : []),
   ];

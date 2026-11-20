@@ -292,11 +292,11 @@ export const PlatformAppConfigurationPage: React.FC = () => {
       />
 
       {/* Tenant Selector & Cryptographic Signature Status */}
-      <div className="bg-zinc-900/60 p-4 rounded-xl border border-zinc-800 flex flex-wrap items-center justify-between gap-4">
+      <div className="bg-primary/60 p-4 rounded-xl border border-line-strong flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <Cpu className="w-5 h-5 text-emerald-400" />
+          <Cpu className="w-5 h-5 text-success" />
           <div>
-            <label className="text-xs font-semibold text-zinc-300 block mb-1">العميل المستهدف:</label>
+            <label className="text-xs font-semibold text-muted block mb-1">العميل المستهدف:</label>
             <select
               value={selectedTenantId}
               onChange={(e) => setSelectedTenantId(e.target.value)}
@@ -313,31 +313,31 @@ export const PlatformAppConfigurationPage: React.FC = () => {
 
         <div className="flex items-center gap-4 text-xs">
           {savedSuccess && (
-            <span className="flex items-center gap-1.5 text-emerald-400 font-semibold bg-emerald-950/40 px-3 py-1.5 rounded-lg border border-emerald-800/40">
+            <span className="flex items-center gap-1.5 text-success font-semibold bg-success/40 px-3 py-1.5 rounded-lg border border-success/40">
               <CheckCircle2 className="w-4 h-4" />
               تم توقيع وحفظ التكوين
             </span>
           )}
 
-          <div className="flex items-center gap-2 bg-zinc-950 px-3 py-1.5 rounded-lg border border-zinc-800">
-            <ShieldCheck className="w-4 h-4 text-emerald-400" />
-            <span className="text-zinc-300">
-              التوقيع الرقمي: <code className="text-emerald-400 font-mono text-[11px]">{currentConfig?.signature?.substring(0, 16)}...</code>
+          <div className="flex items-center gap-2 bg-primary px-3 py-1.5 rounded-lg border border-line-strong">
+            <ShieldCheck className="w-4 h-4 text-success" />
+            <span className="text-muted">
+              التوقيع الرقمي: <code className="text-success font-mono text-[11px]">{currentConfig?.signature?.substring(0, 16)}...</code>
             </span>
           </div>
 
-          <span className="text-zinc-400">
-            الإصدار: <strong className="text-zinc-200">#{currentConfig?.version || 1}</strong>
+          <span className="text-muted">
+            الإصدار: <strong className="text-muted">#{currentConfig?.version || 1}</strong>
           </span>
         </div>
       </div>
 
       {/* Tabs Navigation */}
-      <div className="flex border-b border-zinc-800 space-x-1 space-x-reverse overflow-x-auto">
+      <div className="flex border-b border-line-strong space-x-1 space-x-reverse overflow-x-auto">
         <button
           onClick={() => setActiveTab('editor')}
           className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
-            activeTab === 'editor' ? 'border-emerald-500 text-emerald-400' : 'border-transparent text-zinc-400 hover:text-zinc-200'
+            activeTab === 'editor' ? 'border-success text-success' : 'border-transparent text-muted hover:text-muted'
           }`}
         >
           <FileCode className="w-4 h-4" />
@@ -346,7 +346,7 @@ export const PlatformAppConfigurationPage: React.FC = () => {
         <button
           onClick={() => setActiveTab('templates')}
           className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
-            activeTab === 'templates' ? 'border-emerald-500 text-emerald-400' : 'border-transparent text-zinc-400 hover:text-zinc-200'
+            activeTab === 'templates' ? 'border-success text-success' : 'border-transparent text-muted hover:text-muted'
           }`}
         >
           <Layers className="w-4 h-4" />
@@ -355,7 +355,7 @@ export const PlatformAppConfigurationPage: React.FC = () => {
         <button
           onClick={() => setActiveTab('rollout')}
           className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
-            activeTab === 'rollout' ? 'border-emerald-500 text-emerald-400' : 'border-transparent text-zinc-400 hover:text-zinc-200'
+            activeTab === 'rollout' ? 'border-success text-success' : 'border-transparent text-muted hover:text-muted'
           }`}
         >
           <Send className="w-4 h-4" />
@@ -364,7 +364,7 @@ export const PlatformAppConfigurationPage: React.FC = () => {
         <button
           onClick={() => setActiveTab('diff')}
           className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
-            activeTab === 'diff' ? 'border-emerald-500 text-emerald-400' : 'border-transparent text-zinc-400 hover:text-zinc-200'
+            activeTab === 'diff' ? 'border-success text-success' : 'border-transparent text-muted hover:text-muted'
           }`}
         >
           <FileDiff className="w-4 h-4" />
@@ -373,7 +373,7 @@ export const PlatformAppConfigurationPage: React.FC = () => {
         <button
           onClick={() => setActiveTab('history')}
           className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
-            activeTab === 'history' ? 'border-emerald-500 text-emerald-400' : 'border-transparent text-zinc-400 hover:text-zinc-200'
+            activeTab === 'history' ? 'border-success text-success' : 'border-transparent text-muted hover:text-muted'
           }`}
         >
           <History className="w-4 h-4" />
@@ -382,7 +382,7 @@ export const PlatformAppConfigurationPage: React.FC = () => {
         <button
           onClick={() => setActiveTab('telemetry')}
           className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
-            activeTab === 'telemetry' ? 'border-emerald-500 text-emerald-400' : 'border-transparent text-zinc-400 hover:text-zinc-200'
+            activeTab === 'telemetry' ? 'border-success text-success' : 'border-transparent text-muted hover:text-muted'
           }`}
         >
           <Activity className="w-4 h-4" />
@@ -393,13 +393,13 @@ export const PlatformAppConfigurationPage: React.FC = () => {
       {/* ─── TAB 1: Visual & JSON Editor ──────────────────────────────────────────── */}
       {activeTab === 'editor' && (
         <div className="space-y-4">
-          <div className="flex items-center justify-between text-xs text-zinc-400">
+          <div className="flex items-center justify-between text-xs text-muted">
             <span>محرر كود التكوين الديناميكي بصيغة JSON الموقعة مشفراً:</span>
-            <span className="text-zinc-500">يتوافق تلقائياً مع محرك التحقق المركزي في CentralLicenseService</span>
+            <span className="text-muted">يتوافق تلقائياً مع محرك التحقق المركزي في CentralLicenseService</span>
           </div>
 
           {jsonError && (
-            <div className="p-3 bg-rose-950/30 border border-rose-800/40 rounded-lg text-rose-300 text-xs flex items-center gap-2">
+            <div className="p-3 bg-danger/30 border border-danger/40 rounded-lg text-danger text-xs flex items-center gap-2">
               <AlertTriangle className="w-4 h-4 flex-shrink-0" />
               <span>{jsonError}</span>
             </div>
@@ -414,7 +414,7 @@ export const PlatformAppConfigurationPage: React.FC = () => {
                 setJsonError(null);
               }}
               dir="ltr"
-              className="w-full bg-zinc-950 text-zinc-100 font-mono text-xs p-4 rounded-xl border border-zinc-800 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none leading-relaxed"
+              className="w-full bg-primary text-muted font-mono text-xs p-4 rounded-xl border border-line-strong focus:border-success focus:ring-1 focus:ring-success outline-none leading-relaxed"
               placeholder="{ ... }"
             />
           </div>
@@ -424,7 +424,7 @@ export const PlatformAppConfigurationPage: React.FC = () => {
       {/* ─── TAB 2: Activity & Plan Templates ─────────────────────────────────────── */}
       {activeTab === 'templates' && (
         <div className="space-y-4">
-          <div className="text-xs text-zinc-400">
+          <div className="text-xs text-muted">
             اختر قالباً لتطبيق حزمة إعدادات كاملة وموحدة لنوع نشاط العميل:
           </div>
 
@@ -432,21 +432,21 @@ export const PlatformAppConfigurationPage: React.FC = () => {
             {templates.map((tmpl) => (
               <div
                 key={tmpl.id}
-                className="bg-zinc-900/60 p-4 rounded-xl border border-zinc-800 space-y-3 flex flex-col justify-between"
+                className="bg-primary/60 p-4 rounded-xl border border-line-strong space-y-3 flex flex-col justify-between"
               >
                 <div>
                   <div className="flex items-center justify-between">
-                    <h4 className="font-semibold text-zinc-100 text-sm">{tmpl.name}</h4>
+                    <h4 className="font-semibold text-muted text-sm">{tmpl.name}</h4>
                     {tmpl.isDefault && (
-                      <span className="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded">
+                      <span className="text-[10px] bg-success/10 text-success border border-success/20 px-2 py-0.5 rounded">
                         افتراضي
                       </span>
                     )}
                   </div>
-                  <div className="text-xs text-zinc-500 font-mono mt-1">الرمز: {tmpl.code}</div>
+                  <div className="text-xs text-muted font-mono mt-1">الرمز: {tmpl.code}</div>
                   <pre
                     dir="ltr"
-                    className="mt-3 p-2 bg-zinc-950 rounded text-[11px] font-mono text-zinc-400 max-h-32 overflow-y-auto"
+                    className="mt-3 p-2 bg-primary rounded text-[11px] font-mono text-muted max-h-32 overflow-y-auto"
                   >
                     {JSON.stringify(tmpl.configPayload, null, 2)}
                   </pre>
@@ -471,14 +471,14 @@ export const PlatformAppConfigurationPage: React.FC = () => {
       {activeTab === 'rollout' && (
         <div className="space-y-6">
           {/* Create Rollout Card */}
-          <div className="bg-zinc-900/50 p-5 rounded-xl border border-zinc-800 space-y-4">
-            <h3 className="text-sm font-semibold text-zinc-100 flex items-center gap-2">
-              <Send className="w-4 h-4 text-emerald-400" />
+          <div className="bg-primary/50 p-5 rounded-xl border border-line-strong space-y-4">
+            <h3 className="text-sm font-semibold text-muted flex items-center gap-2">
+              <Send className="w-4 h-4 text-success" />
               إطلاق حملة نشر تكوين تدريجي جديدة (Canary / Phased Rollout)
             </h3>
 
             {rolloutSuccess && (
-              <div className="p-3 bg-emerald-950/40 border border-emerald-800/40 rounded-lg text-emerald-300 text-xs flex items-center gap-2">
+              <div className="p-3 bg-success/40 border border-success/40 rounded-lg text-success text-xs flex items-center gap-2">
                 <CheckCircle2 className="w-4 h-4" />
                 <span>تم إطلاق حملة النشر وتحديث أجهزة العملاء المستهدفين بنجاح.</span>
               </div>
@@ -486,7 +486,7 @@ export const PlatformAppConfigurationPage: React.FC = () => {
 
             <form onSubmit={handleCreateRollout} className="space-y-4">
               <div>
-                <label className="block text-xs font-medium text-zinc-400 mb-1">عنوان الحملة / ملاحظات الإصدار</label>
+                <label className="block text-xs font-medium text-muted mb-1">عنوان الحملة / ملاحظات الإصدار</label>
                 <input
                   type="text"
                   required
@@ -498,7 +498,7 @@ export const PlatformAppConfigurationPage: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-zinc-400 mb-1">قالب التكوين المراد نشره</label>
+                <label className="block text-xs font-medium text-muted mb-1">قالب التكوين المراد نشره</label>
                 <select
                   value={rolloutTemplateId}
                   onChange={(e) => setRolloutTemplateId(e.target.value)}
@@ -515,7 +515,7 @@ export const PlatformAppConfigurationPage: React.FC = () => {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-medium text-zinc-400 mb-1">شريحة النشر المستهدفة</label>
+                  <label className="block text-xs font-medium text-muted mb-1">شريحة النشر المستهدفة</label>
                   <select
                     value={rolloutTargetType}
                     onChange={(e) => setRolloutTargetType(e.target.value as RolloutTargetType)}
@@ -530,7 +530,7 @@ export const PlatformAppConfigurationPage: React.FC = () => {
 
                 {rolloutTargetType === 'CANARY_PERCENT' && (
                   <div>
-                    <label className="block text-xs font-medium text-zinc-400 mb-1">النسبة المئوية التجريبية (%)</label>
+                    <label className="block text-xs font-medium text-muted mb-1">النسبة المئوية التجريبية (%)</label>
                     <input
                       type="number"
                       min={1}
@@ -554,18 +554,18 @@ export const PlatformAppConfigurationPage: React.FC = () => {
 
           {/* Past Rollouts Table */}
           <div className="space-y-3">
-            <h4 className="text-xs font-semibold text-zinc-300">سجل حملات النشر التدريجي:</h4>
+            <h4 className="text-xs font-semibold text-muted">سجل حملات النشر التدريجي:</h4>
             <DataTable
                           ariaLabel="سجل حملات النشر"
                           rows={rollouts}
                           rowKey={(ro) => ro.id}
                           emptyTitle="لا توجد حملات نشر سابقة"
                           columns={[
-                            { key: 'title', header: 'عنوان الحملة', render: (ro) => <span className="font-medium text-zinc-200">{ro.title}</span> },
-                            { key: 'type', header: 'النوع', render: (ro) => <span className="text-xs font-mono text-zinc-400">{ro.targetType}</span> },
-                            { key: 'status', header: 'الحالة', render: (ro) => <span className="px-2.5 py-0.5 rounded text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">{ro.status}</span> },
-                            { key: 'tenants', header: 'العملاء المستهدفين', render: (ro) => <span className="text-zinc-200 font-semibold">{ro.totalTenants} عميل</span> },
-                            { key: 'created', header: 'تاريخ الإطلاق', render: (ro) => <span className="text-xs text-zinc-400">{formatDateTime(ro.createdAt)}</span> },
+                            { key: 'title', header: 'عنوان الحملة', render: (ro) => <span className="font-medium text-muted">{ro.title}</span> },
+                            { key: 'type', header: 'النوع', render: (ro) => <span className="text-xs font-mono text-muted">{ro.targetType}</span> },
+                            { key: 'status', header: 'الحالة', render: (ro) => <span className="px-2.5 py-0.5 rounded text-xs bg-success/10 text-success border border-success/20">{ro.status}</span> },
+                            { key: 'tenants', header: 'العملاء المستهدفين', render: (ro) => <span className="text-muted font-semibold">{ro.totalTenants} عميل</span> },
+                            { key: 'created', header: 'تاريخ الإطلاق', render: (ro) => <span className="text-xs text-muted">{formatDateTime(ro.createdAt)}</span> },
                           ]}
                         />
 
@@ -576,9 +576,9 @@ export const PlatformAppConfigurationPage: React.FC = () => {
       {/* ─── TAB 4: Version Diff Viewer ───────────────────────────────────────────── */}
       {activeTab === 'diff' && (
         <div className="space-y-4">
-          <div className="bg-zinc-900/50 p-4 rounded-xl border border-zinc-800 flex flex-wrap items-center gap-4">
+          <div className="bg-primary/50 p-4 rounded-xl border border-line-strong flex flex-wrap items-center gap-4">
             <div className="flex items-center gap-2">
-              <span className="text-xs text-zinc-400">مقارنة الإصدار:</span>
+              <span className="text-xs text-muted">مقارنة الإصدار:</span>
               <select
                 value={diffVersionA}
                 onChange={(e) => setDiffVersionA(Number(e.target.value))}
@@ -592,10 +592,10 @@ export const PlatformAppConfigurationPage: React.FC = () => {
               </select>
             </div>
 
-            <span className="text-zinc-500 font-bold">مقابل</span>
+            <span className="text-muted font-bold">مقابل</span>
 
             <div className="flex items-center gap-2">
-              <span className="text-xs text-zinc-400">الإصدار:</span>
+              <span className="text-xs text-muted">الإصدار:</span>
               <select
                 value={diffVersionB}
                 onChange={(e) => setDiffVersionB(Number(e.target.value))}
@@ -616,7 +616,7 @@ export const PlatformAppConfigurationPage: React.FC = () => {
                       rowKey={(row) => row.key}
                       dense
                       tableClassName="font-mono"
-                      rowClassName={(row) => row.changed ? 'bg-amber-950/20 text-amber-200' : 'text-zinc-300'}
+                      rowClassName={(row) => row.changed ? 'bg-warning/20 text-warning' : 'text-muted'}
                       columns={[
                         { key: 'key', header: 'مفتاح التكوين (Key)', render: (row) => <span className="font-semibold">{row.key}</span> },
                         { key: 'a', header: `إصدار #${diffVersionA}`, render: (row) => <span className="block max-w-xs truncate">{row.valA}</span> },
@@ -624,8 +624,8 @@ export const PlatformAppConfigurationPage: React.FC = () => {
                         {
                           key: 'status', header: 'الحالة', align: 'center',
                           render: (row) => row.changed ? (
-                            <span className="px-2 py-0.5 rounded text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/30">مُعدل</span>
-                          ) : <span className="text-zinc-600 text-[10px]">متطابق</span>,
+                            <span className="px-2 py-0.5 rounded text-[10px] bg-warning/20 text-warning border border-warning/30">مُعدل</span>
+                          ) : <span className="text-ink-secondary text-[10px]">متطابق</span>,
                         },
                       ]}
                     />
@@ -636,7 +636,7 @@ export const PlatformAppConfigurationPage: React.FC = () => {
       {/* ─── TAB 5: Version History & Rollback ─────────────────────────────────────── */}
       {activeTab === 'history' && (
         <div className="space-y-3">
-          <div className="text-xs text-zinc-400">
+          <div className="text-xs text-muted">
             سجل الإصدارات السابقة مع إمكانية الاسترجاع السريع وإعادة التوقيع بضغطة زر:
           </div>
 
@@ -647,18 +647,18 @@ export const PlatformAppConfigurationPage: React.FC = () => {
               {versions.map((ver) => (
                 <div
                   key={ver.id}
-                  className="bg-zinc-950 p-3.5 rounded-lg border border-zinc-800 flex items-center justify-between text-xs"
+                  className="bg-primary p-3.5 rounded-lg border border-line-strong flex items-center justify-between text-xs"
                 >
                   <div>
-                    <div className="font-semibold text-zinc-200 flex items-center gap-2">
+                    <div className="font-semibold text-muted flex items-center gap-2">
                       <span>إصدار #{ver.version}</span>
                       {ver.version === currentConfig?.version && (
-                        <span className="text-emerald-400 font-normal">(النشط حالياً)</span>
+                        <span className="text-success font-normal">(النشط حالياً)</span>
                       )}
-                      <span className="text-[10px] text-zinc-500 font-mono">توقيع: {ver.signature?.substring(0, 12)}...</span>
+                      <span className="text-[10px] text-muted font-mono">توقيع: {ver.signature?.substring(0, 12)}...</span>
                     </div>
-                    <div className="text-zinc-400 text-[11px] mt-0.5">{ver.changeSummary}</div>
-                    <div className="text-zinc-500 text-[10px]">{formatDateTime(ver.createdAt)}</div>
+                    <div className="text-muted text-[11px] mt-0.5">{ver.changeSummary}</div>
+                    <div className="text-muted text-[10px]">{formatDateTime(ver.createdAt)}</div>
                   </div>
 
                   {ver.version !== currentConfig?.version && (
@@ -682,7 +682,7 @@ export const PlatformAppConfigurationPage: React.FC = () => {
       {/* ─── TAB 6: Client & Device Telemetry (ACK) ───────────────────────────────── */}
       {activeTab === 'telemetry' && (
         <div className="space-y-4">
-          <div className="text-xs text-zinc-400">
+          <div className="text-xs text-muted">
             تأكيدات الاستلام والتطبيق الحية الواردة من أجهزة هذا العميل:
           </div>
 
@@ -692,26 +692,26 @@ export const PlatformAppConfigurationPage: React.FC = () => {
                       rowKey={(ack) => ack.id}
                       emptyTitle="لا توجد تأكيدات استلام مسجلة حتى الآن"
                       columns={[
-                        { key: 'device', header: 'معرف الجهاز', render: (ack) => <span className="font-mono text-xs text-zinc-300">{ack.deviceId ? ack.deviceId.substring(0, 16) + '...' : 'الجهاز الرئيسي'}</span> },
-                        { key: 'version', header: 'رقم الإصدار', render: (ack) => <span className="font-semibold text-zinc-200">#{ack.version}</span> },
+                        { key: 'device', header: 'معرف الجهاز', render: (ack) => <span className="font-mono text-xs text-muted">{ack.deviceId ? ack.deviceId.substring(0, 16) + '...' : 'الجهاز الرئيسي'}</span> },
+                        { key: 'version', header: 'رقم الإصدار', render: (ack) => <span className="font-semibold text-muted">#{ack.version}</span> },
                         {
                           key: 'status', header: 'الحالة',
                           render: (ack) => (
                             <>
                               {ack.status === 'APPLIED' && (
-                                <span className="px-2 py-0.5 rounded text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">تم التطبيق</span>
+                                <span className="px-2 py-0.5 rounded text-xs bg-success/10 text-success border border-success/20">تم التطبيق</span>
                               )}
                               {ack.status === 'RECEIVED' && (
-                                <span className="px-2 py-0.5 rounded text-xs bg-blue-500/10 text-blue-400 border border-blue-500/20">تم الاستلام</span>
+                                <span className="px-2 py-0.5 rounded text-xs bg-primary/10 text-primary border border-primary/20">تم الاستلام</span>
                               )}
                               {ack.status === 'FAILED' && (
-                                <span className="px-2 py-0.5 rounded text-xs bg-rose-500/10 text-rose-400 border border-rose-500/20">فشل</span>
+                                <span className="px-2 py-0.5 rounded text-xs bg-danger/10 text-danger border border-danger/20">فشل</span>
                               )}
                             </>
                           ),
                         },
-                        { key: 'time', header: 'توقيت الاستلام', render: (ack) => <span className="text-xs text-zinc-400">{formatDateTime(ack.acknowledgedAt)}</span> },
-                        { key: 'notes', header: 'ملاحظات', render: (ack) => <span className="text-xs text-zinc-400">{ack.errorMessage || '—'}</span> },
+                        { key: 'time', header: 'توقيت الاستلام', render: (ack) => <span className="text-xs text-muted">{formatDateTime(ack.acknowledgedAt)}</span> },
+                        { key: 'notes', header: 'ملاحظات', render: (ack) => <span className="text-xs text-muted">{ack.errorMessage || '—'}</span> },
                       ]}
                     />
 

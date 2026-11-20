@@ -41,7 +41,7 @@ export function SubledgerPanel({
           value={partyType}
           aria-label="نوع الأستاذ المساعد"
           onChange={(event) => onTypeChange(event.target.value === 'SUPPLIER' ? 'SUPPLIER' : 'CUSTOMER')}
-          className="px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold"
+          className="px-3 py-2.5 bg-surface border border-line rounded-xl text-xs font-bold"
         >
           <option value="CUSTOMER">أستاذ العملاء</option>
           <option value="SUPPLIER">أستاذ الموردين</option>
@@ -50,7 +50,7 @@ export function SubledgerPanel({
           value={partyId}
           aria-label="الطرف"
           onChange={(event) => onPartyChange(event.target.value)}
-          className="flex-1 px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold"
+          className="flex-1 px-3 py-2.5 bg-surface border border-line rounded-xl text-xs font-bold"
         >
           <option value="">— اختر الطرف —</option>
           {parties.map((party) => (
@@ -64,35 +64,35 @@ export function SubledgerPanel({
       {statement && (
         <>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            <div className="bg-white border border-slate-200 rounded-xl p-4">
-              <p className="text-xs text-slate-500 font-bold">الرصيد الافتتاحي</p>
+            <div className="bg-surface border border-line rounded-xl p-4">
+              <p className="text-xs text-muted font-bold">الرصيد الافتتاحي</p>
               <p className="text-lg font-black font-mono">{formatCurrency(statement.opening)}</p>
             </div>
-            <div className="bg-white border border-slate-200 rounded-xl p-4">
-              <p className="text-xs text-slate-500 font-bold">الرصيد الختامي (الأستاذ المساعد)</p>
+            <div className="bg-surface border border-line rounded-xl p-4">
+              <p className="text-xs text-muted font-bold">الرصيد الختامي (الأستاذ المساعد)</p>
               <p className="text-lg font-black font-mono">{formatCurrency(statement.closing)}</p>
             </div>
-            <div className="bg-white border border-slate-200 rounded-xl p-4">
-              <p className="text-xs text-slate-500 font-bold">رصيد بطاقة الطرف</p>
+            <div className="bg-surface border border-line rounded-xl p-4">
+              <p className="text-xs text-muted font-bold">رصيد بطاقة الطرف</p>
               <p className="text-lg font-black font-mono">{formatCurrency(statement.masterBalance)}</p>
-              <p className={`text-[11px] font-bold ${statement.masterStatus === 'MATCH' ? 'text-emerald-600' : statement.masterStatus === 'DIFFERENCE' ? 'text-rose-600' : 'text-slate-400'}`}>
+              <p className={`text-[11px] font-bold ${statement.masterStatus === 'MATCH' ? 'text-success' : statement.masterStatus === 'DIFFERENCE' ? 'text-danger' : 'text-muted'}`}>
                 {statement.masterStatus === 'MATCH' ? 'متطابق' : statement.masterStatus === 'DIFFERENCE' ? `فرق ${formatCurrency(statement.masterDifference)}` : 'غير قابل للمقارنة تاريخيًا'}
               </p>
             </div>
-            <div className="bg-white border border-slate-200 rounded-xl p-4">
-              <p className="text-xs text-slate-500 font-bold">رصيد حساب المراقبة {statement.controlAccountCode}</p>
+            <div className="bg-surface border border-line rounded-xl p-4">
+              <p className="text-xs text-muted font-bold">رصيد حساب المراقبة {statement.controlAccountCode}</p>
               <p className="text-lg font-black font-mono">{formatCurrency(statement.controlBalance)}</p>
-              <p className="text-[11px] font-bold text-slate-400">الإجمالي على مستوى الشركة</p>
+              <p className="text-[11px] font-bold text-muted">الإجمالي على مستوى الشركة</p>
             </div>
           </div>
 
           {statement.coverageStartDate && (
-            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-semibold text-amber-800">
+            <div className="rounded-xl border border-warning-border bg-warning-soft px-4 py-3 text-xs font-semibold text-warning">
               يبدأ سجل حركات الأستاذ المساعد من {statement.coverageStartDate}؛ الأرصدة السابقة ممثلة في الرصيد الافتتاحي المسجل.
             </div>
           )}
 
-          <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+          <div className="bg-surface border border-line rounded-xl overflow-hidden">
             <DataTable
               ariaLabel="كشف حساب الطرف"
               rows={[
@@ -100,17 +100,17 @@ export function SubledgerPanel({
                 ...statement.lines.map((line: any, index: number) => ({ ...line, __index: index })),
               ]}
               rowKey={(row: any) => row.__opening ? '__opening__' : `${row.entryNumber}-${row.__index}`}
-              rowClassName={(row: any) => (row as any).__opening ? 'bg-slate-50/60' : ''}
+              rowClassName={(row: any) => (row as any).__opening ? 'bg-surface-muted/60' : ''}
               tableClassName="text-sm"
               columns={[
-                { key: 'date', header: 'التاريخ', render: (row: any) => <span className="text-slate-500">{row.date}</span> },
+                { key: 'date', header: 'التاريخ', render: (row: any) => <span className="text-muted">{row.date}</span> },
                 {
                   key: 'entry', header: 'رقم القيد',
-                  render: (row: any) => row.__opening ? '—' : <span className="font-mono font-bold text-teal-700">{row.entryNumber}</span>,
+                  render: (row: any) => row.__opening ? '—' : <span className="font-mono font-bold text-success">{row.entryNumber}</span>,
                 },
                 {
                   key: 'ref', header: 'المصدر',
-                  render: (row: any) => row.__opening ? '—' : <span className="text-xs text-slate-500">{sourceLabels[row.referenceType] || row.referenceType}</span>,
+                  render: (row: any) => row.__opening ? '—' : <span className="text-xs text-muted">{sourceLabels[row.referenceType] || row.referenceType}</span>,
                 },
                 {
                   key: 'desc', header: 'البيان',
@@ -132,15 +132,15 @@ export function SubledgerPanel({
                 },
               ]}
               footer={
-                <tr className="bg-slate-50 border-t-2 border-slate-200 font-black">
-                  <td colSpan={6} className="px-4 py-3 text-xs text-slate-600">الرصيد الختامي</td>
+                <tr className="bg-surface-muted border-t-2 border-line font-black">
+                  <td colSpan={6} className="px-4 py-3 text-xs text-ink-secondary">الرصيد الختامي</td>
                   <td className="px-4 py-3 font-mono">{formatCurrency(statement.closing)}</td>
                 </tr>
               }
               emptyTitle="لا توجد حركات على هذا الطرف في الفترة"
             />
             {statement.lines.length === 0 && (
-              <p className="py-6 text-center text-sm text-slate-400">لا توجد حركات على هذا الطرف في الفترة</p>
+              <p className="py-6 text-center text-sm text-muted">لا توجد حركات على هذا الطرف في الفترة</p>
             )}
           </div>
         </>

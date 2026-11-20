@@ -6,6 +6,8 @@ import {
 } from 'lucide-react';
 import { useRouteAccess } from '../../../hooks/domains/auth/useRouteAccess';
 import { useActivityPageCopy } from '../../../hooks/domains/config/useBusinessTerm';
+import { resolveHubTabs } from '../../../config/activityHubTabs';
+import { ActivityHubSummary } from '../../../components/dashboard/activity/ActivityHubSummary';
 import { WorkspaceHub } from '../../common/workspace-hub/WorkspaceHub';
 import type { WorkspaceHubTab } from '../../common/workspace-hub/WorkspaceHub';
 
@@ -61,20 +63,19 @@ export const InventoryHubPage: React.FC = () => {
   const { pathname } = useLocation();
   const canAccess = useRouteAccess();
   const pageCopy = useActivityPageCopy('inventory');
-  // Tabs follow the exact same route rules as the MainLayout guard — no
-  // per-tab permission map that can drift from ROUTE_PERMISSIONS.
-  const tabs = TABS.filter((tab) => canAccess(tab.path));
+  // التبويبات تُرشَّح حسب ظهور المسار في النشاط ثم حسب الصلاحيات.
+  const tabs = resolveHubTabs('inventory', TABS).filter((tab) => canAccess(tab.path));
   const matchedTab = TABS.find((tab) => tab.path === pathname);
   const matchedAllowed = matchedTab ? tabs.some((tab) => tab.id === matchedTab.id) : false;
   const activeTab = matchedTab ? (matchedAllowed ? matchedTab.id : null) : tabs[0]?.id ?? null;
   const ActivePage = activeTab ? PAGE_BY_TAB[activeTab as keyof typeof PAGE_BY_TAB] : null;
 
   if (matchedTab && !matchedAllowed) {
-    return <div className="flex h-full items-center justify-center p-6 text-sm font-bold text-slate-500">لا تملك صلاحية الوصول إلى هذا القسم من مركز المخزون.</div>;
+    return <div className="flex h-full items-center justify-center p-6 text-sm font-bold text-muted">لا تملك صلاحية الوصول إلى هذا القسم من مركز المخزون.</div>;
   }
 
   if (!activeTab || !ActivePage) {
-    return <div className="flex h-full items-center justify-center p-6 text-sm font-bold text-slate-500">لا تملك صلاحية الوصول إلى مركز المخزون.</div>;
+    return <div className="flex h-full items-center justify-center p-6 text-sm font-bold text-muted">لا تملك صلاحية الوصول إلى مركز المخزون.</div>;
   }
 
   return (
@@ -87,6 +88,7 @@ export const InventoryHubPage: React.FC = () => {
       showHeading={false}
       showTabs={false}
     >
+      {activeTab === 'overview' && <ActivityHubSummary />}
       <ActivePage />
     </WorkspaceHub>
   );

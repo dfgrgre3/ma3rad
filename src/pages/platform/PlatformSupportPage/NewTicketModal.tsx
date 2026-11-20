@@ -46,7 +46,7 @@ export const NewTicketModal: React.FC<NewTicketModalProps> = ({
   >
     <div className="space-y-3.5 text-right">
       <div>
-        <label className="block text-xs font-semibold text-slate-300 mb-1">العميل / المتجر *</label>
+        <label className="block text-xs font-semibold text-muted mb-1">العميل / المتجر *</label>
         <select
           value={tenantId}
           onChange={(e) => setTenantId(e.target.value)}
@@ -62,7 +62,7 @@ export const NewTicketModal: React.FC<NewTicketModalProps> = ({
       </div>
 
       <div>
-        <label className="block text-xs font-semibold text-slate-300 mb-1">عنوان التذكرة *</label>
+        <label className="block text-xs font-semibold text-muted mb-1">عنوان التذكرة *</label>
         <input
           type="text"
           value={subject}
@@ -74,7 +74,7 @@ export const NewTicketModal: React.FC<NewTicketModalProps> = ({
 
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="block text-xs font-semibold text-slate-300 mb-1">الأولوية</label>
+          <label className="block text-xs font-semibold text-muted mb-1">الأولوية</label>
           <select
             value={priority}
             onChange={(e) => setPriority(e.target.value as any)}
@@ -87,7 +87,7 @@ export const NewTicketModal: React.FC<NewTicketModalProps> = ({
           </select>
         </div>
         <div>
-          <label className="block text-xs font-semibold text-slate-300 mb-1">الموظف المسؤول</label>
+          <label className="block text-xs font-semibold text-muted mb-1">الموظف المسؤول</label>
           <input
             type="text"
             value={assignedTo}
@@ -99,7 +99,7 @@ export const NewTicketModal: React.FC<NewTicketModalProps> = ({
       </div>
 
       <div>
-        <label className="block text-xs font-semibold text-slate-300 mb-1">وصف المشكلة</label>
+        <label className="block text-xs font-semibold text-muted mb-1">وصف المشكلة</label>
         <textarea
           rows={3}
           value={description}
@@ -109,7 +109,7 @@ export const NewTicketModal: React.FC<NewTicketModalProps> = ({
         />
       </div>
 
-      <div className="flex justify-end gap-2 pt-3 border-t border-slate-800">
+      <div className="flex justify-end gap-2 pt-3 border-t border-line-strong">
         <Button variant="secondary" size="sm" onClick={onClose}>
           إلغاء
         </Button>

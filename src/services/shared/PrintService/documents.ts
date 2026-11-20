@@ -5,7 +5,7 @@ import { writeAndPrintWindow } from '../../../utils/shared/printWindow';
 import { SettingsService } from '../../domains/config/SettingsService';
 import { getBusinessProfile } from '../../../config/businessProfiles';
 import { getEffectiveBusinessType } from '../../domains/config/BusinessTypeService';
-import { esc, printOverride } from './invoiceHtmlHelpers';
+import { esc, operationalFieldsHtml, printOverride } from './invoiceHtmlHelpers';
 
 /**
  * Documents adapt to the active business activity: services-based activities
@@ -128,6 +128,7 @@ export function printQuotationDocument(quotation: any): void {
         <div><b>الحالة:</b> ${esc(statusLabel)}</div>
         <div><b>عدد البنود:</b> ${itemCount}</div>
       </div>
+      ${operationalFieldsHtml('quotations', quotation.id, false)}
       <table>
         <thead><tr>${head}</tr></thead>
         <tbody>${items || `<tr><td colspan="${colspan}">لا توجد بنود</td></tr>`}</tbody>
@@ -175,6 +176,7 @@ export function printOrderDocument(order: any): void {
         <div><b>المخزن:</b> ${esc(order.warehouseName || '-')}</div>
         <div><b>الحالة:</b> ${esc(order.status)}</div>
       </div>
+      ${operationalFieldsHtml('orders', order.id, false)}
       <table>
         <thead><tr>${head}</tr></thead>
         <tbody>${items || `<tr><td colspan="${colspan}">لا توجد بنود</td></tr>`}</tbody>
@@ -224,6 +226,7 @@ export function printSalesReturnDocument(salesReturn: any): void {
         <div><b>سبب الإرجاع:</b> ${esc(salesReturn.reason || '-')}</div>
         <div><b>عدد البنود:</b> ${(salesReturn.items || []).length}</div>
       </div>
+      ${operationalFieldsHtml('sales_returns', salesReturn.id, false)}
       <table>
         <thead><tr>${head}</tr></thead>
         <tbody>${items || `<tr><td colspan="${colspan}">لا توجد بنود</td></tr>`}</tbody>
@@ -275,6 +278,7 @@ export function printPurchaseReturnDocument(purchaseReturn: any): void {
         <div><b>سبب الإرجاع:</b> ${esc(purchaseReturn.reason || '-')}</div>
         <div><b>طريقة التسوية:</b> ${isCash ? 'استرداد نقدي من الخزينة' : 'خصم من حساب المورد'}</div>
       </div>
+      ${operationalFieldsHtml('purchase_returns', purchaseReturn.id, false)}
       <table>
         <thead><tr>${head}</tr></thead>
         <tbody>${items || `<tr><td colspan="${colspan}">لا توجد بنود</td></tr>`}</tbody>
@@ -285,6 +289,120 @@ export function printPurchaseReturnDocument(purchaseReturn: any): void {
         <div class="row grand"><span>خصم من حساب المورد</span><span>${CeramicMath.formatCurrency(purchaseReturn.remainingToBalance || 0)}</span></div>
       </div>
       <div class="sign"><div>توقيع المورد</div><div>إدارة المشتريات</div></div>
+      <div class="footer">${esc(settings.receiptFooter)}</div>
+    `);
+}
+
+/**
+ * مقاييسة مساحة سيراميك: مجموعة بنود لنفس رقم المقاييسة مع المساحة والهالك
+ * والكراتين والقطع وسعر المتر — المستند الذي يأخذه العميل لطلب المساحة.
+ */
+export function printAreaTakeoffDocument(lines: any[]): void {
+  const settings = SettingsService.getSettings();
+  const first = lines[0] || {};
+  const quoteNumber = first.quoteNumber || '';
+  const date = first.createdAt ? String(first.createdAt).slice(0, 10) : new Date().toISOString().slice(0, 10);
+  const items = lines.map((line: any, i: number) => `
+      <tr>
+        <td>${i + 1}</td>
+        <td class="name">${esc(line.productName)}${line.metersPerBox ? ` <span class="muted">(${line.metersPerBox} م²/كرتونة)</span>` : ''}</td>
+        <td>${Number(line.areaM2 || 0)}</td>
+        <td>${Number(line.wastePercent || 0)}%</td>
+        <td>${Number(line.requiredM2 || 0)}</td>
+        <td>${Number(line.boxesNeeded || 0)}</td>
+        <td>${line.piecesPerBox ? Number(line.boxesNeeded || 0) * Number(line.piecesPerBox) : '—'}</td>
+        <td>${CeramicMath.formatCurrency(line.unitPriceM2 || 0)}</td>
+        <td>${CeramicMath.formatCurrency(line.totalAmount || 0)}</td>
+      </tr>`).join('');
+  const total = lines.reduce((s: number, l: any) => s + Number(l.totalAmount || 0), 0);
+  const totalArea = lines.reduce((s: number, l: any) => s + Number(l.requiredM2 || 0), 0);
+  const quotationLabel = first.quotationNumber ? `عرض السعر: ${esc(first.quotationNumber)}` : '';
+
+  openDocument(`مقاييسة مساحة ${quoteNumber}`, `
+      ${header(settings, 'مقاييسة مساحة سيراميك وبورسلين', quoteNumber, date, quotationLabel)}
+      <div class="meta">
+        <div><b>العميل:</b> ${esc(first.customerName || 'عميل نقدي')}</div>
+        <div><b>إجمالي المساحة المطلوبة:</b> ${totalArea} م²</div>
+        <div><b>عدد البنود:</b> ${lines.length}</div>
+      </div>
+      <table>
+        <thead><tr><th>#</th><th>الصنف والتصميم</th><th>المساحة (م²)</th><th>الهالك</th><th>المطلوب (م²)</th><th>الكراتين</th><th>القطع</th><th>سعر المتر</th><th>الإجمالي</th></tr></thead>
+        <tbody>${items || '<tr><td colspan="9">لا توجد بنود</td></tr>'}</tbody>
+      </table>
+      <div class="totals">
+        <div class="row grand"><span>إجمالي المقاييسة</span><span>${CeramicMath.formatCurrency(total)}</span></div>
+      </div>
+      ${first.notes ? `<div class="notes"><b>ملاحظات:</b>\n${esc(first.notes)}</div>` : ''}
+      <div class="notes"><b>شروط التسليم:</b>\n- الكميات تقديرية وقد تزيد أو تقل حسب التقطيع النهائي.\n- النغمات والألوان تُطابق من نفس الدفعة عند الإمكان.\n- يُراجع الفرق المسؤول قبل الاعتماد النهائي.</div>
+      <div class="sign"><div>توقيع العميل بالموافقة</div><div>مسؤول المعرض</div></div>
+      <div class="footer">${esc(settings.receiptFooter)}</div>
+    `);
+}
+
+/**
+ * Purchase invoice (فاتورة مشتريات): goods totals plus the landed-cost
+ * breakdown and per-line effective unit cost, with activity operational
+ * fields (INCOTERM, country of origin, shipping documents...) printed for
+ * import/export activities.
+ */
+export function printPurchaseInvoiceDocument(purchase: any): void {
+  const settings = SettingsService.getSettings();
+  const mode = docColumnMode();
+  const items = (purchase.items || []).map((item: any, i: number) => mode === 'services' ? `
+      <tr>
+        <td>${i + 1}</td>
+        <td class="name">${esc(item.productName || item.product_name)}</td>
+        <td>${formatProductQuantity(Number(item.quantityM2 || item.quantity || 0), item)}</td>
+        <td>${CeramicMath.formatCurrency(item.unitCost || 0)}</td>
+        <td>${CeramicMath.formatCurrency(item.totalCost || 0)}</td>
+      </tr>` : `
+      <tr>
+        <td>${i + 1}</td>
+        <td class="name">${esc(item.productName || item.product_name)}${item.size ? ` (${esc(item.size)})` : ''}</td>
+        <td>${esc(item.grade || '—')}</td>
+        <td>${formatProductQuantity(Number(item.quantityM2 || item.quantity || 0), item)}</td>
+        <td>${item.productType === 'GENERAL' ? '—' : Number(item.boxesCount || 0)}</td>
+        <td>${CeramicMath.formatCurrency(item.unitCost || 0)}</td>
+        <td>${item.landedCostShare ? `<div>${CeramicMath.formatCurrency(item.effectiveUnitCost || item.unitCost)}</div><div class="muted">شامل الوصول</div>` : CeramicMath.formatCurrency(item.unitCost || 0)}</td>
+        <td>${CeramicMath.formatCurrency(item.totalCost || 0)}</td>
+      </tr>`).join('');
+  const head = mode === 'services'
+    ? '<th>#</th><th>الصنف والبيان</th><th>الكمية</th><th>سعر الشراء</th><th>الإجمالي</th>'
+    : '<th>#</th><th>الصنف والبيان</th><th>الفرز</th><th>الكمية</th><th>الكراتين</th><th>سعر الشراء</th><th>تكلفة الوصول للوحدة</th><th>الإجمالي</th>';
+  const colspan = mode === 'services' ? 5 : 8;
+
+  const landed = [
+    ['شحن / نقل', purchase.landed_freight ?? purchase.landedFreight],
+    ['تحميل وتفريغ', purchase.landed_loading ?? purchase.landedLoading],
+    ['جمارك وضرائب', purchase.landed_customs_taxes ?? purchase.landedCustomsTaxes],
+    ['تأمين', purchase.landed_insurance ?? purchase.landedInsurance],
+    ['مصاريف أخرى', purchase.landed_other ?? purchase.landedOther],
+  ].filter(([, v]) => Number(v) > 0);
+  const landedTotal = landed.reduce((s: number, [, v]) => s + Number(v || 0), 0);
+  const remaining = Number(purchase.remaining_amount ?? (Number(purchase.total_amount || 0) - Number(purchase.paid_amount || 0)));
+
+  openDocument(`فاتورة مشتريات ${purchase.invoice_number || ''}`, `
+      ${header(settings, 'فاتورة مشتريات / توريد', purchase.invoice_number || '', purchase.date || '', purchase.supplier_invoice_number ? `فاتورة المورد: ${esc(purchase.supplier_invoice_number)}` : '')}
+      <div class="meta">
+        <div><b>المورد:</b> ${esc(purchase.supplierName || purchase.supplier_name || '-')}</div>
+        <div><b>المخزن:</b> ${esc(purchase.warehouseName || purchase.warehouse_name || '-')}</div>
+        <div><b>حالة السداد:</b> ${remaining <= 0.01 ? 'مسددة بالكامل' : `متبقي ${CeramicMath.formatCurrency(remaining)}`}</div>
+        <div><b>عدد البنود:</b> ${(purchase.items || []).length}</div>
+      </div>
+      ${operationalFieldsHtml('purchase_invoices', purchase.id, false)}
+      <table>
+        <thead><tr>${head}</tr></thead>
+        <tbody>${items || `<tr><td colspan="${colspan}">لا توجد بنود</td></tr>`}</tbody>
+      </table>
+      <div class="totals">
+        <div class="row"><span>إجمالي البضاعة</span><span>${CeramicMath.formatCurrency(purchase.subtotal || 0)}</span></div>
+        ${Number(purchase.discount_amount || purchase.discountAmount || 0) > 0 ? `<div class="row"><span>الخصم</span><span>-${CeramicMath.formatCurrency(purchase.discount_amount || purchase.discountAmount)}</span></div>` : ''}
+        ${landedTotal > 0 ? landed.map(([label, v]) => `<div class="row"><span>${esc(label)}</span><span>${CeramicMath.formatCurrency(v)}</span></div>`).join('') : ''}
+        <div class="row grand"><span>الإجمالي النهائي</span><span>${CeramicMath.formatCurrency(purchase.total_amount || 0)}</span></div>
+        <div class="row"><span>المدفوع</span><span>${CeramicMath.formatCurrency(purchase.paid_amount || 0)}</span></div>
+      </div>
+      ${purchase.notes ? `<div class="notes"><b>ملاحظات:</b>\n${esc(purchase.notes)}</div>` : ''}
+      <div class="sign"><div>توقيع المورد / المستلم</div><div>إدارة المشتريات</div></div>
       <div class="footer">${esc(settings.receiptFooter)}</div>
     `);
 }

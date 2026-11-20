@@ -46,9 +46,9 @@ export const ActivityStep: React.FC<ActivityStepProps> = ({
   optionControl,
 }) => (
   <div className="space-y-4">
-    <div className="flex items-start gap-3 rounded-xl border border-sky-100 bg-sky-50 p-3">
-      <Boxes className="mt-0.5 h-5 w-5 shrink-0 text-sky-700" />
-      <div><h2 className="text-sm font-bold text-slate-900 dark:text-slate-100">خصص النظام حسب طبيعة عملك</h2><p className="mt-1 text-xs text-slate-600 dark:text-slate-300">تُحفظ هذه الخيارات محليًا ويمكن تعديلها لاحقًا من إعدادات النشاط.</p></div>
+    <div className="flex items-start gap-3 rounded-xl border border-accent-border bg-accent-soft p-3">
+      <Boxes className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
+      <div><h2 className="text-sm font-bold text-ink ">خصص النظام حسب طبيعة عملك</h2><p className="mt-1 text-xs text-ink-secondary ">تُحفظ هذه الخيارات محليًا ويمكن تعديلها لاحقًا من إعدادات النشاط.</p></div>
     </div>
     {optionControl('modules', 'تهيئة النشاط والوحدات الآن', 'يمكنك تخطيها والاحتفاظ بالنشاط والوحدات الحالية، ثم تغييرها لاحقًا من إعدادات النشاط.')}
     <fieldset disabled={!options.modules} className="m-0 min-w-0 space-y-4 border-0 p-0 disabled:opacity-60">
@@ -73,11 +73,11 @@ export const ActivityStep: React.FC<ActivityStepProps> = ({
         ))}
       </select>
     </div>
-    <p className="text-[11px] text-slate-500 dark:text-slate-400" aria-live="polite">
+    <p className="text-[11px] text-muted " aria-live="polite">
       {visibleBusinessTypes.length} نشاط متاح. اختر نشاطًا رئيسيًا، ويمكن إضافة أنشطة فرعية.
     </p>
     {visibleBusinessTypes.length === 0 ? (
-      <p className="rounded-lg border border-slate-200 p-4 text-center text-xs text-slate-500">لا توجد أنشطة تطابق البحث.</p>
+      <p className="rounded-lg border border-line p-4 text-center text-xs text-muted">لا توجد أنشطة تطابق البحث.</p>
     ) : (
       <div className="grid max-h-72 grid-cols-1 gap-2 overflow-y-auto sm:grid-cols-2">
         {visibleBusinessTypes.map((type) => {
@@ -86,7 +86,7 @@ export const ActivityStep: React.FC<ActivityStepProps> = ({
           return (
             <article
               key={type.id}
-              className={`rounded-xl border p-3 transition ${isPrimary ? 'border-sky-500 bg-sky-50 ring-1 ring-sky-500 dark:bg-sky-900/30' : 'border-slate-200 dark:border-slate-700 dark:bg-slate-800/30'}`}
+              className={`rounded-xl border p-3 transition ${isPrimary ? 'border-primary bg-accent-soft ring-1 ring-primary dark:bg-primary/30' : 'border-line dark:border-line-strong dark:bg-primary/30'}`}
             >
               <button
                 type="button"
@@ -94,17 +94,17 @@ export const ActivityStep: React.FC<ActivityStepProps> = ({
                 aria-pressed={isPrimary}
                 className="w-full text-right"
               >
-                <span className="mb-1 block text-[9px] font-semibold text-sky-700 dark:text-sky-300">{type.familyLabel}</span>
-                <span className="block text-xs font-bold text-slate-900 dark:text-slate-100">{type.label}</span>
-                <span className="mt-1 block text-[10px] text-slate-500 dark:text-slate-400">{type.description}</span>
+                <span className="mb-1 block text-[9px] font-semibold text-primary ">{type.familyLabel}</span>
+                <span className="block text-xs font-bold text-ink ">{type.label}</span>
+                <span className="mt-1 block text-[10px] text-muted ">{type.description}</span>
               </button>
-              <label className="mt-2 flex items-center gap-2 border-t border-slate-200 pt-2 text-[10px] font-semibold text-slate-600 dark:border-slate-700 dark:text-slate-300">
+              <label className="mt-2 flex items-center gap-2 border-t border-line pt-2 text-[10px] font-semibold text-ink-secondary ">
                 <input
                   type="checkbox"
                   checked={isAdditional}
                   disabled={isPrimary}
                   onChange={(event) => toggleAdditionalActivity(type.id, event.target.checked)}
-                  className="h-3.5 w-3.5 accent-sky-600"
+                  className="h-3.5 w-3.5 accent-primary"
                 />
                 نشاط فرعي
               </label>
@@ -114,7 +114,7 @@ export const ActivityStep: React.FC<ActivityStepProps> = ({
       </div>
     )}
     {businessConfig.additionalActivityIds.length > 0 && (
-      <p className="text-[11px] text-slate-600 dark:text-slate-300">
+      <p className="text-[11px] text-ink-secondary ">
         الأنشطة الفرعية: {businessConfig.additionalActivityIds
           .map((id) => BUSINESS_TYPES.find((type) => type.id === id)?.label || id)
           .join('، ')}
@@ -144,11 +144,11 @@ export const ActivityStep: React.FC<ActivityStepProps> = ({
       </div>
     </div>
     <div>
-      <h3 className="mb-2 text-xs font-bold text-slate-700 dark:text-slate-200">وحدات المنتجات والخدمات</h3>
+      <h3 className="mb-2 text-xs font-bold text-ink ">وحدات المنتجات والخدمات</h3>
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
         {BUSINESS_UNITS.map((unit) => (
-          <div key={unit.id} className="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 dark:border-slate-700 dark:bg-slate-800/30 dark:text-slate-200">
-            <input id={`setup-unit-${unit.id}`} type="checkbox" checked={businessConfig.units.includes(unit.id)} onChange={() => updateBusinessConfig({ units: businessConfig.units.includes(unit.id) ? businessConfig.units.filter((id) => id !== unit.id) : [...businessConfig.units, unit.id] })} className="accent-sky-600" />
+          <div key={unit.id} className="flex cursor-pointer items-center gap-2 rounded-lg border border-line px-3 py-2 text-xs font-semibold text-ink dark:bg-primary/30 ">
+            <input id={`setup-unit-${unit.id}`} type="checkbox" checked={businessConfig.units.includes(unit.id)} onChange={() => updateBusinessConfig({ units: businessConfig.units.includes(unit.id) ? businessConfig.units.filter((id) => id !== unit.id) : [...businessConfig.units, unit.id] })} className="accent-primary" />
             <label htmlFor={`setup-unit-${unit.id}`} className="cursor-pointer">{unit.label}</label>
           </div>
         ))}
@@ -172,13 +172,13 @@ export const ActivityStep: React.FC<ActivityStepProps> = ({
         placeholder="مثال: المقاس، اللون، الموديل"
       />
     </div>
-    <div><h3 className="mb-2 text-xs font-bold text-slate-700 dark:text-slate-200">الوحدات التي تحتاجها</h3><div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+    <div><h3 className="mb-2 text-xs font-bold text-ink ">الوحدات التي تحتاجها</h3><div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
       {BUSINESS_MODULES.map((module) => {
         const definition = getModuleDefinition(module.id);
         const unavailable = Boolean(definition?.activation.requiresInventoryTracking && !businessConfig.trackInventory);
         return (
-          <div key={module.id} title={definition?.description} className={`flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 dark:border-slate-700 dark:bg-slate-800/30 dark:text-slate-200 ${unavailable ? 'opacity-50' : ''}`}>
-            <input id={`setup-module-${module.id}`} type="checkbox" checked={form.enabledModules.includes(module.id)} onChange={() => toggleModule(module.id)} disabled={unavailable} className="accent-sky-600" />
+          <div key={module.id} title={definition?.description} className={`flex cursor-pointer items-center gap-2 rounded-lg border border-line px-3 py-2 text-xs font-semibold text-ink dark:bg-primary/30 ${unavailable ? 'opacity-50' : ''}`}>
+            <input id={`setup-module-${module.id}`} type="checkbox" checked={form.enabledModules.includes(module.id)} onChange={() => toggleModule(module.id)} disabled={unavailable} className="accent-primary" />
             <label htmlFor={`setup-module-${module.id}`} className="cursor-pointer">{module.label}</label>
           </div>
         );

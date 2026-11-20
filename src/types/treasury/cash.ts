@@ -111,7 +111,7 @@ export interface AuditLog {
   createdAt: string;
 }
 
-export type InvoiceSectionId = 'promotions' | 'delivery' | 'paymentSplits' | 'notes';
+export type InvoiceSectionId = 'promotions' | 'delivery' | 'operationalFields' | 'paymentSplits' | 'notes';
 export type InvoiceTableColumnId =
   | 'number'
   | 'product'
@@ -229,6 +229,7 @@ export interface SystemSettings {
   invoiceShowShipping?: boolean;
   invoiceShowPaymentSplits?: boolean;
   invoiceShowNotes?: boolean;
+  invoiceShowOperationalFields?: boolean;
   invoiceShowBrandLogo?: boolean;
   invoiceFontFamily?: 'Cairo' | 'Tajawal' | 'Tahoma' | 'Arial';
   invoiceSectionOrder?: InvoiceSectionId[];

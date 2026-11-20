@@ -323,7 +323,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
                       setFieldErrors({});
                     }}
                     aria-pressed={loginMethod === 'password'}
-                    className={`rounded-[2px] px-1.5 py-1.5 text-[11px] font-semibold ${loginMethod === 'password' ? 'bg-white text-[#0078d4] shadow-sm dark:bg-[#3a3a3a]' : 'text-[var(--win-text-muted)]'}`}
+                    className={`rounded-[2px] px-1.5 py-1.5 text-[11px] font-semibold ${loginMethod === 'password' ? 'bg-surface text-[#0078d4] shadow-sm dark:bg-[#3a3a3a]' : 'text-[var(--win-text-muted)]'}`}
                   >
                     اسم المستخدم وكلمة المرور
                   </button>
@@ -336,7 +336,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
                       setFieldErrors({});
                     }}
                     aria-pressed={loginMethod === 'pin'}
-                    className={`rounded-[2px] px-1.5 py-1.5 text-[11px] font-semibold ${loginMethod === 'pin' ? 'bg-white text-[#0078d4] shadow-sm dark:bg-[#3a3a3a]' : 'text-[var(--win-text-muted)]'}`}
+                    className={`rounded-[2px] px-1.5 py-1.5 text-[11px] font-semibold ${loginMethod === 'pin' ? 'bg-surface text-[#0078d4] shadow-sm dark:bg-[#3a3a3a]' : 'text-[var(--win-text-muted)]'}`}
                   >
                     رمز الدخول
                   </button>
@@ -349,7 +349,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
                       setFieldErrors({});
                     }}
                     aria-pressed={loginMethod === 'security-key'}
-                    className={`rounded-[2px] px-1.5 py-1.5 text-[11px] font-semibold ${loginMethod === 'security-key' ? 'bg-white text-[#0078d4] shadow-sm dark:bg-[#3a3a3a]' : 'text-[var(--win-text-muted)]'}`}
+                    className={`rounded-[2px] px-1.5 py-1.5 text-[11px] font-semibold ${loginMethod === 'security-key' ? 'bg-surface text-[#0078d4] shadow-sm dark:bg-[#3a3a3a]' : 'text-[var(--win-text-muted)]'}`}
                   >
                     مفتاح الأمان
                   </button>

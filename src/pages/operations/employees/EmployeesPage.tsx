@@ -520,7 +520,7 @@ export const EmployeesPage: React.FC = () => {
     : 0;
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
+    <div className="h-full flex flex-col bg-surface-muted text-ink overflow-hidden">
 
       <EmployeesHeader
         loading={loading}

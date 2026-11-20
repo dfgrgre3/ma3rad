@@ -12,10 +12,10 @@ const fmt = (n: number) => new Intl.NumberFormat('ar-EG', { maximumFractionDigit
 const currentMonth = () => new Date().toISOString().slice(0, 7);
 
 const statusStyles: Record<string, string> = {
-  PENDING: 'bg-amber-50 text-amber-700 border-amber-200',
-  APPROVED: 'bg-sky-50 text-sky-700 border-sky-200',
-  PAID: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-  CANCELLED: 'bg-slate-100 text-slate-500 border-slate-200',
+  PENDING: 'bg-warning-soft text-warning border-warning-border',
+  APPROVED: 'bg-accent-soft text-primary border-accent-border',
+  PAID: 'bg-success-soft text-success border-success-border',
+  CANCELLED: 'bg-surface-sunken text-muted border-line',
 };
 const statusLabels: Record<string, string> = {
   PENDING: 'قيد الاعتماد', APPROVED: 'معتمدة', PAID: 'مدفوعة', CANCELLED: 'ملغاة',
@@ -91,49 +91,49 @@ export const CommissionsPage: React.FC = () => {
   };
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
-      <div className="bg-white px-6 pt-4">
+    <div className="h-full flex flex-col bg-surface-muted text-ink overflow-hidden">
+      <div className="bg-surface px-6 pt-4">
         <PageHeader
           icon={<BadgeDollarSign className="h-5 w-5" />}
           title="عمولات المبيعات"
           description="احتساب واعتماد وصرف عمولات مندوبي المبيعات"
           actions={<>
-            <input type="month" value={month} onChange={(e) => setMonth(e.target.value)} className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold" />
-            <select value={status} onChange={(e) => setStatus(e.target.value)} className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold">
+            <input type="month" value={month} onChange={(e) => setMonth(e.target.value)} className="px-3 py-2 bg-surface-muted border border-line rounded-xl text-xs font-bold" />
+            <select value={status} onChange={(e) => setStatus(e.target.value)} className="px-3 py-2 bg-surface-muted border border-line rounded-xl text-xs font-bold">
               <option value="ALL">كل الحالات</option>
               <option value="PENDING">قيد الاعتماد</option>
               <option value="APPROVED">معتمدة</option>
               <option value="PAID">مدفوعة</option>
               <option value="CANCELLED">ملغاة</option>
             </select>
-            {canManagePayroll && <button onClick={generate} disabled={generating} className="flex items-center gap-2 px-3 py-2 rounded-xl bg-indigo-600 text-white text-xs font-bold disabled:opacity-50">
+            {canManagePayroll && <button onClick={generate} disabled={generating} className="flex items-center gap-2 px-3 py-2 rounded-xl bg-primary text-white text-xs font-bold disabled:opacity-50">
               {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Calculator className="w-4 h-4" />} احتساب الشهر
             </button>}
-            <button onClick={() => load()} className="p-2 rounded-xl border border-slate-200 bg-slate-50 text-slate-600"><RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /></button>
-            <button onClick={exportRows} className="flex items-center gap-2 px-3 py-2 rounded-xl bg-teal-600 text-white text-xs font-bold"><FileSpreadsheet className="w-4 h-4" /> جدول بيانات</button>
+            <button onClick={() => load()} className="p-2 rounded-xl border border-line bg-surface-muted text-ink-secondary"><RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /></button>
+            <button onClick={exportRows} className="flex items-center gap-2 px-3 py-2 rounded-xl bg-success text-white text-xs font-bold"><FileSpreadsheet className="w-4 h-4" /> جدول بيانات</button>
           </>}
         />
       </div>
 
       <div className="flex-1 overflow-auto p-6 space-y-4">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <div className="bg-white border border-slate-200 rounded-xl p-4">
-            <p className="text-[11px] text-slate-500 font-bold">قيد الاعتماد</p>
+          <div className="bg-surface border border-line rounded-xl p-4">
+            <p className="text-[11px] text-muted font-bold">قيد الاعتماد</p>
             <p className="text-xl font-black mt-1">{fmt(stats?.totalPending || 0)}</p>
-            <p className="text-[10px] text-slate-400">{stats?.pending || 0} + {stats?.approved || 0} معتمدة</p>
+            <p className="text-[10px] text-muted">{stats?.pending || 0} + {stats?.approved || 0} معتمدة</p>
           </div>
-          <div className="bg-white border border-slate-200 rounded-xl p-4">
-            <p className="text-[11px] text-slate-500 font-bold">المدفوع</p>
-            <p className="text-xl font-black mt-1 text-emerald-700">{fmt(stats?.totalPaid || 0)}</p>
-            <p className="text-[10px] text-slate-400">{stats?.paid || 0} عمولة</p>
+          <div className="bg-surface border border-line rounded-xl p-4">
+            <p className="text-[11px] text-muted font-bold">المدفوع</p>
+            <p className="text-xl font-black mt-1 text-success">{fmt(stats?.totalPaid || 0)}</p>
+            <p className="text-[10px] text-muted">{stats?.paid || 0} عمولة</p>
           </div>
-          <div className="bg-white border border-slate-200 rounded-xl p-4">
-            <p className="text-[11px] text-slate-500 font-bold">إجمالي السجلات</p>
+          <div className="bg-surface border border-line rounded-xl p-4">
+            <p className="text-[11px] text-muted font-bold">إجمالي السجلات</p>
             <p className="text-xl font-black mt-1">{rows.length}</p>
           </div>
         </div>
 
-        <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+        <div className="bg-surface border border-line rounded-xl overflow-hidden">
           <DataTable
               ariaLabel="عمولات الموظفين"
               rows={rows}
@@ -141,7 +141,7 @@ export const CommissionsPage: React.FC = () => {
               tableClassName="text-sm"
               columns={[
                 { key: 'emp', header: 'الموظف', render: (row: any) => <span className="font-bold">{row.employeeName}</span> },
-                { key: 'invoice', header: 'الفاتورة', render: (row: any) => <span className="font-mono text-[11px] text-slate-500">{row.invoiceNumber || row.sourceId || '—'}</span> },
+                { key: 'invoice', header: 'الفاتورة', render: (row: any) => <span className="font-mono text-[11px] text-muted">{row.invoiceNumber || row.sourceId || '—'}</span> },
                 { key: 'base', header: 'الأساس', render: (row: any) => <span className="font-mono">{fmt(row.baseAmount)}</span> },
                 { key: 'pct', header: 'النسبة', render: (row: any) => <span className="font-mono">{row.percentage}%</span> },
                 { key: 'comm', header: 'العمولة', render: (row: any) => <span className="font-mono font-black">{fmt(row.commissionAmount)}</span> },
@@ -153,9 +153,9 @@ export const CommissionsPage: React.FC = () => {
                   key: 'actions', header: 'إجراءات',
                   render: (row: any) => (
                     <span className="flex items-center gap-1">
-                      {canApprovePayroll && row.status === 'PENDING' && <button onClick={() => changeStatus(row, 'APPROVED')} className="rounded-lg p-1.5 text-sky-600 hover:bg-sky-50" title="اعتماد"><Check className="h-4 w-4" /></button>}
-                      {canApprovePayroll && row.status === 'APPROVED' && <button onClick={() => changeStatus(row, 'PAID')} className="rounded-lg p-1.5 text-emerald-600 hover:bg-emerald-50" title="صرف"><Banknote className="h-4 w-4" /></button>}
-                      {canManagePayroll && row.status !== 'PAID' && row.status !== 'CANCELLED' && <button onClick={() => changeStatus(row, 'CANCELLED')} className="rounded-lg p-1.5 text-rose-600 hover:bg-rose-50" title="إلغاء"><X className="h-4 w-4" /></button>}
+                      {canApprovePayroll && row.status === 'PENDING' && <button onClick={() => changeStatus(row, 'APPROVED')} className="rounded-lg p-1.5 text-primary hover:bg-accent-soft" title="اعتماد"><Check className="h-4 w-4" /></button>}
+                      {canApprovePayroll && row.status === 'APPROVED' && <button onClick={() => changeStatus(row, 'PAID')} className="rounded-lg p-1.5 text-success hover:bg-success-soft" title="صرف"><Banknote className="h-4 w-4" /></button>}
+                      {canManagePayroll && row.status !== 'PAID' && row.status !== 'CANCELLED' && <button onClick={() => changeStatus(row, 'CANCELLED')} className="rounded-lg p-1.5 text-danger hover:bg-danger-soft" title="إلغاء"><X className="h-4 w-4" /></button>}
                     </span>
                   ),
                 },

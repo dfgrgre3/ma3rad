@@ -37,44 +37,44 @@ export const DynamicDataPage: React.FC = () => {
 
   return <div className="w-full space-y-5 p-4 md:p-8">
     {/* Sub Navigation Bar */}
-    <div className="flex items-center gap-2 border-b border-slate-200 pb-3">
+    <div className="flex items-center gap-2 border-b border-line pb-3">
       <Link
         to="/data-import"
-        className="px-4 py-2 rounded-xl text-xs font-black text-slate-600 hover:bg-slate-100 transition"
+        className="px-4 py-2 rounded-xl text-xs font-black text-ink-secondary hover:bg-surface-sunken transition"
       >
         مركز استيراد الملفات (جداول البيانات وCSV)
       </Link>
       <Link
         to="/data-import/types"
-        className="px-4 py-2 rounded-xl text-xs font-black bg-sky-600 text-white shadow-sm"
+        className="px-4 py-2 rounded-xl text-xs font-black bg-primary text-white shadow-sm"
       >
         إدارة أنواع البيانات المرنة والسجلات
       </Link>
     </div>
 
-    <PageHeader title="إدارة أنواع البيانات المرنة" description="تعريفات الأنواع والحقول تبقى محفوظة لإعادة استخدامها بعد كل استيراد." actions={<Link to="/data-import" className="rounded-xl bg-sky-600 hover:bg-sky-700 px-4 py-2.5 text-sm font-black text-white transition">استيراد ملف جديد</Link>} />
-    {message&&<div className="rounded-xl bg-sky-50 p-3 text-sm font-bold text-sky-900">{message}</div>}
+    <PageHeader title="إدارة أنواع البيانات المرنة" description="تعريفات الأنواع والحقول تبقى محفوظة لإعادة استخدامها بعد كل استيراد." actions={<Link to="/data-import" className="rounded-xl bg-primary hover:bg-primary px-4 py-2.5 text-sm font-black text-white transition">استيراد ملف جديد</Link>} />
+    {message&&<div className="rounded-xl bg-accent-soft p-3 text-sm font-bold text-primary">{message}</div>}
     <div className="grid gap-5 lg:grid-cols-[260px_minmax(0,1fr)]">
-      <aside className="rounded-2xl border border-slate-200 bg-white p-4"><div className="mb-3 flex items-center justify-between"><h2 className="font-black">أنواع البيانات</h2><button onClick={refresh} className="text-xs font-bold text-sky-700">تحديث</button></div><div className="space-y-2">{entities.map(e=><button key={e.id} onClick={()=>setEntityId(e.id)} className={`w-full rounded-xl p-3 text-right ${entityId===e.id?'bg-sky-100 text-sky-900':'bg-slate-50 text-slate-700'}`}><span className="block text-sm font-black">{e.name}</span><span className="mt-1 block text-xs">{e.fields.length} حقل · {e.recordCount||0} سجل</span></button>)}{!entities.length&&<p className="rounded-xl bg-slate-50 p-3 text-xs text-slate-500">لا توجد أنواع مرنة بعد. ارفع ملفًا غير مطابق للأنواع المعروفة.</p>}</div></aside>
+      <aside className="rounded-2xl border border-line bg-surface p-4"><div className="mb-3 flex items-center justify-between"><h2 className="font-black">أنواع البيانات</h2><button onClick={refresh} className="text-xs font-bold text-primary">تحديث</button></div><div className="space-y-2">{entities.map(e=><button key={e.id} onClick={()=>setEntityId(e.id)} className={`w-full rounded-xl p-3 text-right ${entityId===e.id?'bg-accent-soft text-primary':'bg-surface-muted text-ink'}`}><span className="block text-sm font-black">{e.name}</span><span className="mt-1 block text-xs">{e.fields.length} حقل · {e.recordCount||0} سجل</span></button>)}{!entities.length&&<p className="rounded-xl bg-surface-muted p-3 text-xs text-muted">لا توجد أنواع مرنة بعد. ارفع ملفًا غير مطابق للأنواع المعروفة.</p>}</div></aside>
       <main className="min-w-0 space-y-5">
-        {!selected?<div className="rounded-2xl border border-dashed border-slate-300 bg-white p-12 text-center text-sm text-slate-500">اختر نوع بيانات لعرض سجلاته وحقوله وعلاقاته.</div>:<>
-          <section className="rounded-2xl border border-slate-200 bg-white p-5"><div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="text-xl font-black">{selected.name}</h2><p className="mt-1 text-xs text-slate-500">أُنشئ {new Date(selected.createdAt).toLocaleString()}</p></div><button onClick={exportRows} disabled={!canExport} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-xs font-black disabled:opacity-40"><Download className="h-4 w-4"/>تصدير جدول بيانات</button></div>
-            <div className="mt-4 grid gap-4 md:grid-cols-2"><div><h3 className="mb-2 text-sm font-black">الحقول</h3><div className="flex flex-wrap gap-2">{selected.fields.map(f=><span key={f.key} className="rounded-lg bg-slate-100 px-2.5 py-1.5 text-xs"><b>{f.label}</b><span className="mr-1 text-slate-500">{f.type}</span>{f.relationCandidate&&<span className="mr-1 text-violet-700">مرشح علاقة: {f.relationCandidate}</span>}</span>)}</div><div className="mt-3 flex flex-wrap gap-2"><input value={newField.label} onChange={e=>setNewField({...newField,label:e.target.value})} placeholder="اسم الحقل الجديد" className="min-w-36 flex-1 rounded-lg border border-slate-200 px-2.5 py-2 text-xs"/><select value={newField.type} onChange={e=>setNewField({...newField,type:e.target.value as DynamicField['type']})} className="rounded-lg border border-slate-200 px-2 py-2 text-xs"><option value="text">نص</option><option value="number">رقم</option><option value="boolean">نعم/لا</option><option value="date">تاريخ</option><option value="json">بيانات مركبة</option></select><label className="flex items-center gap-1 text-xs"><input type="checkbox" checked={newField.required} onChange={e=>setNewField({...newField,required:e.target.checked})}/>إلزامي</label><button onClick={addField} disabled={!canManage} className="rounded-lg bg-violet-700 px-3 py-2 text-xs font-black text-white"><FilePlus2 className="inline h-4 w-4"/> إضافة</button></div></div>
-              <div><h3 className="mb-2 text-sm font-black">العلاقات المعرفة</h3><div className="space-y-1">{selected.relations.map((r,i)=><p key={i} className="rounded-lg bg-violet-50 p-2 text-xs">{String(r.name)}: {String(r.sourceField)} ← {entities.find(e=>e.id===r.targetEntityId)?.name||'نوع محذوف'}.{String(r.targetField||'id')}</p>)}</div><div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2"><input value={newRelation.name} onChange={e=>setNewRelation({...newRelation,name:e.target.value})} placeholder="اسم العلاقة" className="rounded-lg border border-slate-200 px-2 py-2 text-xs"/><select value={newRelation.sourceField} onChange={e=>setNewRelation({...newRelation,sourceField:e.target.value})} className="rounded-lg border border-slate-200 px-2 py-2 text-xs"><option value="">الحقل المحلي</option>{selected.fields.map(f=><option key={f.key} value={f.key}>{f.label}</option>)}</select><select value={newRelation.targetEntityId} onChange={e=>setNewRelation({...newRelation,targetEntityId:e.target.value,targetField:''})} className="rounded-lg border border-slate-200 px-2 py-2 text-xs"><option value="">النوع المرتبط</option>{entities.filter(e=>e.id!==selected.id).map(e=><option key={e.id} value={e.id}>{e.name}</option>)}</select><select value={newRelation.targetField} onChange={e=>setNewRelation({...newRelation,targetField:e.target.value})} className="rounded-lg border border-slate-200 px-2 py-2 text-xs"><option value="">الحقل المرتبط (المعرف الافتراضي)</option>{(entities.find(e=>e.id===newRelation.targetEntityId)?.fields||[]).map(f=><option key={f.key} value={f.key}>{f.label}</option>)}</select></div><button onClick={addRelation} disabled={!canManage} className="mt-2 rounded-lg bg-violet-100 px-3 py-2 text-xs font-black text-violet-900">حفظ علاقة</button></div>
+        {!selected?<div className="rounded-2xl border border-dashed border-line-strong bg-surface p-12 text-center text-sm text-muted">اختر نوع بيانات لعرض سجلاته وحقوله وعلاقاته.</div>:<>
+          <section className="rounded-2xl border border-line bg-surface p-5"><div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="text-xl font-black">{selected.name}</h2><p className="mt-1 text-xs text-muted">أُنشئ {new Date(selected.createdAt).toLocaleString()}</p></div><button onClick={exportRows} disabled={!canExport} className="inline-flex items-center gap-2 rounded-xl border border-line px-3 py-2 text-xs font-black disabled:opacity-40"><Download className="h-4 w-4"/>تصدير جدول بيانات</button></div>
+            <div className="mt-4 grid gap-4 md:grid-cols-2"><div><h3 className="mb-2 text-sm font-black">الحقول</h3><div className="flex flex-wrap gap-2">{selected.fields.map(f=><span key={f.key} className="rounded-lg bg-surface-sunken px-2.5 py-1.5 text-xs"><b>{f.label}</b><span className="mr-1 text-muted">{f.type}</span>{f.relationCandidate&&<span className="mr-1 text-primary">مرشح علاقة: {f.relationCandidate}</span>}</span>)}</div><div className="mt-3 flex flex-wrap gap-2"><input value={newField.label} onChange={e=>setNewField({...newField,label:e.target.value})} placeholder="اسم الحقل الجديد" className="min-w-36 flex-1 rounded-lg border border-line px-2.5 py-2 text-xs"/><select value={newField.type} onChange={e=>setNewField({...newField,type:e.target.value as DynamicField['type']})} className="rounded-lg border border-line px-2 py-2 text-xs"><option value="text">نص</option><option value="number">رقم</option><option value="boolean">نعم/لا</option><option value="date">تاريخ</option><option value="json">بيانات مركبة</option></select><label className="flex items-center gap-1 text-xs"><input type="checkbox" checked={newField.required} onChange={e=>setNewField({...newField,required:e.target.checked})}/>إلزامي</label><button onClick={addField} disabled={!canManage} className="rounded-lg bg-primary px-3 py-2 text-xs font-black text-white"><FilePlus2 className="inline h-4 w-4"/> إضافة</button></div></div>
+              <div><h3 className="mb-2 text-sm font-black">العلاقات المعرفة</h3><div className="space-y-1">{selected.relations.map((r,i)=><p key={i} className="rounded-lg bg-accent-soft p-2 text-xs">{String(r.name)}: {String(r.sourceField)} ← {entities.find(e=>e.id===r.targetEntityId)?.name||'نوع محذوف'}.{String(r.targetField||'id')}</p>)}</div><div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2"><input value={newRelation.name} onChange={e=>setNewRelation({...newRelation,name:e.target.value})} placeholder="اسم العلاقة" className="rounded-lg border border-line px-2 py-2 text-xs"/><select value={newRelation.sourceField} onChange={e=>setNewRelation({...newRelation,sourceField:e.target.value})} className="rounded-lg border border-line px-2 py-2 text-xs"><option value="">الحقل المحلي</option>{selected.fields.map(f=><option key={f.key} value={f.key}>{f.label}</option>)}</select><select value={newRelation.targetEntityId} onChange={e=>setNewRelation({...newRelation,targetEntityId:e.target.value,targetField:''})} className="rounded-lg border border-line px-2 py-2 text-xs"><option value="">النوع المرتبط</option>{entities.filter(e=>e.id!==selected.id).map(e=><option key={e.id} value={e.id}>{e.name}</option>)}</select><select value={newRelation.targetField} onChange={e=>setNewRelation({...newRelation,targetField:e.target.value})} className="rounded-lg border border-line px-2 py-2 text-xs"><option value="">الحقل المرتبط (المعرف الافتراضي)</option>{(entities.find(e=>e.id===newRelation.targetEntityId)?.fields||[]).map(f=><option key={f.key} value={f.key}>{f.label}</option>)}</select></div><button onClick={addRelation} disabled={!canManage} className="mt-2 rounded-lg bg-accent-soft px-3 py-2 text-xs font-black text-primary">حفظ علاقة</button></div>
             </div>
           </section>
-          <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-            <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 p-3">
-              <label className="flex min-w-52 flex-1 items-center gap-2 rounded-lg border border-slate-200 px-3">
-                <Search className="h-4 w-4 text-slate-400"/>
+          <section className="overflow-hidden rounded-2xl border border-line bg-surface">
+            <div className="flex flex-wrap items-center gap-2 border-b border-line p-3">
+              <label className="flex min-w-52 flex-1 items-center gap-2 rounded-lg border border-line px-3">
+                <Search className="h-4 w-4 text-muted"/>
                 <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="بحث في كل الحقول..." className="w-full py-2 text-sm outline-none"/>
               </label>
-              <select value={filterKey} onChange={e=>setFilterKey(e.target.value)} className="rounded-lg border border-slate-200 px-2 py-2 text-xs"><option value="">كل الحقول</option>{selected.fields.map(f=><option key={f.key} value={f.key}>{f.label}</option>)}</select>
-              <input value={filterValue} onChange={e=>setFilterValue(e.target.value)} placeholder="قيمة التصفية" className="w-32 rounded-lg border border-slate-200 px-2 py-2 text-xs"/>
-              <select value={sortKey} onChange={e=>setSortKey(e.target.value)} className="rounded-lg border border-slate-200 px-2 py-2 text-xs"><option value="">الترتيب الافتراضي</option>{selected.fields.map(f=><option key={f.key} value={f.key}>{f.label}</option>)}</select>
-              <button onClick={()=>setSortDesc(x=>!x)} className="rounded-lg border border-slate-200 p-2" title="عكس اتجاه الترتيب"><ArrowDownAZ className="h-4 w-4"/></button>
-              <button onClick={()=>{setEditing('__new__');setDraft({});}} disabled={!canManage || editing!==null} className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-black text-white disabled:opacity-40">إضافة سجل</button>
-              <span className="text-xs text-slate-500">{sorted.length} ظاهر · تم تحميل {records.length} من {totalRecords} سجل</span>
+              <select value={filterKey} onChange={e=>setFilterKey(e.target.value)} className="rounded-lg border border-line px-2 py-2 text-xs"><option value="">كل الحقول</option>{selected.fields.map(f=><option key={f.key} value={f.key}>{f.label}</option>)}</select>
+              <input value={filterValue} onChange={e=>setFilterValue(e.target.value)} placeholder="قيمة التصفية" className="w-32 rounded-lg border border-line px-2 py-2 text-xs"/>
+              <select value={sortKey} onChange={e=>setSortKey(e.target.value)} className="rounded-lg border border-line px-2 py-2 text-xs"><option value="">الترتيب الافتراضي</option>{selected.fields.map(f=><option key={f.key} value={f.key}>{f.label}</option>)}</select>
+              <button onClick={()=>setSortDesc(x=>!x)} className="rounded-lg border border-line p-2" title="عكس اتجاه الترتيب"><ArrowDownAZ className="h-4 w-4"/></button>
+              <button onClick={()=>{setEditing('__new__');setDraft({});}} disabled={!canManage || editing!==null} className="rounded-lg bg-success px-3 py-2 text-xs font-black text-white disabled:opacity-40">إضافة سجل</button>
+              <span className="text-xs text-muted">{sorted.length} ظاهر · تم تحميل {records.length} من {totalRecords} سجل</span>
             </div>
             <div className="overflow-auto">
               <DataTable
@@ -82,19 +82,19 @@ export const DynamicDataPage: React.FC = () => {
               rows={(editing === '__new__' ? [{ __new: true, id: '__new__' } as any, ...sorted] : sorted) as any[]}
               rowKey={(record: any) => String(record.id)}
                             tableClassName="text-xs"
-              rowClassName={(record: any) => record.__new ? 'border-b border-emerald-200 bg-emerald-50' : ''}
+              rowClassName={(record: any) => record.__new ? 'border-b border-success-border bg-success-soft' : ''}
               columns={[
                 {
                   key: 'actions', header: 'إجراءات',
                   render: (record: any) => editing === record.id || record.__new ? (
                     <span className="whitespace-nowrap">
-                      <button onClick={saveEdit} className="ml-2 font-black text-emerald-700">حفظ</button>
-                      <button onClick={() => setEditing(null)} className="font-bold text-slate-500">إلغاء</button>
+                      <button onClick={saveEdit} className="ml-2 font-black text-success">حفظ</button>
+                      <button onClick={() => setEditing(null)} className="font-bold text-muted">إلغاء</button>
                     </span>
                   ) : (
                     <span className="whitespace-nowrap">
-                      <button onClick={() => beginEdit(record)} disabled={!canManage} className="ml-2 text-sky-700" title="تعديل"><Pencil className="h-4 w-4" /></button>
-                      <button onClick={() => deleteRecord(record)} disabled={!canManage} className="text-rose-700" title="حذف"><Trash2 className="h-4 w-4" /></button>
+                      <button onClick={() => beginEdit(record)} disabled={!canManage} className="ml-2 text-primary" title="تعديل"><Pencil className="h-4 w-4" /></button>
+                      <button onClick={() => deleteRecord(record)} disabled={!canManage} className="text-danger" title="حذف"><Trash2 className="h-4 w-4" /></button>
                     </span>
                   ),
                 },
@@ -119,11 +119,11 @@ export const DynamicDataPage: React.FC = () => {
                 })),
               ]}
             />
-              {!records.length&&editing!=='__new__'&&<p className="p-8 text-center text-sm text-slate-500">لا توجد سجلات مطابقة.</p>}
+              {!records.length&&editing!=='__new__'&&<p className="p-8 text-center text-sm text-muted">لا توجد سجلات مطابقة.</p>}
             </div>
-            {records.length<totalRecords&&<div className="border-t border-slate-100 p-3 text-center"><button type="button" onClick={loadMore} className="rounded-lg bg-sky-50 px-4 py-2 text-xs font-black text-sky-800 hover:bg-sky-100">تحميل المزيد ({records.length} من {totalRecords})</button></div>}
+            {records.length<totalRecords&&<div className="border-t border-line p-3 text-center"><button type="button" onClick={loadMore} className="rounded-lg bg-accent-soft px-4 py-2 text-xs font-black text-primary hover:bg-accent-soft">تحميل المزيد ({records.length} من {totalRecords})</button></div>}
           </section>
-          <section className="rounded-2xl border border-slate-200 bg-white p-4"><h3 className="mb-3 flex items-center gap-2 text-sm font-black"><RotateCcw className="h-4 w-4"/>سجل الاستيراد والتراجع</h3>{batches.map(b=><div key={b.id} className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 py-2 text-xs"><span>{b.sourceName} · {b.importedCount} سجل · {b.status} · {new Date(b.createdAt).toLocaleString()}</span>{b.status!=='ROLLED_BACK'&&<button onClick={()=>rollback(b.id)} disabled={!canManage} className="font-black text-rose-700">تراجع عن الدفعة</button>}</div>)}</section>
+          <section className="rounded-2xl border border-line bg-surface p-4"><h3 className="mb-3 flex items-center gap-2 text-sm font-black"><RotateCcw className="h-4 w-4"/>سجل الاستيراد والتراجع</h3>{batches.map(b=><div key={b.id} className="flex flex-wrap items-center justify-between gap-2 border-t border-line py-2 text-xs"><span>{b.sourceName} · {b.importedCount} سجل · {b.status} · {new Date(b.createdAt).toLocaleString()}</span>{b.status!=='ROLLED_BACK'&&<button onClick={()=>rollback(b.id)} disabled={!canManage} className="font-black text-danger">تراجع عن الدفعة</button>}</div>)}</section>
         </>}
       </main>
     </div>

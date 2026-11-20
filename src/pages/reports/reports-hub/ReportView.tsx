@@ -66,36 +66,36 @@ function formatCell(value: unknown, column: ReportColumn): string {
 }
 
 const TONE_CLASS: Record<string, string> = {
-  success: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-  danger: 'bg-rose-50 text-rose-700 border-rose-200',
-  warning: 'bg-amber-50 text-amber-700 border-amber-200',
-  info: 'bg-sky-50 text-sky-700 border-sky-200',
-  neutral: 'bg-slate-100 text-slate-600 border-slate-200',
+  success: 'bg-success-soft text-success border-success-border',
+  danger: 'bg-danger-soft text-danger border-danger-border',
+  warning: 'bg-warning-soft text-warning border-warning-border',
+  info: 'bg-accent-soft text-primary border-accent-border',
+  neutral: 'bg-surface-sunken text-ink-secondary border-line',
 };
 
 function badgeClass(value: unknown): string {
   const text = String(value || '').toUpperCase();
   if (['A', 'APPROVED', 'PAID', 'POSTED', 'ACTIVE', 'COMPLETED'].some((token) => text.includes(token))) {
-    return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+    return 'bg-success-soft text-success border-success-border';
   }
-  if (['B'].includes(text)) return 'bg-sky-50 text-sky-700 border-sky-200';
-  if (['C'].includes(text)) return 'bg-slate-100 text-slate-600 border-slate-200';
+  if (['B'].includes(text)) return 'bg-accent-soft text-primary border-accent-border';
+  if (['C'].includes(text)) return 'bg-surface-sunken text-ink-secondary border-line';
   if (['REJECTED', 'BOUNCED', 'OVERDUE', 'LATE', 'CANCELLED', 'VOID'].some((token) => text.includes(token))) {
-    return 'bg-rose-50 text-rose-700 border-rose-200';
+    return 'bg-danger-soft text-danger border-danger-border';
   }
   if (['PENDING', 'OPEN', 'DRAFT', 'PARTIAL', 'REVIEW'].some((token) => text.includes(token))) {
-    return 'bg-amber-50 text-amber-700 border-amber-200';
+    return 'bg-warning-soft text-warning border-warning-border';
   }
   if (/متأخر|راكد|عجز|مرتد|خاسر|تجاوز|نفاد|خطر|منصرف/.test(String(value))) {
-    return 'bg-rose-50 text-rose-700 border-rose-200';
+    return 'bg-danger-soft text-danger border-danger-border';
   }
   if (/منتظم|متاح|ملتزم|ربحي|آمن|نشط|وارد|زيادة|موافق|تم/.test(String(value))) {
-    return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+    return 'bg-success-soft text-success border-success-border';
   }
   if (/معلق|بطيء|تحتاج|متابعة|قيد|مسودة/.test(String(value))) {
-    return 'bg-amber-50 text-amber-700 border-amber-200';
+    return 'bg-warning-soft text-warning border-warning-border';
   }
-  return 'bg-sky-50 text-sky-700 border-sky-200';
+  return 'bg-accent-soft text-primary border-accent-border';
 }
 
 const KPI_VALUE = (value: number | string): string => {
@@ -476,8 +476,8 @@ export const ReportView: React.FC<{ definition: ReportDefinition; onBack: () => 
   };
 
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-slate-50 text-slate-900">
-      <div className="border-b border-slate-200 bg-white px-5 py-4">
+    <div className="flex h-full flex-col overflow-hidden bg-surface-muted text-ink">
+      <div className="border-b border-line bg-surface px-5 py-4">
         <PageHeader
           icon={<Icon className="h-5 w-5" />}
           title={definition.title}
@@ -486,17 +486,17 @@ export const ReportView: React.FC<{ definition: ReportDefinition; onBack: () => 
             <button
               type="button"
               onClick={onBack}
-              className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-500 transition hover:bg-slate-50 hover:text-slate-800"
+              className="flex h-9 w-9 items-center justify-center rounded-xl border border-line text-muted transition hover:bg-surface-muted hover:text-ink"
               aria-label="العودة لمركز التقارير"
             >
               <ArrowRight className="h-4 w-4" />
             </button>
-            <div className="flex rounded-xl border border-slate-200 bg-slate-100 p-0.5">
+            <div className="flex rounded-xl border border-line bg-surface-sunken p-0.5">
               <button
                 type="button"
                 onClick={() => setViewMode('table')}
                 className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-bold transition ${
-                  viewMode === 'table' ? 'bg-white text-teal-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+                  viewMode === 'table' ? 'bg-surface text-success shadow-sm' : 'text-ink-secondary hover:text-ink'
                 }`}
               >
                 <Table className="h-3.5 w-3.5" /> جدول
@@ -505,7 +505,7 @@ export const ReportView: React.FC<{ definition: ReportDefinition; onBack: () => 
                 type="button"
                 onClick={() => setViewMode('chart')}
                 className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-bold transition ${
-                  viewMode === 'chart' ? 'bg-white text-teal-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+                  viewMode === 'chart' ? 'bg-surface text-success shadow-sm' : 'text-ink-secondary hover:text-ink'
                 }`}
               >
                 <BarChart2 className="h-3.5 w-3.5" /> رسم بياني
@@ -514,14 +514,14 @@ export const ReportView: React.FC<{ definition: ReportDefinition; onBack: () => 
             <button
               type="button"
               onClick={() => setShowAdvancedFilters((current) => !current)}
-              className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-600 transition hover:bg-slate-50"
+              className="flex items-center gap-2 rounded-xl border border-line bg-surface px-3 py-2 text-xs font-bold text-ink-secondary transition hover:bg-surface-muted"
             >
               <SlidersHorizontal className="h-4 w-4" /> فلترة متقدمة
             </button>
             <button
               type="button"
               onClick={() => setRefreshToken((current) => current + 1)}
-              className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-600 transition hover:bg-slate-50"
+              className="flex items-center gap-2 rounded-xl border border-line bg-surface px-3 py-2 text-xs font-bold text-ink-secondary transition hover:bg-surface-muted"
             >
               <RefreshCw className="h-4 w-4" /> تحديث
             </button>
@@ -529,7 +529,7 @@ export const ReportView: React.FC<{ definition: ReportDefinition; onBack: () => 
               type="button"
               onClick={handlePrint}
               disabled={!result || rows.length === 0}
-              className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex items-center gap-2 rounded-xl border border-line bg-surface px-3 py-2 text-xs font-bold text-ink transition hover:bg-surface-muted disabled:cursor-not-allowed disabled:opacity-50"
             >
               <Printer className="h-4 w-4" /> طباعة / PDF
             </button>
@@ -537,7 +537,7 @@ export const ReportView: React.FC<{ definition: ReportDefinition; onBack: () => 
               type="button"
               onClick={handleExport}
               disabled={!result || rows.length === 0}
-              className="flex items-center gap-2 rounded-xl bg-teal-600 px-3 py-2 text-xs font-bold text-white transition hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex items-center gap-2 rounded-xl bg-success px-3 py-2 text-xs font-bold text-white transition hover:bg-success disabled:cursor-not-allowed disabled:opacity-50"
             >
               <Download className="h-4 w-4" /> تصدير Excel
             </button>
@@ -545,7 +545,7 @@ export const ReportView: React.FC<{ definition: ReportDefinition; onBack: () => 
               type="button"
               onClick={handleExportCsv}
               disabled={!result || rows.length === 0}
-              className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex items-center gap-2 rounded-xl border border-line bg-surface px-3 py-2 text-xs font-bold text-ink transition hover:bg-surface-muted disabled:cursor-not-allowed disabled:opacity-50"
             >
               <Download className="h-4 w-4" /> CSV
             </button>
@@ -553,7 +553,7 @@ export const ReportView: React.FC<{ definition: ReportDefinition; onBack: () => 
         />
       </div>
 
-      <div className="flex flex-wrap items-end gap-3 border-b border-slate-200 bg-white px-5 py-3">
+      <div className="flex flex-wrap items-end gap-3 border-b border-line bg-surface px-5 py-3">
         {definition.dateMode === 'range' ? (
           <>
             <DateField label="من تاريخ" value={from} onChange={setFrom} />
@@ -564,13 +564,13 @@ export const ReportView: React.FC<{ definition: ReportDefinition; onBack: () => 
         ) : null}
 
         {definition.dateMode !== 'none' && (
-          <div className="flex flex-wrap items-center gap-1 rounded-xl border border-slate-200 bg-slate-50 p-1">
+          <div className="flex flex-wrap items-center gap-1 rounded-xl border border-line bg-surface-muted p-1">
             {DATE_PRESETS.map((preset) => (
               <button
                 key={preset.key}
                 type="button"
                 onClick={() => applyPreset(preset.key, definition, setFrom, setTo, setAsOf)}
-                className="rounded-lg px-2.5 py-1 text-[10px] font-bold text-slate-600 transition hover:bg-white hover:text-teal-700"
+                className="rounded-lg px-2.5 py-1 text-[10px] font-bold text-ink-secondary transition hover:bg-surface hover:text-success"
               >
                 {preset.label}
               </button>
@@ -582,11 +582,11 @@ export const ReportView: React.FC<{ definition: ReportDefinition; onBack: () => 
           if (control.kind === 'dimension') {
             return (
               <label key={control.key} className="block">
-                <span className="mb-1 block text-[10px] font-bold text-slate-500">{control.label}</span>
+                <span className="mb-1 block text-[10px] font-bold text-muted">{control.label}</span>
                 <select
                   value={filters[control.key] || control.options?.[0]?.value || ''}
                   onChange={(event) => setFilters((current) => ({ ...current, [control.key]: event.target.value }))}
-                  className="min-w-36 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold"
+                  className="min-w-36 rounded-xl border border-line bg-surface-muted px-3 py-2 text-xs font-bold"
                 >
                   {control.options?.map((option) => (
                     <option key={option.value} value={option.value}>{option.label}</option>
@@ -598,7 +598,7 @@ export const ReportView: React.FC<{ definition: ReportDefinition; onBack: () => 
           if (control.kind === 'product') {
             return (
               <label key={control.key} className="block min-w-56">
-                <span className="mb-1 block text-[10px] font-bold text-slate-500">{control.label}</span>
+                <span className="mb-1 block text-[10px] font-bold text-muted">{control.label}</span>
                 <ProductPicker
                   value={filters[control.key] || ''}
                   selectedLabel={products.find((product) => product.id === filters[control.key])?.name}
@@ -611,11 +611,11 @@ export const ReportView: React.FC<{ definition: ReportDefinition; onBack: () => 
           }
           return (
             <label key={control.key} className="block min-w-44">
-              <span className="mb-1 block text-[10px] font-bold text-slate-500">{control.label}</span>
+              <span className="mb-1 block text-[10px] font-bold text-muted">{control.label}</span>
               <select
                 value={filters[control.key] || ''}
                 onChange={(event) => setFilters((current) => ({ ...current, [control.key]: event.target.value }))}
-                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold"
+                className="w-full rounded-xl border border-line bg-surface-muted px-3 py-2 text-xs font-bold"
               >
                 <option value="">كل الخزائن</option>
                 {registers.map((register) => (
@@ -625,35 +625,35 @@ export const ReportView: React.FC<{ definition: ReportDefinition; onBack: () => 
             </label>
           );
         })}
-        <span className="mr-auto text-[10px] font-medium text-slate-400" aria-live="polite">
+        <span className="mr-auto text-[10px] font-medium text-muted" aria-live="polite">
           {lastUpdatedAt ? `آخر تحديث: ${lastUpdatedAt.toLocaleTimeString('ar-EG')}` : ''}
         </span>
 
         <div className="relative mr-auto w-full sm:w-64">
-          <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
           <input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             placeholder="بحث في النتائج…"
-            className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2 pl-3 pr-9 text-xs font-bold"
+            className="w-full rounded-xl border border-line bg-surface-muted py-2 pl-3 pr-9 text-xs font-bold"
           />
         </div>
-        <div className="flex items-center gap-1 pb-1 text-[10px] font-bold text-slate-400">
+        <div className="flex items-center gap-1 pb-1 text-[10px] font-bold text-muted">
           <SlidersHorizontal className="h-3.5 w-3.5" />
           {rows.length} صف
         </div>
       </div>
 
       {showAdvancedFilters && advancedFilterFields.length > 0 && (
-        <div className="border-b border-slate-200 bg-slate-50 px-5 py-3">
+        <div className="border-b border-line bg-surface-muted px-5 py-3">
           <div className="mb-2 flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2 text-xs font-black text-slate-700">
+            <div className="flex items-center gap-2 text-xs font-black text-ink">
               <SlidersHorizontal className="h-3.5 w-3.5" /> فلترة متقدمة
             </div>
             <button
               type="button"
               onClick={() => setFilters((current) => Object.fromEntries(Object.entries(current).filter(([key]) => key === 'productId' || key === 'registerId' || key === 'dimension')))}
-              className="text-[10px] font-bold text-slate-500 transition hover:text-teal-700"
+              className="text-[10px] font-bold text-muted transition hover:text-success"
             >
               مسح الفلاتر
             </button>
@@ -661,11 +661,11 @@ export const ReportView: React.FC<{ definition: ReportDefinition; onBack: () => 
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             {advancedFilterFields.map((field) => (
               <label key={field.key} className="block min-w-0">
-                <span className="mb-1 block text-[10px] font-bold text-slate-500">{field.label}</span>
+                <span className="mb-1 block text-[10px] font-bold text-muted">{field.label}</span>
                 <select
                   value={filters[field.key] || ''}
                   onChange={(event) => setFilters((current) => ({ ...current, [field.key]: event.target.value }))}
-                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700"
+                  className="w-full rounded-xl border border-line bg-surface px-3 py-2 text-xs font-bold text-ink"
                 >
                   {field.options.map((option) => (
                     <option key={option.value || 'empty'} value={option.value}>{option.label}</option>
@@ -679,44 +679,44 @@ export const ReportView: React.FC<{ definition: ReportDefinition; onBack: () => 
 
       <div className="flex-1 overflow-auto p-5">
         {error && (
-          <div className="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs font-bold text-rose-700">
+          <div className="mb-4 rounded-xl border border-danger-border bg-danger-soft px-4 py-3 text-xs font-bold text-danger">
             {error}
           </div>
         )}
         {loading ? (
-          <div className="flex justify-center py-16"><Loader2 className="h-7 w-7 animate-spin text-teal-500" /></div>
+          <div className="flex justify-center py-16"><Loader2 className="h-7 w-7 animate-spin text-success" /></div>
         ) : (
           <>
             {result?.kpis?.length ? (
               <div className="mb-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                 {result.kpis.map((kpi) => (
-                  <div key={kpi.label} className={`rounded-2xl border bg-white p-4 ${kpi.tone ? TONE_CLASS[kpi.tone] : 'border-slate-200'}`}>
-                    <div className="text-[10px] font-bold text-slate-500">{kpi.label}</div>
+                  <div key={kpi.label} className={`rounded-2xl border bg-surface p-4 ${kpi.tone ? TONE_CLASS[kpi.tone] : 'border-line'}`}>
+                    <div className="text-[10px] font-bold text-muted">{kpi.label}</div>
                     <div className="mt-1 truncate text-xl font-black">{KPI_VALUE(kpi.value)}</div>
-                    {kpi.hint && <div className="mt-1 text-[10px] font-medium text-slate-400">{kpi.hint}</div>}
+                    {kpi.hint && <div className="mt-1 text-[10px] font-medium text-muted">{kpi.hint}</div>}
                   </div>
                 ))}
               </div>
             ) : null}
 
             {result?.notes?.length ? (
-              <div className="mb-4 space-y-1 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-[11px] font-semibold text-sky-800">
+              <div className="mb-4 space-y-1 rounded-xl border border-accent-border bg-accent-soft px-4 py-3 text-[11px] font-semibold text-primary">
                 {result.notes.map((note) => <div key={note}>• {note}</div>)}
               </div>
             ) : null}
 
             {definition.drilldown ? (
-              <div className="mb-4 flex items-center justify-between rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-2 text-[11px] font-bold text-indigo-700">
+              <div className="mb-4 flex items-center justify-between rounded-xl border border-accent-border bg-accent-soft px-4 py-2 text-[11px] font-bold text-primary">
                 <span>{definition.drilldown.label}</span>
-                <span className="text-indigo-500">{definition.drilldown.note}</span>
+                <span className="text-primary">{definition.drilldown.note}</span>
               </div>
             ) : null}
 
             {viewMode === 'chart' && chartData.length > 0 ? (
-              <div className="mb-4 rounded-2xl border border-slate-200 bg-white p-5">
-                <div className="mb-4 flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="mb-4 rounded-2xl border border-line bg-surface p-5">
+                <div className="mb-4 flex items-center justify-between border-b border-line pb-3">
                   <h3 className="text-sm font-black">تحليل بياني (أعلى العناصر)</h3>
-                  <span className="text-[11px] font-bold text-slate-500">
+                  <span className="text-[11px] font-bold text-muted">
                     نوع الرسم: {chartKind === 'bar' ? 'أعمدة' : chartKind === 'line' ? 'خطي' : chartKind === 'area' ? 'مساحة' : 'توزيعي'}
                   </span>
                 </div>
@@ -771,10 +771,10 @@ export const ReportView: React.FC<{ definition: ReportDefinition; onBack: () => 
               </div>
             ) : null}
 
-            <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-              <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-4 py-3">
+            <div className="overflow-hidden rounded-2xl border border-line bg-surface">
+              <div className="flex items-center justify-between border-b border-line bg-surface-muted px-4 py-3">
                 <h3 className="text-sm font-black">{definition.title}</h3>
-                <span className="text-[10px] font-bold text-slate-400">
+                <span className="text-[10px] font-bold text-muted">
                   {definition.dateMode === 'range' ? `${from} → ${to}` : definition.dateMode === 'asOf' ? `كما في ${asOf}` : 'الأرصدة الحالية'}
                 </span>
               </div>
@@ -786,7 +786,7 @@ export const ReportView: React.FC<{ definition: ReportDefinition; onBack: () => 
                 stickyHeader
                 tableClassName="text-xs"
                 onRowClick={definition.drilldown ? handleRowClick : undefined}
-                rowClassName={() => definition.drilldown ? 'cursor-pointer transition hover:bg-slate-50/70' : 'transition hover:bg-slate-50/70'}
+                rowClassName={() => definition.drilldown ? 'cursor-pointer transition hover:bg-surface-muted/70' : 'transition hover:bg-surface-muted/70'}
                 columns={columns.map((column: any) => {
                   const isNumeric = column.type === 'currency' || column.type === 'number' || column.type === 'qty' || column.type === 'percent';
                   return {
@@ -795,7 +795,7 @@ export const ReportView: React.FC<{ definition: ReportDefinition; onBack: () => 
                       <button
                         type="button"
                         onClick={() => toggleSort(column.key)}
-                        className={`w-full cursor-pointer whitespace-nowrap font-bold text-slate-500 transition hover:text-teal-700 ${isNumeric ? 'text-end' : 'text-start'}`}
+                        className={`w-full cursor-pointer whitespace-nowrap font-bold text-muted transition hover:text-success ${isNumeric ? 'text-end' : 'text-start'}`}
                       >
                         {column.label}
                         {sort?.key === column.key ? (sort?.direction === 'asc' ? ' ▲' : ' ▼') : ''}
@@ -809,7 +809,7 @@ export const ReportView: React.FC<{ definition: ReportDefinition; onBack: () => 
                         return <span className={`inline-flex rounded-lg border px-2 py-0.5 text-[10px] font-bold ${badgeClass(value)}`}>{String(value ?? '—')}</span>;
                       }
                       const text = formatCell(value, column);
-                      return <span className={column.type === 'currency' && Number(value) < 0 ? 'text-rose-700' : undefined}>{text}</span>;
+                      return <span className={column.type === 'currency' && Number(value) < 0 ? 'text-danger' : undefined}>{text}</span>;
                     },
                   };
                 })}
@@ -818,8 +818,8 @@ export const ReportView: React.FC<{ definition: ReportDefinition; onBack: () => 
               </div>
 
               {totalPages > 1 && (
-                <div className="flex items-center justify-between border-t border-slate-200 bg-slate-50 px-4 py-2.5">
-                  <div className="text-[11px] font-bold text-slate-500">
+                <div className="flex items-center justify-between border-t border-line bg-surface-muted px-4 py-2.5">
+                  <div className="text-[11px] font-bold text-muted">
                     عرض {((currentPage - 1) * pageSize) + 1} إلى {Math.min(currentPage * pageSize, rows.length)} من إجمالي {rows.length} سجل
                   </div>
                   <div className="flex items-center gap-1.5">
@@ -827,18 +827,18 @@ export const ReportView: React.FC<{ definition: ReportDefinition; onBack: () => 
                       type="button"
                       disabled={currentPage <= 1}
                       onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                      className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                      className="flex h-7 w-7 items-center justify-center rounded-lg border border-line bg-surface text-ink-secondary transition hover:bg-surface-muted disabled:cursor-not-allowed disabled:opacity-40"
                     >
                       <ChevronRight className="h-3.5 w-3.5" />
                     </button>
-                    <span className="px-2 text-xs font-bold text-slate-600">
+                    <span className="px-2 text-xs font-bold text-ink-secondary">
                       صفحة {currentPage} من {totalPages}
                     </span>
                     <button
                       type="button"
                       disabled={currentPage >= totalPages}
                       onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                      className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                      className="flex h-7 w-7 items-center justify-center rounded-lg border border-line bg-surface text-ink-secondary transition hover:bg-surface-muted disabled:cursor-not-allowed disabled:opacity-40"
                     >
                       <ChevronLeft className="h-3.5 w-3.5" />
                     </button>
@@ -855,14 +855,14 @@ export const ReportView: React.FC<{ definition: ReportDefinition; onBack: () => 
 
 const DateField: React.FC<{ label: string; value: string; onChange: (value: string) => void }> = ({ label, value, onChange }) => (
   <label className="block">
-    <span className="mb-1 block text-[10px] font-bold text-slate-500">{label}</span>
+    <span className="mb-1 block text-[10px] font-bold text-muted">{label}</span>
     <div className="relative">
-      <CalendarDays className="absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+      <CalendarDays className="absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted" />
       <input
         type="date"
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="rounded-xl border border-slate-200 bg-slate-50 py-2 pl-3 pr-9 text-xs font-bold"
+        className="rounded-xl border border-line bg-surface-muted py-2 pl-3 pr-9 text-xs font-bold"
       />
     </div>
   </label>

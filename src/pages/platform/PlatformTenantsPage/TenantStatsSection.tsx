@@ -43,7 +43,7 @@ export const TenantStatsSection: React.FC<TenantStatsSectionProps> = ({ tenants,
       label: 'إجمالي العملاء',
       value: formatNumber(tenants.length),
       icon: <Building2 className="h-4 w-4" />,
-      tone: 'bg-slate-100 text-slate-600',
+      tone: 'bg-surface-sunken text-ink-secondary',
       status: '',
     },
     {
@@ -51,7 +51,7 @@ export const TenantStatsSection: React.FC<TenantStatsSectionProps> = ({ tenants,
       label: 'نشط',
       value: formatNumber(stats.byStatus.ACTIVE ?? 0),
       icon: <CheckCircle2 className="h-4 w-4" />,
-      tone: 'bg-emerald-50 text-emerald-600',
+      tone: 'bg-success-soft text-success',
       status: 'ACTIVE',
     },
     {
@@ -59,7 +59,7 @@ export const TenantStatsSection: React.FC<TenantStatsSectionProps> = ({ tenants,
       label: 'تجريبي',
       value: formatNumber(stats.byStatus.TRIAL ?? 0),
       icon: <Clock className="h-4 w-4" />,
-      tone: 'bg-amber-50 text-amber-600',
+      tone: 'bg-warning-soft text-warning',
       status: 'TRIAL',
     },
     {
@@ -67,7 +67,7 @@ export const TenantStatsSection: React.FC<TenantStatsSectionProps> = ({ tenants,
       label: 'موقوف',
       value: formatNumber(stats.byStatus.SUSPENDED ?? 0),
       icon: <XCircle className="h-4 w-4" />,
-      tone: 'bg-rose-50 text-rose-600',
+      tone: 'bg-danger-soft text-danger',
       status: 'SUSPENDED',
     },
     {
@@ -75,14 +75,14 @@ export const TenantStatsSection: React.FC<TenantStatsSectionProps> = ({ tenants,
       label: 'اشتراك ينتهي (30 يوم)',
       value: formatNumber(stats.expiringSoon),
       icon: <AlarmClock className="h-4 w-4" />,
-      tone: 'bg-sky-50 text-sky-600',
+      tone: 'bg-accent-soft text-primary',
     },
     {
       key: 'outstanding',
       label: 'إجمالي المستحقات',
       value: stats.outstanding > 0 ? formatMoney(stats.outstanding) : '—',
       icon: <Banknote className="h-4 w-4" />,
-      tone: 'bg-violet-50 text-violet-600',
+      tone: 'bg-accent-soft text-primary',
       hint: stats.devicesLimit > 0 ? `الأجهزة: ${formatNumber(stats.devicesUsed)} / ${formatNumber(stats.devicesLimit)}` : undefined,
     },
   ];
@@ -98,15 +98,15 @@ export const TenantStatsSection: React.FC<TenantStatsSectionProps> = ({ tenants,
             key={card.key}
             type="button"
             onClick={() => card.status !== undefined && onSelectStatus(card.status === activeStatus ? '' : card.status)}
-            className={`rounded-xl border bg-white p-3.5 text-right shadow-sm transition ${
-              card.status !== undefined ? 'hover:border-emerald-300 hover:shadow cursor-pointer' : 'cursor-default'
-            } ${card.status !== undefined && card.status === activeStatus ? 'border-emerald-400 ring-1 ring-emerald-200' : 'border-slate-200'}`}
+            className={`rounded-xl border bg-surface p-3.5 text-right shadow-sm transition ${
+ card.status !== undefined ? 'hover:border-success hover:shadow cursor-pointer' : 'cursor-default'
+ } ${card.status !== undefined && card.status === activeStatus ? 'border-success ring-1 ring-success' : 'border-line'}`}
           >
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
-                <p className="text-[11px] font-semibold text-slate-500">{card.label}</p>
-                <p className="mt-1 truncate text-[20px] font-black leading-tight text-slate-900">{card.value}</p>
-                {card.hint && <p className="mt-1 text-[10px] text-slate-400">{card.hint}</p>}
+                <p className="text-[11px] font-semibold text-muted">{card.label}</p>
+                <p className="mt-1 truncate text-[20px] font-black leading-tight text-ink">{card.value}</p>
+                {card.hint && <p className="mt-1 text-[10px] text-muted">{card.hint}</p>}
               </div>
               <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${card.tone}`}>{card.icon}</span>
             </div>
@@ -115,23 +115,23 @@ export const TenantStatsSection: React.FC<TenantStatsSectionProps> = ({ tenants,
       </div>
 
       {/* شريط توزيع الحالات */}
-      <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+      <div className="rounded-xl border border-line bg-surface px-4 py-3 shadow-sm">
         <div className="mb-2 flex items-center justify-between">
-          <p className="flex items-center gap-1.5 text-[11.5px] font-bold text-slate-700">
-            <Users className="h-3.5 w-3.5 text-slate-400" /> توزيع حالات العملاء
+          <p className="flex items-center gap-1.5 text-[11.5px] font-bold text-ink">
+            <Users className="h-3.5 w-3.5 text-muted" /> توزيع حالات العملاء
           </p>
-          <span className="text-[10.5px] text-slate-400">{tenants.length} عميل</span>
+          <span className="text-[10.5px] text-muted">{tenants.length} عميل</span>
         </div>
-        <div className="flex h-2.5 overflow-hidden rounded-full bg-slate-100">
+        <div className="flex h-2.5 overflow-hidden rounded-full bg-surface-sunken">
           {statuses.map((status) => {
             const count = stats.byStatus[status] ?? 0;
             if (count === 0) return null;
             const colors: Record<string, string> = {
-              ACTIVE: 'bg-emerald-500',
-              TRIAL: 'bg-amber-400',
-              SUSPENDED: 'bg-rose-500',
-              EXPIRED: 'bg-slate-400',
-              CANCELLED: 'bg-slate-300',
+              ACTIVE: 'bg-success',
+              TRIAL: 'bg-warning',
+              SUSPENDED: 'bg-danger',
+              EXPIRED: 'bg-line-strong',
+              CANCELLED: 'bg-surface-sunken',
             };
             return (
               <div
@@ -154,18 +154,18 @@ export const TenantStatsSection: React.FC<TenantStatsSectionProps> = ({ tenants,
               CANCELLED: 'ملغي',
             };
             const dots: Record<string, string> = {
-              ACTIVE: 'bg-emerald-500',
-              TRIAL: 'bg-amber-400',
-              SUSPENDED: 'bg-rose-500',
-              EXPIRED: 'bg-slate-400',
-              CANCELLED: 'bg-slate-300',
+              ACTIVE: 'bg-success',
+              TRIAL: 'bg-warning',
+              SUSPENDED: 'bg-danger',
+              EXPIRED: 'bg-line-strong',
+              CANCELLED: 'bg-surface-sunken',
             };
             return (
               <button
                 key={status}
                 type="button"
                 onClick={() => onSelectStatus(status === activeStatus ? '' : status)}
-                className={`flex items-center gap-1.5 text-[10.5px] font-semibold transition ${activeStatus === status ? 'text-emerald-700' : 'text-slate-500 hover:text-slate-700'}`}
+                className={`flex items-center gap-1.5 text-[10.5px] font-semibold transition ${activeStatus === status ? 'text-success' : 'text-muted hover:text-ink'}`}
               >
                 <span className={`h-2 w-2 rounded-full ${dots[status]}`} />
                 {labels[status]}: {formatNumber(count)}

@@ -431,6 +431,13 @@ const ROUTE_MANIFEST = [
   route('/api/v1/admin/security/signing-keys/rotate', ['POST'], {
     POST: ['platform.security.update', 'platform.security.manage'],
   }),
+  route('/api/v1/admin/security/ip-bans', ['GET', 'POST'], {
+    GET: ['platform.security.view', 'platform.security.manage'],
+    POST: ['platform.security.update', 'platform.security.manage'],
+  }),
+  route('/api/v1/admin/security/ip-bans/:id/lift', ['POST'], {
+    POST: ['platform.security.update', 'platform.security.manage'],
+  }),
   route('/api/v1/admin/analytics/events', ['GET'], {
     GET: ['platform.analytics.view', 'platform.analytics.manage'],
   }),

@@ -20,9 +20,9 @@ export const LoginsTab: React.FC<LoginsTabProps> = ({
   onLoginFilterFailedChange,
 }) => (
   <section className="space-y-3">
-    <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-800 bg-slate-900/80 p-3 shadow-sm">
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line-strong bg-primary/80 p-3 shadow-sm">
       <div className="relative min-w-[240px]">
-        <Search className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+        <Search className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
         <input
           type="text"
           value={loginSearch}
@@ -32,20 +32,20 @@ export const LoginsTab: React.FC<LoginsTabProps> = ({
         />
       </div>
 
-      <label className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer select-none">
+      <label className="flex items-center gap-2 text-xs text-muted cursor-pointer select-none">
         <input
           type="checkbox"
           checked={loginFilterFailed}
           onChange={(e) => onLoginFilterFailedChange(e.target.checked)}
-          className="rounded border-slate-700 bg-slate-800 text-rose-500 focus:ring-rose-500"
+          className="rounded border-line-strong bg-primary text-danger focus:ring-danger"
         />
-        <span className={loginFilterFailed ? 'text-rose-400 font-bold' : ''}>
+        <span className={loginFilterFailed ? 'text-danger font-bold' : ''}>
           عرض المحاولات الفاشلة والمحظورة فقط
         </span>
       </label>
     </div>
 
-    <div className="overflow-hidden rounded-xl border border-slate-800 bg-slate-900/70 shadow-sm">
+    <div className="overflow-hidden rounded-xl border border-line-strong bg-primary/70 shadow-sm">
       <DataTable
         ariaLabel="سجل محاولات الدخول"
         rows={logins}
@@ -53,18 +53,18 @@ export const LoginsTab: React.FC<LoginsTabProps> = ({
         minWidth={800}
         emptyTitle="لا توجد سجلات دخول تطابق البحث."
         columns={[
-          { key: 'email', header: 'البريد الإلكتروني', render: (login) => <span className="text-xs font-bold text-slate-100">{login.email}</span> },
-          { key: 'ip', header: 'عنوان IP', render: (login) => <span className="text-xs font-mono text-slate-300">{login.ipAddress || '—'}</span> },
+          { key: 'email', header: 'البريد الإلكتروني', render: (login) => <span className="text-xs font-bold text-muted">{login.email}</span> },
+          { key: 'ip', header: 'عنوان IP', render: (login) => <span className="text-xs font-mono text-muted">{login.ipAddress || '—'}</span> },
           {
             key: 'status', header: 'حالة المحاولة',
             render: (login) => (
               <span
                 className={`inline-flex items-center gap-1 font-bold text-xs ${
                   login.status === 'SUCCESS'
-                    ? 'text-emerald-400'
+                    ? 'text-success'
                     : login.status === 'BLOCKED'
-                    ? 'text-rose-500'
-                    : 'text-amber-400'
+                    ? 'text-danger'
+                    : 'text-warning'
                 }`}
               >
                 {login.status === 'SUCCESS' ? (
@@ -80,8 +80,8 @@ export const LoginsTab: React.FC<LoginsTabProps> = ({
               </span>
             ),
           },
-          { key: 'reason', header: 'السبب / الملاحظات', render: (login) => <span className="text-xs text-slate-400">{login.failureReason || '—'}</span> },
-          { key: 'time', header: 'التوقيت', render: (login) => <span className="text-xs text-slate-400">{formatDateTime(login.attemptedAt)}</span> },
+          { key: 'reason', header: 'السبب / الملاحظات', render: (login) => <span className="text-xs text-muted">{login.failureReason || '—'}</span> },
+          { key: 'time', header: 'التوقيت', render: (login) => <span className="text-xs text-muted">{formatDateTime(login.attemptedAt)}</span> },
         ]}
       />
     </div>

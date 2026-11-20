@@ -420,7 +420,7 @@ export const PlatformSupportPage: React.FC = () => {
       <PageHeader
         title="مركز الدعم الفني للمنصة"
         description="إدارة تذاكر الدعم الفني، جلسات الوصول عن بُعد، تقييم رضا العملاء، ومتابعة التزامات SLA داخل لوحة المنصة."
-        icon={<LifeBuoy className="h-6 w-6 text-emerald-400" />}
+        icon={<LifeBuoy className="h-6 w-6 text-success" />}
         actions={
           <Button
             size="sm"
@@ -434,9 +434,9 @@ export const PlatformSupportPage: React.FC = () => {
       />
 
       {error && (
-        <div role="alert" className="rounded-xl border border-rose-800 bg-rose-950/40 p-4 text-rose-200">
+        <div role="alert" className="rounded-xl border border-danger bg-danger/40 p-4 text-danger">
           <div className="flex items-center gap-2">
-            <AlertTriangle className="h-5 w-5 text-rose-400" />
+            <AlertTriangle className="h-5 w-5 text-danger" />
             <span className="font-bold">{error}</span>
           </div>
         </div>

@@ -309,10 +309,10 @@ export const FacilityManagementPage: React.FC = () => {
   };
 
   const statusBadge = (status: string) => {
-    const tone = ['COMPLETED', 'ACTIVE', 'PASS', 'CLOSED'].includes(status) ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-      : ['FAIL', 'OUT_OF_SERVICE', 'EXPIRED', 'CANCELLED'].includes(status) ? 'border-rose-200 bg-rose-50 text-rose-700'
-        : ['IN_PROGRESS', 'OBSERVATION', 'MAINTENANCE', 'HIGH', 'URGENT'].includes(status) ? 'border-amber-200 bg-amber-50 text-amber-800'
-          : 'border-slate-200 bg-slate-100 text-slate-700';
+    const tone = ['COMPLETED', 'ACTIVE', 'PASS', 'CLOSED'].includes(status) ? 'border-success-border bg-success-soft text-success'
+      : ['FAIL', 'OUT_OF_SERVICE', 'EXPIRED', 'CANCELLED'].includes(status) ? 'border-danger-border bg-danger-soft text-danger'
+        : ['IN_PROGRESS', 'OBSERVATION', 'MAINTENANCE', 'HIGH', 'URGENT'].includes(status) ? 'border-warning-border bg-warning-soft text-warning'
+          : 'border-line bg-surface-sunken text-ink';
     return <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-bold ${tone}`}>{statusLabels[status] || status}</span>;
   };
 
@@ -334,9 +334,9 @@ export const FacilityManagementPage: React.FC = () => {
                     key: 'location', header: 'الموقع',
                     render: (item) => (
                       <span>
-                        <span className={`font-bold text-slate-800 block ${item.archivedAt ? 'opacity-60' : ''}`}>{item.name}</span>
-                        <span className="text-xs text-slate-400">{item.code || 'بدون رمز'}</span>
-                        {item.archivedAt && <span className="text-xs text-rose-500 block">مؤرشف منذ {formatDate(item.archivedAt)}</span>}
+                        <span className={`font-bold text-ink block ${item.archivedAt ? 'opacity-60' : ''}`}>{item.name}</span>
+                        <span className="text-xs text-muted">{item.code || 'بدون رمز'}</span>
+                        {item.archivedAt && <span className="text-xs text-danger block">مؤرشف منذ {formatDate(item.archivedAt)}</span>}
                       </span>
                     ),
                   },
@@ -348,11 +348,11 @@ export const FacilityManagementPage: React.FC = () => {
                     key: 'actions', header: 'إجراءات', align: 'center',
                     render: (item) => canManage ? (
                       <div className="flex flex-wrap justify-center gap-1">
-                        <button onClick={() => openEdit('locations', item.id)} className="rounded border border-slate-200 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50" title="تعديل"><Edit3 size={14} /></button>
+                        <button onClick={() => openEdit('locations', item.id)} className="rounded border border-line px-2 py-1 text-xs text-ink-secondary hover:bg-surface-muted" title="تعديل"><Edit3 size={14} /></button>
                         {item.archivedAt ? (
-                          <button onClick={() => { service.restoreLocation(item.id); load(); }} className="rounded border border-emerald-200 px-2 py-1 text-xs text-emerald-700 hover:bg-emerald-50" title="استعادة"><Store size={14} /></button>
+                          <button onClick={() => { service.restoreLocation(item.id); load(); }} className="rounded border border-success-border px-2 py-1 text-xs text-success hover:bg-success-soft" title="استعادة"><Store size={14} /></button>
                         ) : (
-                          <button onClick={() => { service.archiveLocation(item.id); load(); }} className="rounded border border-rose-200 px-2 py-1 text-xs text-rose-700 hover:bg-rose-50" title="أرشفة"><Archive size={14} /></button>
+                          <button onClick={() => { service.archiveLocation(item.id); load(); }} className="rounded border border-danger-border px-2 py-1 text-xs text-danger hover:bg-danger-soft" title="أرشفة"><Archive size={14} /></button>
                         )}
                       </div>
                     ) : null,
@@ -376,14 +376,14 @@ export const FacilityManagementPage: React.FC = () => {
                     key: 'asset', header: 'الأصل',
                     render: (item) => (
                       <span>
-                        <span className={`font-bold text-slate-800 block ${item.archivedAt ? 'opacity-60' : ''}`}>{item.name}</span>
-                        <span className="text-xs text-slate-400">{item.code}</span>
-                        {item.archivedAt && <span className="text-xs text-rose-500 block">مؤرشف منذ {formatDate(item.archivedAt)}</span>}
+                        <span className={`font-bold text-ink block ${item.archivedAt ? 'opacity-60' : ''}`}>{item.name}</span>
+                        <span className="text-xs text-muted">{item.code}</span>
+                        {item.archivedAt && <span className="text-xs text-danger block">مؤرشف منذ {formatDate(item.archivedAt)}</span>}
                       </span>
                     ),
                   },
                   { key: 'location', header: 'الموقع', render: (item) => item.locationName },
-                  { key: 'category', header: 'الفئة / الرقم التسلسلي', render: (item) => <span>{item.category}<span className="block text-xs text-slate-400">{item.serialNumber || '—'}</span></span> },
+                  { key: 'category', header: 'الفئة / الرقم التسلسلي', render: (item) => <span>{item.category}<span className="block text-xs text-muted">{item.serialNumber || '—'}</span></span> },
                   { key: 'responsible', header: 'المسؤول (موظف)', render: (item) => item.responsibleName || 'غير محدد' },
                   { key: 'warranty', header: 'الضمان', render: (item) => formatDate(item.warrantyExpiresAt) },
                   { key: 'status', header: 'الحالة', render: (item) => statusBadge(item.status) },
@@ -391,13 +391,13 @@ export const FacilityManagementPage: React.FC = () => {
                     key: 'actions', header: 'إجراءات', align: 'center',
                     render: (item) => canManage ? (
                       <div className="flex flex-wrap justify-center gap-1">
-                        <button onClick={() => openEdit('assets', item.id)} className="rounded border border-slate-200 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50" title="تعديل"><Edit3 size={14} /></button>
+                        <button onClick={() => openEdit('assets', item.id)} className="rounded border border-line px-2 py-1 text-xs text-ink-secondary hover:bg-surface-muted" title="تعديل"><Edit3 size={14} /></button>
                         {item.status === 'RETIRED' ? (
-                          <button onClick={() => { service.restoreAsset(item.id); load(); }} className="rounded border border-emerald-200 px-2 py-1 text-xs text-emerald-700 hover:bg-emerald-50" title="استعادة"><Store size={14} /></button>
+                          <button onClick={() => { service.restoreAsset(item.id); load(); }} className="rounded border border-success-border px-2 py-1 text-xs text-success hover:bg-success-soft" title="استعادة"><Store size={14} /></button>
                         ) : (
                           <>
-                            <button onClick={() => { service.archiveAsset(item.id); load(); }} className="rounded border border-rose-200 px-2 py-1 text-xs text-rose-700 hover:bg-rose-50" title="أرشفة"><Archive size={14} /></button>
-                            <button onClick={() => { service.retireAsset(item.id); load(); }} className="rounded border border-slate-200 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50" title="استبعاد"><Trash2 size={14} /></button>
+                            <button onClick={() => { service.archiveAsset(item.id); load(); }} className="rounded border border-danger-border px-2 py-1 text-xs text-danger hover:bg-danger-soft" title="أرشفة"><Archive size={14} /></button>
+                            <button onClick={() => { service.retireAsset(item.id); load(); }} className="rounded border border-line px-2 py-1 text-xs text-ink-secondary hover:bg-surface-muted" title="استبعاد"><Trash2 size={14} /></button>
                           </>
                         )}
                       </div>
@@ -412,52 +412,52 @@ export const FacilityManagementPage: React.FC = () => {
   const renderMaintenanceBody = () => {
     const rows = workOrders.filter((item) => visible(`${item.workOrderNumber} ${item.title} ${item.locationName} ${item.assetName || ''} ${item.vendorName || ''}`));
     return (
-      <div className="divide-y divide-slate-100">
+      <div className="divide-y divide-line-strong">
         {rows.map((item) => (
           <article key={item.id} className="grid gap-3 px-4 py-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(130px,.7fr)_minmax(130px,.7fr)_minmax(130px,.8fr)_minmax(170px,auto)] lg:items-center">
             <div>
               <div className="flex flex-wrap items-center gap-2">
-                <span className="font-mono text-xs text-slate-400">{item.workOrderNumber}</span>{statusBadge(item.status)}
-                <span className="text-xs text-slate-500">{typeLabels[item.requestType]}</span>
+                <span className="font-mono text-xs text-muted">{item.workOrderNumber}</span>{statusBadge(item.status)}
+                <span className="text-xs text-muted">{typeLabels[item.requestType]}</span>
               </div>
-              <h3 className="mt-1 font-bold text-slate-800">{item.title}</h3>
-              <p className="mt-1 text-xs text-slate-500">{item.locationName}{item.assetName ? ` · ${item.assetName}` : ''}</p>
-              {item.description && <p className="mt-1 text-sm text-slate-600">{item.description}</p>}
-              <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-500">
+              <h3 className="mt-1 font-bold text-ink">{item.title}</h3>
+              <p className="mt-1 text-xs text-muted">{item.locationName}{item.assetName ? ` · ${item.assetName}` : ''}</p>
+              {item.description && <p className="mt-1 text-sm text-ink-secondary">{item.description}</p>}
+              <div className="mt-2 flex flex-wrap gap-2 text-xs text-muted">
                 <span>طلب من: {item.requesterName}</span>
                 {item.assignedTo && <span>الفني: {item.assigneeName}</span>}
                 <span>ساعات العمل: {item.workHours}</span>
                 <span>وقت الاستجابة: {item.responseTimeMinutes} د</span>
                 <span>وقت الحل: {item.resolutionTimeMinutes} د</span>
-                {item.slaTargetMinutes && <span className={item.slaMet ? 'text-emerald-600' : 'text-rose-600'}>التزام SLA: {item.slaMet ? 'نعم' : 'لا'}</span>}
+                {item.slaTargetMinutes && <span className={item.slaMet ? 'text-success' : 'text-danger'}>التزام SLA: {item.slaMet ? 'نعم' : 'لا'}</span>}
               </div>
             </div>
             <div className="text-sm">
-              <div className="text-xs text-slate-400">التكلفة الإجمالية</div>
+              <div className="text-xs text-muted">التكلفة الإجمالية</div>
               <div className="font-bold">{amountLabel(Number(item.laborCost) + Number(item.partsCost) + Number(item.serviceCost))}</div>
             </div>
             <div className="text-sm">
-              <div className="text-xs text-slate-400">الموعد</div>
+              <div className="text-xs text-muted">الموعد</div>
               <div>{formatDate(item.scheduledDate)}</div>
             </div>
             <div className="text-sm">
-              <div className="text-xs text-slate-400">تاريخ الإكمال</div>
+              <div className="text-xs text-muted">تاريخ الإكمال</div>
               <div>{formatDate(item.completedDate)}</div>
             </div>
             <div className="flex flex-wrap gap-1 justify-end lg:justify-start">
               {canManage && !['COMPLETED', 'CANCELLED'].includes(item.status) && (
                 <>
-                  <button onClick={() => { service.approveWorkOrder(item.id); load(); }} className="rounded border border-sky-200 px-2 py-1 text-xs font-bold text-sky-700 hover:bg-sky-50" disabled={item.status !== 'OPEN'} title="اعتماد">{item.status === 'OPEN' ? 'اعتماد' : '—'}</button>
-                  <button onClick={() => { setWoDetailId(item.id); loadWoDetail(item.id); }} className="rounded border border-slate-200 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50" title="تفاصيل الدورة"><History size={14} /></button>
-                  <button onClick={() => { service.startWorkOrder(item.id); load(); }} className="rounded border border-blue-200 px-2 py-1 text-xs font-bold text-blue-700 hover:bg-blue-50" disabled={item.status !== 'APPROVED'} title="بدء التنفيذ">بدء</button>
-                  <button onClick={() => { setWoDetailId(item.id); loadWoDetail(item.id); }} className="rounded border border-emerald-200 px-2 py-1 text-xs font-bold text-emerald-700 hover:bg-emerald-50" disabled={item.status !== 'IN_PROGRESS'} title="إكمال مع فحص جودة">إكمال</button>
+                  <button onClick={() => { service.approveWorkOrder(item.id); load(); }} className="rounded border border-accent-border px-2 py-1 text-xs font-bold text-primary hover:bg-accent-soft" disabled={item.status !== 'OPEN'} title="اعتماد">{item.status === 'OPEN' ? 'اعتماد' : '—'}</button>
+                  <button onClick={() => { setWoDetailId(item.id); loadWoDetail(item.id); }} className="rounded border border-line px-2 py-1 text-xs text-ink-secondary hover:bg-surface-muted" title="تفاصيل الدورة"><History size={14} /></button>
+                  <button onClick={() => { service.startWorkOrder(item.id); load(); }} className="rounded border border-accent-border px-2 py-1 text-xs font-bold text-primary hover:bg-accent-soft" disabled={item.status !== 'APPROVED'} title="بدء التنفيذ">بدء</button>
+                  <button onClick={() => { setWoDetailId(item.id); loadWoDetail(item.id); }} className="rounded border border-success-border px-2 py-1 text-xs font-bold text-success hover:bg-success-soft" disabled={item.status !== 'IN_PROGRESS'} title="إكمال مع فحص جودة">إكمال</button>
                 </>
               )}
               {canManage && item.status === 'COMPLETED' && (
-                <button onClick={() => { setWoDetailId(item.id); loadWoDetail(item.id); }} className="rounded border border-rose-200 px-2 py-1 text-xs font-bold text-rose-700 hover:bg-rose-50" title="إعادة فتح"><RotateCcw size={14} /></button>
+                <button onClick={() => { setWoDetailId(item.id); loadWoDetail(item.id); }} className="rounded border border-danger-border px-2 py-1 text-xs font-bold text-danger hover:bg-danger-soft" title="إعادة فتح"><RotateCcw size={14} /></button>
               )}
               {canManage && !item.archivedAt && (
-                <button onClick={() => { service.archiveAsset(item.id); load(); }} className="rounded border border-slate-200 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50" title="أرشفة"><Archive size={14} /></button>
+                <button onClick={() => { service.archiveAsset(item.id); load(); }} className="rounded border border-line px-2 py-1 text-xs text-ink-secondary hover:bg-surface-muted" title="أرشفة"><Archive size={14} /></button>
               )}
             </div>
           </article>
@@ -475,14 +475,14 @@ export const FacilityManagementPage: React.FC = () => {
                 rowKey={(item) => item.id}
                 minWidth={800}
                 columns={[
-                  { key: 'contract', header: 'العقد', render: (item) => <span><span className="font-bold text-slate-800 block">{item.title}</span><span className="text-xs text-slate-400">{item.contractNumber}</span></span> },
-                  { key: 'type', header: 'النوع والموقع', render: (item) => <span>{typeLabels[item.contractType]}<span className="block text-xs text-slate-400">{item.locationName}</span></span> },
+                  { key: 'contract', header: 'العقد', render: (item) => <span><span className="font-bold text-ink block">{item.title}</span><span className="text-xs text-muted">{item.contractNumber}</span></span> },
+                  { key: 'type', header: 'النوع والموقع', render: (item) => <span>{typeLabels[item.contractType]}<span className="block text-xs text-muted">{item.locationName}</span></span> },
                   { key: 'vendor', header: 'المورد', render: (item) => item.vendorName },
                   { key: 'ends', header: 'الانتهاء', render: (item) => formatDate(item.endsAt) },
                   { key: 'next', header: 'الدفعة التالية', render: (item) => formatDate(item.nextPaymentDate) },
-                  { key: 'amount', header: 'قيمة الدفعة', render: (item) => <span className="font-bold">{amountLabel(item.paymentAmount)} <span className="font-normal text-slate-400">/ {typeLabels[item.paymentCycle] || item.paymentCycle}</span></span> },
+                  { key: 'amount', header: 'قيمة الدفعة', render: (item) => <span className="font-bold">{amountLabel(item.paymentAmount)} <span className="font-normal text-muted">/ {typeLabels[item.paymentCycle] || item.paymentCycle}</span></span> },
                   { key: 'status', header: 'الحالة', render: (item) => statusBadge(item.status) },
-                  { key: 'actions', header: 'إجراءات', align: 'center', render: (item) => canManage ? <button onClick={() => openEdit('contracts', item.id)} className="rounded border border-slate-200 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50" title="تعديل"><Edit3 size={14} /></button> : null },
+                  { key: 'actions', header: 'إجراءات', align: 'center', render: (item) => canManage ? <button onClick={() => openEdit('contracts', item.id)} className="rounded border border-line px-2 py-1 text-xs text-ink-secondary hover:bg-surface-muted" title="تعديل"><Edit3 size={14} /></button> : null },
                 ]}
               />
 
@@ -492,19 +492,19 @@ export const FacilityManagementPage: React.FC = () => {
   const renderSafetyBody = () => {
     const rows = safetyRecords.filter((item) => visible(`${item.title} ${item.locationName} ${item.assetName || ''} ${item.checklistName || ''} ${item.observations || ''}`));
     return (
-      <div className="divide-y divide-slate-100">
+      <div className="divide-y divide-line-strong">
         {rows.map((item) => (
           <article key={item.id} className="grid gap-3 px-4 py-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(140px,.7fr)_minmax(130px,.7fr)_minmax(140px,.8fr)_auto] lg:items-center">
             <div>
-              <div className="flex flex-wrap items-center gap-2">{statusBadge(item.result)}<span className="text-xs text-slate-500">{typeLabels[item.recordType]}{item.riskLevel ? ` · خطورة ${typeLabels[item.riskLevel] || item.riskLevel}` : ''}</span></div>
-              <h3 className="mt-1 font-bold text-slate-800">{item.title}</h3>
-              <p className="mt-1 text-xs text-slate-500">{item.locationName}{item.assetName ? ` · ${item.assetName}` : ''}{item.checklistName ? ` · ${item.checklistName}` : ''}</p>
-              {item.observations && <p className="mt-1 text-sm text-slate-600">{item.observations}</p>}
+              <div className="flex flex-wrap items-center gap-2">{statusBadge(item.result)}<span className="text-xs text-muted">{typeLabels[item.recordType]}{item.riskLevel ? ` · خطورة ${typeLabels[item.riskLevel] || item.riskLevel}` : ''}</span></div>
+              <h3 className="mt-1 font-bold text-ink">{item.title}</h3>
+              <p className="mt-1 text-xs text-muted">{item.locationName}{item.assetName ? ` · ${item.assetName}` : ''}{item.checklistName ? ` · ${item.checklistName}` : ''}</p>
+              {item.observations && <p className="mt-1 text-sm text-ink-secondary">{item.observations}</p>}
             </div>
-            <div className="text-sm"><div className="text-xs text-slate-400">الإجراء التصحيحي</div><div>{item.correctiveAction || 'لا يوجد'}</div></div>
-            <div className="text-sm"><div className="text-xs text-slate-400">موعد المتابعة</div><div>{formatDate(item.dueDate)}</div></div>
-            <div className="text-sm"><div className="text-xs text-slate-400">مسجل بواسطة</div><div>{item.recorderName}</div></div>
-            {canManage && item.result !== 'CLOSED' && <button onClick={() => { service.closeSafetyRecord(item.id); load(); }} className="inline-flex items-center gap-1 rounded border border-emerald-200 px-2.5 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-50"><Check size={14} /> إغلاق</button>}
+            <div className="text-sm"><div className="text-xs text-muted">الإجراء التصحيحي</div><div>{item.correctiveAction || 'لا يوجد'}</div></div>
+            <div className="text-sm"><div className="text-xs text-muted">موعد المتابعة</div><div>{formatDate(item.dueDate)}</div></div>
+            <div className="text-sm"><div className="text-xs text-muted">مسجل بواسطة</div><div>{item.recorderName}</div></div>
+            {canManage && item.result !== 'CLOSED' && <button onClick={() => { service.closeSafetyRecord(item.id); load(); }} className="inline-flex items-center gap-1 rounded border border-success-border px-2.5 py-1.5 text-xs font-bold text-success hover:bg-success-soft"><Check size={14} /> إغلاق</button>}
           </article>
         ))}
       </div>
@@ -528,13 +528,13 @@ export const FacilityManagementPage: React.FC = () => {
         title="المرافق والأصول التشغيلية"
         description="المواقع، الأصول، أوامر العمل، العقود، وسجلات السلامة مع دورة حياة كاملة وسجل تغييرات."
         actions={<>
-          <button onClick={load} title="تحديث" className="inline-flex h-10 w-10 items-center justify-center rounded border border-slate-300 bg-white text-slate-600 hover:bg-slate-50"><RefreshCw size={17} /></button>
-          {canManage && <button onClick={() => openForm(activeTab)} className="inline-flex h-10 items-center gap-2 rounded bg-teal-700 px-4 text-sm font-bold text-white hover:bg-teal-800"><Plus size={17} /> إضافة {activeTab === 'locations' ? 'موقع' : activeTab === 'assets' ? 'أصل' : activeTab === 'maintenance' ? 'طلب صيانة' : activeTab === 'contracts' ? 'عقد' : 'سجل سلامة'}</button>}
+          <button onClick={load} title="تحديث" className="inline-flex h-10 w-10 items-center justify-center rounded border border-line-strong bg-surface text-ink-secondary hover:bg-surface-muted"><RefreshCw size={17} /></button>
+          {canManage && <button onClick={() => openForm(activeTab)} className="inline-flex h-10 items-center gap-2 rounded bg-success px-4 text-sm font-bold text-white hover:bg-success"><Plus size={17} /> إضافة {activeTab === 'locations' ? 'موقع' : activeTab === 'assets' ? 'أصل' : activeTab === 'maintenance' ? 'طلب صيانة' : activeTab === 'contracts' ? 'عقد' : 'سجل سلامة'}</button>}
         </>}
       />
 
-      {notice && <div className="flex items-center justify-between border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm text-emerald-800"><span>{notice}</span><button onClick={() => setNotice('')} aria-label="إغلاق" className="p-1"><X size={15} /></button></div>}
-      {error && !modalOpen && !woDetailId && <div role="alert" className="flex items-center gap-2 border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800"><AlertTriangle size={17} />{error}</div>}
+      {notice && <div className="flex items-center justify-between border border-success-border bg-success-soft px-4 py-2 text-sm text-success"><span>{notice}</span><button onClick={() => setNotice('')} aria-label="إغلاق" className="p-1"><X size={15} /></button></div>}
+      {error && !modalOpen && !woDetailId && <div role="alert" className="flex items-center gap-2 border border-danger-border bg-danger-soft px-4 py-3 text-sm text-danger"><AlertTriangle size={17} />{error}</div>}
 
       <section className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         <Summary icon={MapPin} label="المواقع النشطة" value={formatNumber(locations.filter((i) => !i.archivedAt).length)} accent="teal" />
@@ -543,108 +543,108 @@ export const FacilityManagementPage: React.FC = () => {
         <Summary icon={AlertTriangle} label="ملاحظات سلامة مفتوحة" value={formatNumber(dueSafety)} sub={`تكلفة الصيانة المسجلة ${amountLabel(maintenanceSpend)}`} accent="rose" />
       </section>
 
-      {activeTab === 'maintenance' && maintenanceSchedules.length > 0 && <section className="border border-teal-200 bg-teal-50/50 p-4">
-        <div className="mb-3 flex items-center justify-between"><h2 className="font-bold text-slate-800">جداول الصيانة الوقائية</h2><span className="text-xs text-slate-500">{formatNumber(maintenanceSchedules.length)} جدول</span></div>
-        <div className="grid gap-2 md:grid-cols-2">{maintenanceSchedules.map((schedule) => <article key={schedule.id} className="flex flex-wrap items-center justify-between gap-3 border border-teal-100 bg-white p-3"><div><div className="font-bold text-slate-800">{schedule.title}</div><div className="mt-1 text-xs text-slate-500">{schedule.locationName}{schedule.assetName ? ` · ${schedule.assetName}` : ''} · كل {formatNumber(schedule.intervalDays)} يوم · التالي {formatDate(schedule.nextDueDate)}</div></div>{canManage && schedule.nextDueDate <= new Date().toISOString().slice(0, 10) && <button onClick={() => { try { service.createDueScheduleWorkOrder(schedule.id); setNotice('تم إنشاء أمر الصيانة الوقائية المستحق.'); load(); } catch (cause) { setError(cause instanceof Error ? cause.message : 'تعذر إنشاء أمر الصيانة.'); } }} className="border border-teal-700 px-3 py-1.5 text-xs font-bold text-teal-800 hover:bg-teal-50">إنشاء أمر مستحق</button>}</article>)}</div>
+      {activeTab === 'maintenance' && maintenanceSchedules.length > 0 && <section className="border border-success-border bg-success-soft/50 p-4">
+        <div className="mb-3 flex items-center justify-between"><h2 className="font-bold text-ink">جداول الصيانة الوقائية</h2><span className="text-xs text-muted">{formatNumber(maintenanceSchedules.length)} جدول</span></div>
+        <div className="grid gap-2 md:grid-cols-2">{maintenanceSchedules.map((schedule) => <article key={schedule.id} className="flex flex-wrap items-center justify-between gap-3 border border-success-border bg-surface p-3"><div><div className="font-bold text-ink">{schedule.title}</div><div className="mt-1 text-xs text-muted">{schedule.locationName}{schedule.assetName ? ` · ${schedule.assetName}` : ''} · كل {formatNumber(schedule.intervalDays)} يوم · التالي {formatDate(schedule.nextDueDate)}</div></div>{canManage && schedule.nextDueDate <= new Date().toISOString().slice(0, 10) && <button onClick={() => { try { service.createDueScheduleWorkOrder(schedule.id); setNotice('تم إنشاء أمر الصيانة الوقائية المستحق.'); load(); } catch (cause) { setError(cause instanceof Error ? cause.message : 'تعذر إنشاء أمر الصيانة.'); } }} className="border border-success px-3 py-1.5 text-xs font-bold text-success hover:bg-success-soft">إنشاء أمر مستحق</button>}</article>)}</div>
       </section>}
 
-      {activeTab === 'maintenance' && workOrders.some((item) => item.expenseId || item.inventoryTransactionId) && <section className="border border-slate-200 bg-white p-4">
-        <h2 className="mb-3 font-bold text-slate-800">روابط المصروف والمخزون</h2>
-        <div className="grid gap-2 md:grid-cols-2">{workOrders.filter((item) => (item.expenseId || item.inventoryTransactionId) && visible(`${item.title} ${item.workOrderNumber}`)).map((item) => <article key={item.id} className="border border-slate-100 p-3"><div className="font-bold text-slate-800">{item.workOrderNumber} · {item.title}</div><div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-teal-800">{item.expenseId && <span>مصروف: {item.expenseDescription || item.expenseId}</span>}{item.inventoryTransactionId && <span>حركة صرف: {item.stockTransactionNumber || item.inventoryTransactionId}</span>}</div></article>)}</div>
+      {activeTab === 'maintenance' && workOrders.some((item) => item.expenseId || item.inventoryTransactionId) && <section className="border border-line bg-surface p-4">
+        <h2 className="mb-3 font-bold text-ink">روابط المصروف والمخزون</h2>
+        <div className="grid gap-2 md:grid-cols-2">{workOrders.filter((item) => (item.expenseId || item.inventoryTransactionId) && visible(`${item.title} ${item.workOrderNumber}`)).map((item) => <article key={item.id} className="border border-line p-3"><div className="font-bold text-ink">{item.workOrderNumber} · {item.title}</div><div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-success">{item.expenseId && <span>مصروف: {item.expenseDescription || item.expenseId}</span>}{item.inventoryTransactionId && <span>حركة صرف: {item.stockTransactionNumber || item.inventoryTransactionId}</span>}</div></article>)}</div>
       </section>}
 
-      <section className="overflow-hidden border border-slate-200 bg-white">
-        <div className="flex flex-col gap-3 border-b border-slate-200 px-4 pt-3 md:flex-row md:items-center md:justify-between">
-          <nav className="flex gap-1 overflow-x-auto" aria-label="أقسام إدارة المنشأة">{tabs.map(({ key, label, icon: Icon }) => <button key={key} onClick={() => { setActiveTab(key); setSearch(''); }} className={`inline-flex shrink-0 items-center gap-2 border-b-2 px-3 py-3 text-sm font-bold transition ${activeTab === key ? 'border-teal-700 text-teal-800' : 'border-transparent text-slate-500 hover:text-slate-800'}`}><Icon size={16} />{label}</button>)}</nav>
-          <label className="mb-2 flex h-9 min-w-[220px] items-center gap-2 border border-slate-200 px-3 text-slate-400 md:mb-0"><Search size={16} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="بحث في السجلات" className="w-full bg-transparent text-sm text-slate-800 outline-none placeholder:text-slate-400" /></label>
+      <section className="overflow-hidden border border-line bg-surface">
+        <div className="flex flex-col gap-3 border-b border-line px-4 pt-3 md:flex-row md:items-center md:justify-between">
+          <nav className="flex gap-1 overflow-x-auto" aria-label="أقسام إدارة المنشأة">{tabs.map(({ key, label, icon: Icon }) => <button key={key} onClick={() => { setActiveTab(key); setSearch(''); }} className={`inline-flex shrink-0 items-center gap-2 border-b-2 px-3 py-3 text-sm font-bold transition ${activeTab === key ? 'border-success text-success' : 'border-transparent text-muted hover:text-ink'}`}><Icon size={16} />{label}</button>)}</nav>
+          <label className="mb-2 flex h-9 min-w-[220px] items-center gap-2 border border-line px-3 text-muted md:mb-0"><Search size={16} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="بحث في السجلات" className="w-full bg-transparent text-sm text-ink outline-none placeholder:text-muted" /></label>
         </div>
-        {loading ? <div className="flex items-center justify-center gap-2 py-16 text-sm text-slate-500"><RefreshCw className="animate-spin" size={17} /> جارٍ تحميل البيانات</div>
+        {loading ? <div className="flex items-center justify-center gap-2 py-16 text-sm text-muted"><RefreshCw className="animate-spin" size={17} /> جارٍ تحميل البيانات</div>
           : (activeTab === 'locations' && !locations.length || activeTab === 'assets' && !assets.length || activeTab === 'maintenance' && !workOrders.length || activeTab === 'contracts' && !contracts.length || activeTab === 'safety' && !safetyRecords.length)
-            ? <div className="py-16 text-center"><div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center bg-slate-100 text-slate-500"><activeTabInfo.icon size={22} /></div><h2 className="font-bold text-slate-800">لا توجد سجلات في هذا القسم</h2><p className="mt-1 text-sm text-slate-500">ابدأ بإضافة أول سجل ليظهر هنا.</p>{canManage && <button onClick={() => openForm(activeTab)} className="mt-4 inline-flex items-center gap-2 border border-teal-700 px-3 py-2 text-sm font-bold text-teal-800 hover:bg-teal-50"><Plus size={16} /> إضافة سجل</button>}</div>
+            ? <div className="py-16 text-center"><div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center bg-surface-sunken text-muted"><activeTabInfo.icon size={22} /></div><h2 className="font-bold text-ink">لا توجد سجلات في هذا القسم</h2><p className="mt-1 text-sm text-muted">ابدأ بإضافة أول سجل ليظهر هنا.</p>{canManage && <button onClick={() => openForm(activeTab)} className="mt-4 inline-flex items-center gap-2 border border-success px-3 py-2 text-sm font-bold text-success hover:bg-success-soft"><Plus size={16} /> إضافة سجل</button>}</div>
             : renderBody()}
       </section>
 
       {/* --- MODAL: ADD / EDIT --- */}
-      {modalOpen && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-3" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setModalOpen(false); }}><section role="dialog" aria-modal="true" aria-labelledby="facility-form-title" className="max-h-[92vh] w-full max-w-3xl overflow-y-auto border border-slate-200 bg-white shadow-2xl"><div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white px-5 py-4"><div><p className="text-xs font-bold text-teal-700">{activeTabInfo.label}</p><h2 id="facility-form-title" className="mt-1 text-lg font-black text-slate-900">{editingId ? 'تعديل سجل' : 'إضافة سجل جديد'}</h2></div><button onClick={() => setModalOpen(false)} aria-label="إغلاق" className="flex h-9 w-9 items-center justify-center border border-slate-200 text-slate-500 hover:bg-slate-50"><X size={18} /></button></div><form onSubmit={editingId ? submitEdit : submit} className="p-5"><div className="grid gap-4 sm:grid-cols-2">{fields[activeTab].map((field) => <label key={field.key} className={`block ${field.type === 'textarea' ? 'sm:col-span-2' : ''}`}><span className="mb-1.5 block text-sm font-bold text-slate-700">{field.label}{field.required && <span className="mr-1 text-rose-600">*</span>}</span>{field.type === 'select' ? <select required={field.required} value={editingId ? (editForm[field.key] || '') : (form[field.key] || '')} onChange={(event) => { if (editingId) setEditForm((current) => ({ ...current, [field.key]: event.target.value })); else setForm((current) => ({ ...current, [field.key]: event.target.value })); }} className="h-10 w-full border border-slate-300 bg-white px-3 text-sm outline-none focus:border-teal-700"><option value="">اختر...</option>{field.options?.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select> : field.type === 'textarea' ? <textarea value={editingId ? (editForm[field.key] || '') : (form[field.key] || '')} onChange={(event) => { if (editingId) setEditForm((current) => ({ ...current, [field.key]: event.target.value })); else setForm((current) => ({ ...current, [field.key]: event.target.value })); }} rows={3} className="w-full border border-slate-300 px-3 py-2 text-sm outline-none focus:border-teal-700" /> : <input required={field.required} value={editingId ? (editForm[field.key] || '') : (form[field.key] || '')} onChange={(event) => { if (editingId) setEditForm((current) => ({ ...current, [field.key]: event.target.value })); else setForm((current) => ({ ...current, [field.key]: event.target.value })); }} className="h-10 w-full border border-slate-300 bg-white px-3 text-sm outline-none focus:border-teal-700" />}</label>)}</div>
+      {modalOpen && <div className="fixed inset-0 z-50 flex items-center justify-center bg-primary/45 p-3" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setModalOpen(false); }}><section role="dialog" aria-modal="true" aria-labelledby="facility-form-title" className="max-h-[92vh] w-full max-w-3xl overflow-y-auto border border-line bg-surface shadow-2xl"><div className="sticky top-0 z-10 flex items-center justify-between border-b border-line bg-surface px-5 py-4"><div><p className="text-xs font-bold text-success">{activeTabInfo.label}</p><h2 id="facility-form-title" className="mt-1 text-lg font-black text-ink">{editingId ? 'تعديل سجل' : 'إضافة سجل جديد'}</h2></div><button onClick={() => setModalOpen(false)} aria-label="إغلاق" className="flex h-9 w-9 items-center justify-center border border-line text-muted hover:bg-surface-muted"><X size={18} /></button></div><form onSubmit={editingId ? submitEdit : submit} className="p-5"><div className="grid gap-4 sm:grid-cols-2">{fields[activeTab].map((field) => <label key={field.key} className={`block ${field.type === 'textarea' ? 'sm:col-span-2' : ''}`}><span className="mb-1.5 block text-sm font-bold text-ink">{field.label}{field.required && <span className="mr-1 text-danger">*</span>}</span>{field.type === 'select' ? <select required={field.required} value={editingId ? (editForm[field.key] || '') : (form[field.key] || '')} onChange={(event) => { if (editingId) setEditForm((current) => ({ ...current, [field.key]: event.target.value })); else setForm((current) => ({ ...current, [field.key]: event.target.value })); }} className="h-10 w-full border border-line-strong bg-surface px-3 text-sm outline-none focus:border-success"><option value="">اختر...</option>{field.options?.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select> : field.type === 'textarea' ? <textarea value={editingId ? (editForm[field.key] || '') : (form[field.key] || '')} onChange={(event) => { if (editingId) setEditForm((current) => ({ ...current, [field.key]: event.target.value })); else setForm((current) => ({ ...current, [field.key]: event.target.value })); }} rows={3} className="w-full border border-line-strong px-3 py-2 text-sm outline-none focus:border-success" /> : <input required={field.required} value={editingId ? (editForm[field.key] || '') : (form[field.key] || '')} onChange={(event) => { if (editingId) setEditForm((current) => ({ ...current, [field.key]: event.target.value })); else setForm((current) => ({ ...current, [field.key]: event.target.value })); }} className="h-10 w-full border border-line-strong bg-surface px-3 text-sm outline-none focus:border-success" />}</label>)}</div>
         <div className="mt-4 flex justify-end gap-2">
-          <button type="button" onClick={() => { setModalOpen(false); if (editingId) { setEditingId(null); setEditForm({}); } }} className="rounded border border-slate-200 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50">إلغاء</button>
-          <button type="submit" disabled={saving} className="rounded bg-teal-700 px-4 py-2 text-sm font-bold text-white hover:bg-teal-800 disabled:opacity-60">{editingId ? 'حفظ التعديل' : 'حفظ السجل'}</button>
+          <button type="button" onClick={() => { setModalOpen(false); if (editingId) { setEditingId(null); setEditForm({}); } }} className="rounded border border-line px-4 py-2 text-sm text-ink-secondary hover:bg-surface-muted">إلغاء</button>
+          <button type="submit" disabled={saving} className="rounded bg-success px-4 py-2 text-sm font-bold text-white hover:bg-success disabled:opacity-60">{editingId ? 'حفظ التعديل' : 'حفظ السجل'}</button>
         </div></form></section></div>}
 
       {/* --- MODAL: WORK ORDER DETAIL / LIFECYCLE --- */}
-      {woDetailId && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-3" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) { setWoDetailId(null); setWoAttachments([]); setWoHistory([]); } }}><section role="dialog" aria-modal="true" aria-labelledby="wo-detail-title" className="max-h-[92vh] w-full max-w-4xl overflow-y-auto border border-slate-200 bg-white shadow-2xl"><div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white px-5 py-4"><div><p className="text-xs font-bold text-teal-700">أمر عمل - تفاصيل ودورة الحياة</p><h2 id="wo-detail-title" className="mt-1 text-lg font-black text-slate-900">تفاصيل الأمر</h2></div><button onClick={() => { setWoDetailId(null); setWoAttachments([]); setWoHistory([]); }} aria-label="إغلاق" className="flex h-9 w-9 items-center justify-center border border-slate-200 text-slate-500 hover:bg-slate-50"><X size={18} /></button></div><div className="p-6">
+      {woDetailId && <div className="fixed inset-0 z-50 flex items-center justify-center bg-primary/45 p-3" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) { setWoDetailId(null); setWoAttachments([]); setWoHistory([]); } }}><section role="dialog" aria-modal="true" aria-labelledby="wo-detail-title" className="max-h-[92vh] w-full max-w-4xl overflow-y-auto border border-line bg-surface shadow-2xl"><div className="sticky top-0 z-10 flex items-center justify-between border-b border-line bg-surface px-5 py-4"><div><p className="text-xs font-bold text-success">أمر عمل - تفاصيل ودورة الحياة</p><h2 id="wo-detail-title" className="mt-1 text-lg font-black text-ink">تفاصيل الأمر</h2></div><button onClick={() => { setWoDetailId(null); setWoAttachments([]); setWoHistory([]); }} aria-label="إغلاق" className="flex h-9 w-9 items-center justify-center border border-line text-muted hover:bg-surface-muted"><X size={18} /></button></div><div className="p-6">
         {(() => {
           const item = workOrders.find((i) => i.id === woDetailId);
-          if (!item) return <div className="text-sm text-slate-500">جاري التحميل...</div>;
+          if (!item) return <div className="text-sm text-muted">جاري التحميل...</div>;
           return (
             <div className="space-y-6">
               <div className="grid gap-4 sm:grid-cols-3">
-                <div className="border border-slate-200 p-4 rounded"><div className="text-xs text-slate-500">رقم الأمر</div><div className="font-mono font-bold text-slate-800">{item.workOrderNumber}</div></div>
-                <div className="border border-slate-200 p-4 rounded"><div className="text-xs text-slate-500">الحالة</div><div className="font-bold">{statusBadge(item.status)}</div></div>
-                <div className="border border-slate-200 p-4 rounded"><div className="text-xs text-slate-500">النوع</div><div className="font-bold text-slate-800">{typeLabels[item.requestType]}</div></div>
-                <div className="border border-slate-200 p-4 rounded"><div className="text-xs text-slate-500">الأولوية</div><div className="font-bold text-slate-800">{item.priority}</div></div>
-                <div className="border border-slate-200 p-4 rounded"><div className="text-xs text-slate-500">الموقع</div><div className="font-bold text-slate-800">{item.locationName}</div></div>
-                <div className="border border-slate-200 p-4 rounded"><div className="text-xs text-slate-500">الأصل</div><div className="font-bold text-slate-800">{item.assetName || 'غير محدد'}</div></div>
+                <div className="border border-line p-4 rounded"><div className="text-xs text-muted">رقم الأمر</div><div className="font-mono font-bold text-ink">{item.workOrderNumber}</div></div>
+                <div className="border border-line p-4 rounded"><div className="text-xs text-muted">الحالة</div><div className="font-bold">{statusBadge(item.status)}</div></div>
+                <div className="border border-line p-4 rounded"><div className="text-xs text-muted">النوع</div><div className="font-bold text-ink">{typeLabels[item.requestType]}</div></div>
+                <div className="border border-line p-4 rounded"><div className="text-xs text-muted">الأولوية</div><div className="font-bold text-ink">{item.priority}</div></div>
+                <div className="border border-line p-4 rounded"><div className="text-xs text-muted">الموقع</div><div className="font-bold text-ink">{item.locationName}</div></div>
+                <div className="border border-line p-4 rounded"><div className="text-xs text-muted">الأصل</div><div className="font-bold text-ink">{item.assetName || 'غير محدد'}</div></div>
               </div>
-              <div className="border border-slate-200 p-4 rounded">
-                <div className="text-xs font-bold text-slate-700 mb-2">الوصف</div>
-                <div className="text-slate-600">{item.description || '—'}</div>
-              </div>
-              <div className="grid gap-4 sm:grid-cols-4">
-                <div className="border border-slate-200 p-4 rounded"><div className="text-xs text-slate-500">تكلفة العمالة</div><div className="font-bold text-slate-800">{amountLabel(item.laborCost)}</div></div>
-                <div className="border border-slate-200 p-4 rounded"><div className="text-xs text-slate-500">تكلفة قطع الغيار</div><div className="font-bold text-slate-800">{amountLabel(item.partsCost)}</div></div>
-                <div className="border border-slate-200 p-4 rounded"><div className="text-xs text-slate-500">تكلفة الخدمات</div><div className="font-bold text-slate-800">{amountLabel(item.serviceCost)}</div></div>
-                <div className="border border-slate-200 p-4 rounded"><div className="text-xs text-slate-500">المجموع</div><div className="font-bold text-teal-700">{amountLabel(Number(item.laborCost) + Number(item.partsCost) + Number(item.serviceCost))}</div></div>
+              <div className="border border-line p-4 rounded">
+                <div className="text-xs font-bold text-ink mb-2">الوصف</div>
+                <div className="text-ink-secondary">{item.description || '—'}</div>
               </div>
               <div className="grid gap-4 sm:grid-cols-4">
-                <div className="border border-slate-200 p-4 rounded"><div className="text-xs text-slate-500">ساعات العمل المسجلة</div><div className="font-bold text-slate-800">{item.workHours} ساعة</div></div>
-                <div className="border border-slate-200 p-4 rounded"><div className="text-xs text-slate-500">وقت الاستجابة</div><div className="font-bold text-slate-800">{item.responseTimeMinutes} دقيقة</div></div>
-                <div className="border border-slate-200 p-4 rounded"><div className="text-xs text-slate-500">وقت الحل</div><div className="font-bold text-slate-800">{item.resolutionTimeMinutes} دقيقة</div></div>
-                <div className="border border-slate-200 p-4 rounded"><div className="text-xs text-slate-500">هدف SLA</div><div className={`font-bold text-slate-800 ${item.slaTargetMinutes ? (item.slaMet ? 'text-emerald-600' : 'text-rose-600') : 'text-slate-500'}`}>{item.slaTargetMinutes ? `${item.slaTargetMinutes} دقيقة - الالتزام: ${item.slaMet ? 'نعم' : 'لا'}` : 'غير محدد'}</div></div>
+                <div className="border border-line p-4 rounded"><div className="text-xs text-muted">تكلفة العمالة</div><div className="font-bold text-ink">{amountLabel(item.laborCost)}</div></div>
+                <div className="border border-line p-4 rounded"><div className="text-xs text-muted">تكلفة قطع الغيار</div><div className="font-bold text-ink">{amountLabel(item.partsCost)}</div></div>
+                <div className="border border-line p-4 rounded"><div className="text-xs text-muted">تكلفة الخدمات</div><div className="font-bold text-ink">{amountLabel(item.serviceCost)}</div></div>
+                <div className="border border-line p-4 rounded"><div className="text-xs text-muted">المجموع</div><div className="font-bold text-success">{amountLabel(Number(item.laborCost) + Number(item.partsCost) + Number(item.serviceCost))}</div></div>
               </div>
-              <div className="border border-slate-200 p-4 rounded">
-                <div className="flex items-center justify-between mb-2"><div className="text-xs font-bold text-slate-700">الفني المسؤول</div>{item.assigneeName ? <span className="text-sm text-slate-600">{item.assigneeName}</span> : <span className="text-sm text-slate-400">غير محدّد</span>}</div>
-                <div className="flex items-center justify-between mb-2"><div className="text-xs font-bold text-slate-700">طلب من</div><span className="text-sm text-slate-600">{item.requesterName}</span></div>
-                <div className="flex items-center justify-between mb-2"><div className="text-xs font-bold text-slate-700">موعد التنفيذ</div><span className="text-sm text-slate-600">{formatDate(item.scheduledDate)}</span></div>
-                <div className="flex items-center justify-between"><div className="text-xs font-bold text-slate-700">تاريخ الإكمال</div><span className={`text-sm font-bold ${item.completedDate ? 'text-emerald-600' : 'text-slate-400'}`}>{formatDate(item.completedDate) || '—'}</span></div>
+              <div className="grid gap-4 sm:grid-cols-4">
+                <div className="border border-line p-4 rounded"><div className="text-xs text-muted">ساعات العمل المسجلة</div><div className="font-bold text-ink">{item.workHours} ساعة</div></div>
+                <div className="border border-line p-4 rounded"><div className="text-xs text-muted">وقت الاستجابة</div><div className="font-bold text-ink">{item.responseTimeMinutes} دقيقة</div></div>
+                <div className="border border-line p-4 rounded"><div className="text-xs text-muted">وقت الحل</div><div className="font-bold text-ink">{item.resolutionTimeMinutes} دقيقة</div></div>
+                <div className="border border-line p-4 rounded"><div className="text-xs text-muted">هدف SLA</div><div className={`font-bold text-ink ${item.slaTargetMinutes ? (item.slaMet ? 'text-success' : 'text-danger') : 'text-muted'}`}>{item.slaTargetMinutes ? `${item.slaTargetMinutes} دقيقة - الالتزام: ${item.slaMet ? 'نعم' : 'لا'}` : 'غير محدد'}</div></div>
+              </div>
+              <div className="border border-line p-4 rounded">
+                <div className="flex items-center justify-between mb-2"><div className="text-xs font-bold text-ink">الفني المسؤول</div>{item.assigneeName ? <span className="text-sm text-ink-secondary">{item.assigneeName}</span> : <span className="text-sm text-muted">غير محدّد</span>}</div>
+                <div className="flex items-center justify-between mb-2"><div className="text-xs font-bold text-ink">طلب من</div><span className="text-sm text-ink-secondary">{item.requesterName}</span></div>
+                <div className="flex items-center justify-between mb-2"><div className="text-xs font-bold text-ink">موعد التنفيذ</div><span className="text-sm text-ink-secondary">{formatDate(item.scheduledDate)}</span></div>
+                <div className="flex items-center justify-between"><div className="text-xs font-bold text-ink">تاريخ الإكمال</div><span className={`text-sm font-bold ${item.completedDate ? 'text-success' : 'text-muted'}`}>{formatDate(item.completedDate) || '—'}</span></div>
               </div>
               {item.resolutionNotes && (
-                <div className="border border-slate-200 p-4 rounded"><div className="text-xs font-bold text-slate-700 mb-2">ملاحظات الإكمال</div><div className="text-slate-600">{item.resolutionNotes}</div></div>
+                <div className="border border-line p-4 rounded"><div className="text-xs font-bold text-ink mb-2">ملاحظات الإكمال</div><div className="text-ink-secondary">{item.resolutionNotes}</div></div>
               )}
-              <div className="border border-slate-200 p-4 rounded">
-                <div className="flex items-center justify-between mb-3"><div className="text-xs font-bold text-slate-700">المرفقات</div><button onClick={() => { /* attachment upload UI can be extended later */ }} className="text-xs text-teal-600 hover:underline">إدارة المرفقات</button></div>
+              <div className="border border-line p-4 rounded">
+                <div className="flex items-center justify-between mb-3"><div className="text-xs font-bold text-ink">المرفقات</div><button onClick={() => { /* attachment upload UI can be extended later */ }} className="text-xs text-success hover:underline">إدارة المرفقات</button></div>
                 <div className="grid gap-2">
-                  {woAttachments.length === 0 && <div className="text-xs text-slate-400">لا توجد مرفقات.</div>}
+                  {woAttachments.length === 0 && <div className="text-xs text-muted">لا توجد مرفقات.</div>}
                   {woAttachments.map((att) => (
-                    <div key={att.id} className="flex items-center justify-between gap-2 text-xs text-slate-600">
+                    <div key={att.id} className="flex items-center justify-between gap-2 text-xs text-ink-secondary">
                       <span>{att.fileName}</span>
-                      <button onClick={() => { service.removeWorkOrderAttachment(att.id); loadWoDetail(item.id); load(); }} className="text-rose-500 hover:text-rose-700"><Trash2 size={14} /></button>
+                      <button onClick={() => { service.removeWorkOrderAttachment(att.id); loadWoDetail(item.id); load(); }} className="text-danger hover:text-danger"><Trash2 size={14} /></button>
                     </div>
                   ))}
                 </div>
               </div>
-              <div className="border border-slate-200 p-4 rounded">
-                <div className="flex items-center justify-between mb-3"><div className="text-xs font-bold text-slate-700">سجل التغييرات والتاريخ</div><span className="text-xs text-slate-500">{woHistory.length} حدث</span></div>
+              <div className="border border-line p-4 rounded">
+                <div className="flex items-center justify-between mb-3"><div className="text-xs font-bold text-ink">سجل التغييرات والتاريخ</div><span className="text-xs text-muted">{woHistory.length} حدث</span></div>
                 <div className="space-y-2">
-                  {woHistory.length === 0 && <div className="text-xs text-slate-400">لا توجد أحداث مسجلة.</div>}
+                  {woHistory.length === 0 && <div className="text-xs text-muted">لا توجد أحداث مسجلة.</div>}
                   {woHistory.map((log) => (
-                    <div key={log.id} className="flex items-start gap-2 text-xs text-slate-600">
-                      <span className="flex-shrink-0 text-slate-400">{formatDate(log.createdAt)}</span>
+                    <div key={log.id} className="flex items-start gap-2 text-xs text-ink-secondary">
+                      <span className="flex-shrink-0 text-muted">{formatDate(log.createdAt)}</span>
                       <div>
-                        <span className="font-bold text-slate-800">{log.actorName}</span>
-                        <span className="text-slate-500"> - {log.action}</span>
-                        {log.newValues && <div className="mt-1 text-xs text-slate-500 break-all">{log.newValues}</div>}
+                        <span className="font-bold text-ink">{log.actorName}</span>
+                        <span className="text-muted"> - {log.action}</span>
+                        {log.newValues && <div className="mt-1 text-xs text-muted break-all">{log.newValues}</div>}
                       </div>
                     </div>
                   ))}
                 </div>
               </div>
               <div className="flex gap-2">
-                {canManage && item.status === 'OPEN' && <button onClick={() => { service.approveWorkOrder(item.id); setWoDetailId(null); load(); }} className="rounded border border-sky-200 px-3 py-1.5 text-xs font-bold text-sky-700 hover:bg-sky-50">اعتماد الأمر</button>}
-                {canManage && item.status === 'APPROVED' && <button onClick={() => { service.startWorkOrder(item.id); setWoDetailId(null); load(); }} className="rounded border border-blue-200 px-3 py-1.5 text-xs font-bold text-blue-700 hover:bg-blue-50">بدء التنفيذ</button>}
-                {canManage && item.status === 'IN_PROGRESS' && <button onClick={() => { setWoDetailId(null); load(); }} className="rounded border border-emerald-200 px-3 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-50">إكمال الأمر مع فحص الجودة</button>}
-                {canManage && (item.status === 'COMPLETED' || item.status === 'CANCELLED') && <button onClick={() => { const reason = window.prompt('سبب إعادة الفتح:'); if (reason !== null) { service.reopenWorkOrder({ id: item.id, reason }); setWoDetailId(null); load(); } }} className="rounded border border-rose-200 px-3 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-50">إعادة فتح الأمر</button>}
-                <button onClick={() => { setWoDetailId(null); setWoAttachments([]); setWoHistory([]); }} className="rounded border border-slate-200 px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-50">إغلاق</button>
+                {canManage && item.status === 'OPEN' && <button onClick={() => { service.approveWorkOrder(item.id); setWoDetailId(null); load(); }} className="rounded border border-accent-border px-3 py-1.5 text-xs font-bold text-primary hover:bg-accent-soft">اعتماد الأمر</button>}
+                {canManage && item.status === 'APPROVED' && <button onClick={() => { service.startWorkOrder(item.id); setWoDetailId(null); load(); }} className="rounded border border-accent-border px-3 py-1.5 text-xs font-bold text-primary hover:bg-accent-soft">بدء التنفيذ</button>}
+                {canManage && item.status === 'IN_PROGRESS' && <button onClick={() => { setWoDetailId(null); load(); }} className="rounded border border-success-border px-3 py-1.5 text-xs font-bold text-success hover:bg-success-soft">إكمال الأمر مع فحص الجودة</button>}
+                {canManage && (item.status === 'COMPLETED' || item.status === 'CANCELLED') && <button onClick={() => { const reason = window.prompt('سبب إعادة الفتح:'); if (reason !== null) { service.reopenWorkOrder({ id: item.id, reason }); setWoDetailId(null); load(); } }} className="rounded border border-danger-border px-3 py-1.5 text-xs font-bold text-danger hover:bg-danger-soft">إعادة فتح الأمر</button>}
+                <button onClick={() => { setWoDetailId(null); setWoAttachments([]); setWoHistory([]); }} className="rounded border border-line px-3 py-1.5 text-xs text-ink-secondary hover:bg-surface-muted">إغلاق</button>
               </div>
             </div>
           );
@@ -655,6 +655,6 @@ export const FacilityManagementPage: React.FC = () => {
 };
 
 function Summary({ icon: Icon, label, value, sub, accent }: { icon: React.ElementType; label: string; value: string; sub?: string; accent: 'teal' | 'amber' | 'blue' | 'rose' }) {
-  const tones = { teal: 'text-teal-700 bg-teal-50', amber: 'text-amber-700 bg-amber-50', blue: 'text-blue-700 bg-blue-50', rose: 'text-rose-700 bg-rose-50' };
-  return <article className="flex min-h-[104px] items-start gap-3 border border-slate-200 bg-white p-4"><div className={`flex h-10 w-10 shrink-0 items-center justify-center ${tones[accent]}`}><Icon size={19} /></div><div className="min-w-0"><p className="text-xs font-semibold text-slate-500">{label}</p><p className="mt-1 text-2xl font-black text-slate-900">{value}</p>{sub && <p className="mt-1 truncate text-xs text-slate-500">{sub}</p>}</div></article>;
+  const tones = { teal: 'text-success bg-success-soft', amber: 'text-warning bg-warning-soft', blue: 'text-primary bg-accent-soft', rose: 'text-danger bg-danger-soft' };
+  return <article className="flex min-h-[104px] items-start gap-3 border border-line bg-surface p-4"><div className={`flex h-10 w-10 shrink-0 items-center justify-center ${tones[accent]}`}><Icon size={19} /></div><div className="min-w-0"><p className="text-xs font-semibold text-muted">{label}</p><p className="mt-1 text-2xl font-black text-ink">{value}</p>{sub && <p className="mt-1 truncate text-xs text-muted">{sub}</p>}</div></article>;
 }

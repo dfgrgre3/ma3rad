@@ -59,6 +59,98 @@ export const BUSINESS_TERMINOLOGY = {
     label: 'فواتير المبيعات',
     description: 'اسم قائمة فواتير المبيعات.',
   },
+  'documents.quotations': {
+    label: 'عروض الأسعار',
+    description: 'اسم عروض الأسعار والمقايسات.',
+  },
+  'documents.orders': {
+    label: 'الطلبات',
+    description: 'اسم طلبات العملاء وأوامر العمل.',
+  },
+  'documents.purchaseOrders': {
+    label: 'أوامر الشراء',
+    description: 'اسم أوامر الشراء للموردين.',
+  },
+  'documents.purchaseInvoices': {
+    label: 'فواتير الشراء',
+    description: 'اسم فواتير ومشتريات الموردين.',
+  },
+  'entities.employees.singular': {
+    label: 'موظف',
+    description: 'اسم الموظف الفردي في النماذج والواجهات.',
+  },
+  'entities.employees.plural': {
+    label: 'الموظفون',
+    description: 'اسم مجموعة الموظفين في القوائم والواجهات.',
+  },
+  'modules.crm': {
+    label: 'إدارة العملاء',
+    description: 'اسم وحدة إدارة علاقات العملاء.',
+  },
+  'modules.finance': {
+    label: 'المالية',
+    description: 'اسم وحدة المالية والحسابات.',
+  },
+  'modules.hr': {
+    label: 'الموارد البشرية',
+    description: 'اسم وحدة الموارد البشرية والرواتب.',
+  },
+  'modules.projects': {
+    label: 'المشروعات',
+    description: 'اسم وحدة إدارة المشروعات والعقود.',
+  },
+  'actions.newInvoice': {
+    label: 'فاتورة جديدة',
+    description: 'نص زر إنشاء فاتورة مبيعات جديدة.',
+  },
+  'actions.newQuotation': {
+    label: 'عرض سعر جديد',
+    description: 'نص زر إنشاء عرض سعر أو مقايسة جديد.',
+  },
+  'actions.newOrder': {
+    label: 'طلب جديد',
+    description: 'نص زر إنشاء طلب أو حجز عميل جديد.',
+  },
+  'actions.newReturn': {
+    label: 'مرتجع جديد',
+    description: 'نص زر تسجيل مرتجع مبيعات جديد.',
+  },
+  'actions.newReservation': {
+    label: 'حجز جديد',
+    description: 'نص زر إنشاء حجز أو دفعة عميل جديدة.',
+  },
+  'actions.newPurchaseInvoice': {
+    label: 'فاتورة مشتريات جديدة',
+    description: 'نص زر تسجيل فاتورة شراء أو توريد جديدة.',
+  },
+  'actions.newTransfer': {
+    label: 'تحويل جديد',
+    description: 'نص زر إنشاء تحويل مخزني جديد بين المخازن.',
+  },
+  'actions.newAdjustment': {
+    label: 'تسوية جديدة',
+    description: 'نص زر إنشاء تسوية جردية جديدة.',
+  },
+  'actions.newPurchaseOrder': {
+    label: 'أمر شراء جديد',
+    description: 'نص زر إنشاء أمر شراء أو توريد جديد.',
+  },
+  'actions.newGoodsReceipt': {
+    label: 'إذن استلام جديد',
+    description: 'نص زر تسجيل إذن استلام بضاعة جديد.',
+  },
+  'actions.newPurchaseRequest': {
+    label: 'طلب توريد جديد',
+    description: 'نص زر إنشاء طلب شراء داخلي جديد.',
+  },
+  'actions.newRfq': {
+    label: 'طلب عروض أسعار',
+    description: 'نص زر إنشاء طلب عروض أسعار من الموردين.',
+  },
+  'actions.newSupplierClaim': {
+    label: 'مطالبة مورد جديدة',
+    description: 'نص زر تسجيل مطالبة على مورد جديد.',
+  },
 } as const;
 
 export type BusinessTermKey = keyof typeof BUSINESS_TERMINOLOGY;

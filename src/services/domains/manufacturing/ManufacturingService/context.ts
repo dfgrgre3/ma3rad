@@ -20,6 +20,27 @@ export class ManufacturingContext {
     return actor;
   }
 
+  /**
+   * Accept any of the given permission codes — used to honour the granular
+   * manufacturing.* permissions while keeping manufacturing.manage/view as
+   * backward-compatible fallbacks.
+   */
+  public requireAny(permissions: string[]): User {
+    const actor = AuthService.requireAuth();
+    const allowed = permissions.some((code) => {
+      try {
+        PermissionService.require(actor, code);
+        return true;
+      } catch {
+        return false;
+      }
+    });
+    if (!allowed) {
+      throw new Error(`ليس لديك صلاحية تنفيذ هذا الإجراء (${permissions.join(' / ')}).`);
+    }
+    return actor;
+  }
+
   public guardWrites(): void {
     ModuleRegistryService.assertModuleEnabled('manufacturing');
   }

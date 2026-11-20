@@ -26,12 +26,12 @@ const STATUS_LABELS: Record<WarrantyClaimStatus, string> = {
 };
 
 const STATUS_BADGES: Record<WarrantyClaimStatus, string> = {
-  OPEN: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800',
-  UNDER_REVIEW: 'bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950/40 dark:text-sky-300 dark:border-sky-800',
-  APPROVED: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800',
-  REJECTED: 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800',
-  RESOLVED: 'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/40 dark:text-indigo-300 dark:border-indigo-800',
-  CANCELLED: 'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-700 dark:text-slate-300 dark:border-slate-600',
+  OPEN: 'bg-warning-soft text-warning border-warning-border dark:bg-warning/40 ',
+  UNDER_REVIEW: 'bg-accent-soft text-primary border-accent-border dark:bg-primary/40 ',
+  APPROVED: 'bg-success-soft text-success border-success-border dark:bg-success/40 ',
+  REJECTED: 'bg-danger-soft text-danger border-danger-border dark:bg-danger/40 ',
+  RESOLVED: 'bg-accent-soft text-primary border-accent-border dark:bg-primary/40 ',
+  CANCELLED: 'bg-surface-sunken text-ink-secondary border-line ',
 };
 
 const TYPE_LABELS: Record<WarrantyClaimType, string> = {
@@ -260,25 +260,25 @@ export const WarrantyClaimsPanel: React.FC<Props> = ({ invoices }) => {
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
-          { label: 'إجمالي المطالبات', value: stats.total, tone: 'text-slate-700 dark:text-slate-200' },
-          { label: 'مفتوحة / قيد المراجعة', value: stats.open + stats.underReview, tone: 'text-amber-600 dark:text-amber-400' },
-          { label: 'معتمدة', value: stats.approved, tone: 'text-emerald-600 dark:text-emerald-400' },
-          { label: 'تم حلها', value: stats.resolved, tone: 'text-indigo-600 dark:text-indigo-400' },
+          { label: 'إجمالي المطالبات', value: stats.total, tone: 'text-ink ' },
+          { label: 'مفتوحة / قيد المراجعة', value: stats.open + stats.underReview, tone: 'text-warning ' },
+          { label: 'معتمدة', value: stats.approved, tone: 'text-success ' },
+          { label: 'تم حلها', value: stats.resolved, tone: 'text-primary ' },
         ].map((card) => (
-          <div key={card.label} className="bg-white dark:bg-slate-800 p-4 rounded-2xl border border-slate-200/80 dark:border-slate-700 shadow-sm">
-            <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">{card.label}</div>
+          <div key={card.label} className="bg-surface p-4 rounded-2xl border border-line/80 dark:border-line-strong shadow-sm">
+            <div className="text-xs text-muted font-medium">{card.label}</div>
             <div className={`text-2xl font-black mt-1 ${card.tone}`}>{card.value}</div>
           </div>
         ))}
       </div>
 
       {/* Toolbar */}
-      <div className="bg-white dark:bg-slate-800 p-4 rounded-2xl border border-slate-200/80 dark:border-slate-700 shadow-sm flex flex-col lg:flex-row gap-3 lg:items-center justify-between">
+      <div className="bg-surface p-4 rounded-2xl border border-line/80 dark:border-line-strong shadow-sm flex flex-col lg:flex-row gap-3 lg:items-center justify-between">
         <div className="flex flex-wrap items-center gap-2">
           <select
             value={statusFilter}
             onChange={(event) => setStatusFilter(event.target.value as WarrantyClaimStatus | 'ALL')}
-            className="px-3 py-2 text-sm bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500"
+            className="px-3 py-2 text-sm bg-surface-muted dark:bg-primary/50 border border-line rounded-xl focus:outline-none focus:ring-2 focus:ring-primary"
           >
             <option value="ALL">كل الحالات</option>
             {Object.entries(STATUS_LABELS).map(([value, label]) => (
@@ -288,7 +288,7 @@ export const WarrantyClaimsPanel: React.FC<Props> = ({ invoices }) => {
           <select
             value={typeFilter}
             onChange={(event) => setTypeFilter(event.target.value as WarrantyClaimType | 'ALL')}
-            className="px-3 py-2 text-sm bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500"
+            className="px-3 py-2 text-sm bg-surface-muted dark:bg-primary/50 border border-line rounded-xl focus:outline-none focus:ring-2 focus:ring-primary"
           >
             <option value="ALL">كل الأنواع</option>
             {Object.entries(TYPE_LABELS).map(([value, label]) => (
@@ -296,17 +296,17 @@ export const WarrantyClaimsPanel: React.FC<Props> = ({ invoices }) => {
             ))}
           </select>
           <div className="relative">
-            <Search className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2" />
+            <Search className="w-4 h-4 text-muted absolute right-3 top-1/2 -translate-y-1/2" />
             <input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               placeholder="بحث برقم المطالبة أو العميل أو الفاتورة..."
-              className="w-64 pl-3 pr-9 py-2 text-sm bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500"
+              className="w-64 pl-3 pr-9 py-2 text-sm bg-surface-muted dark:bg-primary/50 border border-line rounded-xl focus:outline-none focus:ring-2 focus:ring-primary"
             />
           </div>
           <button
             onClick={loadData}
-            className="p-2 text-slate-600 dark:text-slate-300 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 rounded-xl transition"
+            className="p-2 text-ink-secondary bg-surface-sunken hover:bg-surface-sunken dark:hover:bg-primary rounded-xl transition"
             title="تحديث"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
@@ -316,7 +316,7 @@ export const WarrantyClaimsPanel: React.FC<Props> = ({ invoices }) => {
         <PermissionGate permission="ui.sales.after_sales.create">
           <button
             onClick={openCreate}
-            className="px-4 py-2 text-sm font-bold text-white bg-sky-600 hover:bg-sky-700 rounded-xl transition flex items-center justify-center gap-1.5"
+            className="px-4 py-2 text-sm font-bold text-white bg-primary hover:bg-primary rounded-xl transition flex items-center justify-center gap-1.5"
           >
             <Plus className="w-4 h-4" />
             تسجيل مطالبة جديدة
@@ -325,15 +325,15 @@ export const WarrantyClaimsPanel: React.FC<Props> = ({ invoices }) => {
       </div>
 
       {/* Claims table */}
-      <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200/80 dark:border-slate-700 shadow-sm overflow-hidden">
+      <div className="bg-surface rounded-2xl border border-line/80 dark:border-line-strong shadow-sm overflow-hidden">
         {loading ? (
-          <div className="p-16 text-center text-slate-400">
-            <Loader2 className="w-7 h-7 animate-spin mx-auto mb-3 text-sky-600" />
+          <div className="p-16 text-center text-muted">
+            <Loader2 className="w-7 h-7 animate-spin mx-auto mb-3 text-primary" />
             جاري تحميل المطالبات...
           </div>
         ) : claims.length === 0 ? (
-          <div className="p-16 text-center text-slate-400">
-            <ShieldCheck className="w-10 h-10 mx-auto mb-3 text-slate-300" />
+          <div className="p-16 text-center text-muted">
+            <ShieldCheck className="w-10 h-10 mx-auto mb-3 text-muted" />
             لا توجد مطالبات ضمان مطابقة لمعايير البحث.
           </div>
         ) : (
@@ -344,51 +344,51 @@ export const WarrantyClaimsPanel: React.FC<Props> = ({ invoices }) => {
               rowKey={(claim) => claim.id}
               tableClassName="text-sm"
               columns={[
-                { key: 'num', header: 'رقم المطالبة', render: (claim) => <span className="font-bold font-mono text-sky-600 dark:text-sky-400">{claim.claimNumber}</span> },
+                { key: 'num', header: 'رقم المطالبة', render: (claim) => <span className="font-bold font-mono text-primary ">{claim.claimNumber}</span> },
                 {
                   key: 'customer', header: 'العميل',
                   render: (claim) => (
-                    <span className="font-semibold text-slate-900 dark:text-white">
+                    <span className="font-semibold text-ink dark:text-white">
                       {claim.customerName}
-                      <span className="block text-[11px] text-slate-400 font-normal">{claim.customerPhone || '—'}</span>
+                      <span className="block text-[11px] text-muted font-normal">{claim.customerPhone || '—'}</span>
                     </span>
                   ),
                 },
-                { key: 'invoice', header: 'الفاتورة', render: (claim) => <span className="font-mono text-xs text-slate-600 dark:text-slate-300">{claim.invoiceNumber}</span> },
+                { key: 'invoice', header: 'الفاتورة', render: (claim) => <span className="font-mono text-xs text-ink-secondary ">{claim.invoiceNumber}</span> },
                 {
                   key: 'product', header: 'الصنف',
                   render: (claim) => (
-                    <span className="text-slate-700 dark:text-slate-200 max-w-[200px] truncate block">
+                    <span className="text-ink max-w-[200px] truncate block">
                       {claim.productName}
-                      <span className="block text-[11px] text-slate-400">{claim.grade || ''} {claim.size || ''}</span>
+                      <span className="block text-[11px] text-muted">{claim.grade || ''} {claim.size || ''}</span>
                     </span>
                   ),
                 },
-                { key: 'type', header: 'النوع', render: (claim) => <span className="px-2 py-0.5 text-[11px] font-bold rounded-md bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">{TYPE_LABELS[claim.claimType]}</span> },
-                { key: 'qty', header: 'الكمية', render: (claim) => <span className="font-bold text-slate-900 dark:text-white">{formatProductQuantity(claim.quantityM2, unitInfo(claim))}</span> },
+                { key: 'type', header: 'النوع', render: (claim) => <span className="px-2 py-0.5 text-[11px] font-bold rounded-md bg-surface-sunken text-ink-secondary ">{TYPE_LABELS[claim.claimType]}</span> },
+                { key: 'qty', header: 'الكمية', render: (claim) => <span className="font-bold text-ink dark:text-white">{formatProductQuantity(claim.quantityM2, unitInfo(claim))}</span> },
                 {
                   key: 'warranty', header: 'حالة الضمان',
                   render: (claim) => {
                     const days = Math.ceil(
                       (new Date(`${claim.warrantyExpiresAt || ''}T00:00:00`).getTime() - Date.now()) / 86_400_000
                     );
-                    if (!claim.warrantyExpiresAt) return <span className="text-xs text-slate-400">—</span>;
+                    if (!claim.warrantyExpiresAt) return <span className="text-xs text-muted">—</span>;
                     return days >= 0 ? (
-                      <span className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold">ساري ({days} يوم)</span>
+                      <span className="text-xs text-success font-semibold">ساري ({days} يوم)</span>
                     ) : (
-                      <span className="text-xs text-rose-600 dark:text-rose-400 font-semibold">منتهي</span>
+                      <span className="text-xs text-danger font-semibold">منتهي</span>
                     );
                   },
                 },
                 { key: 'status', header: 'الحالة', render: (claim) => <span className={`px-2.5 py-1 text-[11px] font-bold rounded-lg border ${STATUS_BADGES[claim.status]}`}>{STATUS_LABELS[claim.status]}</span> },
-                { key: 'date', header: 'التاريخ', render: (claim) => <span className="text-xs text-slate-500 font-mono">{claim.createdAt?.substring(0, 10)}</span> },
+                { key: 'date', header: 'التاريخ', render: (claim) => <span className="text-xs text-muted font-mono">{claim.createdAt?.substring(0, 10)}</span> },
                 {
                   key: 'actions', header: 'إجراءات', align: 'center',
                   render: (claim) => (
                     <span className="flex items-center justify-center gap-1.5">
                       <button
                         onClick={() => openDetail(claim)}
-                        className="p-1.5 text-slate-500 hover:text-sky-600 dark:hover:text-sky-400 bg-slate-100 dark:bg-slate-700 rounded-lg transition"
+                        className="p-1.5 text-muted hover:text-primary dark:hover:text-primary bg-surface-sunken rounded-lg transition"
                         title="عرض التفاصيل"
                       >
                         <Eye className="w-4 h-4" />
@@ -397,7 +397,7 @@ export const WarrantyClaimsPanel: React.FC<Props> = ({ invoices }) => {
                         <PermissionGate permission="ui.sales.after_sales.update">
                           <button
                             onClick={() => openDecision(claim, 'review')}
-                            className="p-1.5 text-sky-600 hover:text-white hover:bg-sky-600 bg-sky-50 dark:bg-sky-950/50 rounded-lg transition"
+                            className="p-1.5 text-primary hover:text-white hover:bg-primary bg-accent-soft dark:bg-primary/50 rounded-lg transition"
                             title="بدء المراجعة"
                           >
                             <Clock className="w-4 h-4" />
@@ -409,7 +409,7 @@ export const WarrantyClaimsPanel: React.FC<Props> = ({ invoices }) => {
                           <PermissionGate permission="ui.sales.after_sales.approve">
                             <button
                               onClick={() => openDecision(claim, 'approve')}
-                              className="p-1.5 text-emerald-600 hover:text-white hover:bg-emerald-600 bg-emerald-50 dark:bg-emerald-950/50 rounded-lg transition"
+                              className="p-1.5 text-success hover:text-white hover:bg-success bg-success-soft dark:bg-success/50 rounded-lg transition"
                               title="اعتماد"
                             >
                               <ThumbsUp className="w-4 h-4" />
@@ -418,7 +418,7 @@ export const WarrantyClaimsPanel: React.FC<Props> = ({ invoices }) => {
                           <PermissionGate permission="ui.sales.after_sales.reject">
                             <button
                               onClick={() => openDecision(claim, 'reject')}
-                              className="p-1.5 text-rose-600 hover:text-white hover:bg-rose-600 bg-rose-50 dark:bg-rose-950/50 rounded-lg transition"
+                              className="p-1.5 text-danger hover:text-white hover:bg-danger bg-danger-soft dark:bg-danger/50 rounded-lg transition"
                               title="رفض"
                             >
                               <XCircle className="w-4 h-4" />
@@ -430,7 +430,7 @@ export const WarrantyClaimsPanel: React.FC<Props> = ({ invoices }) => {
                         <PermissionGate permission="ui.sales.after_sales.update">
                           <button
                             onClick={() => openDecision(claim, 'resolve')}
-                            className="p-1.5 text-indigo-600 hover:text-white hover:bg-indigo-600 bg-indigo-50 dark:bg-indigo-950/50 rounded-lg transition"
+                            className="p-1.5 text-primary hover:text-white hover:bg-primary bg-accent-soft dark:bg-primary/50 rounded-lg transition"
                             title="تسجيل الحل"
                           >
                             <PackageCheck className="w-4 h-4" />
@@ -450,13 +450,13 @@ export const WarrantyClaimsPanel: React.FC<Props> = ({ invoices }) => {
       {/* Create modal */}
       {createOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 w-full max-w-4xl max-h-[92vh] overflow-y-auto shadow-2xl">
-            <div className="p-5 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between sticky top-0 bg-white dark:bg-slate-800 z-10">
-              <h3 className="text-lg font-black text-slate-900 dark:text-white flex items-center gap-2">
-                <ShieldCheck className="w-5 h-5 text-sky-600" />
+          <div className="bg-surface rounded-2xl border border-line w-full max-w-4xl max-h-[92vh] overflow-y-auto shadow-2xl">
+            <div className="p-5 border-b border-line flex items-center justify-between sticky top-0 bg-surface z-10">
+              <h3 className="text-lg font-black text-ink dark:text-white flex items-center gap-2">
+                <ShieldCheck className="w-5 h-5 text-primary" />
                 تسجيل مطالبة ضمان جديدة
               </h3>
-              <button onClick={() => setCreateOpen(false)} className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+              <button onClick={() => setCreateOpen(false)} className="p-1 text-muted hover:text-ink-secondary dark:hover:text-muted">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -464,11 +464,11 @@ export const WarrantyClaimsPanel: React.FC<Props> = ({ invoices }) => {
             <div className="p-5 space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">الفاتورة</label>
+                  <label className="block text-xs font-bold text-ink-secondary mb-1">الفاتورة</label>
                   <select
                     value={invoiceId}
                     onChange={(event) => loadEligible(event.target.value)}
-                    className="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500"
+                    className="w-full px-3 py-2 text-sm bg-surface-muted dark:bg-primary/50 border border-line rounded-xl focus:outline-none focus:ring-2 focus:ring-primary"
                   >
                     <option value="">اختر الفاتورة...</option>
                     {invoices.map((invoice) => (
@@ -479,21 +479,21 @@ export const WarrantyClaimsPanel: React.FC<Props> = ({ invoices }) => {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">مدة الضمان (شهور)</label>
+                  <label className="block text-xs font-bold text-ink-secondary mb-1">مدة الضمان (شهور)</label>
                   <input
                     type="number"
                     min={0}
                     value={warrantyMonths}
                     onChange={(event) => handleMonthsChange(Number(event.target.value))}
-                    className="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500"
+                    className="w-full px-3 py-2 text-sm bg-surface-muted dark:bg-primary/50 border border-line rounded-xl focus:outline-none focus:ring-2 focus:ring-primary"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">نوع المطالبة</label>
+                  <label className="block text-xs font-bold text-ink-secondary mb-1">نوع المطالبة</label>
                   <select
                     value={claimType}
                     onChange={(event) => setClaimType(event.target.value as WarrantyClaimType)}
-                    className="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500"
+                    className="w-full px-3 py-2 text-sm bg-surface-muted dark:bg-primary/50 border border-line rounded-xl focus:outline-none focus:ring-2 focus:ring-primary"
                   >
                     {Object.entries(TYPE_LABELS).map(([value, label]) => (
                       <option key={value} value={value}>{label}</option>
@@ -503,27 +503,27 @@ export const WarrantyClaimsPanel: React.FC<Props> = ({ invoices }) => {
               </div>
 
               {selectedInvoice && (
-                <div className="text-xs text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-700/40 rounded-xl p-3">
-                  العميل: <strong className="text-slate-700 dark:text-slate-200">{selectedInvoice.customerName || 'عميل نقدي'}</strong>
+                <div className="text-xs text-muted bg-surface-muted dark:bg-primary/40 rounded-xl p-3">
+                  العميل: <strong className="text-ink ">{selectedInvoice.customerName || 'عميل نقدي'}</strong>
                   <span className="mx-2">•</span>
-                  تاريخ الفاتورة: <strong className="font-mono text-slate-700 dark:text-slate-200">{selectedInvoice.date?.substring(0, 10)}</strong>
+                  تاريخ الفاتورة: <strong className="font-mono text-ink ">{selectedInvoice.date?.substring(0, 10)}</strong>
                 </div>
               )}
 
               {invoiceId && (
                 <div>
-                  <h4 className="text-sm font-bold text-slate-900 dark:text-white mb-2 flex items-center gap-2">
-                    <FileText className="w-4 h-4 text-sky-600" />
+                  <h4 className="text-sm font-bold text-ink dark:text-white mb-2 flex items-center gap-2">
+                    <FileText className="w-4 h-4 text-primary" />
                     أصناف الفاتورة المؤهلة للمطالبة
                   </h4>
                   {loadingEligible ? (
-                    <div className="p-8 text-center text-slate-400"><Loader2 className="w-5 h-5 animate-spin mx-auto" /></div>
+                    <div className="p-8 text-center text-muted"><Loader2 className="w-5 h-5 animate-spin mx-auto" /></div>
                   ) : claimableItems.length === 0 ? (
-                    <div className="p-6 text-center text-xs text-slate-400 bg-slate-50 dark:bg-slate-700/40 rounded-xl">
+                    <div className="p-6 text-center text-xs text-muted bg-surface-muted dark:bg-primary/40 rounded-xl">
                       لا توجد كميات متاحة للمطالبة في هذه الفاتورة (تم إرجاعها أو المطالبة بها بالكامل).
                     </div>
                   ) : (
-                    <div className="border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden">
+                    <div className="border border-line rounded-xl overflow-hidden">
                       <DataTable
                         ariaLabel="أصناف الفاتورة المؤهلة للمطالبة"
                         rows={claimableItems}
@@ -531,41 +531,41 @@ export const WarrantyClaimsPanel: React.FC<Props> = ({ invoices }) => {
                         dense
                         onRowClick={(item) => selectItem(item)}
                         rowClassName={(item) => selectedInvoiceItemId === item.invoiceItemId
-                          ? 'bg-sky-50 dark:bg-sky-950/40 cursor-pointer'
+                          ? 'bg-accent-soft dark:bg-primary/40 cursor-pointer'
                           : 'cursor-pointer'}
                         columns={[
                           {
                             key: 'product', header: 'الصنف',
                             render: (item) => (
-                              <span className="font-bold text-slate-900 dark:text-white">
+                              <span className="font-bold text-ink dark:text-white">
                                 {item.productName}
-                                <span className="block text-[10px] text-slate-400">{item.productSku || ''} {item.size || ''}</span>
+                                <span className="block text-[10px] text-muted">{item.productSku || ''} {item.size || ''}</span>
                               </span>
                             ),
                           },
                           { key: 'sold', header: 'المباع', render: (item) => formatProductQuantity(item.soldQuantity, unitInfo(item)) },
                           { key: 'returned', header: 'المرتجع', render: (item) => formatProductQuantity(item.returnedQuantity, unitInfo(item)) },
                           { key: 'claimed', header: 'مطالبات سابقة', render: (item) => formatProductQuantity(item.claimedQuantity, unitInfo(item)) },
-                          { key: 'available', header: 'المتاح', render: (item) => <span className="font-bold text-sky-700 dark:text-sky-300">{formatProductQuantity(item.availableQuantity, unitInfo(item))}</span> },
+                          { key: 'available', header: 'المتاح', render: (item) => <span className="font-bold text-primary ">{formatProductQuantity(item.availableQuantity, unitInfo(item))}</span> },
                           { key: 'price', header: 'سعر الوحدة', render: (item) => <span className="font-mono">{fmtCurrency(item.unitPrice)}</span> },
                           {
                             key: 'warranty', header: 'الضمان',
                             render: (item) => (
                               <span>
                                 {item.warrantyActive ? (
-                                  <span className="text-emerald-600 dark:text-emerald-400 font-semibold">ساري</span>
+                                  <span className="text-success font-semibold">ساري</span>
                                 ) : (
-                                  <span className="text-rose-600 dark:text-rose-400 font-semibold">منتهي</span>
+                                  <span className="text-danger font-semibold">منتهي</span>
                                 )}
-                                <span className="block text-[10px] text-slate-400 font-mono">{item.warrantyExpiresAt}</span>
+                                <span className="block text-[10px] text-muted font-mono">{item.warrantyExpiresAt}</span>
                               </span>
                             ),
                           },
                           {
                             key: 'selected', header: '', align: 'center',
                             render: (item) => selectedInvoiceItemId === item.invoiceItemId
-                              ? <CheckCircle2 className="w-4 h-4 text-sky-600 mx-auto" />
-                              : <span className="block w-4 h-4 rounded-full border border-slate-300 mx-auto" />,
+                              ? <CheckCircle2 className="w-4 h-4 text-primary mx-auto" />
+                              : <span className="block w-4 h-4 rounded-full border border-line-strong mx-auto" />,
                           },
                         ]}
                       />
@@ -577,7 +577,7 @@ export const WarrantyClaimsPanel: React.FC<Props> = ({ invoices }) => {
               {selectedItem && (
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <div>
-                    <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">
+                    <label className="block text-xs font-bold text-ink-secondary mb-1">
                       الكمية المطالب بها (المتاح: {selectedItem.availableQuantity})
                     </label>
                     <input
@@ -587,40 +587,40 @@ export const WarrantyClaimsPanel: React.FC<Props> = ({ invoices }) => {
                       max={selectedItem.availableQuantity}
                       value={quantity}
                       onChange={(event) => setQuantity(event.target.value)}
-                      className="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500"
+                      className="w-full px-3 py-2 text-sm bg-surface-muted dark:bg-primary/50 border border-line rounded-xl focus:outline-none focus:ring-2 focus:ring-primary"
                     />
                   </div>
                   <div className="md:col-span-2">
-                    <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">وصف المشكلة / العيب *</label>
+                    <label className="block text-xs font-bold text-ink-secondary mb-1">وصف المشكلة / العيب *</label>
                     <input
                       value={issue}
                       onChange={(event) => setIssue(event.target.value)}
                       placeholder="مثال: كسر في 3 كراتين أثناء النقل أو اختلاف درجة اللون..."
-                      className="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500"
+                      className="w-full px-3 py-2 text-sm bg-surface-muted dark:bg-primary/50 border border-line rounded-xl focus:outline-none focus:ring-2 focus:ring-primary"
                     />
                   </div>
                 </div>
               )}
 
               {selectedItem && !selectedItem.warrantyActive && claimType !== 'COMPLAINT' && (
-                <div className="flex items-start gap-2 p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-xs text-amber-800 dark:text-amber-200">
+                <div className="flex items-start gap-2 p-3 rounded-xl bg-warning-soft dark:bg-warning/40 border border-warning-border text-xs text-warning ">
                   <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
                   انتهت مدة الضمان لهذا الصنف. يمكن تسجيل «شكوى» فقط دون مطالبة ضمان.
                 </div>
               )}
             </div>
 
-            <div className="p-5 border-t border-slate-100 dark:border-slate-700 flex justify-end gap-2">
+            <div className="p-5 border-t border-line flex justify-end gap-2">
               <button
                 onClick={() => setCreateOpen(false)}
-                className="px-4 py-2 text-sm font-bold text-slate-600 dark:text-slate-300 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 rounded-xl transition"
+                className="px-4 py-2 text-sm font-bold text-ink-secondary bg-surface-sunken hover:bg-surface-sunken rounded-xl transition"
               >
                 إلغاء
               </button>
               <button
                 onClick={handleCreate}
                 disabled={saving || !selectedItem}
-                className="px-5 py-2 text-sm font-bold text-white bg-sky-600 hover:bg-sky-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl transition flex items-center gap-1.5"
+                className="px-5 py-2 text-sm font-bold text-white bg-primary hover:bg-primary disabled:opacity-50 disabled:cursor-not-allowed rounded-xl transition flex items-center gap-1.5"
               >
                 {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
                 حفظ المطالبة
@@ -633,123 +633,123 @@ export const WarrantyClaimsPanel: React.FC<Props> = ({ invoices }) => {
       {/* Detail modal */}
       {detail && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 w-full max-w-3xl max-h-[92vh] overflow-y-auto shadow-2xl">
-            <div className="p-5 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between sticky top-0 bg-white dark:bg-slate-800 z-10">
-              <h3 className="text-lg font-black text-slate-900 dark:text-white flex items-center gap-2">
-                <ShieldCheck className="w-5 h-5 text-sky-600" />
+          <div className="bg-surface rounded-2xl border border-line w-full max-w-3xl max-h-[92vh] overflow-y-auto shadow-2xl">
+            <div className="p-5 border-b border-line flex items-center justify-between sticky top-0 bg-surface z-10">
+              <h3 className="text-lg font-black text-ink dark:text-white flex items-center gap-2">
+                <ShieldCheck className="w-5 h-5 text-primary" />
                 تفاصيل المطالبة {detail.claimNumber}
               </h3>
-              <button onClick={() => setDetail(null)} className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+              <button onClick={() => setDetail(null)} className="p-1 text-muted hover:text-ink-secondary dark:hover:text-muted">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             {loadingDetail ? (
-              <div className="p-16 text-center text-slate-400"><Loader2 className="w-6 h-6 animate-spin mx-auto" /></div>
+              <div className="p-16 text-center text-muted"><Loader2 className="w-6 h-6 animate-spin mx-auto" /></div>
             ) : (
               <div className="p-5 space-y-4 text-sm">
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 p-3 bg-slate-50 dark:bg-slate-700/40 rounded-xl text-xs">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 p-3 bg-surface-muted dark:bg-primary/40 rounded-xl text-xs">
                   <div>
-                    <span className="text-slate-400 block">العميل</span>
-                    <span className="font-bold text-slate-900 dark:text-white">{detail.customerName}</span>
+                    <span className="text-muted block">العميل</span>
+                    <span className="font-bold text-ink dark:text-white">{detail.customerName}</span>
                   </div>
                   <div>
-                    <span className="text-slate-400 block">الفاتورة</span>
-                    <span className="font-mono font-bold text-slate-900 dark:text-white">{detail.invoiceNumber}</span>
+                    <span className="text-muted block">الفاتورة</span>
+                    <span className="font-mono font-bold text-ink dark:text-white">{detail.invoiceNumber}</span>
                   </div>
                   <div>
-                    <span className="text-slate-400 block">تاريخ الفاتورة</span>
-                    <span className="font-mono text-slate-700 dark:text-slate-200">{detail.invoiceDate?.substring(0, 10)}</span>
+                    <span className="text-muted block">تاريخ الفاتورة</span>
+                    <span className="font-mono text-ink ">{detail.invoiceDate?.substring(0, 10)}</span>
                   </div>
                   <div>
-                    <span className="text-slate-400 block">الحالة</span>
+                    <span className="text-muted block">الحالة</span>
                     <span className={`inline-block mt-0.5 px-2 py-0.5 rounded-md border font-bold ${STATUS_BADGES[detail.status]}`}>
                       {STATUS_LABELS[detail.status]}
                     </span>
                   </div>
                   <div>
-                    <span className="text-slate-400 block">الصنف</span>
-                    <span className="font-bold text-slate-900 dark:text-white">{detail.productName}</span>
+                    <span className="text-muted block">الصنف</span>
+                    <span className="font-bold text-ink dark:text-white">{detail.productName}</span>
                   </div>
                   <div>
-                    <span className="text-slate-400 block">النوع</span>
-                    <span className="font-bold text-slate-900 dark:text-white">{TYPE_LABELS[detail.claimType]}</span>
+                    <span className="text-muted block">النوع</span>
+                    <span className="font-bold text-ink dark:text-white">{TYPE_LABELS[detail.claimType]}</span>
                   </div>
                   <div>
-                    <span className="text-slate-400 block">الكمية</span>
-                    <span className="font-bold text-slate-900 dark:text-white">{formatProductQuantity(detail.quantityM2, unitInfo(detail))}</span>
+                    <span className="text-muted block">الكمية</span>
+                    <span className="font-bold text-ink dark:text-white">{formatProductQuantity(detail.quantityM2, unitInfo(detail))}</span>
                   </div>
                   <div>
-                    <span className="text-slate-400 block">انتهاء الضمان</span>
-                    <span className="font-mono text-slate-700 dark:text-slate-200">{detail.warrantyExpiresAt || '—'}</span>
+                    <span className="text-muted block">انتهاء الضمان</span>
+                    <span className="font-mono text-ink ">{detail.warrantyExpiresAt || '—'}</span>
                   </div>
                 </div>
 
-                <div className="p-3 rounded-xl border border-slate-200 dark:border-slate-700">
-                  <div className="text-xs font-bold text-slate-500 mb-1">وصف المشكلة</div>
-                  <p className="text-slate-800 dark:text-slate-200 leading-relaxed">{detail.issueDescription}</p>
+                <div className="p-3 rounded-xl border border-line ">
+                  <div className="text-xs font-bold text-muted mb-1">وصف المشكلة</div>
+                  <p className="text-ink leading-relaxed">{detail.issueDescription}</p>
                 </div>
 
                 {(detail.resolutionType || detail.resolutionNotes) && (
-                  <div className="p-3 rounded-xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50/60 dark:bg-emerald-950/30">
-                    <div className="text-xs font-bold text-emerald-700 dark:text-emerald-300 mb-1">الحل / القرار</div>
+                  <div className="p-3 rounded-xl border border-success-border bg-success-soft/60 dark:bg-success/30">
+                    <div className="text-xs font-bold text-success mb-1">الحل / القرار</div>
                     {detail.resolutionType && (
-                      <div className="text-xs text-slate-600 dark:text-slate-300">
+                      <div className="text-xs text-ink-secondary ">
                         نوع الحل: <strong>{RESOLUTION_LABELS[detail.resolutionType]}</strong>
                       </div>
                     )}
                     {detail.resolutionNotes && (
-                      <p className="text-slate-700 dark:text-slate-200 mt-1">{detail.resolutionNotes}</p>
+                      <p className="text-ink mt-1">{detail.resolutionNotes}</p>
                     )}
                   </div>
                 )}
 
                 {detail.execution && (
-                  <div className="p-3 rounded-xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50/60 dark:bg-indigo-950/30">
-                    <div className="text-xs font-bold text-indigo-700 dark:text-indigo-300 mb-1">تنفيذ الحل والمراجع</div>
-                    <div className="text-xs text-slate-700 dark:text-slate-200">
+                  <div className="p-3 rounded-xl border border-accent-border bg-accent-soft/60 dark:bg-primary/30">
+                    <div className="text-xs font-bold text-primary mb-1">تنفيذ الحل والمراجع</div>
+                    <div className="text-xs text-ink ">
                       الإجراء: <strong>{detail.execution.referenceType}</strong>
                       {detail.execution.referenceId && <span className="font-mono" dir="ltr"> — {detail.execution.referenceId}</span>}
                     </div>
-                    {detail.execution.returnId && <div className="text-xs text-slate-700 dark:text-slate-200 mt-1">رقم المرتجع: <span className="font-mono" dir="ltr">{detail.execution.returnId}</span></div>}
-                    {detail.execution.replacementInvoiceId && <div className="text-xs text-slate-700 dark:text-slate-200 mt-1">الفاتورة البديلة: <span className="font-mono" dir="ltr">{detail.execution.replacementInvoiceId}</span></div>}
-                    {detail.execution.amount > 0 && <div className="text-xs text-slate-700 dark:text-slate-200 mt-1">المبلغ المسوّى: <strong>{fmtCurrency(detail.execution.amount)}</strong></div>}
-                    <p className="text-xs text-slate-600 dark:text-slate-300 mt-1">{detail.execution.details}</p>
+                    {detail.execution.returnId && <div className="text-xs text-ink mt-1">رقم المرتجع: <span className="font-mono" dir="ltr">{detail.execution.returnId}</span></div>}
+                    {detail.execution.replacementInvoiceId && <div className="text-xs text-ink mt-1">الفاتورة البديلة: <span className="font-mono" dir="ltr">{detail.execution.replacementInvoiceId}</span></div>}
+                    {detail.execution.amount > 0 && <div className="text-xs text-ink mt-1">المبلغ المسوّى: <strong>{fmtCurrency(detail.execution.amount)}</strong></div>}
+                    <p className="text-xs text-ink-secondary mt-1">{detail.execution.details}</p>
                   </div>
                 )}
 
                 <div>
-                  <h4 className="text-xs font-bold text-slate-500 mb-2">سجل المطالبة</h4>
+                  <h4 className="text-xs font-bold text-muted mb-2">سجل المطالبة</h4>
                   <div className="space-y-2">
                     {(detail.events || []).map((event) => (
-                      <div key={event.id} className="flex gap-3 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-700/40">
-                        <div className="w-7 h-7 rounded-full bg-sky-100 dark:bg-sky-950/60 text-sky-600 dark:text-sky-300 flex items-center justify-center shrink-0">
+                      <div key={event.id} className="flex gap-3 p-2.5 rounded-xl bg-surface-muted dark:bg-primary/40">
+                        <div className="w-7 h-7 rounded-full bg-accent-soft dark:bg-primary/60 text-primary flex items-center justify-center shrink-0">
                           <Clock className="w-3.5 h-3.5" />
                         </div>
                         <div className="flex-1">
                           <div className="flex flex-wrap items-center justify-between gap-2">
-                            <span className="font-bold text-slate-800 dark:text-slate-100 text-xs">
+                            <span className="font-bold text-ink text-xs">
                               {ACTION_LABELS[event.action] || event.action}
                               {event.toStatus && (
-                                <span className="mr-2 font-normal text-slate-500">→ {STATUS_LABELS[event.toStatus]}</span>
+                                <span className="mr-2 font-normal text-muted">→ {STATUS_LABELS[event.toStatus]}</span>
                               )}
                             </span>
-                            <span className="text-[10px] text-slate-400 font-mono">{event.createdAt?.replace('T', ' ').substring(0, 16)}</span>
+                            <span className="text-[10px] text-muted font-mono">{event.createdAt?.replace('T', ' ').substring(0, 16)}</span>
                           </div>
-                          <div className="text-[11px] text-slate-500 mt-0.5">
+                          <div className="text-[11px] text-muted mt-0.5">
                             بواسطة {event.createdByName || event.createdBy}
                           </div>
-                          {event.notes && <p className="text-xs text-slate-600 dark:text-slate-300 mt-1">{event.notes}</p>}
+                          {event.notes && <p className="text-xs text-ink-secondary mt-1">{event.notes}</p>}
                         </div>
                       </div>
                     ))}
                   </div>
                 </div>
 
-                <div className="flex flex-wrap justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-700">
+                <div className="flex flex-wrap justify-end gap-2 pt-2 border-t border-line ">
                   {detail.status === 'OPEN' && (
                     <PermissionGate permission="ui.sales.after_sales.update">
-                      <button onClick={() => openDecision(detail, 'review')} className="px-3 py-2 text-xs font-bold text-sky-700 bg-sky-50 hover:bg-sky-100 dark:bg-sky-950/50 dark:text-sky-300 rounded-xl transition flex items-center gap-1.5">
+                      <button onClick={() => openDecision(detail, 'review')} className="px-3 py-2 text-xs font-bold text-primary bg-accent-soft hover:bg-accent-soft dark:bg-primary/50 rounded-xl transition flex items-center gap-1.5">
                         <Clock className="w-4 h-4" /> بدء المراجعة
                       </button>
                     </PermissionGate>
@@ -757,12 +757,12 @@ export const WarrantyClaimsPanel: React.FC<Props> = ({ invoices }) => {
                   {(detail.status === 'OPEN' || detail.status === 'UNDER_REVIEW') && (
                     <>
                       <PermissionGate permission="ui.sales.after_sales.approve">
-                        <button onClick={() => openDecision(detail, 'approve')} className="px-3 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl transition flex items-center gap-1.5">
+                        <button onClick={() => openDecision(detail, 'approve')} className="px-3 py-2 text-xs font-bold text-white bg-success hover:bg-success rounded-xl transition flex items-center gap-1.5">
                           <ThumbsUp className="w-4 h-4" /> اعتماد
                         </button>
                       </PermissionGate>
                       <PermissionGate permission="ui.sales.after_sales.reject">
-                        <button onClick={() => openDecision(detail, 'reject')} className="px-3 py-2 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl transition flex items-center gap-1.5">
+                        <button onClick={() => openDecision(detail, 'reject')} className="px-3 py-2 text-xs font-bold text-white bg-danger hover:bg-danger rounded-xl transition flex items-center gap-1.5">
                           <XCircle className="w-4 h-4" /> رفض
                         </button>
                       </PermissionGate>
@@ -770,19 +770,19 @@ export const WarrantyClaimsPanel: React.FC<Props> = ({ invoices }) => {
                   )}
                   {detail.status === 'APPROVED' && (
                     <PermissionGate permission="ui.sales.after_sales.resolve">
-                      <button onClick={() => openDecision(detail, 'resolve')} className="px-3 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl transition flex items-center gap-1.5">
+                      <button onClick={() => openDecision(detail, 'resolve')} className="px-3 py-2 text-xs font-bold text-white bg-primary hover:bg-primary rounded-xl transition flex items-center gap-1.5">
                         <PackageCheck className="w-4 h-4" /> تسجيل الحل
                       </button>
                     </PermissionGate>
                   )}
                   {['OPEN', 'UNDER_REVIEW', 'APPROVED'].includes(detail.status) && (
                     <PermissionGate permission="ui.sales.after_sales.delete">
-                      <button onClick={() => openDecision(detail, 'cancel')} className="px-3 py-2 text-xs font-bold text-slate-600 dark:text-slate-300 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 rounded-xl transition flex items-center gap-1.5">
+                      <button onClick={() => openDecision(detail, 'cancel')} className="px-3 py-2 text-xs font-bold text-ink-secondary bg-surface-sunken hover:bg-surface-sunken rounded-xl transition flex items-center gap-1.5">
                         <Ban className="w-4 h-4" /> إلغاء
                       </button>
                     </PermissionGate>
                   )}
-                  <button onClick={() => setDetail(null)} className="px-4 py-2 text-xs font-bold text-slate-600 dark:text-slate-300 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 rounded-xl transition">
+                  <button onClick={() => setDetail(null)} className="px-4 py-2 text-xs font-bold text-ink-secondary bg-surface-sunken hover:bg-surface-sunken rounded-xl transition">
                     إغلاق
                   </button>
                 </div>
@@ -795,27 +795,27 @@ export const WarrantyClaimsPanel: React.FC<Props> = ({ invoices }) => {
       {/* Decision modal */}
       {decision && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 w-full max-w-lg shadow-2xl">
-            <div className="p-5 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
-              <h3 className="text-base font-black text-slate-900 dark:text-white flex items-center gap-2">
-                <Wrench className="w-5 h-5 text-sky-600" />
+          <div className="bg-surface rounded-2xl border border-line w-full max-w-lg shadow-2xl">
+            <div className="p-5 border-b border-line flex items-center justify-between">
+              <h3 className="text-base font-black text-ink dark:text-white flex items-center gap-2">
+                <Wrench className="w-5 h-5 text-primary" />
                 {ACTION_BUTTON_LABELS[decision.action]} المطالبة {decision.claim.claimNumber}
               </h3>
-              <button onClick={() => setDecision(null)} className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+              <button onClick={() => setDecision(null)} className="p-1 text-muted hover:text-ink-secondary dark:hover:text-muted">
                 <X className="w-5 h-5" />
               </button>
             </div>
             <div className="p-5 space-y-3">
               {decision.action === 'resolve' && (
                 <div>
-                  <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">نوع الحل</label>
+                  <label className="block text-xs font-bold text-ink-secondary mb-1">نوع الحل</label>
                   <select
                     value={decision.resolutionType}
                     onChange={(event) => setDecision({
                       ...decision,
                       resolutionType: event.target.value as DecisionState['resolutionType'],
                     })}
-                    className="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500"
+                    className="w-full px-3 py-2 text-sm bg-surface-muted dark:bg-primary/50 border border-line rounded-xl focus:outline-none focus:ring-2 focus:ring-primary"
                   >
                     <option value="">اختر نوع الحل...</option>
                     {(['REPAIR', 'REPLACEMENT', 'REFUND', 'OTHER'] as const).map((value) => (
@@ -823,15 +823,15 @@ export const WarrantyClaimsPanel: React.FC<Props> = ({ invoices }) => {
                     ))}
                   </select>
                   {decision.resolutionType === 'REFUND' && (
-                    <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">سينشئ النظام مرتجعًا ماليًا ويضيف المبلغ إلى رصيد العميل، مع عزل الكمية المرتجعة للفحص.</p>
+                    <p className="mt-2 text-xs text-warning ">سينشئ النظام مرتجعًا ماليًا ويضيف المبلغ إلى رصيد العميل، مع عزل الكمية المرتجعة للفحص.</p>
                   )}
                   {decision.resolutionType === 'REPLACEMENT' && (
-                    <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">سينشئ النظام المرتجع ويعزل الصنف المعيب، ثم يصدر فاتورة بديلة ويصرف الكمية من المخزون.</p>
+                    <p className="mt-2 text-xs text-warning ">سينشئ النظام المرتجع ويعزل الصنف المعيب، ثم يصدر فاتورة بديلة ويصرف الكمية من المخزون.</p>
                   )}
                 </div>
               )}
               <div>
-                <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">
+                <label className="block text-xs font-bold text-ink-secondary mb-1">
                   ملاحظات {decision.action === 'reject' || (decision.action === 'resolve' && ['REPAIR', 'OTHER'].includes(decision.resolutionType)) ? '*' : ''}
                 </label>
                 <textarea
@@ -839,24 +839,24 @@ export const WarrantyClaimsPanel: React.FC<Props> = ({ invoices }) => {
                   value={decision.notes}
                   onChange={(event) => setDecision({ ...decision, notes: event.target.value })}
                   placeholder={decision.action === 'reject' ? 'سبب رفض المطالبة...' : 'تفاصيل القرار أو الحل...'}
-                  className="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500"
+                  className="w-full px-3 py-2 text-sm bg-surface-muted dark:bg-primary/50 border border-line rounded-xl focus:outline-none focus:ring-2 focus:ring-primary"
                 />
               </div>
               {decision.action === 'cancel' && (
-                <div className="flex items-start gap-2 p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-xs text-amber-800 dark:text-amber-200">
+                <div className="flex items-start gap-2 p-3 rounded-xl bg-warning-soft dark:bg-warning/40 border border-warning-border text-xs text-warning ">
                   <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
                   إلغاء المطالبة يحرر الكمية المطالب بها ويمكن تسجيل مطالبة جديدة لها لاحقاً.
                 </div>
               )}
             </div>
-            <div className="p-5 border-t border-slate-100 dark:border-slate-700 flex justify-end gap-2">
-              <button onClick={() => setDecision(null)} className="px-4 py-2 text-sm font-bold text-slate-600 dark:text-slate-300 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 rounded-xl transition">
+            <div className="p-5 border-t border-line flex justify-end gap-2">
+              <button onClick={() => setDecision(null)} className="px-4 py-2 text-sm font-bold text-ink-secondary bg-surface-sunken hover:bg-surface-sunken rounded-xl transition">
                 تراجع
               </button>
               <button
                 onClick={submitDecision}
                 disabled={deciding || (decision.action === 'resolve' && !decision.resolutionType)}
-                className="px-5 py-2 text-sm font-bold text-white bg-sky-600 hover:bg-sky-700 disabled:opacity-50 rounded-xl transition flex items-center gap-1.5"
+                className="px-5 py-2 text-sm font-bold text-white bg-primary hover:bg-primary disabled:opacity-50 rounded-xl transition flex items-center gap-1.5"
               >
                 {deciding ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
                 تأكيد

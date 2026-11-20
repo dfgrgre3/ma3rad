@@ -60,7 +60,7 @@ export const ModalShell: React.FC<{
         onClick={() => {
           if (!busyRef.current) closeRef.current();
         }}
-        className="absolute inset-0 border-0 bg-slate-900/50 p-0 backdrop-blur-sm disabled:cursor-default"
+        className="absolute inset-0 border-0 bg-primary/50 p-0 backdrop-blur-sm disabled:cursor-default"
       />
       <div
         ref={dialogRef}
@@ -69,14 +69,14 @@ export const ModalShell: React.FC<{
         aria-labelledby="daily-modal-title"
         tabIndex={-1}
         style={{ maxWidth: wide ? 'min(56rem, calc(100vw - 2rem))' : 'min(32rem, calc(100vw - 2rem))' }}
-        className={`relative z-10 bg-white rounded-2xl border border-slate-200 shadow-2xl w-full ${wide ? 'max-w-4xl' : 'max-w-lg'} max-h-[92vh] flex flex-col outline-none`}
+        className={`relative z-10 bg-surface rounded-2xl border border-line shadow-2xl w-full ${wide ? 'max-w-4xl' : 'max-w-lg'} max-h-[92vh] flex flex-col outline-none`}
       >
-        <div className="flex items-start justify-between gap-4 px-5 py-4 border-b border-slate-200">
+        <div className="flex items-start justify-between gap-4 px-5 py-4 border-b border-line">
           <div>
-            <h3 id="daily-modal-title" className="text-sm font-black text-slate-900">{title}</h3>
-            {subtitle && <p className="text-[11px] text-slate-500 mt-0.5">{subtitle}</p>}
+            <h3 id="daily-modal-title" className="text-sm font-black text-ink">{title}</h3>
+            {subtitle && <p className="text-[11px] text-muted mt-0.5">{subtitle}</p>}
           </div>
-          <button type="button" onClick={onClose} disabled={busy} aria-label="إغلاق" className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 disabled:opacity-50">
+          <button type="button" onClick={onClose} disabled={busy} aria-label="إغلاق" className="p-1.5 rounded-lg text-muted hover:bg-surface-sunken disabled:opacity-50">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -87,7 +87,7 @@ export const ModalShell: React.FC<{
 };
 
 export const LoadErrorNotice: React.FC<{ message: string }> = ({ message }) => (
-  <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+  <div role="alert" className="rounded-lg border border-danger-border bg-danger-soft px-3 py-2 text-xs text-danger">
     تعذر تحميل البيانات اللازمة: {message}
   </div>
 );

@@ -223,20 +223,20 @@ export const PurchaseReturnsPage: React.FC = () => {
   };
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
-      <div className="bg-white px-6 pt-4">
+    <div className="h-full flex flex-col bg-surface-muted text-ink overflow-hidden">
+      <div className="bg-surface px-6 pt-4">
         <PageHeader
           icon={<RotateCcw className="w-5 h-5" />}
           title="مرتجعات الشراء"
           description="إرجاع أصناف للمورد مع عكس المخزون وتحديث حساب المورد أو الخزينة"
           actions={<>
-            <button onClick={doExport} className="flex items-center gap-1.5 px-3 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold"><FileSpreadsheet className="w-4 h-4 text-emerald-600" /> جدول بيانات</button>
-            <button onClick={doExport} className="flex items-center gap-1.5 px-3 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold"><FileDown className="w-4 h-4 text-rose-600" /> مستند</button>
-            <button onClick={load} className="p-2 rounded-xl border border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100" title="تحديث">
+            <button onClick={doExport} className="flex items-center gap-1.5 px-3 py-2 bg-surface border border-line hover:bg-surface-muted text-ink rounded-xl text-xs font-bold"><FileSpreadsheet className="w-4 h-4 text-success" /> جدول بيانات</button>
+            <button onClick={doExport} className="flex items-center gap-1.5 px-3 py-2 bg-surface border border-line hover:bg-surface-muted text-ink rounded-xl text-xs font-bold"><FileDown className="w-4 h-4 text-danger" /> مستند</button>
+            <button onClick={load} className="p-2 rounded-xl border border-line bg-surface-muted text-ink-secondary hover:bg-surface-sunken" title="تحديث">
               <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             </button>
             {canReturn && (
-              <button onClick={openModal} className="flex items-center gap-2 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-sm font-bold transition">
+              <button onClick={openModal} className="flex items-center gap-2 px-4 py-2 bg-danger hover:bg-danger text-white rounded-xl text-sm font-bold transition">
                 <Plus className="w-4 h-4" /> تسجيل مرتجع
               </button>
             )}
@@ -244,21 +244,21 @@ export const PurchaseReturnsPage: React.FC = () => {
         />
       </div>
 
-      <div className="p-4 bg-white border-b border-slate-200 space-y-3">
+      <div className="p-4 bg-surface border-b border-line space-y-3">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-          <Stat label="عدد المرتجعات" value={String(stats?.count ?? 0)} icon={RotateCcw} tone="text-slate-700 bg-slate-50 border-slate-200" />
-          <Stat label="إجمالي القيمة" value={fmt(stats?.totalAmount ?? 0)} icon={TrendingDown} tone="text-rose-700 bg-rose-50 border-rose-200" />
-          <Stat label="مُسترد نقداً" value={fmt(stats?.cashRefunded ?? 0)} icon={Banknote} tone="text-amber-700 bg-amber-50 border-amber-200" />
-          <Stat label="على حساب المورد" value={fmt(stats?.creditedToBalance ?? 0)} icon={Wallet} tone="text-sky-700 bg-sky-50 border-sky-200" />
-          <Stat label="مرتجعات اليوم" value={`${stats?.todayCount ?? 0} • ${fmt(stats?.todayAmount ?? 0)}`} icon={CheckCircle2} tone="text-emerald-700 bg-emerald-50 border-emerald-200" />
+          <Stat label="عدد المرتجعات" value={String(stats?.count ?? 0)} icon={RotateCcw} tone="text-ink bg-surface-muted border-line" />
+          <Stat label="إجمالي القيمة" value={fmt(stats?.totalAmount ?? 0)} icon={TrendingDown} tone="text-danger bg-danger-soft border-danger-border" />
+          <Stat label="مُسترد نقداً" value={fmt(stats?.cashRefunded ?? 0)} icon={Banknote} tone="text-warning bg-warning-soft border-warning-border" />
+          <Stat label="على حساب المورد" value={fmt(stats?.creditedToBalance ?? 0)} icon={Wallet} tone="text-primary bg-accent-soft border-accent-border" />
+          <Stat label="مرتجعات اليوم" value={`${stats?.todayCount ?? 0} • ${fmt(stats?.todayAmount ?? 0)}`} icon={CheckCircle2} tone="text-success bg-success-soft border-success-border" />
         </div>
 
         {topReasons.length > 0 && (
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-[10px] font-bold text-slate-400">أكثر أسباب الإرجاع:</span>
+            <span className="text-[10px] font-bold text-muted">أكثر أسباب الإرجاع:</span>
             {topReasons.map((r) => (
-              <span key={r.reason} className="text-[10px] font-bold px-2 py-1 rounded-lg bg-rose-50 border border-rose-200 text-rose-700">
-                {r.reason} <span className="text-rose-400">×{r.count}</span> — {fmt(r.amount)}
+              <span key={r.reason} className="text-[10px] font-bold px-2 py-1 rounded-lg bg-danger-soft border border-danger-border text-danger">
+                {r.reason} <span className="text-danger">×{r.count}</span> — {fmt(r.amount)}
               </span>
             ))}
           </div>
@@ -266,51 +266,51 @@ export const PurchaseReturnsPage: React.FC = () => {
 
         <div className="flex flex-col xl:flex-row gap-2">
           <div className="relative flex-1">
-            <Search className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="بحث برقم المرتجع أو الفاتورة أو المورد أو السبب..." className="w-full pl-4 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:border-rose-400" />
+            <Search className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
+            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="بحث برقم المرتجع أو الفاتورة أو المورد أو السبب..." className="w-full pl-4 pr-10 py-2.5 bg-surface-muted border border-line rounded-xl text-sm font-medium focus:outline-none focus:border-danger" />
           </div>
           <OperationalFieldsFilter fields={operationalFields} values={fieldFilters} onChange={setFieldFilters} />
           <div className="flex flex-wrap items-center gap-2">
-            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2 py-1.5">
-              <Calendar className="w-3.5 h-3.5 text-slate-400" />
+            <div className="flex items-center gap-1.5 bg-surface-muted border border-line rounded-xl px-2 py-1.5">
+              <Calendar className="w-3.5 h-3.5 text-muted" />
               <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="bg-transparent text-[11px] font-bold outline-none" />
-              <span className="text-slate-300">—</span>
+              <span className="text-muted">—</span>
               <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="bg-transparent text-[11px] font-bold outline-none" />
             </div>
             {(dateFrom || dateTo || search) && (
-              <button onClick={() => { setSearch(''); setDateFrom(''); setDateTo(''); }} className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-600 hover:bg-slate-100 text-xs font-bold">تفريغ</button>
+              <button onClick={() => { setSearch(''); setDateFrom(''); setDateTo(''); }} className="px-3 py-2 bg-surface-muted border border-line rounded-xl text-ink-secondary hover:bg-surface-sunken text-xs font-bold">تفريغ</button>
             )}
           </div>
         </div>
       </div>
 
       <div className="flex-1 overflow-y-auto p-4">
-        {error && <div className="mb-3 px-4 py-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold">{error}</div>}
+        {error && <div className="mb-3 px-4 py-2.5 rounded-xl bg-danger-soft border border-danger-border text-danger text-xs font-semibold">{error}</div>}
         {loading ? (
-          <div className="py-16 flex justify-center"><Loader2 className="w-7 h-7 animate-spin text-rose-500" /></div>
+          <div className="py-16 flex justify-center"><Loader2 className="w-7 h-7 animate-spin text-danger" /></div>
         ) : (
           <>
-            <div className="bg-white border border-slate-200 rounded-2xl overflow-x-auto shadow-sm">
+            <div className="bg-surface border border-line rounded-2xl overflow-x-auto shadow-sm">
               <DataTable
                             ariaLabel="مرتجعات الشراء"
                             rows={pageItems}
                             rowKey={(row) => row.id}
                             minWidth={920}
                             columns={[
-                              { key: 'num', header: 'رقم المرتجع', render: (row) => <span className="font-mono font-bold text-rose-600">{row.returnNumber}</span> },
-                              { key: 'invoice', header: 'فاتورة الشراء', render: (row) => <span className="font-mono text-slate-700">{row.originalInvoiceNumber}</span> },
-                              { key: 'supplier', header: 'المورد', render: (row) => <span className="font-bold text-slate-800">{row.supplierName || '—'}</span> },
-                              { key: 'warehouse', header: 'المخزن', render: (row) => <span className="text-slate-600">{row.warehouseName || '—'}</span> },
-                              { key: 'date', header: 'التاريخ', render: (row) => <span className="inline-flex items-center gap-1 text-slate-600"><Calendar className="w-3 h-3" />{row.date || '—'}</span> },
+                              { key: 'num', header: 'رقم المرتجع', render: (row) => <span className="font-mono font-bold text-danger">{row.returnNumber}</span> },
+                              { key: 'invoice', header: 'فاتورة الشراء', render: (row) => <span className="font-mono text-ink">{row.originalInvoiceNumber}</span> },
+                              { key: 'supplier', header: 'المورد', render: (row) => <span className="font-bold text-ink">{row.supplierName || '—'}</span> },
+                              { key: 'warehouse', header: 'المخزن', render: (row) => <span className="text-ink-secondary">{row.warehouseName || '—'}</span> },
+                              { key: 'date', header: 'التاريخ', render: (row) => <span className="inline-flex items-center gap-1 text-ink-secondary"><Calendar className="w-3 h-3" />{row.date || '—'}</span> },
                               { key: 'items', header: 'الأصناف', render: (row) => <span className="font-mono">{row.itemsCount || 0}</span> },
-                              { key: 'total', header: 'القيمة', render: (row) => <span className="font-black text-rose-600">{fmt(row.totalAmount)}</span> },
+                              { key: 'total', header: 'القيمة', render: (row) => <span className="font-black text-danger">{fmt(row.totalAmount)}</span> },
                               {
                                 key: 'refund', header: 'نقدي / حساب المورد',
                                 render: (row) => (
-                                  <div className="text-[10px] text-slate-500">
+                                  <div className="text-[10px] text-muted">
                                     <div className="flex items-center gap-1">
-                                      {row.refundMethod === 'CASH' ? <Banknote className="w-3.5 h-3.5 text-amber-600" /> : <Wallet className="w-3.5 h-3.5 text-sky-600" />}
-                                      <span className="font-bold text-slate-700">{REFUND_LABEL[row.refundMethod] || '—'}</span>
+                                      {row.refundMethod === 'CASH' ? <Banknote className="w-3.5 h-3.5 text-warning" /> : <Wallet className="w-3.5 h-3.5 text-primary" />}
+                                      <span className="font-bold text-ink">{REFUND_LABEL[row.refundMethod] || '—'}</span>
                                     </div>
                                     <div className="mt-0.5">نقدي: {fmt(row.refundedAmount)} • حساب: {fmt(row.remainingToBalance)}</div>
                                   </div>
@@ -318,7 +318,7 @@ export const PurchaseReturnsPage: React.FC = () => {
                               },
                               ...operationalFields.map((field) => ({
                                 key: `op-${field.id}`, header: field.name,
-                                render: (row: PurchaseReturnRow) => <span className="text-slate-600">{valuesByReturn[row.id]?.[field.name] || '—'}</span>,
+                                render: (row: PurchaseReturnRow) => <span className="text-ink-secondary">{valuesByReturn[row.id]?.[field.name] || '—'}</span>,
                               })),
                               {
                                 key: 'actions', header: 'إجراءات', align: 'end',
@@ -336,12 +336,12 @@ export const PurchaseReturnsPage: React.FC = () => {
             </div>
 
             {rows.length > PAGE_SIZE && (
-              <div className="flex items-center justify-between mt-4 text-xs text-slate-500">
+              <div className="flex items-center justify-between mt-4 text-xs text-muted">
                 <span>{(page - 1) * PAGE_SIZE + 1} — {Math.min(page * PAGE_SIZE, rows.length)} من {rows.length}</span>
                 <div className="flex items-center gap-1">
-                  <button disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))} className="p-1.5 rounded-lg border border-slate-200 bg-white disabled:opacity-40"><ChevronRight className="w-4 h-4" /></button>
+                  <button disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))} className="p-1.5 rounded-lg border border-line bg-surface disabled:opacity-40"><ChevronRight className="w-4 h-4" /></button>
                   <span className="px-3 font-bold">{page} / {totalPages}</span>
-                  <button disabled={page >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))} className="p-1.5 rounded-lg border border-slate-200 bg-white disabled:opacity-40"><ChevronLeft className="w-4 h-4" /></button>
+                  <button disabled={page >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))} className="p-1.5 rounded-lg border border-line bg-surface disabled:opacity-40"><ChevronLeft className="w-4 h-4" /></button>
                 </div>
               </div>
             )}
@@ -352,42 +352,42 @@ export const PurchaseReturnsPage: React.FC = () => {
       {modalOpen && (
         <Modal onClose={() => setModalOpen(false)} wide>
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-base font-black text-slate-900 flex items-center gap-2"><RotateCcw className="w-5 h-5 text-rose-600" /> تسجيل مرتجع شراء</h3>
-            <button onClick={() => setModalOpen(false)} className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100"><X className="w-4 h-4" /></button>
+            <h3 className="text-base font-black text-ink flex items-center gap-2"><RotateCcw className="w-5 h-5 text-danger" /> تسجيل مرتجع شراء</h3>
+            <button onClick={() => setModalOpen(false)} className="p-1.5 rounded-lg text-muted hover:bg-surface-sunken"><X className="w-4 h-4" /></button>
           </div>
           <form onSubmit={submit} className="space-y-3 text-xs">
             <div>
-              <label className="font-bold text-slate-700 block mb-1">فاتورة الشراء *</label>
-              <select required value={purchaseId} onChange={(e) => pickPurchase(e.target.value)} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold">
+              <label className="font-bold text-ink block mb-1">فاتورة الشراء *</label>
+              <select required value={purchaseId} onChange={(e) => pickPurchase(e.target.value)} className="w-full px-3 py-2 bg-surface-muted border border-line rounded-xl font-bold">
                 <option value="">— اختر فاتورة —</option>
                 {purchases.map((p) => <option key={p.id} value={p.id}>{p.invoiceNumber} — {p.supplierName} — {fmt(p.totalAmount)}</option>)}
               </select>
             </div>
 
             {purchaseId && lines.length === 0 && (
-              <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-[11px] text-amber-800 flex items-center gap-2"><PackageX className="w-4 h-4" /> لا توجد كميات متاحة للإرجاع من هذه الفاتورة (تم إرجاع كل الكميات سابقاً).</div>
+              <div className="bg-warning-soft border border-warning-border rounded-xl p-3 text-[11px] text-warning flex items-center gap-2"><PackageX className="w-4 h-4" /> لا توجد كميات متاحة للإرجاع من هذه الفاتورة (تم إرجاع كل الكميات سابقاً).</div>
             )}
 
             {lines.length > 0 && (
-              <div className="border border-slate-200 rounded-xl overflow-hidden">
+              <div className="border border-line rounded-xl overflow-hidden">
                 <DataTable
                                 ariaLabel="أصناف مرتجع الشراء"
                                 rows={lines.map((l, i) => ({ ...l, _i: i }))}
                                 rowKey={(l) => l.productId}
                                 dense
                                 columns={[
-                                  { key: 'product', header: 'الصنف', render: (l) => <span className="font-semibold text-slate-800">{l.productName}<div className="text-[9px] text-slate-400 font-normal">{l.grade}</div></span> },
+                                  { key: 'product', header: 'الصنف', render: (l) => <span className="font-semibold text-ink">{l.productName}<div className="text-[9px] text-muted font-normal">{l.grade}</div></span> },
                                   { key: 'purchased', header: 'المشترى', render: (l) => <span className="font-mono">{formatProductQuantity(l.purchasedM2, l)}</span> },
-                                  { key: 'returned', header: 'مُرجع سابقاً', render: (l) => <span className="font-mono text-slate-500">{formatProductQuantity(l.returnedM2, l)}</span> },
-                                  { key: 'available', header: 'القابل للإرجاع', render: (l) => <span className="font-mono font-bold text-emerald-600">{formatProductQuantity(l.returnableM2, l)}</span> },
+                                  { key: 'returned', header: 'مُرجع سابقاً', render: (l) => <span className="font-mono text-muted">{formatProductQuantity(l.returnedM2, l)}</span> },
+                                  { key: 'available', header: 'القابل للإرجاع', render: (l) => <span className="font-mono font-bold text-success">{formatProductQuantity(l.returnableM2, l)}</span> },
                                   { key: 'cost', header: 'سعر التكلفة', render: (l) => <span className="font-mono">{fmt(l.unitCost)}</span> },
                                   {
                                     key: 'qty', header: 'كمية الإرجاع',
                                     render: (l) => (
-                                      <input type="number" min={0} max={l.returnableM2} step={l.productType === 'GENERAL' && ['BOX', 'PIECE', 'SET'].includes(l.baseUnit || '') ? 1 : 0.01} value={l.quantityM2 || ''} onChange={(e) => setLine(l._i, { quantityM2: Math.min(Number(e.target.value) || 0, l.returnableM2) })} className="w-full px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg font-mono" aria-label={`كمية الإرجاع ${getProductUnitLabel(l)}`} />
+                                      <input type="number" min={0} max={l.returnableM2} step={l.productType === 'GENERAL' && ['BOX', 'PIECE', 'SET'].includes(l.baseUnit || '') ? 1 : 0.01} value={l.quantityM2 || ''} onChange={(e) => setLine(l._i, { quantityM2: Math.min(Number(e.target.value) || 0, l.returnableM2) })} className="w-full px-2 py-1 bg-surface-muted border border-line rounded-lg font-mono" aria-label={`كمية الإرجاع ${getProductUnitLabel(l)}`} />
                                     ),
                                   },
-                                  { key: 'total', header: 'الإجمالي', render: (l) => <span className="font-bold text-rose-600">{fmt(l.quantityM2 * l.unitCost)}</span> },
+                                  { key: 'total', header: 'الإجمالي', render: (l) => <span className="font-bold text-danger">{fmt(l.quantityM2 * l.unitCost)}</span> },
                                 ]}
                               />
 
@@ -396,36 +396,36 @@ export const PurchaseReturnsPage: React.FC = () => {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <div>
-                <label className="font-bold text-slate-700 block mb-1">طريقة التسوية</label>
-                <select value={refundMethod} onChange={(e) => setRefundMethod(e.target.value as PurchaseRefundMethod)} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold">
+                <label className="font-bold text-ink block mb-1">طريقة التسوية</label>
+                <select value={refundMethod} onChange={(e) => setRefundMethod(e.target.value as PurchaseRefundMethod)} className="w-full px-3 py-2 bg-surface-muted border border-line rounded-xl font-bold">
                   {REFUND_METHODS.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
                 </select>
               </div>
-              <div className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-[10px] text-slate-500 self-end">
+              <div className="bg-surface-muted border border-line rounded-xl px-3 py-2 text-[10px] text-muted self-end">
                 {refundMethod === 'CASH'
                   ? 'يُضاف المبلغ إلى رصيد الخزينة ويُخصم من حساب المورد.'
                   : 'يُخصم المبلغ من رصيد المورد المستحق دون حركة نقدية.'}
-                <div className="mt-0.5 text-[9px] text-slate-400">سيتم عكس الكميات من المخزن وتسجيل الحركة في دفتر المخزون.</div>
+                <div className="mt-0.5 text-[9px] text-muted">سيتم عكس الكميات من المخزن وتسجيل الحركة في دفتر المخزون.</div>
               </div>
             </div>
 
             <div>
-              <label className="font-bold text-slate-700 block mb-1">سبب المرتجع *</label>
-              <input list="purchase-return-reasons" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="مثال: كسر، عيب صناعة، صنف خاطئ..." className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl" />
+              <label className="font-bold text-ink block mb-1">سبب المرتجع *</label>
+              <input list="purchase-return-reasons" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="مثال: كسر، عيب صناعة، صنف خاطئ..." className="w-full px-3 py-2 bg-surface-muted border border-line rounded-xl" />
               <datalist id="purchase-return-reasons">
                 {RETURN_REASONS.map((r) => <option key={r} value={r} />)}
               </datalist>
             </div>
             <OperationalFieldsForm fields={operationalFields} values={operationalFieldValues} onChange={setOperationalFieldValues} title="بيانات إضافية للمرتجع" />
 
-            <div className="flex items-center justify-between bg-rose-50 border border-rose-200 rounded-xl px-4 py-3">
-              <span className="text-xs font-bold text-rose-700 flex items-center gap-1"><AlertTriangle className="w-4 h-4" /> إجمالي قيمة المرتجع</span>
-              <span className="text-lg font-black text-rose-600">{fmt(total)}</span>
+            <div className="flex items-center justify-between bg-danger-soft border border-danger-border rounded-xl px-4 py-3">
+              <span className="text-xs font-bold text-danger flex items-center gap-1"><AlertTriangle className="w-4 h-4" /> إجمالي قيمة المرتجع</span>
+              <span className="text-lg font-black text-danger">{fmt(total)}</span>
             </div>
 
-            <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
-              <button type="button" onClick={() => setModalOpen(false)} className="px-4 py-2 bg-slate-100 text-slate-700 font-bold rounded-xl">إلغاء</button>
-              <button type="submit" disabled={saving} className="px-5 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl flex items-center gap-2">
+            <div className="flex justify-end gap-2 pt-3 border-t border-line">
+              <button type="button" onClick={() => setModalOpen(false)} className="px-4 py-2 bg-surface-sunken text-ink font-bold rounded-xl">إلغاء</button>
+              <button type="submit" disabled={saving} className="px-5 py-2 bg-danger hover:bg-danger text-white font-bold rounded-xl flex items-center gap-2">
                 {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileText className="w-3.5 h-3.5" />} ترحيل المرتجع
               </button>
             </div>
@@ -437,10 +437,10 @@ export const PurchaseReturnsPage: React.FC = () => {
         <Modal onClose={() => setDetail(null)} wide>
           <div className="flex items-start justify-between mb-4">
             <div>
-              <h3 className="text-base font-black text-slate-900">مرتجع {detail.returnNumber}</h3>
-              <p className="text-[11px] text-slate-500 mt-1">فاتورة الشراء: {detail.originalInvoiceNumber} • {detail.date}</p>
+              <h3 className="text-base font-black text-ink">مرتجع {detail.returnNumber}</h3>
+              <p className="text-[11px] text-muted mt-1">فاتورة الشراء: {detail.originalInvoiceNumber} • {detail.date}</p>
             </div>
-            <button onClick={() => setDetail(null)} className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100"><X className="w-4 h-4" /></button>
+            <button onClick={() => setDetail(null)} className="p-1.5 rounded-lg text-muted hover:bg-surface-sunken"><X className="w-4 h-4" /></button>
           </div>
           <div className="grid grid-cols-1  sm:grid-cols-4 gap-3 mb-4">
             <Info label="المورد" value={detail.supplierName || '—'} />
@@ -453,13 +453,13 @@ export const PurchaseReturnsPage: React.FC = () => {
             <Info label="على حساب المورد" value={fmt(detail.remainingToBalance)} />
             <Info label="بواسطة" value={detail.createdByName || '—'} />
           </div>
-          {detail.reason && <div className="bg-rose-50 border border-rose-200 rounded-xl p-3 text-[11px] text-rose-800 mb-4"><b>سبب الإرجاع:</b> {detail.reason}</div>}
+          {detail.reason && <div className="bg-danger-soft border border-danger-border rounded-xl p-3 text-[11px] text-danger mb-4"><b>سبب الإرجاع:</b> {detail.reason}</div>}
           <OperationalFieldsSummary fields={operationalFields} values={fieldService.getRecordValues('purchase_returns', detail.id)} />
           <OperationalFieldsRecordEditor recordLabel={detail.returnNumber} fields={operationalFields} initialValues={fieldService.getRecordValues('purchase_returns', detail.id)} canEdit={canReturn} onSave={(values) => {
             fieldService.setRecordValues('purchase_returns', detail.id, values);
             load();
           }} />
-          <div className="border border-slate-200 rounded-xl overflow-x-auto mb-4">
+          <div className="border border-line rounded-xl overflow-x-auto mb-4">
             <DataTable
                           ariaLabel="أصناف مرتجع الشراء"
                           rows={detail.items || []}
@@ -467,7 +467,7 @@ export const PurchaseReturnsPage: React.FC = () => {
                           minWidth={560}
                           dense
                           columns={[
-                            { key: 'product', header: 'الصنف', render: (i: any) => <span className="font-bold text-slate-800">{i.productName}</span> },
+                            { key: 'product', header: 'الصنف', render: (i: any) => <span className="font-bold text-ink">{i.productName}</span> },
                             { key: 'grade', header: 'الفرز', render: (i: any) => i.grade },
                             { key: 'qty', header: 'الكمية', render: (i: any) => <span className="font-mono">{formatProductQuantity(Number(i.quantityM2), i)}</span> },
                             { key: 'boxes', header: 'الكراتين', render: (i: any) => <span className="font-mono">{i.boxesCount}</span> },
@@ -478,8 +478,8 @@ export const PurchaseReturnsPage: React.FC = () => {
                         />
 
           </div>
-          <div className="flex justify-end pt-3 border-t border-slate-100">
-            <button onClick={() => printService.printPurchaseReturn(detail)} className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold flex items-center gap-1.5"><Printer className="w-3.5 h-3.5" /> طباعة المرتجع</button>
+          <div className="flex justify-end pt-3 border-t border-line">
+            <button onClick={() => printService.printPurchaseReturn(detail)} className="px-3 py-2 bg-surface-sunken hover:bg-surface-sunken text-ink rounded-xl text-xs font-bold flex items-center gap-1.5"><Printer className="w-3.5 h-3.5" /> طباعة المرتجع</button>
           </div>
         </Modal>
       )}
@@ -506,19 +506,19 @@ const Stat: React.FC<{ label: string; value: string; icon: React.ElementType; to
 );
 
 const Btn: React.FC<{ onClick: () => void; tone: 'slate'; children: React.ReactNode }> = ({ onClick, tone, children }) => {
-  const styles: Record<string, string> = { slate: 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200' };
+  const styles: Record<string, string> = { slate: 'bg-surface-sunken hover:bg-surface-sunken text-ink border-line' };
   return <button onClick={onClick} className={`px-3 py-1.5 border rounded-xl text-xs font-bold flex items-center gap-1.5 transition ${styles[tone]}`}>{children}</button>;
 };
 
 const Modal: React.FC<{ children: React.ReactNode; onClose: () => void; wide?: boolean }> = ({ children, onClose, wide }) => (
-  <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-    <div className={`bg-white rounded-2xl border border-slate-200 shadow-2xl w-full ${wide ? 'max-w-5xl' : 'max-w-lg'} p-6 max-h-[92vh] overflow-y-auto`}>{children}</div>
+  <div className="fixed inset-0 bg-primary/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+    <div className={`bg-surface rounded-2xl border border-line shadow-2xl w-full ${wide ? 'max-w-5xl' : 'max-w-lg'} p-6 max-h-[92vh] overflow-y-auto`}>{children}</div>
   </div>
 );
 
 const Info: React.FC<{ label: string; value: string }> = ({ label, value }) => (
-  <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
-    <div className="text-[10px] font-bold text-slate-400">{label}</div>
-    <div className="text-xs font-black text-slate-800 mt-0.5">{value}</div>
+  <div className="bg-surface-muted border border-line rounded-xl p-3">
+    <div className="text-[10px] font-bold text-muted">{label}</div>
+    <div className="text-xs font-black text-ink mt-0.5">{value}</div>
   </div>
 );

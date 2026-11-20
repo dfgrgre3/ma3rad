@@ -9,8 +9,8 @@ interface InvoiceHeaderFooterSectionProps {
 }
 
 export const InvoiceHeaderFooterSection: React.FC<InvoiceHeaderFooterSectionProps> = ({ settings, set }) => (
-  <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 space-y-3">
-    <h4 className="text-xs font-black text-slate-800 dark:text-slate-200 border-b border-slate-100 dark:border-slate-800 pb-2">
+  <div className="rounded-2xl border border-line bg-surface p-4 space-y-3">
+    <h4 className="text-xs font-black text-ink border-b border-line pb-2">
       نصوص الترويسة والتذييل وشروط الاسترجاع
     </h4>
 

@@ -24,7 +24,7 @@ const TABS: Array<{ id: TabId; label: string; icon: React.ElementType }> = [
   { id: 'diagnostics', label: 'التشخيصات', icon: Activity },
 ];
 
-const inputCls = 'w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-500/30 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100';
+const inputCls = 'w-full rounded-xl border border-line bg-surface-muted px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/30 ';
 
 export const ConfigurationStudioPage: React.FC = () => {
   const can = usePermission();
@@ -105,8 +105,8 @@ export const ConfigurationStudioPage: React.FC = () => {
         title="استوديو التكوين الديناميكي"
         description="إدارة الأزرار والميزات والنطاقات (مستأجر / شركة / فرع / جهاز / مستخدم) مع الوراثة والتشخيص."
         meta={
-          <span className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-xs text-slate-600">
-            <ShieldCheck className="h-4 w-4 text-emerald-500" />
+          <span className="flex items-center gap-2 rounded-2xl border border-line bg-surface px-4 py-2 text-xs text-ink-secondary">
+            <ShieldCheck className="h-4 w-4 text-success" />
             <span>الحالة: {state.entries.length} إعداد أساسي · {state.scopedEntries.length} تجاوز نطاق</span>
           </span>
         }
@@ -122,7 +122,7 @@ export const ConfigurationStudioPage: React.FC = () => {
               type="button"
               onClick={() => setActiveTab(tab.id)}
               className={`flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold transition ${
-                active ? 'bg-sky-600 text-white shadow-lg shadow-sky-600/30' : 'bg-white text-slate-600 hover:bg-slate-50'
+                active ? 'bg-primary text-white shadow-lg shadow-primary/30' : 'bg-surface text-ink-secondary hover:bg-surface-muted'
               }`}
             >
               <Icon className="h-4 w-4" />
@@ -134,8 +134,8 @@ export const ConfigurationStudioPage: React.FC = () => {
 
       {activeTab === 'actions' && (
         <section className="grid gap-6 lg:grid-cols-[320px_1fr]">
-          <aside className="rounded-2xl border border-slate-200 bg-white p-4">
-            <h2 className="mb-3 text-sm font-black text-slate-900">الإجراءات المسجلة</h2>
+          <aside className="rounded-2xl border border-line bg-surface p-4">
+            <h2 className="mb-3 text-sm font-black text-ink">الإجراءات المسجلة</h2>
             <div className="max-h-[480px] space-y-2 overflow-y-auto">
               {ACTION_REGISTRY.map((action) => {
                 const resolved = ActionRegistryService.resolve(action.id, admin);
@@ -151,28 +151,28 @@ export const ConfigurationStudioPage: React.FC = () => {
                     }}
                     className={`w-full rounded-xl border px-3 py-2 text-right text-xs transition ${
                       selectedActionId === action.id
-                        ? 'border-sky-500 bg-sky-50 text-sky-700'
-                        : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100'
+                        ? 'border-primary bg-accent-soft text-primary'
+                        : 'border-line bg-surface-muted text-ink hover:bg-surface-sunken'
                     }`}
                   >
                     <div className="flex items-center justify-between gap-2">
                       <span className="font-bold">{action.label}</span>
-                      <span className={`rounded-full px-2 py-0.5 text-[10px] ${resolved.enabled ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
+                      <span className={`rounded-full px-2 py-0.5 text-[10px] ${resolved.enabled ? 'bg-success-soft text-success' : 'bg-danger-soft text-danger'}`}>
                         {resolved.enabled ? 'مفعّل' : 'مقيّد'}
                       </span>
                     </div>
-                    <div className="mt-1 text-[10px] text-slate-500">{action.id}</div>
+                    <div className="mt-1 text-[10px] text-muted">{action.id}</div>
                   </button>
                 );
               })}
             </div>
           </aside>
 
-          <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-6">
-            <h2 className="text-lg font-black text-slate-900">تكوين الإجراء: {selectedActionId}</h2>
+          <div className="space-y-4 rounded-2xl border border-line bg-surface p-6">
+            <h2 className="text-lg font-black text-ink">تكوين الإجراء: {selectedActionId}</h2>
             <div className="grid gap-4 md:grid-cols-2">
               <div>
-                <label className="mb-1 block text-[11px] font-bold text-slate-600">العنوان (تجاوز)</label>
+                <label className="mb-1 block text-[11px] font-bold text-ink-secondary">العنوان (تجاوز)</label>
                 <input
                   className={inputCls}
                   value={actionLabel}
@@ -181,26 +181,26 @@ export const ConfigurationStudioPage: React.FC = () => {
                 />
               </div>
               <div className="flex items-center gap-6 pt-6">
-                <label className="flex items-center gap-2 text-xs font-bold text-slate-700">
+                <label className="flex items-center gap-2 text-xs font-bold text-ink">
                   <input type="checkbox" checked={actionVisible} onChange={(e) => setActionVisible(e.target.checked)} />
                   مرئي
                 </label>
-                <label className="flex items-center gap-2 text-xs font-bold text-slate-700">
+                <label className="flex items-center gap-2 text-xs font-bold text-ink">
                   <input type="checkbox" checked={actionConfirm} onChange={(e) => setActionConfirm(e.target.checked)} />
                   يتطلب تأكيد
                 </label>
               </div>
             </div>
-            <div className="rounded-xl bg-slate-50 p-3 text-xs text-slate-600">
+            <div className="rounded-xl bg-surface-muted p-3 text-xs text-ink-secondary">
               <div>الحالة الفعّالة: <strong>{selectedAction.enabled ? 'مسموح' : 'مقيّد'}</strong></div>
-              {selectedAction.reason && <div className="mt-1 text-rose-600">{selectedAction.reason}</div>}
+              {selectedAction.reason && <div className="mt-1 text-danger">{selectedAction.reason}</div>}
               <div className="mt-1">الصلاحيات (غير قابلة للتخفيف): {(selectedAction.definition?.permissions ?? []).join('، ') || '—'}</div>
             </div>
             <button
               type="button"
               disabled={!canUpdate}
               onClick={saveAction}
-              className="rounded-xl bg-sky-600 px-4 py-2 text-sm font-bold text-white shadow-lg shadow-sky-600/30 disabled:opacity-50"
+              className="rounded-xl bg-primary px-4 py-2 text-sm font-bold text-white shadow-lg shadow-primary/30 disabled:opacity-50"
             >
               حفظ تكوين الإجراء
             </button>
@@ -210,8 +210,8 @@ export const ConfigurationStudioPage: React.FC = () => {
 
       {activeTab === 'features' && (
         <section className="grid gap-6 lg:grid-cols-[320px_1fr]">
-          <aside className="rounded-2xl border border-slate-200 bg-white p-4">
-            <h2 className="mb-3 text-sm font-black text-slate-900">الميزات المسجلة</h2>
+          <aside className="rounded-2xl border border-line bg-surface p-4">
+            <h2 className="mb-3 text-sm font-black text-ink">الميزات المسجلة</h2>
             <div className="max-h-[480px] space-y-2 overflow-y-auto">
               {FEATURE_REGISTRY.map((feature) => {
                 const resolved = FeatureService.resolve(feature.id, admin);
@@ -222,37 +222,37 @@ export const ConfigurationStudioPage: React.FC = () => {
                     onClick={() => setSelectedFeatureId(feature.id)}
                     className={`w-full rounded-xl border px-3 py-2 text-right text-xs transition ${
                       selectedFeatureId === feature.id
-                        ? 'border-sky-500 bg-sky-50 text-sky-700'
-                        : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100'
+                        ? 'border-primary bg-accent-soft text-primary'
+                        : 'border-line bg-surface-muted text-ink hover:bg-surface-sunken'
                     }`}
                   >
                     <div className="flex items-center justify-between gap-2">
                       <span className="font-bold">{feature.label}</span>
-                      <span className={`rounded-full px-2 py-0.5 text-[10px] ${resolved.allowed ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
+                      <span className={`rounded-full px-2 py-0.5 text-[10px] ${resolved.allowed ? 'bg-success-soft text-success' : 'bg-danger-soft text-danger'}`}>
                         {resolved.allowed ? 'متاحة' : 'مقيّدة'}
                       </span>
                     </div>
-                    <div className="mt-1 text-[10px] text-slate-500">{feature.id}</div>
+                    <div className="mt-1 text-[10px] text-muted">{feature.id}</div>
                   </button>
                 );
               })}
             </div>
           </aside>
 
-          <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-6">
-            <h2 className="text-lg font-black text-slate-900">تكوين الميزة: {selectedFeatureId}</h2>
-            <div className="rounded-xl bg-slate-50 p-3 text-xs text-slate-600">
+          <div className="space-y-4 rounded-2xl border border-line bg-surface p-6">
+            <h2 className="text-lg font-black text-ink">تكوين الميزة: {selectedFeatureId}</h2>
+            <div className="rounded-xl bg-surface-muted p-3 text-xs text-ink-secondary">
               <div>التوفر (وحدة): <strong>{selectedFeature.available ? 'مفعّل' : 'غير مفعّل'}</strong></div>
               <div className="mt-1">الاستحقاق (اشتراك): <strong>{selectedFeature.entitled ? 'مستحق' : 'غير مستحق'}</strong></div>
               <div className="mt-1">الصلاحية: <strong>{selectedFeature.permitted ? 'ممنوحة' : 'غير ممنوحة'}</strong></div>
-              {selectedFeature.reason && <div className="mt-1 text-rose-600">{selectedFeature.reason}</div>}
+              {selectedFeature.reason && <div className="mt-1 text-danger">{selectedFeature.reason}</div>}
             </div>
             <div className="flex gap-2">
               <button
                 type="button"
                 disabled={!canUpdate}
                 onClick={() => saveFeatureEntitlement(true)}
-                className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
+                className="rounded-xl bg-success px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
               >
                 تفعيل الاستحقاق
               </button>
@@ -260,12 +260,12 @@ export const ConfigurationStudioPage: React.FC = () => {
                 type="button"
                 disabled={!canUpdate}
                 onClick={() => saveFeatureEntitlement(false)}
-                className="rounded-xl bg-rose-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
+                className="rounded-xl bg-danger px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
               >
                 إلغاء الاستحقاق
               </button>
             </div>
-            <p className="text-[11px] text-slate-500">
+            <p className="text-[11px] text-muted">
               إلغاء الاستحقاق (اشتراك) لا يحذف البيانات. الوحدة والصلاحيات تُدار من مكانها الأصلي.
             </p>
           </div>
@@ -273,14 +273,14 @@ export const ConfigurationStudioPage: React.FC = () => {
       )}
 
       {activeTab === 'scopes' && (
-        <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-6">
-          <h2 className="text-lg font-black text-slate-900">تجاوزات النطاق (وراثة)</h2>
-          <p className="text-xs text-slate-500">
+        <section className="space-y-4 rounded-2xl border border-line bg-surface p-6">
+          <h2 className="text-lg font-black text-ink">تجاوزات النطاق (وراثة)</h2>
+          <p className="text-xs text-muted">
             حدد النطاق (فرع/جهاز/مستخدم/...) ثم أدخل تجاوزًا. الأعلى سلطة (منصة ← مستأجر ← نشاط ← شركة ← فرع ← جهاز ← مستخدم) يفوز عند التعارض.
           </p>
           <div className="grid gap-4 md:grid-cols-3">
             <div>
-              <label className="mb-1 block text-[11px] font-bold text-slate-600">نوع النطاق</label>
+              <label className="mb-1 block text-[11px] font-bold text-ink-secondary">نوع النطاق</label>
               <select className={inputCls} value={scopeType} onChange={(e) => setScopeType(e.target.value as any)}>
                 {CONFIGURATION_SCOPE_PRECEDENCE.map((type) => (
                   <option key={type} value={type}>{CONFIGURATION_SCOPE_LABELS[type]}</option>
@@ -288,7 +288,7 @@ export const ConfigurationStudioPage: React.FC = () => {
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-[11px] font-bold text-slate-600">معرّف النطاق</label>
+              <label className="mb-1 block text-[11px] font-bold text-ink-secondary">معرّف النطاق</label>
               <input
                 className={inputCls}
                 value={scopeId}
@@ -305,17 +305,17 @@ export const ConfigurationStudioPage: React.FC = () => {
               )}
             </div>
             <div>
-              <label className="mb-1 block text-[11px] font-bold text-slate-600">صفحة (path)</label>
+              <label className="mb-1 block text-[11px] font-bold text-ink-secondary">صفحة (path)</label>
               <input className={inputCls} value={scopePagePath} onChange={(e) => setScopePagePath(e.target.value)} placeholder="/dashboard" />
             </div>
           </div>
           <div className="grid gap-4 md:grid-cols-2">
-            <label className="flex items-center gap-2 text-xs font-bold text-slate-700">
+            <label className="flex items-center gap-2 text-xs font-bold text-ink">
               <input type="checkbox" checked={scopeEnabled} onChange={(e) => setScopeEnabled(e.target.checked)} />
               مفعّلة
             </label>
             <div>
-              <label className="mb-1 block text-[11px] font-bold text-slate-600">عنوان (تجاوز)</label>
+              <label className="mb-1 block text-[11px] font-bold text-ink-secondary">عنوان (تجاوز)</label>
               <input className={inputCls} value={scopeLabel} onChange={(e) => setScopeLabel(e.target.value)} placeholder="عنوان مخصص" />
             </div>
           </div>
@@ -323,12 +323,12 @@ export const ConfigurationStudioPage: React.FC = () => {
             type="button"
             disabled={!canUpdate}
             onClick={saveScope}
-            className="rounded-xl bg-sky-600 px-4 py-2 text-sm font-bold text-white shadow-lg shadow-sky-600/30 disabled:opacity-50"
+            className="rounded-xl bg-primary px-4 py-2 text-sm font-bold text-white shadow-lg shadow-primary/30 disabled:opacity-50"
           >
             حفظ تجاوز النطاق
           </button>
 
-          <div className="mt-4 rounded-xl bg-slate-50 p-3 text-xs text-slate-600">
+          <div className="mt-4 rounded-xl bg-surface-muted p-3 text-xs text-ink-secondary">
             <div>السياق الفعّال: {AppConfigService.getActiveContext().userId ?? '—'} · {AppConfigService.getActiveContext().branchId ?? '—'}</div>
             <div className="mt-1">تجاوزات مسجلة: {state.scopedEntries.length}</div>
           </div>
@@ -336,9 +336,9 @@ export const ConfigurationStudioPage: React.FC = () => {
       )}
 
       {activeTab === 'diagnostics' && (
-        <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-6">
-          <h2 className="text-lg font-black text-slate-900">تشخيصات التكوين</h2>
-          <ul className="space-y-2 text-sm text-slate-700">
+        <section className="space-y-4 rounded-2xl border border-line bg-surface p-6">
+          <h2 className="text-lg font-black text-ink">تشخيصات التكوين</h2>
+          <ul className="space-y-2 text-sm text-ink">
             <li>• إعدادات أساسية: {state.entries.length}</li>
             <li>• قواعد DOM/نص: {state.rules.length}</li>
             <li>• تجاوزات نطاق: {state.scopedEntries.length}</li>
@@ -347,7 +347,7 @@ export const ConfigurationStudioPage: React.FC = () => {
             <li>• عدد الإجراءات المسجلة: {ACTION_REGISTRY.length}</li>
             <li>• عدد الميزات المسجلة: {FEATURE_REGISTRY.length}</li>
           </ul>
-          <p className="text-[11px] text-slate-500">
+          <p className="text-[11px] text-muted">
             استخدم «محرك التكوين الديناميكي» (/settings/app-configuration) لإدارة الصفحات/Aقسام/الحقول/النصوص/السياسات/الترقيم/الطباعة.
           </p>
         </section>

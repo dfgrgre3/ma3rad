@@ -164,21 +164,21 @@ export const ProductDetailPage: React.FC = () => {
   };
 
   if (loading) return (
-    <div className="flex items-center justify-center h-full bg-slate-50"><Loader2 className="w-8 h-8 animate-spin text-sky-600" /></div>
+    <div className="flex items-center justify-center h-full bg-surface-muted"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>
   );
 
   if (!product) return (
-    <div className="flex flex-col items-center justify-center h-full bg-slate-50 gap-4">
-      <AlertTriangle className="w-12 h-12 text-amber-600" />
-      <p className="text-slate-700">المنتج غير موجود</p>
-      <button onClick={() => navigate('/products')} className="px-4 py-2 bg-sky-600 text-white rounded-lg text-sm">العودة للمنتجات</button>
+    <div className="flex flex-col items-center justify-center h-full bg-surface-muted gap-4">
+      <AlertTriangle className="w-12 h-12 text-warning" />
+      <p className="text-ink">المنتج غير موجود</p>
+      <button onClick={() => navigate('/products')} className="px-4 py-2 bg-primary text-white rounded-lg text-sm">العودة للمنتجات</button>
     </div>
   );
 
   const margin = product.costPrice > 0 ? ((product.sellingPriceM2 - product.costPrice) / product.costPrice) * 100 : null;
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
+    <div className="h-full flex flex-col bg-surface-muted text-ink overflow-hidden">
       <ProductDetailHeader
         product={product}
         stock={stock}
@@ -210,8 +210,8 @@ export const ProductDetailPage: React.FC = () => {
         {tab === 'purchases' && can('purchases.view') && <PurchasesTab product={product} purchases={purchases} />}
 
         {tab === 'pricing' && canViewPricing && (
-          <div className="bg-white rounded-xl border border-slate-200 p-5">
-            <h3 className="text-sm font-bold text-slate-900 mb-4">قوائم الأسعار المرتبطة بالمنتج</h3>
+          <div className="bg-surface rounded-xl border border-line p-5">
+            <h3 className="text-sm font-bold text-ink mb-4">قوائم الأسعار المرتبطة بالمنتج</h3>
             <PriceListsForProduct productId={product.id} unitLabel={getProductUnitLabel(product)} />
           </div>
         )}
@@ -240,8 +240,8 @@ export const ProductDetailPage: React.FC = () => {
         />}
 
         {tab === 'history' && can('inventory.view') && (
-          <div className="bg-white rounded-xl border border-slate-200 p-5">
-            <h3 className="text-sm font-bold text-slate-900 mb-4">حركات المخزون</h3>
+          <div className="bg-surface rounded-xl border border-line p-5">
+            <h3 className="text-sm font-bold text-ink mb-4">حركات المخزون</h3>
             <InventoryHistory productId={product.id} unitLabel={getProductUnitLabel(product)} />
           </div>
         )}

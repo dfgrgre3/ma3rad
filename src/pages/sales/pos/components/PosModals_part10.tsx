@@ -22,9 +22,9 @@ export const ShortcutsModal: React.FC<{ onClose: () => void }> = ({ onClose }) =
   <Modal title="اختصارات لوحة المفاتيح" icon={<Keyboard className="w-5 h-5" />} onClose={onClose}>
     <div className="space-y-1.5 text-xs">
       {SHORTCUTS.map(([key, desc]) => (
-        <div key={key} className="flex items-center justify-between bg-white border border-slate-200 rounded-lg px-3 py-2">
-          <span className="text-slate-700">{desc}</span>
-          <kbd className="font-mono bg-slate-100 text-sky-700 px-2 py-0.5 rounded text-[11px]">{key}</kbd>
+        <div key={key} className="flex items-center justify-between bg-surface border border-line rounded-lg px-3 py-2">
+          <span className="text-ink">{desc}</span>
+          <kbd className="font-mono bg-surface-sunken text-primary px-2 py-0.5 rounded text-[11px]">{key}</kbd>
         </div>
       ))}
     </div>

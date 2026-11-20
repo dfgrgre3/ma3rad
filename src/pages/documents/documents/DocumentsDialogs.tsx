@@ -103,9 +103,9 @@ export const DocumentsDialogs: React.FC<DocumentsDialogsProps> = ({
       </div>
       <div><label className={labelCls}>تاريخ الانتهاء</label><input type="date" value={docDraft.expiresAt} onChange={(e) => setDocDraft({ ...docDraft, expiresAt: e.target.value })} className={inputCls} /></div>
       <div><label className={labelCls}>الوصف</label><textarea rows={3} value={docDraft.description} onChange={(e) => setDocDraft({ ...docDraft, description: e.target.value })} className={inputCls} /></div>
-      <div className="flex justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
-        <button type="button" onClick={() => setCreateOpen(false)} className="px-4 py-2 bg-slate-100 dark:bg-slate-800 font-bold rounded-xl">إلغاء</button>
-        <button type="submit" disabled={saving} className="px-5 py-2 bg-indigo-600 text-white font-bold rounded-xl flex items-center gap-2">{saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />} إنشاء</button>
+      <div className="flex justify-end gap-2 pt-3 border-t border-line ">
+        <button type="button" onClick={() => setCreateOpen(false)} className="px-4 py-2 bg-surface-sunken font-bold rounded-xl">إلغاء</button>
+        <button type="submit" disabled={saving} className="px-5 py-2 bg-primary text-white font-bold rounded-xl flex items-center gap-2">{saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />} إنشاء</button>
       </div>
     </form>
   </Modal>
@@ -117,51 +117,51 @@ export const DocumentsDialogs: React.FC<DocumentsDialogsProps> = ({
     <div className="space-y-4 text-xs">
       <div className="flex flex-wrap gap-2">
         <span className={`px-2 py-0.5 rounded-full border font-bold ${DOC_STATUS_STYLE[selected.status]}`}>{DOC_STATUS_LABEL[selected.status]}</span>
-        <span className="px-2 py-0.5 rounded-full border border-slate-200 dark:border-slate-700">{CONFIDENTIALITY_LABEL[selected.confidentiality]}</span>
-        <span className="px-2 py-0.5 rounded-full border border-slate-200 dark:border-slate-700">{selected.companyName}</span>
-        {selected.expiresAt && <span className="px-2 py-0.5 rounded-full border border-amber-200 text-amber-700">ينتهي {selected.expiresAt}</span>}
+        <span className="px-2 py-0.5 rounded-full border border-line ">{CONFIDENTIALITY_LABEL[selected.confidentiality]}</span>
+        <span className="px-2 py-0.5 rounded-full border border-line ">{selected.companyName}</span>
+        {selected.expiresAt && <span className="px-2 py-0.5 rounded-full border border-warning-border text-warning">ينتهي {selected.expiresAt}</span>}
       </div>
-      {selected.description && <p className="text-slate-600 dark:text-slate-300 leading-relaxed">{selected.description}</p>}
+      {selected.description && <p className="text-ink-secondary leading-relaxed">{selected.description}</p>}
       <div className="flex flex-wrap gap-2">
         {selected.status === 'DRAFT' && can('documents.update') && (
-          <button onClick={() => onChangeStatus(selected, 'ACTIVE')} className="px-3 py-1.5 rounded-xl bg-emerald-600 text-white font-bold flex items-center gap-1"><CheckCircle2 className="w-3.5 h-3.5" /> تفعيل المستند</button>
+          <button onClick={() => onChangeStatus(selected, 'ACTIVE')} className="px-3 py-1.5 rounded-xl bg-success text-white font-bold flex items-center gap-1"><CheckCircle2 className="w-3.5 h-3.5" /> تفعيل المستند</button>
         )}
         {selected.status !== 'ARCHIVED' && can('documents.archive') && (
-          <button onClick={() => onChangeStatus(selected, 'ARCHIVED')} className="px-3 py-1.5 rounded-xl bg-slate-700 text-white font-bold flex items-center gap-1"><Archive className="w-3.5 h-3.5" /> أرشفة</button>
+          <button onClick={() => onChangeStatus(selected, 'ARCHIVED')} className="px-3 py-1.5 rounded-xl bg-primary text-white font-bold flex items-center gap-1"><Archive className="w-3.5 h-3.5" /> أرشفة</button>
         )}
         {selected.status === 'ARCHIVED' && can('documents.archive') && (
-          <button onClick={() => onChangeStatus(selected, 'ACTIVE')} className="px-3 py-1.5 rounded-xl bg-emerald-600 text-white font-bold flex items-center gap-1"><RefreshCw className="w-3.5 h-3.5" /> استعادة</button>
+          <button onClick={() => onChangeStatus(selected, 'ACTIVE')} className="px-3 py-1.5 rounded-xl bg-success text-white font-bold flex items-center gap-1"><RefreshCw className="w-3.5 h-3.5" /> استعادة</button>
         )}
         {selected.status !== 'ARCHIVED' && can('documents.update') && (
-          <button onClick={() => { setVersionDraft({ fileName: '', mimeType: '', fileSize: null, checksum: '', storageName: '', notes: '' }); setVersionOpen(true); }} className="px-3 py-1.5 rounded-xl bg-indigo-600 text-white font-bold flex items-center gap-1"><Sparkles className="w-3.5 h-3.5" /> إضافة إصدار</button>
+          <button onClick={() => { setVersionDraft({ fileName: '', mimeType: '', fileSize: null, checksum: '', storageName: '', notes: '' }); setVersionOpen(true); }} className="px-3 py-1.5 rounded-xl bg-primary text-white font-bold flex items-center gap-1"><Sparkles className="w-3.5 h-3.5" /> إضافة إصدار</button>
         )}
       </div>
 
       <div>
         <h4 className="font-black mb-2">الإصدارات ({selected.versions?.length || 0})</h4>
-        <div className="border border-slate-200 dark:border-slate-700 rounded-xl divide-y divide-slate-100 dark:divide-slate-800">
+        <div className="border border-line rounded-xl divide-y divide-line-strong dark:divide-primary">
           {(selected.versions || []).map((version) => (
             <div key={version.id} className="p-3 flex items-center justify-between gap-3">
               <div>
                 <div className="font-bold">v{version.versionNumber} — {version.fileName}</div>
-                <div className="text-[10px] text-slate-400">
+                <div className="text-[10px] text-muted">
                   {version.fileSize !== null ? `${Math.max(1, Math.round(version.fileSize / 1024))} KB` : 'بدون ملف مرفق'}
                   {version.checksum ? ` • ${version.checksum.slice(0, 12)}…` : ''}
                   {version.createdByName ? ` • ${version.createdByName}` : ''}
                 </div>
-                {version.notes && <div className="text-[11px] text-slate-500 mt-1">{version.notes}</div>}
+                {version.notes && <div className="text-[11px] text-muted mt-1">{version.notes}</div>}
               </div>
               {version.storageName && window.ceramisys?.documents?.openFile && (
                 <button
                   onClick={() => window.ceramisys?.documents?.openFile?.(version.storageName!)}
-                  className="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 font-bold text-[10px] flex items-center gap-1 shrink-0"
+                  className="px-3 py-1.5 rounded-lg bg-surface-sunken font-bold text-[10px] flex items-center gap-1 shrink-0"
                 >
                   <Paperclip className="w-3 h-3" /> فتح
                 </button>
               )}
             </div>
           ))}
-          {(selected.versions || []).length === 0 && <div className="p-6 text-center text-slate-400">لا توجد إصدارات بعد.</div>}
+          {(selected.versions || []).length === 0 && <div className="p-6 text-center text-muted">لا توجد إصدارات بعد.</div>}
         </div>
       </div>
 
@@ -169,12 +169,12 @@ export const DocumentsDialogs: React.FC<DocumentsDialogsProps> = ({
         <h4 className="font-black mb-2">سجل الأحداث</h4>
         <div className="space-y-1 max-h-40 overflow-y-auto">
           {events.map((event) => (
-            <div key={event.id} className="flex items-center justify-between gap-2 text-[11px] border-b border-slate-100 dark:border-slate-800 py-1.5">
+            <div key={event.id} className="flex items-center justify-between gap-2 text-[11px] border-b border-line py-1.5">
               <span className="font-bold">{event.action}</span>
-              <span className="text-slate-400">{event.actorName || 'النظام'} • {new Date(event.createdAt).toLocaleString()}</span>
+              <span className="text-muted">{event.actorName || 'النظام'} • {new Date(event.createdAt).toLocaleString()}</span>
             </div>
           ))}
-          {events.length === 0 && <div className="text-slate-400">لا توجد أحداث مسجلة.</div>}
+          {events.length === 0 && <div className="text-muted">لا توجد أحداث مسجلة.</div>}
         </div>
       </div>
     </div>
@@ -185,23 +185,23 @@ export const DocumentsDialogs: React.FC<DocumentsDialogsProps> = ({
 {versionOpen && selected && (
   <Modal title={`إصدار جديد — ${selected.documentNumber}`} onClose={() => setVersionOpen(false)}>
     <form onSubmit={submitVersion} className="space-y-3 text-xs">
-      <div className="flex items-center justify-between gap-2 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
+      <div className="flex items-center justify-between gap-2 p-3 rounded-xl bg-surface-muted dark:bg-primary/60 border border-line ">
         <div>
           <div className="font-bold">ملف المستند</div>
-          <div className="text-[10px] text-slate-400">{versionDraft.fileName || 'لم يتم اختيار ملف بعد'}</div>
+          <div className="text-[10px] text-muted">{versionDraft.fileName || 'لم يتم اختيار ملف بعد'}</div>
         </div>
-        <button type="button" onClick={attachFile} className="px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 font-bold flex items-center gap-1">
+        <button type="button" onClick={attachFile} className="px-3 py-1.5 rounded-lg bg-surface border border-line font-bold flex items-center gap-1">
           <Paperclip className="w-3.5 h-3.5" /> اختيار ملف
         </button>
       </div>
       {!window.ceramisys?.documents?.importFile && (
-        <p className="text-[10px] text-amber-600">إرفاق الملفات متاح داخل تطبيق سطح المكتب. يمكنك تسجيل نسخة ببياناتها فقط.</p>
+        <p className="text-[10px] text-warning">إرفاق الملفات متاح داخل تطبيق سطح المكتب. يمكنك تسجيل نسخة ببياناتها فقط.</p>
       )}
       <div><label className={labelCls}>اسم الملف / وصف النسخة *</label><input required value={versionDraft.fileName} onChange={(e) => setVersionDraft({ ...versionDraft, fileName: e.target.value })} className={inputCls} /></div>
       <div><label className={labelCls}>ملاحظات</label><textarea rows={2} value={versionDraft.notes} onChange={(e) => setVersionDraft({ ...versionDraft, notes: e.target.value })} className={inputCls} /></div>
-      <div className="flex justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
-        <button type="button" onClick={() => setVersionOpen(false)} className="px-4 py-2 bg-slate-100 dark:bg-slate-800 font-bold rounded-xl">إلغاء</button>
-        <button type="submit" disabled={saving} className="px-5 py-2 bg-indigo-600 text-white font-bold rounded-xl flex items-center gap-2">{saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />} إضافة</button>
+      <div className="flex justify-end gap-2 pt-3 border-t border-line ">
+        <button type="button" onClick={() => setVersionOpen(false)} className="px-4 py-2 bg-surface-sunken font-bold rounded-xl">إلغاء</button>
+        <button type="submit" disabled={saving} className="px-5 py-2 bg-primary text-white font-bold rounded-xl flex items-center gap-2">{saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />} إضافة</button>
       </div>
     </form>
   </Modal>
@@ -247,15 +247,15 @@ export const DocumentsDialogs: React.FC<DocumentsDialogsProps> = ({
             ))}
           </select>
         </div>
-        <label className="flex items-center gap-2 pt-5 font-bold text-slate-700 dark:text-slate-300">
+        <label className="flex items-center gap-2 pt-5 font-bold text-ink ">
           <input type="checkbox" checked={contractDraft.autoRenew} onChange={(e) => setContractDraft({ ...contractDraft, autoRenew: e.target.checked })} />
           تجديد تلقائي
         </label>
       </div>
       <div><label className={labelCls}>ملاحظات</label><textarea rows={2} value={contractDraft.notes} onChange={(e) => setContractDraft({ ...contractDraft, notes: e.target.value })} className={inputCls} /></div>
-      <div className="flex justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
-        <button type="button" onClick={() => setContractOpen(false)} className="px-4 py-2 bg-slate-100 dark:bg-slate-800 font-bold rounded-xl">إلغاء</button>
-        <button type="submit" disabled={saving} className="px-5 py-2 bg-indigo-600 text-white font-bold rounded-xl flex items-center gap-2">{saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />} إنشاء</button>
+      <div className="flex justify-end gap-2 pt-3 border-t border-line ">
+        <button type="button" onClick={() => setContractOpen(false)} className="px-4 py-2 bg-surface-sunken font-bold rounded-xl">إلغاء</button>
+        <button type="submit" disabled={saving} className="px-5 py-2 bg-primary text-white font-bold rounded-xl flex items-center gap-2">{saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />} إنشاء</button>
       </div>
     </form>
   </Modal>

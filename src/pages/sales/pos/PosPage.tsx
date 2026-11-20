@@ -9,13 +9,14 @@ import { PosProductGrid } from './components/PosProductGrid';
 import { PosCartPanel } from './components/PosCartPanel';
 import { PosCheckoutPanel } from './components/PosCheckoutPanel';
 import { PosPageOverlays } from './components/PosPageOverlays';
+import { usePosActivityCopy } from '../../../hooks/pages/sales/pos/usePosActivityCopy';
 
 export const PosView: React.FC = () => {
   const vm = usePosView();
+  const posCopy = usePosActivityCopy();
   const {
     navigate, currentUser, actingUser, setActingUser,
     productsTotal, gradeOptions,
-    invoiceOperationalFields, invoiceOperationalValues, setInvoiceOperationalValues,
     customers, customersTotal, warehouses, registers, activeShift, setActiveShift, settings,
     discountedStocks, setIsDiscountedStocksOpen,
     selectedWarehouseId, setSelectedWarehouseId, selectedCustomer, setSelectedCustomer,
@@ -62,9 +63,9 @@ export const PosView: React.FC = () => {
   } = vm;
 
   return (
-    <div className={`relative flex h-full min-h-0 overflow-hidden bg-slate-50 text-slate-900 max-[900px]:flex-col ${touchMode ? 'pos-touch-mode' : ''}`}>
+    <div className={`relative flex h-full min-h-0 overflow-hidden bg-surface-muted text-ink max-[900px]:flex-col ${touchMode ? 'pos-touch-mode' : ''}`}>
       {/* ═══ Left: Catalog ═══ */}
-      <div className="flex-1 flex flex-col min-h-0 overflow-hidden border-l border-slate-200 min-w-0">
+      <div className="flex-1 flex flex-col min-h-0 overflow-hidden border-l border-line min-w-0">
         <PosToolbar
           activeShift={activeShift}
           actingUserName={actingUser?.fullName}
@@ -136,13 +137,13 @@ export const PosView: React.FC = () => {
           onClearFilters={clearFilters}
         />
 
-        <div className="flex items-center justify-between border-b border-slate-200 bg-purple-50/70 px-4 py-2">
-          <div className="text-xs font-bold text-purple-900">مخزون الفرز الثاني والبواقي له سعر وتكلفة منفصلان</div>
+        <div className="flex items-center justify-between border-b border-line bg-accent-soft/70 px-4 py-2">
+          <div className="text-xs font-bold text-primary">مخزون الفرز الثاني والبواقي له سعر وتكلفة منفصلان</div>
           <button
             type="button"
             onClick={() => setIsDiscountedStocksOpen(true)}
             disabled={!selectedWarehouseId || discountedStocks.length === 0}
-            className="rounded-lg border border-purple-200 bg-white px-3 py-1.5 text-xs font-black text-purple-800 hover:bg-purple-100 disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-lg border border-accent-border bg-surface px-3 py-1.5 text-xs font-black text-primary hover:bg-accent-soft disabled:cursor-not-allowed disabled:opacity-50"
           >
             البيع المخفض ({discountedStocks.length})
           </button>
@@ -173,7 +174,7 @@ export const PosView: React.FC = () => {
           type="button"
           aria-label="إغلاق السلة وإتمام البيع"
           onClick={() => setIsMobileCheckoutOpen(false)}
-          className="fixed inset-0 z-30 bg-slate-950/45 min-[901px]:hidden"
+          className="fixed inset-0 z-30 bg-primary/45 min-[901px]:hidden"
         />
       )}
       <div
@@ -182,19 +183,19 @@ export const PosView: React.FC = () => {
         role={isMobileCheckoutOpen ? 'dialog' : undefined}
         aria-modal={isMobileCheckoutOpen ? 'true' : undefined}
         aria-label="السلة وإتمام البيع"
-        className={`hidden h-full min-h-0 w-[26rem] max-w-[90vw] shrink-0 flex-col border-r border-slate-200 bg-white shadow-2xl min-[901px]:flex max-[900px]:fixed max-[900px]:inset-x-0 max-[900px]:bottom-0 max-[900px]:z-40 max-[900px]:h-[94dvh] max-[900px]:max-h-[94dvh] max-[900px]:w-full max-[900px]:max-w-none max-[900px]:rounded-t-2xl max-[900px]:border-r-0 max-[900px]:border-t ${isMobileCheckoutOpen ? 'max-[900px]:flex' : ''}`}
+        className={`hidden h-full min-h-0 w-[26rem] max-w-[90vw] shrink-0 flex-col border-r border-line bg-surface shadow-2xl min-[901px]:flex max-[900px]:fixed max-[900px]:inset-x-0 max-[900px]:bottom-0 max-[900px]:z-40 max-[900px]:h-[94dvh] max-[900px]:max-h-[94dvh] max-[900px]:w-full max-[900px]:max-w-none max-[900px]:rounded-t-2xl max-[900px]:border-r-0 max-[900px]:border-t ${isMobileCheckoutOpen ? 'max-[900px]:flex' : ''}`}
       >
-        <div className="flex shrink-0 items-center justify-between border-b border-slate-200 px-3 py-2 dark:border-slate-800 min-[901px]:hidden">
+        <div className="flex shrink-0 items-center justify-between border-b border-line px-3 py-2 min-[901px]:hidden">
           <div className="min-w-0">
-            <p className="text-sm font-black text-slate-900 dark:text-slate-100">السلة وإتمام البيع</p>
-            <p className="text-xs text-slate-600 dark:text-slate-400">{cart.length} أصناف · {CeramicMath.formatCurrency(totalAmount)} ج.م</p>
+            <p className="text-sm font-black text-ink ">{posCopy.cartTitle} وإتمام البيع</p>
+            <p className="text-xs text-ink-secondary ">{cart.length} أصناف · {CeramicMath.formatCurrency(totalAmount)} ج.م</p>
           </div>
           <button
             ref={mobileCheckoutCloseRef}
             type="button"
             onClick={() => setIsMobileCheckoutOpen(false)}
             aria-label="إغلاق السلة"
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-600 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-line text-ink-secondary transition hover:bg-surface-sunken focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary dark:hover:bg-primary"
           >
             <X className="h-5 w-5" />
           </button>
@@ -328,23 +329,20 @@ export const PosView: React.FC = () => {
           onClearOrder={clearCart}
           onOpenCalculator={() => setIsCalculatorOpen(true)}
           onCheckout={() => handleCheckout()}
-          operationalFields={invoiceOperationalFields}
-          operationalFieldValues={invoiceOperationalValues}
-          onOperationalFieldValuesChange={setInvoiceOperationalValues}
           salesReps={salesReps}
           salesRepId={salesRepId}
           onSalesRepChange={setSalesRepId}
         />
       </div>
 
-      <div className="absolute inset-x-0 bottom-0 z-20 border-t border-slate-200 bg-white/95 px-3 py-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] shadow-[0_-8px_18px_rgba(15,23,42,0.10)] backdrop-blur min-[901px]:hidden dark:border-slate-800 dark:bg-slate-950/95">
+      <div className="absolute inset-x-0 bottom-0 z-20 border-t border-line bg-surface/95 px-3 py-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] shadow-[0_-8px_18px_rgba(15,23,42,0.10)] backdrop-blur min-[901px]:hidden dark:bg-primary/95">
         <button
           ref={mobileCheckoutTriggerRef}
           type="button"
           aria-controls="pos-mobile-order-panel"
           aria-expanded={isMobileCheckoutOpen}
           onClick={() => setIsMobileCheckoutOpen(true)}
-          className="flex min-h-12 w-full items-center justify-between gap-3 rounded-xl bg-sky-700 px-3 py-2 text-white transition hover:bg-sky-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2"
+          className="flex min-h-12 w-full items-center justify-between gap-3 rounded-xl bg-primary px-3 py-2 text-white transition hover:bg-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
         >
           <span className="flex min-w-0 items-center gap-2 text-right">
             <ShoppingCart className="h-5 w-5 shrink-0" />

@@ -43,7 +43,7 @@ export const ReleaseTargetsModal: React.FC<ReleaseTargetsModalProps> = ({
     busy={saving}
     footer={
       <div className="flex justify-between items-center w-full">
-        <span className="text-[11px] font-semibold text-slate-500">
+        <span className="text-[11px] font-semibold text-muted">
           تم تحديد {selectedTenantIds.length} من أصل {tenants.length} عميل.
         </span>
         <div className="flex gap-2">
@@ -58,9 +58,9 @@ export const ReleaseTargetsModal: React.FC<ReleaseTargetsModalProps> = ({
     }
   >
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-3 bg-slate-50 p-2.5 rounded-lg border border-slate-200">
+      <div className="flex items-center justify-between gap-3 bg-surface-muted p-2.5 rounded-lg border border-line">
         <div className="relative flex-1">
-          <Search className="absolute right-2.5 top-2.5 h-3.5 w-3.5 text-slate-400" />
+          <Search className="absolute right-2.5 top-2.5 h-3.5 w-3.5 text-muted" />
           <input
             className={`${inputClass} pr-8 text-xs`}
             placeholder="بحث عن عميل..."
@@ -72,21 +72,21 @@ export const ReleaseTargetsModal: React.FC<ReleaseTargetsModalProps> = ({
           <button
             type="button"
             onClick={() => setSelectedTenantIds(tenants.map((t) => t.id))}
-            className="rounded bg-white border border-slate-200 px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-100"
+            className="rounded bg-surface border border-line px-2.5 py-1 text-[11px] font-semibold text-ink hover:bg-surface-sunken"
           >
             تحديد الكل
           </button>
           <button
             type="button"
             onClick={() => setSelectedTenantIds([])}
-            className="rounded bg-white border border-slate-200 px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-100"
+            className="rounded bg-surface border border-line px-2.5 py-1 text-[11px] font-semibold text-ink hover:bg-surface-sunken"
           >
             إلغاء التحديد
           </button>
         </div>
       </div>
 
-      <div className="max-h-[380px] overflow-y-auto divide-y divide-slate-100 rounded-xl border border-slate-200">
+      <div className="max-h-[380px] overflow-y-auto divide-y divide-line-strong rounded-xl border border-line">
         {tenants
           .filter(
             (t) =>
@@ -103,7 +103,7 @@ export const ReleaseTargetsModal: React.FC<ReleaseTargetsModalProps> = ({
               <div
                 key={tenant.id}
                 className={`flex items-center justify-between p-3 transition ${
-                  isSelected ? 'bg-sky-50/40' : 'hover:bg-slate-50/60'
+                  isSelected ? 'bg-accent-soft/40' : 'hover:bg-surface-muted/60'
                 }`}
               >
                 <div className="flex items-center gap-3">
@@ -117,11 +117,11 @@ export const ReleaseTargetsModal: React.FC<ReleaseTargetsModalProps> = ({
                         setSelectedTenantIds(selectedTenantIds.filter((id) => id !== tenant.id));
                       }
                     }}
-                    className="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+                    className="h-4 w-4 rounded border-line-strong text-primary focus:ring-primary"
                   />
                   <div>
-                    <p className="text-[12px] font-bold text-slate-800">{tenant.name}</p>
-                    <p className="font-mono text-[9.5px] text-slate-400" dir="ltr">
+                    <p className="text-[12px] font-bold text-ink">{tenant.name}</p>
+                    <p className="font-mono text-[9.5px] text-muted" dir="ltr">
                       {tenant.code} — {tenant.businessType || 'عام'}
                     </p>
                   </div>
@@ -137,12 +137,12 @@ export const ReleaseTargetsModal: React.FC<ReleaseTargetsModalProps> = ({
                         {statusMeta.label}
                       </span>
                       {targetRecord.error && (
-                        <span className="text-[9.5px] text-rose-600 max-w-[150px] truncate" title={targetRecord.error}>
+                        <span className="text-[9.5px] text-danger max-w-[150px] truncate" title={targetRecord.error}>
                           {targetRecord.error}
                         </span>
                       )}
                       <select
-                        className="rounded border border-slate-200 text-[10px] p-1 bg-white"
+                        className="rounded border border-line text-[10px] p-1 bg-surface"
                         value={targetRecord.status}
                         onChange={(e) => onMarkTargetStatus(targetRecord.id, e.target.value as PlatformReleaseTarget['status'])}
                       >
@@ -153,7 +153,7 @@ export const ReleaseTargetsModal: React.FC<ReleaseTargetsModalProps> = ({
                       </select>
                     </div>
                   ) : (
-                    <span className="text-[10px] text-slate-400">غير مدرج بالتحديث</span>
+                    <span className="text-[10px] text-muted">غير مدرج بالتحديث</span>
                   )}
                 </div>
               </div>

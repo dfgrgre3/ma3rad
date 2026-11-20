@@ -25,7 +25,7 @@ export const formatCurrency = (n: number) =>
   new Intl.NumberFormat('ar-EG', { style: 'decimal', maximumFractionDigits: 0 }).format(n) + ' ج';
 
 export const paymentStatusLabel: Record<string, { label: string; cls: string }> = {
-  PAID: { label: 'مدفوع', cls: 'bg-emerald-500/20 text-emerald-600' },
-  PARTIAL: { label: 'جزئي', cls: 'bg-amber-500/20 text-amber-600' },
-  UNPAID: { label: 'آجل', cls: 'bg-rose-500/20 text-rose-600' },
+  PAID: { label: 'مدفوع', cls: 'bg-success/20 text-success' },
+  PARTIAL: { label: 'جزئي', cls: 'bg-warning/20 text-warning' },
+  UNPAID: { label: 'آجل', cls: 'bg-danger/20 text-danger' },
 };

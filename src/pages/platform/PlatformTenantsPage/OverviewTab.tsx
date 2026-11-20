@@ -85,9 +85,9 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
                     <InfoItem label="Tenant ID" value={<span dir="ltr" className="font-mono text-[10.5px]">{tenant.id}</span>} />
                     <InfoItem label="اسم المسؤول" value={tenant.contactName} />
                     <InfoItem label="تاريخ التسجيل" value={formatDate(tenant.createdAt)} />
-                    <InfoItem label="الهاتف" value={<span className="inline-flex items-center gap-1"><Phone className="h-3 w-3 text-slate-400" />{tenant.phone || '—'}</span>} ltr />
-                    <InfoItem label="البريد الإلكتروني" value={<span className="inline-flex items-center gap-1"><Mail className="h-3 w-3 text-slate-400" />{tenant.email || '—'}</span>} ltr />
-                    <InfoItem label="العنوان" value={<span className="inline-flex items-center gap-1"><MapPin className="h-3 w-3 text-slate-400" />{[tenant.country, tenant.city, tenant.address].filter(Boolean).join('، ') || '—'}</span>} />
+                    <InfoItem label="الهاتف" value={<span className="inline-flex items-center gap-1"><Phone className="h-3 w-3 text-muted" />{tenant.phone || '—'}</span>} ltr />
+                    <InfoItem label="البريد الإلكتروني" value={<span className="inline-flex items-center gap-1"><Mail className="h-3 w-3 text-muted" />{tenant.email || '—'}</span>} ltr />
+                    <InfoItem label="العنوان" value={<span className="inline-flex items-center gap-1"><MapPin className="h-3 w-3 text-muted" />{[tenant.country, tenant.city, tenant.address].filter(Boolean).join('، ') || '—'}</span>} />
                     {tenant.notes && <div className="sm:col-span-2 xl:col-span-3"><InfoItem label="ملاحظات" value={tenant.notes} /></div>}
                   </dl>
                 </SectionCard>
@@ -108,31 +108,31 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
 
                   <SectionCard title="حدود الاستخدام" subtitle="الأجهزة والفروع والوحدات المفعّلة" icon={<Smartphone className="h-4 w-4" />}>
                     <div className="grid gap-2 p-3 sm:grid-cols-2">
-                      <div className="rounded-lg border border-slate-200 p-3">
-                        <p className="flex items-center gap-1 text-[10.5px] font-semibold text-slate-500"><Smartphone className="h-3 w-3" /> الأجهزة</p>
-                        <p className="mt-1 text-lg font-black text-slate-800">
-                          {formatNumber(profile.usage.devicesUsed)} <span className="text-[11px] font-semibold text-slate-400">/ {formatNumber(profile.usage.devicesLimit)}</span>
+                      <div className="rounded-lg border border-line p-3">
+                        <p className="flex items-center gap-1 text-[10.5px] font-semibold text-muted"><Smartphone className="h-3 w-3" /> الأجهزة</p>
+                        <p className="mt-1 text-lg font-black text-ink">
+                          {formatNumber(profile.usage.devicesUsed)} <span className="text-[11px] font-semibold text-muted">/ {formatNumber(profile.usage.devicesLimit)}</span>
                         </p>
-                        <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+                        <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-surface-sunken">
                           <div
-                            className={`h-full rounded-full ${profile.usage.devicesUsed >= profile.usage.devicesLimit ? 'bg-rose-500' : 'bg-emerald-500'}`}
+                            className={`h-full rounded-full ${profile.usage.devicesUsed >= profile.usage.devicesLimit ? 'bg-danger' : 'bg-success'}`}
                             style={{ width: `${Math.min(100, profile.usage.devicesLimit ? (profile.usage.devicesUsed / profile.usage.devicesLimit) * 100 : 0)}%` }}
                           />
                         </div>
                       </div>
-                      <div className="rounded-lg border border-slate-200 p-3">
-                        <p className="flex items-center gap-1 text-[10.5px] font-semibold text-slate-500"><Layers3 className="h-3 w-3" /> الفروع المسموحة</p>
-                        <p className="mt-1 text-lg font-black text-slate-800">
-                          {formatNumber(profile.usage.branchesUsed)} <span className="text-[11px] font-semibold text-slate-400">/ {formatNumber(profile.usage.branchesLimit)}</span>
+                      <div className="rounded-lg border border-line p-3">
+                        <p className="flex items-center gap-1 text-[10.5px] font-semibold text-muted"><Layers3 className="h-3 w-3" /> الفروع المسموحة</p>
+                        <p className="mt-1 text-lg font-black text-ink">
+                          {formatNumber(profile.usage.branchesUsed)} <span className="text-[11px] font-semibold text-muted">/ {formatNumber(profile.usage.branchesLimit)}</span>
                         </p>
-                        <p className="mt-1 text-[10px] text-slate-500">فروع مستخدمة / المسموح</p>
+                        <p className="mt-1 text-[10px] text-muted">فروع مستخدمة / المسموح</p>
                       </div>
-                      <div className="rounded-lg border border-slate-200 p-3 sm:col-span-2">
-                        <p className="flex items-center gap-1 text-[10.5px] font-semibold text-slate-500"><KeyRound className="h-3 w-3" /> التراخيص والوحدات</p>
-                        <p className="mt-1 text-[12px] font-bold text-slate-800">
+                      <div className="rounded-lg border border-line p-3 sm:col-span-2">
+                        <p className="flex items-center gap-1 text-[10.5px] font-semibold text-muted"><KeyRound className="h-3 w-3" /> التراخيص والوحدات</p>
+                        <p className="mt-1 text-[12px] font-bold text-ink">
                           {formatNumber(profile.licenses.length)} ترخيص · {formatNumber(profile.usage.modulesCount)} وحدة مفعّلة
                         </p>
-                        <p className="mt-0.5 text-[10px] text-slate-500">
+                        <p className="mt-0.5 text-[10px] text-muted">
                           {tenant.activeLicenses ? `${formatNumber(tenant.activeLicenses)} ترخيص ساري` : 'لا يوجد ترخيص ساري'}
                         </p>
                       </div>
@@ -152,19 +152,19 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
                     )}
                   >
                     {branches.length === 0 ? (
-                      <p className="p-3 text-[11.5px] text-slate-500">لا توجد فروع مسجلة لهذا العميل.</p>
+                      <p className="p-3 text-[11.5px] text-muted">لا توجد فروع مسجلة لهذا العميل.</p>
                     ) : (
-                      <div className="divide-y divide-slate-100">
+                      <div className="divide-y divide-line-strong">
                         {branches.map((b) => (
                           <div key={b.id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2.5">
                             <div className="min-w-0">
-                              <p className="text-[12px] font-bold text-slate-800">
+                              <p className="text-[12px] font-bold text-ink">
                                 {b.name}
-                                {b.isMain && <span className="mr-1.5 rounded bg-indigo-100 px-1.5 py-0.5 text-[9px] font-black text-indigo-700">رئيسي</span>}
-                                {b.status === 'SUSPENDED' && <span className="mr-1.5 rounded bg-amber-100 px-1.5 py-0.5 text-[9px] font-black text-amber-700">موقوف</span>}
-                                {b.status === 'CLOSED' && <span className="mr-1.5 rounded bg-slate-200 px-1.5 py-0.5 text-[9px] font-black text-slate-600">مغلق</span>}
+                                {b.isMain && <span className="mr-1.5 rounded bg-accent-soft px-1.5 py-0.5 text-[9px] font-black text-primary">رئيسي</span>}
+                                {b.status === 'SUSPENDED' && <span className="mr-1.5 rounded bg-warning-soft px-1.5 py-0.5 text-[9px] font-black text-warning">موقوف</span>}
+                                {b.status === 'CLOSED' && <span className="mr-1.5 rounded bg-surface-sunken px-1.5 py-0.5 text-[9px] font-black text-ink-secondary">مغلق</span>}
                               </p>
-                              <p className="text-[10.5px] text-slate-500 font-mono">
+                              <p className="text-[10.5px] text-muted font-mono">
                                 {b.code}{b.city ? ` · ${b.city}` : ''} · {b.seatsLimit} مقعد / {b.devicesLimit} جهاز
                               </p>
                             </div>
@@ -186,7 +186,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
                       <div
                         key={check.label}
                         className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-[11.5px] font-semibold ${
-                          check.ok ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-rose-200 bg-rose-50 text-rose-700'
+                          check.ok ? 'border-success-border bg-success-soft text-success' : 'border-danger-border bg-danger-soft text-danger'
                         }`}
                       >
                         {check.ok ? <CheckCircle2 className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
@@ -222,7 +222,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
                     </div>
                   ) : (
                     <div className="flex flex-wrap items-center justify-between gap-3 p-3">
-                      <p className="text-[11.5px] text-slate-500">لا يوجد حساب دخول لهذا العميل بعد. أنشئ حساباً لتوليد بيانات التفعيل.</p>
+                      <p className="text-[11.5px] text-muted">لا يوجد حساب دخول لهذا العميل بعد. أنشئ حساباً لتوليد بيانات التفعيل.</p>
                       {canManageTenants && (
                         <Button variant="primary" size="sm" leadingIcon={<UserPlus className="h-3.5 w-3.5" />} onClick={() => setAccountOpen(true)}>
                           إنشاء حساب
@@ -255,7 +255,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
                       </div>
                     </div>
                     {overrides.length === 0 ? (
-                      <p className="text-[11px] text-slate-500">لا توجد مزايا أو حدود خاصة لهذا العميل.</p>
+                      <p className="text-[11px] text-muted">لا توجد مزايا أو حدود خاصة لهذا العميل.</p>
                     ) : (
                                             <DataTable
                         ariaLabel="المزايا والحدود الخاصة"
@@ -264,14 +264,14 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
                         minWidth={520}
                         dense
                         columns={[
-                          { key: 'kind', header: 'النوع', render: (item) => <span className="text-[10.5px] font-semibold text-slate-700">{item.kind}</span> },
+                          { key: 'kind', header: 'النوع', render: (item) => <span className="text-[10.5px] font-semibold text-ink">{item.kind}</span> },
                           { key: 'code', header: 'الرمز', render: (item) => <span className="font-mono text-[10.5px]" dir="ltr">{item.code}</span> },
                           { key: 'value', header: 'القيمة', render: (item) => <span className="text-[10.5px]">{item.value || (item.isEnabled ? 'مفعّل' : 'معطّل')}</span> },
                           { key: 'status', header: 'الحالة', render: (item) => <StatusBadge value={item.isEnabled ? 'ACTIVE' : 'CANCELLED'} label={item.isEnabled ? 'مفعّل' : 'معطّل'} /> },
                           {
                             key: 'action', header: 'إجراء',
                             render: (item) => (
-                              <button type="button" disabled={!canManageTenants} onClick={() => removeOverride(item.id)} className="rounded p-1.5 text-slate-500 hover:bg-rose-50 hover:text-rose-700" title="حذف">
+                              <button type="button" disabled={!canManageTenants} onClick={() => removeOverride(item.id)} className="rounded p-1.5 text-muted hover:bg-danger-soft hover:text-danger" title="حذف">
                                 <Trash2 className="h-3.5 w-3.5" />
                               </button>
                             ),

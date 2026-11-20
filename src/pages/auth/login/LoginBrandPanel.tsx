@@ -40,7 +40,7 @@ export const LoginBrandPanel: React.FC = () => (
           <li key={title} className="win-auth-feature">
             <div className="mb-2 flex items-center gap-2 text-[#c2d8d0]">
               <span className="font-mono text-[11px] tabular-nums">0{index + 1}</span>
-              <span aria-hidden="true" className="h-px flex-1 bg-white/20" />
+              <span aria-hidden="true" className="h-px flex-1 bg-surface/20" />
               <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
             </div>
             <p className="text-[13px] font-semibold">{title}</p>

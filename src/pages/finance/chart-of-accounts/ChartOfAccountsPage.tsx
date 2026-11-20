@@ -18,11 +18,11 @@ const TYPE_LABELS: Record<AccountType, string> = {
   EXPENSE: 'مصروفات',
 };
 const TYPE_COLORS: Record<AccountType, string> = {
-  ASSET: 'bg-sky-50 text-sky-700 border-sky-200',
-  LIABILITY: 'bg-rose-50 text-rose-700 border-rose-200',
-  EQUITY: 'bg-violet-50 text-violet-700 border-violet-200',
-  REVENUE: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-  EXPENSE: 'bg-amber-50 text-amber-700 border-amber-200',
+  ASSET: 'bg-accent-soft text-primary border-accent-border',
+  LIABILITY: 'bg-danger-soft text-danger border-danger-border',
+  EQUITY: 'bg-accent-soft text-primary border-accent-border',
+  REVENUE: 'bg-success-soft text-success border-success-border',
+  EXPENSE: 'bg-warning-soft text-warning border-warning-border',
 };
 const fmt = (n: number) => new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 2 }).format(n || 0) + ' ج';
 
@@ -230,16 +230,16 @@ export const ChartOfAccountsPage: React.FC = () => {
   const hasChildren = expandableIds.length > 0;
 
   return (
-    <div className="h-full min-h-0 flex flex-col overflow-hidden bg-slate-50 text-slate-900">
-      <div className="shrink-0 bg-white px-4 pt-4 sm:px-6">
+    <div className="h-full min-h-0 flex flex-col overflow-hidden bg-surface-muted text-ink">
+      <div className="shrink-0 bg-surface px-4 pt-4 sm:px-6">
         <PageHeader
           icon={<BookOpen className="h-5 w-5" />}
           title="دليل الحسابات العام"
           description="هيكل الحسابات المحاسبية وأرصدتها المستخرجة من القيود"
           actions={<>
-            <span className="text-xs font-semibold text-slate-500">{accounts.length} حساب</span>
+            <span className="text-xs font-semibold text-muted">{accounts.length} حساب</span>
             {canManage && (
-              <button onClick={() => openNew()} className="inline-flex items-center gap-2 rounded-lg bg-sky-700 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-sky-800 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2">
+              <button onClick={() => openNew()} className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-bold text-white transition hover:bg-primary focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2">
                 <Plus className="h-4 w-4" /> إضافة حساب رئيسي
               </button>
             )}
@@ -247,14 +247,14 @@ export const ChartOfAccountsPage: React.FC = () => {
         />
       </div>
 
-      <section aria-label="ملخص الأرصدة حسب نوع الحساب" className="grid shrink-0 grid-cols-2 gap-2 border-b border-slate-200 bg-white p-3 sm:grid-cols-3 sm:gap-3 sm:px-6 sm:py-4 lg:grid-cols-5">
+      <section aria-label="ملخص الأرصدة حسب نوع الحساب" className="grid shrink-0 grid-cols-2 gap-2 border-b border-line bg-surface p-3 sm:grid-cols-3 sm:gap-3 sm:px-6 sm:py-4 lg:grid-cols-5">
         {(Object.keys(TYPE_LABELS) as AccountType[]).map((type) => (
           <button
             key={type}
             type="button"
             aria-pressed={typeFilter === type}
             onClick={() => setTypeFilter(typeFilter === type ? 'ALL' : type)}
-            className={`rounded-lg border px-3 py-2 text-right transition focus:outline-none focus:ring-2 focus:ring-sky-400 ${typeFilter === type ? 'ring-2 ring-sky-400' : 'hover:border-slate-300'} ${TYPE_COLORS[type]}`}
+            className={`rounded-lg border px-3 py-2 text-right transition focus:outline-none focus:ring-2 focus:ring-primary ${typeFilter === type ? 'ring-2 ring-primary' : 'hover:border-line-strong'} ${TYPE_COLORS[type]}`}
           >
             <span className="block text-[10px] font-bold">{TYPE_LABELS[type]}</span>
             <span className="mt-1 block font-mono text-sm font-black tabular-nums" dir="ltr">{fmt(totals[type] || 0)}</span>
@@ -262,16 +262,16 @@ export const ChartOfAccountsPage: React.FC = () => {
         ))}
       </section>
 
-      <section aria-label="تصفية دليل الحسابات" className="shrink-0 border-b border-slate-200 bg-white px-4 py-3 sm:px-6">
+      <section aria-label="تصفية دليل الحسابات" className="shrink-0 border-b border-line bg-surface px-4 py-3 sm:px-6">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
           <label className="relative min-w-0 flex-1 lg:max-w-md">
             <span className="sr-only">بحث بالكود أو اسم الحساب</span>
-            <Search aria-hidden="true" className="absolute right-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <Search aria-hidden="true" className="absolute right-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="بحث بالكود أو اسم الحساب..."
-              className="w-full rounded-lg border border-slate-200 bg-slate-50 py-2.5 pl-4 pr-10 text-sm placeholder:text-slate-400 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-100"
+              className="w-full rounded-lg border border-line bg-surface-muted py-2.5 pl-4 pr-10 text-sm placeholder:text-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary"
             />
           </label>
           <div className="flex flex-wrap items-center gap-2">
@@ -280,23 +280,23 @@ export const ChartOfAccountsPage: React.FC = () => {
               id="account-status-filter"
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
-              className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-xs font-bold text-slate-700 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-100"
+              className="rounded-lg border border-line bg-surface px-3 py-2.5 text-xs font-bold text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary"
             >
               <option value="ALL">كل الحالات</option>
               <option value="ACTIVE">نشط</option>
               <option value="INACTIVE">موقوف</option>
             </select>
-            <span className="text-xs text-slate-500">{isFiltering ? `${matches.size} نتيجة · المسارات ظاهرة` : `${rows.length} حساب ظاهر`}</span>
-            <button type="button" onClick={resetFilters} className="inline-flex items-center gap-1 rounded-md px-2 py-2 text-xs font-bold text-slate-500 transition hover:bg-slate-100 hover:text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-400">
+            <span className="text-xs text-muted">{isFiltering ? `${matches.size} نتيجة · المسارات ظاهرة` : `${rows.length} حساب ظاهر`}</span>
+            <button type="button" onClick={resetFilters} className="inline-flex items-center gap-1 rounded-md px-2 py-2 text-xs font-bold text-muted transition hover:bg-surface-sunken hover:text-ink focus:outline-none focus:ring-2 focus:ring-primary">
               <RotateCcw className="h-3.5 w-3.5" /> إعادة الضبط
             </button>
-            <span className="hidden h-5 border-r border-slate-200 lg:block" />
+            <span className="hidden h-5 border-r border-line lg:block" />
             <button
               type="button"
               onClick={() => setExpanded(new Set(expandableIds))}
               disabled={!hasChildren || isFiltering}
               title={isFiltering ? 'تظهر مسارات الحسابات تلقائيًا أثناء التصفية' : undefined}
-              className="inline-flex items-center gap-1 rounded-md px-2 py-2 text-xs font-bold text-slate-600 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40 focus:outline-none focus:ring-2 focus:ring-sky-400"
+              className="inline-flex items-center gap-1 rounded-md px-2 py-2 text-xs font-bold text-ink-secondary transition hover:bg-surface-sunken disabled:cursor-not-allowed disabled:opacity-40 focus:outline-none focus:ring-2 focus:ring-primary"
             >
               <ChevronsDownUp className="h-3.5 w-3.5" /> توسيع الكل
             </button>
@@ -305,7 +305,7 @@ export const ChartOfAccountsPage: React.FC = () => {
               onClick={() => setExpanded(new Set())}
               disabled={!hasChildren || isFiltering}
               title={isFiltering ? 'تظهر مسارات الحسابات تلقائيًا أثناء التصفية' : undefined}
-              className="inline-flex items-center gap-1 rounded-md px-2 py-2 text-xs font-bold text-slate-600 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40 focus:outline-none focus:ring-2 focus:ring-sky-400"
+              className="inline-flex items-center gap-1 rounded-md px-2 py-2 text-xs font-bold text-ink-secondary transition hover:bg-surface-sunken disabled:cursor-not-allowed disabled:opacity-40 focus:outline-none focus:ring-2 focus:ring-primary"
             >
               <ChevronsUpDown className="h-3.5 w-3.5" /> طي الكل
             </button>
@@ -315,26 +315,26 @@ export const ChartOfAccountsPage: React.FC = () => {
 
       <main className="min-h-0 flex-1 overflow-auto p-3 sm:p-6">
         {error && (
-          <div role="alert" className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-xs font-semibold text-rose-700">
+          <div role="alert" className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-danger-border bg-danger-soft px-4 py-3 text-xs font-semibold text-danger">
             <span>{error}</span>
-            <button type="button" onClick={load} className="rounded-md px-2 py-1 font-bold underline underline-offset-2 hover:text-rose-900">إعادة المحاولة</button>
+            <button type="button" onClick={load} className="rounded-md px-2 py-1 font-bold underline underline-offset-2 hover:text-danger">إعادة المحاولة</button>
           </div>
         )}
         {loading ? (
-          <div className="flex min-h-56 items-center justify-center rounded-xl border border-slate-200 bg-white">
-            <Loader2 aria-label="جارٍ تحميل الحسابات" className="h-6 w-6 animate-spin text-sky-600" />
+          <div className="flex min-h-56 items-center justify-center rounded-xl border border-line bg-surface">
+            <Loader2 aria-label="جارٍ تحميل الحسابات" className="h-6 w-6 animate-spin text-primary" />
           </div>
         ) : accounts.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-slate-300 bg-white px-5 py-16 text-center">
-            <BookOpen className="mx-auto h-8 w-8 text-slate-300" />
-            <h2 className="mt-3 text-sm font-bold text-slate-700">لا توجد حسابات بعد</h2>
-            <p className="mt-1 text-xs text-slate-500">أضف الحسابات الرئيسية للبدء في بناء دليل الحسابات.</p>
-            {canManage && <button type="button" onClick={() => openNew()} className="mt-4 rounded-lg bg-sky-700 px-4 py-2 text-xs font-bold text-white hover:bg-sky-800">إضافة حساب رئيسي</button>}
+          <div className="rounded-xl border border-dashed border-line-strong bg-surface px-5 py-16 text-center">
+            <BookOpen className="mx-auto h-8 w-8 text-muted" />
+            <h2 className="mt-3 text-sm font-bold text-ink">لا توجد حسابات بعد</h2>
+            <p className="mt-1 text-xs text-muted">أضف الحسابات الرئيسية للبدء في بناء دليل الحسابات.</p>
+            {canManage && <button type="button" onClick={() => openNew()} className="mt-4 rounded-lg bg-primary px-4 py-2 text-xs font-bold text-white hover:bg-primary">إضافة حساب رئيسي</button>}
           </div>
         ) : (
           <>
-          <div className="overflow-hidden rounded-xl border border-slate-200 bg-white lg:hidden">
-            <div className="divide-y divide-slate-200">
+          <div className="overflow-hidden rounded-xl border border-line bg-surface lg:hidden">
+            <div className="divide-y divide-line-strong">
               {rows.map(({ node, depth, isExpanded, continuing, isLastSibling }) => {
                 const account = node.account;
                 const parent = tree.parentOf.get(account.id);
@@ -345,17 +345,17 @@ export const ChartOfAccountsPage: React.FC = () => {
                 return (
                   <article
                     key={account.id}
-                    className={`relative py-3 pl-3 transition-colors ${isRoot ? 'bg-sky-50/70' : isOrphan ? 'bg-amber-50/50' : 'bg-white'} ${!isMatch ? 'opacity-75' : ''}`}
+                    className={`relative py-3 pl-3 transition-colors ${isRoot ? 'bg-accent-soft/70' : isOrphan ? 'bg-warning-soft/50' : 'bg-surface'} ${!isMatch ? 'opacity-75' : ''}`}
                     style={{ paddingRight: `${14 + depth * 14}px` }}
                     aria-level={depth + 1}
                   >
                     {continuing.map((hasFollowingSibling, index) => hasFollowingSibling && (
-                      <span key={index} aria-hidden="true" className="absolute inset-y-0 border-r-2 border-sky-200" style={{ right: `${7 + index * 14}px` }} />
+                      <span key={index} aria-hidden="true" className="absolute inset-y-0 border-r-2 border-accent-border" style={{ right: `${7 + index * 14}px` }} />
                     ))}
                     {depth > 0 && (
                       <>
-                        <span aria-hidden="true" className={`absolute top-0 border-r-2 border-sky-300 ${isLastSibling ? 'h-1/2' : 'inset-y-0'}`} style={{ right: `${7 + (depth - 1) * 14}px` }} />
-                        <span aria-hidden="true" className="absolute top-1/2 h-0.5 w-3 bg-sky-300" style={{ right: `${7 + (depth - 1) * 14}px` }} />
+                        <span aria-hidden="true" className={`absolute top-0 border-r-2 border-accent-border ${isLastSibling ? 'h-1/2' : 'inset-y-0'}`} style={{ right: `${7 + (depth - 1) * 14}px` }} />
+                        <span aria-hidden="true" className="absolute top-1/2 h-0.5 w-3 bg-accent-border" style={{ right: `${7 + (depth - 1) * 14}px` }} />
                       </>
                     )}
                     <div className="flex items-start justify-between gap-2">
@@ -368,43 +368,43 @@ export const ChartOfAccountsPage: React.FC = () => {
                               aria-label={`${isExpanded ? 'طي' : 'توسيع'} الحساب ${account.name}`}
                               aria-expanded={isExpanded}
                               disabled={isFiltering}
-                              className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-slate-500 hover:bg-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-400"
+                              className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-muted hover:bg-surface-sunken focus:outline-none focus:ring-2 focus:ring-primary"
                             >
                               {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
                             </button>
                           ) : <span aria-hidden="true" className="h-6 w-6 shrink-0" />}
-                          <span className={`truncate ${depth === 0 ? 'font-black text-slate-900' : 'font-semibold text-slate-700'}`}>{account.name}</span>
-                          {isRoot && <span className="shrink-0 rounded border border-sky-200 bg-white px-1.5 py-0.5 text-[9px] font-bold text-sky-800">رئيسي</span>}
-                          {isOrphan && <span className="shrink-0 rounded border border-amber-200 bg-white px-1.5 py-0.5 text-[9px] font-bold text-amber-800">أب غير مرتبط</span>}
-                          {!isMatch && <span className="shrink-0 text-[9px] font-medium text-slate-400">مسار</span>}
+                          <span className={`truncate ${depth === 0 ? 'font-black text-ink' : 'font-semibold text-ink'}`}>{account.name}</span>
+                          {isRoot && <span className="shrink-0 rounded border border-accent-border bg-surface px-1.5 py-0.5 text-[9px] font-bold text-primary">رئيسي</span>}
+                          {isOrphan && <span className="shrink-0 rounded border border-warning-border bg-surface px-1.5 py-0.5 text-[9px] font-bold text-warning">أب غير مرتبط</span>}
+                          {!isMatch && <span className="shrink-0 text-[9px] font-medium text-muted">مسار</span>}
                         </div>
                         <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 pr-7 text-[10px]">
-                          <span className="font-mono font-bold text-slate-600" dir="ltr">{account.code}</span>
+                          <span className="font-mono font-bold text-ink-secondary" dir="ltr">{account.code}</span>
                           <span className={`rounded border px-1.5 py-0.5 font-bold ${TYPE_COLORS[account.type]}`}>{TYPE_LABELS[account.type]}</span>
-                          <span className={`rounded-full px-1.5 py-0.5 font-bold ${account.isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>{account.isActive ? 'نشط' : 'موقوف'}</span>
+                          <span className={`rounded-full px-1.5 py-0.5 font-bold ${account.isActive ? 'bg-success-soft text-success' : 'bg-surface-sunken text-muted'}`}>{account.isActive ? 'نشط' : 'موقوف'}</span>
                         </div>
-                        <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 pr-7 text-[10px] text-slate-500">
+                        <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 pr-7 text-[10px] text-muted">
                           <span className="font-mono" dir="ltr">{parent?.code || (account.parentCode ? `${account.parentCode} · غير مرتبط` : 'حساب رئيسي')}</span>
                           <span className="font-medium">الرصيد</span>
-                          <span className="font-mono font-black tabular-nums text-slate-800" dir="ltr">{fmt(balance)}</span>
+                          <span className="font-mono font-black tabular-nums text-ink" dir="ltr">{fmt(balance)}</span>
                         </div>
                       </div>
                       {canManage && (
                         <div className="flex shrink-0 items-center gap-0.5">
-                          {account.isActive && <button type="button" onClick={() => openNew(account)} title="إضافة حساب فرعي" aria-label={`إضافة حساب فرعي تحت ${account.name}`} className="rounded-md p-1.5 text-emerald-700 hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-400"><Plus className="h-3.5 w-3.5" /></button>}
-                          <button type="button" onClick={() => toggle(account)} title="تفعيل/إيقاف" aria-label={`${account.isActive ? 'إيقاف' : 'تفعيل'} ${account.name}`} className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-400"><Power className="h-3.5 w-3.5" /></button>
-                          <button type="button" onClick={() => openEdit(account)} title="تعديل الحساب" aria-label={`تعديل ${account.name}`} className="rounded-md p-1.5 text-sky-700 hover:bg-sky-50 focus:outline-none focus:ring-2 focus:ring-sky-400"><Pencil className="h-3.5 w-3.5" /></button>
-                          <button type="button" onClick={() => remove(account)} title="حذف" aria-label={`حذف ${account.name}`} className="rounded-md p-1.5 text-rose-600 hover:bg-rose-50 focus:outline-none focus:ring-2 focus:ring-rose-400"><Trash2 className="h-3.5 w-3.5" /></button>
+                          {account.isActive && <button type="button" onClick={() => openNew(account)} title="إضافة حساب فرعي" aria-label={`إضافة حساب فرعي تحت ${account.name}`} className="rounded-md p-1.5 text-success hover:bg-success-soft focus:outline-none focus:ring-2 focus:ring-success"><Plus className="h-3.5 w-3.5" /></button>}
+                          <button type="button" onClick={() => toggle(account)} title="تفعيل/إيقاف" aria-label={`${account.isActive ? 'إيقاف' : 'تفعيل'} ${account.name}`} className="rounded-md p-1.5 text-muted hover:bg-surface-sunken focus:outline-none focus:ring-2 focus:ring-line-strong"><Power className="h-3.5 w-3.5" /></button>
+                          <button type="button" onClick={() => openEdit(account)} title="تعديل الحساب" aria-label={`تعديل ${account.name}`} className="rounded-md p-1.5 text-primary hover:bg-accent-soft focus:outline-none focus:ring-2 focus:ring-primary"><Pencil className="h-3.5 w-3.5" /></button>
+                          <button type="button" onClick={() => remove(account)} title="حذف" aria-label={`حذف ${account.name}`} className="rounded-md p-1.5 text-danger hover:bg-danger-soft focus:outline-none focus:ring-2 focus:ring-danger"><Trash2 className="h-3.5 w-3.5" /></button>
                         </div>
                       )}
                     </div>
                   </article>
                 );
               })}
-              {rows.length === 0 && <div className="px-4 py-16 text-center text-sm text-slate-500">لا توجد حسابات مطابقة للفلاتر المحددة.</div>}
+              {rows.length === 0 && <div className="px-4 py-16 text-center text-sm text-muted">لا توجد حسابات مطابقة للفلاتر المحددة.</div>}
             </div>
           </div>
-          <div className="hidden overflow-hidden rounded-xl border border-slate-200 bg-white lg:block">
+          <div className="hidden overflow-hidden rounded-xl border border-line bg-surface lg:block">
             <div className="overflow-x-auto">
               <DataTable
                 ariaLabel="شجرة الحسابات"
@@ -417,10 +417,10 @@ export const ChartOfAccountsPage: React.FC = () => {
                   const isRoot = !account.parentCode;
                   const isOrphan = !!account.parentCode;
                   const isMatch = matches.has(account.id);
-                  return `group transition-colors hover:bg-slate-50/80 ${isRoot ? 'bg-sky-50/50' : isOrphan ? 'bg-amber-50/50' : 'bg-white'} ${!isMatch ? 'bg-slate-50/50' : ''}`;
+                  return `group transition-colors hover:bg-surface-muted/80 ${isRoot ? 'bg-accent-soft/50' : isOrphan ? 'bg-warning-soft/50' : 'bg-surface'} ${!isMatch ? 'bg-surface-muted/50' : ''}`;
                 }}
                 columns={[
-                  { key: 'code', header: 'الكود', render: (row: any) => <span className="whitespace-nowrap font-mono font-bold text-slate-700" dir="ltr">{row.node.account.code}</span> },
+                  { key: 'code', header: 'الكود', render: (row: any) => <span className="whitespace-nowrap font-mono font-bold text-ink" dir="ltr">{row.node.account.code}</span> },
                   {
                     key: 'name', header: 'اسم الحساب',
                     render: (row: any) => {
@@ -431,14 +431,14 @@ export const ChartOfAccountsPage: React.FC = () => {
                       const isOrphan = !!account.parentCode && !parent;
                       const isMatch = matches.has(account.id);
                       return (
-                        <div className={`relative flex min-w-0 items-center gap-2 ${isRoot ? 'border-r-4 border-sky-600 pr-2' : isOrphan ? 'border-r-4 border-amber-500 pr-2' : 'pr-1'}`} style={{ paddingRight: depth ? `${depth * 22}px` : undefined }}>
+                        <div className={`relative flex min-w-0 items-center gap-2 ${isRoot ? 'border-r-4 border-primary pr-2' : isOrphan ? 'border-r-4 border-warning pr-2' : 'pr-1'}`} style={{ paddingRight: depth ? `${depth * 22}px` : undefined }}>
                           {continuing.map((hasFollowingSibling: boolean, index: number) => hasFollowingSibling && (
-                            <span key={index} aria-hidden="true" className="absolute inset-y-[-12px] border-r-2 border-sky-200" style={{ right: `${7 + index * 22}px` }} />
+                            <span key={index} aria-hidden="true" className="absolute inset-y-[-12px] border-r-2 border-accent-border" style={{ right: `${7 + index * 22}px` }} />
                           ))}
                           {depth > 0 && (
                             <>
-                              <span aria-hidden="true" className={`absolute top-[-12px] border-r-2 border-sky-300 ${isLastSibling ? 'h-[calc(50%+12px)]' : 'bottom-[-12px]'}`} style={{ right: `${7 + (depth - 1) * 22}px` }} />
-                              <span aria-hidden="true" className="absolute h-0.5 w-4 bg-sky-300" style={{ right: `${7 + (depth - 1) * 22}px`, top: '50%' }} />
+                              <span aria-hidden="true" className={`absolute top-[-12px] border-r-2 border-accent-border ${isLastSibling ? 'h-[calc(50%+12px)]' : 'bottom-[-12px]'}`} style={{ right: `${7 + (depth - 1) * 22}px` }} />
+                              <span aria-hidden="true" className="absolute h-0.5 w-4 bg-accent-border" style={{ right: `${7 + (depth - 1) * 22}px`, top: '50%' }} />
                             </>
                           )}
                           {node.children.length ? (
@@ -449,15 +449,15 @@ export const ChartOfAccountsPage: React.FC = () => {
                               aria-expanded={isExpanded}
                               disabled={isFiltering}
                               title={isFiltering ? 'تظهر مسارات الحسابات تلقائيًا أثناء التصفية' : undefined}
-                              className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-slate-400 transition hover:bg-slate-200 hover:text-slate-700 disabled:cursor-default focus:outline-none focus:ring-2 focus:ring-sky-400"
+                              className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-muted transition hover:bg-surface-sunken hover:text-ink disabled:cursor-default focus:outline-none focus:ring-2 focus:ring-primary"
                             >
                               {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
                             </button>
-                          ) : <span aria-hidden="true" className="h-6 w-6 shrink-0 border-r border-slate-200" />}
-                          <span className={`min-w-0 truncate ${depth === 0 ? 'font-black text-slate-900' : 'font-semibold text-slate-700'}`}>{account.name}</span>
-                          {isRoot && <span className="hidden shrink-0 rounded border border-sky-200 bg-white px-1.5 py-0.5 text-[9px] font-bold text-sky-800 sm:inline">رئيسي</span>}
-                          {isOrphan && <span className="shrink-0 rounded border border-amber-200 bg-white px-1.5 py-0.5 text-[9px] font-bold text-amber-800">أب غير مرتبط</span>}
-                          {!isMatch && <span className="shrink-0 text-[9px] font-medium text-slate-400">مسار</span>}
+                          ) : <span aria-hidden="true" className="h-6 w-6 shrink-0 border-r border-line" />}
+                          <span className={`min-w-0 truncate ${depth === 0 ? 'font-black text-ink' : 'font-semibold text-ink'}`}>{account.name}</span>
+                          {isRoot && <span className="hidden shrink-0 rounded border border-accent-border bg-surface px-1.5 py-0.5 text-[9px] font-bold text-primary sm:inline">رئيسي</span>}
+                          {isOrphan && <span className="shrink-0 rounded border border-warning-border bg-surface px-1.5 py-0.5 text-[9px] font-bold text-warning">أب غير مرتبط</span>}
+                          {!isMatch && <span className="shrink-0 text-[9px] font-medium text-muted">مسار</span>}
                         </div>
                       );
                     },
@@ -471,14 +471,14 @@ export const ChartOfAccountsPage: React.FC = () => {
                     render: (row: any) => {
                       const account = row.node.account;
                       const parent = tree.parentOf.get(account.id);
-                      return <span className="whitespace-nowrap font-mono text-xs text-slate-500" dir="ltr">{parent?.code || (account.parentCode ? `${account.parentCode} · غير مرتبط` : '—')}</span>;
+                      return <span className="whitespace-nowrap font-mono text-xs text-muted" dir="ltr">{parent?.code || (account.parentCode ? `${account.parentCode} · غير مرتبط` : '—')}</span>;
                     },
                   },
                   {
                     key: 'balance', header: 'الرصيد الصافي', align: 'end',
                     render: (row: any) => {
                       const account = row.node.account;
-                      return <span className="whitespace-nowrap font-mono font-black tabular-nums text-slate-800" dir="ltr">{fmt(Number(account.computedBalance ?? account.balance ?? 0))}</span>;
+                      return <span className="whitespace-nowrap font-mono font-black tabular-nums text-ink" dir="ltr">{fmt(Number(account.computedBalance ?? account.balance ?? 0))}</span>;
                     },
                   },
                   {
@@ -486,7 +486,7 @@ export const ChartOfAccountsPage: React.FC = () => {
                     render: (row: any) => {
                       const account = row.node.account;
                       return (
-                        <span className={`whitespace-nowrap rounded-full px-2 py-1 text-[10px] font-bold ${account.isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
+                        <span className={`whitespace-nowrap rounded-full px-2 py-1 text-[10px] font-bold ${account.isActive ? 'bg-success-soft text-success' : 'bg-surface-sunken text-muted'}`}>
                           {account.isActive ? 'نشط' : 'موقوف'}
                         </span>
                       );
@@ -499,17 +499,17 @@ export const ChartOfAccountsPage: React.FC = () => {
                       return canManage ? (
                         <div className="flex items-center justify-end gap-1 opacity-100 transition sm:opacity-70 sm:group-hover:opacity-100">
                           {account.isActive ? (
-                            <button type="button" onClick={() => openNew(account)} title="إضافة حساب فرعي" aria-label={`إضافة حساب فرعي تحت ${account.name}`} className="rounded-md p-1.5 text-emerald-700 hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-400">
+                            <button type="button" onClick={() => openNew(account)} title="إضافة حساب فرعي" aria-label={`إضافة حساب فرعي تحت ${account.name}`} className="rounded-md p-1.5 text-success hover:bg-success-soft focus:outline-none focus:ring-2 focus:ring-success">
                               <Plus className="h-3.5 w-3.5" />
                             </button>
                           ) : null}
-                          <button type="button" onClick={() => toggle(account)} title="تفعيل/إيقاف" aria-label={`${account.isActive ? 'إيقاف' : 'تفعيل'} ${account.name}`} className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-400">
+                          <button type="button" onClick={() => toggle(account)} title="تفعيل/إيقاف" aria-label={`${account.isActive ? 'إيقاف' : 'تفعيل'} ${account.name}`} className="rounded-md p-1.5 text-muted hover:bg-surface-sunken focus:outline-none focus:ring-2 focus:ring-line-strong">
                             <Power className="h-3.5 w-3.5" />
                           </button>
-                          <button type="button" onClick={() => openEdit(account)} title="تعديل الحساب" aria-label={`تعديل ${account.name}`} className="rounded-md p-1.5 text-sky-700 hover:bg-sky-50 focus:outline-none focus:ring-2 focus:ring-sky-400">
+                          <button type="button" onClick={() => openEdit(account)} title="تعديل الحساب" aria-label={`تعديل ${account.name}`} className="rounded-md p-1.5 text-primary hover:bg-accent-soft focus:outline-none focus:ring-2 focus:ring-primary">
                             <Pencil className="h-3.5 w-3.5" />
                           </button>
-                          <button type="button" onClick={() => remove(account)} title="حذف" aria-label={`حذف ${account.name}`} className="rounded-md p-1.5 text-rose-600 hover:bg-rose-50 focus:outline-none focus:ring-2 focus:ring-rose-400">
+                          <button type="button" onClick={() => remove(account)} title="حذف" aria-label={`حذف ${account.name}`} className="rounded-md p-1.5 text-danger hover:bg-danger-soft focus:outline-none focus:ring-2 focus:ring-danger">
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>
                         </div>
@@ -526,38 +526,38 @@ export const ChartOfAccountsPage: React.FC = () => {
       </main>
 
       {modal && canManage && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4" role="presentation">
-          <section role="dialog" aria-modal="true" aria-labelledby="account-dialog-title" className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-xl border border-slate-200 bg-white p-5 shadow-2xl sm:p-6">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-primary/40 p-4" role="presentation">
+          <section role="dialog" aria-modal="true" aria-labelledby="account-dialog-title" className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-xl border border-line bg-surface p-5 shadow-2xl sm:p-6">
             <div className="mb-5 flex items-center justify-between gap-3">
               <div>
-                <h2 id="account-dialog-title" className="text-base font-black text-slate-900">{editing ? 'تعديل الحساب' : form.parentCode ? 'إضافة حساب فرعي' : 'إضافة حساب رئيسي'}</h2>
-                <p className="mt-1 text-xs text-slate-500">{editing ? 'حدّث بيانات الحساب مع الحفاظ على هيكله.' : 'أدخل بيانات الحساب المحاسبي الجديد.'}</p>
+                <h2 id="account-dialog-title" className="text-base font-black text-ink">{editing ? 'تعديل الحساب' : form.parentCode ? 'إضافة حساب فرعي' : 'إضافة حساب رئيسي'}</h2>
+                <p className="mt-1 text-xs text-muted">{editing ? 'حدّث بيانات الحساب مع الحفاظ على هيكله.' : 'أدخل بيانات الحساب المحاسبي الجديد.'}</p>
               </div>
-              <button type="button" onClick={() => setModal(false)} aria-label="إغلاق" className="rounded-md p-2 text-slate-500 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-400"><X className="h-4 w-4" /></button>
+              <button type="button" onClick={() => setModal(false)} aria-label="إغلاق" className="rounded-md p-2 text-muted hover:bg-surface-sunken focus:outline-none focus:ring-2 focus:ring-primary"><X className="h-4 w-4" /></button>
             </div>
             <form onSubmit={submit} className="space-y-4 text-xs">
               {!editing && (
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <div>
-                    <label htmlFor="account-code" className="mb-1.5 block font-bold text-slate-700">الكود *</label>
-                    <input id="account-code" required value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 font-mono focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-100" placeholder="1106" />
+                    <label htmlFor="account-code" className="mb-1.5 block font-bold text-ink">الكود *</label>
+                    <input id="account-code" required value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} className="w-full rounded-lg border border-line bg-surface-muted px-3 py-2.5 font-mono focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary" placeholder="1106" />
                   </div>
                   <div>
-                    <label htmlFor="account-type" className="mb-1.5 block font-bold text-slate-700">النوع *</label>
-                    <select id="account-type" value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value as AccountType, parentCode: '' })} className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 font-bold focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-100">
+                    <label htmlFor="account-type" className="mb-1.5 block font-bold text-ink">النوع *</label>
+                    <select id="account-type" value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value as AccountType, parentCode: '' })} className="w-full rounded-lg border border-line bg-surface-muted px-3 py-2.5 font-bold focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary">
                       {(Object.keys(TYPE_LABELS) as AccountType[]).map((type) => <option key={type} value={type}>{TYPE_LABELS[type]}</option>)}
                     </select>
                   </div>
                 </div>
               )}
               <div>
-                <label htmlFor="account-name" className="mb-1.5 block font-bold text-slate-700">اسم الحساب *</label>
-                <input id="account-name" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-100" />
+                <label htmlFor="account-name" className="mb-1.5 block font-bold text-ink">اسم الحساب *</label>
+                <input id="account-name" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="w-full rounded-lg border border-line bg-surface-muted px-3 py-2.5 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary" />
               </div>
               {!editing && (
                 <div>
-                  <label htmlFor="account-parent" className="mb-1.5 block font-bold text-slate-700">الحساب الأب</label>
-                  <select id="account-parent" value={form.parentCode} onChange={(e) => setForm({ ...form, parentCode: e.target.value })} className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 font-bold focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-100">
+                  <label htmlFor="account-parent" className="mb-1.5 block font-bold text-ink">الحساب الأب</label>
+                  <select id="account-parent" value={form.parentCode} onChange={(e) => setForm({ ...form, parentCode: e.target.value })} className="w-full rounded-lg border border-line bg-surface-muted px-3 py-2.5 font-bold focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary">
                     <option value="">حساب رئيسي</option>
                     {accounts.filter((account) => account.isActive && account.type === form.type).sort(compareAccounts).map((account) => (
                       <option key={account.id} value={account.code}>{account.code} — {account.name}</option>
@@ -566,12 +566,12 @@ export const ChartOfAccountsPage: React.FC = () => {
                 </div>
               )}
               <div>
-                <label htmlFor="account-notes" className="mb-1.5 block font-bold text-slate-700">ملاحظات</label>
-                <textarea id="account-notes" rows={3} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className="w-full resize-y rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-100" />
+                <label htmlFor="account-notes" className="mb-1.5 block font-bold text-ink">ملاحظات</label>
+                <textarea id="account-notes" rows={3} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className="w-full resize-y rounded-lg border border-line bg-surface-muted px-3 py-2.5 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary" />
               </div>
-              <div className="flex justify-end gap-2 border-t border-slate-100 pt-4">
-                <button type="button" onClick={() => setModal(false)} className="rounded-lg bg-slate-100 px-4 py-2.5 font-bold text-slate-700 hover:bg-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-400">إلغاء</button>
-                <button type="submit" className="rounded-lg bg-sky-700 px-5 py-2.5 font-bold text-white hover:bg-sky-800 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2">حفظ الحساب</button>
+              <div className="flex justify-end gap-2 border-t border-line pt-4">
+                <button type="button" onClick={() => setModal(false)} className="rounded-lg bg-surface-sunken px-4 py-2.5 font-bold text-ink hover:bg-surface-sunken focus:outline-none focus:ring-2 focus:ring-line-strong">إلغاء</button>
+                <button type="submit" className="rounded-lg bg-primary px-5 py-2.5 font-bold text-white hover:bg-primary focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2">حفظ الحساب</button>
               </div>
             </form>
           </section>

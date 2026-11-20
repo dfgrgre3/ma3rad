@@ -38,57 +38,57 @@ export const DepositModal: React.FC<DepositModalProps> = ({
 }) => {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-      <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 w-full max-w-md p-6 shadow-2xl animate-in fade-in zoom-in-95">
-        <div className="flex justify-between items-center pb-4 border-b border-slate-100 dark:border-slate-700">
-          <h3 className="text-lg font-black text-slate-900 dark:text-white flex items-center gap-2">
-            <DollarSign className="w-5 h-5 text-emerald-600" />
+      <div className="bg-surface rounded-2xl border border-line w-full max-w-md p-6 shadow-2xl animate-in fade-in zoom-in-95">
+        <div className="flex justify-between items-center pb-4 border-b border-line ">
+          <h3 className="text-lg font-black text-ink dark:text-white flex items-center gap-2">
+            <DollarSign className="w-5 h-5 text-success" />
             تسجيل عربون / دفعة مقدمة
           </h3>
           <button
             onClick={onClose}
-            className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg"
+            className="p-1 text-muted hover:text-ink-secondary dark:hover:text-muted rounded-lg"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         <form onSubmit={onSubmit} className="space-y-4 mt-4">
-          <div className="p-3 bg-slate-50 dark:bg-slate-700/50 rounded-xl space-y-1.5 text-xs">
-            <div className="flex justify-between text-slate-600 dark:text-slate-300">
+          <div className="p-3 bg-surface-muted dark:bg-primary/50 rounded-xl space-y-1.5 text-xs">
+            <div className="flex justify-between text-ink-secondary ">
               <span>رقم الطلب:</span>
-              <span className="font-bold text-slate-900 dark:text-white">{order.orderNumber}</span>
+              <span className="font-bold text-ink dark:text-white">{order.orderNumber}</span>
             </div>
-            <div className="flex justify-between text-slate-600 dark:text-slate-300">
+            <div className="flex justify-between text-ink-secondary ">
               <span>العميل:</span>
-              <span className="font-semibold text-slate-900 dark:text-white">{order.customerName || 'نقدي'}</span>
+              <span className="font-semibold text-ink dark:text-white">{order.customerName || 'نقدي'}</span>
             </div>
-            <div className="flex justify-between text-slate-600 dark:text-slate-300">
+            <div className="flex justify-between text-ink-secondary ">
               <span>إجمالي الطلب:</span>
-              <span className="font-bold text-slate-900 dark:text-white">{fmtCurrency(order.totalAmount)}</span>
+              <span className="font-bold text-ink dark:text-white">{fmtCurrency(order.totalAmount)}</span>
             </div>
-            <div className="flex justify-between text-slate-600 dark:text-slate-300">
+            <div className="flex justify-between text-ink-secondary ">
               <span>المدفوع مسبقاً:</span>
-              <span className="font-semibold text-emerald-600">{fmtCurrency(order.paidAmount)}</span>
+              <span className="font-semibold text-success">{fmtCurrency(order.paidAmount)}</span>
             </div>
-            <div className="flex justify-between text-slate-600 dark:text-slate-300 font-bold border-t border-slate-200 dark:border-slate-600 pt-1">
+            <div className="flex justify-between text-ink-secondary font-bold border-t border-line pt-1">
               <span>المبلغ المتبقي:</span>
-              <span className="text-rose-600">{fmtCurrency(order.remainingAmount)}</span>
+              <span className="text-danger">{fmtCurrency(order.remainingAmount)}</span>
             </div>
           </div>
 
           {paymentType === 'BANK_TRANSFER' && (
             <div>
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">الحساب البنكي المستلم *</label>
-              <select required value={bankAccountId} onChange={(event) => onBankAccountChange(event.target.value)} className="w-full px-3 py-2 text-sm bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-xl">
+              <label className="block text-xs font-bold text-ink mb-1">الحساب البنكي المستلم *</label>
+              <select required value={bankAccountId} onChange={(event) => onBankAccountChange(event.target.value)} className="w-full px-3 py-2 text-sm bg-surface border border-line-strong rounded-xl">
                 <option value="">اختر الحساب البنكي</option>
                 {bankAccounts.map((account) => <option key={account.id} value={account.id}>{account.accountName} — {account.bankName}</option>)}
               </select>
-              {bankAccounts.length === 0 && <p className="mt-1 text-xs text-rose-600">لا توجد حسابات بنكية متاحة؛ اختر وسيلة أخرى.</p>}
+              {bankAccounts.length === 0 && <p className="mt-1 text-xs text-danger">لا توجد حسابات بنكية متاحة؛ اختر وسيلة أخرى.</p>}
             </div>
           )}
 
           <div>
-            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+            <label className="block text-xs font-bold text-ink mb-1">
               مبلغ العربون الجديد (ج.م) *
             </label>
             <input
@@ -99,18 +99,18 @@ export const DepositModal: React.FC<DepositModalProps> = ({
               placeholder="0.00"
               value={amount}
               onChange={(e) => onAmountChange(e.target.value)}
-              className="w-full px-3 py-2 text-base font-bold text-slate-900 dark:text-white bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              className="w-full px-3 py-2 text-base font-bold text-ink dark:text-white bg-surface border border-line-strong rounded-xl focus:outline-none focus:ring-2 focus:ring-success"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+            <label className="block text-xs font-bold text-ink mb-1">
               طريقة الدفع
             </label>
             <select
               value={paymentType}
               onChange={(e) => onPaymentTypeChange(e.target.value as DepositPaymentType)}
-              className="w-full px-3 py-2 text-sm bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              className="w-full px-3 py-2 text-sm bg-surface border border-line-strong rounded-xl focus:outline-none focus:ring-2 focus:ring-success"
             >
               <option value="CASH">نقدي (خزينة المعرض)</option>
               <option value="CARD">بطاقة بنكية / فيزا</option>
@@ -120,7 +120,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+            <label className="block text-xs font-bold text-ink mb-1">
               ملاحظات الدفعة / رقم الإيصال
             </label>
             <input
@@ -128,7 +128,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({
               placeholder="ملاحظات العربون أو رقم المرجع البنكي..."
               value={notes}
               onChange={(e) => onNotesChange(e.target.value)}
-              className="w-full px-3 py-2 text-sm bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              className="w-full px-3 py-2 text-sm bg-surface border border-line-strong rounded-xl focus:outline-none focus:ring-2 focus:ring-success"
             />
           </div>
 
@@ -136,14 +136,14 @@ export const DepositModal: React.FC<DepositModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 py-2.5 text-xs font-bold text-slate-600 dark:text-slate-300 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 rounded-xl transition"
+              className="flex-1 py-2.5 text-xs font-bold text-ink-secondary bg-surface-sunken hover:bg-surface-sunken dark:hover:bg-primary rounded-xl transition"
             >
               إلغاء
             </button>
             <button
               type="submit"
               disabled={submitting}
-              className="flex-1 py-2.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl shadow transition flex items-center justify-center gap-1.5"
+              className="flex-1 py-2.5 text-xs font-bold text-white bg-success hover:bg-success rounded-xl shadow transition flex items-center justify-center gap-1.5"
             >
               {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCheck className="w-4 h-4" />}
               تأكيد وحفظ العربون

@@ -11,6 +11,10 @@ import { HrPayrollReports } from './HrPayrollReports';
 import { HrStaffReports } from './HrStaffReports';
 import { HrPerformanceReports } from './HrPerformanceReports';
 import { BusinessKpisReports } from './BusinessKpisReports';
+import { ManufacturingReports } from './ManufacturingReports';
+import { CeramicsReports } from './CeramicsReports';
+import { ConstructionReports } from './ConstructionReports';
+import { ActivityReports } from './ActivityReports';
 import { reportCache } from './cache';
 import { normalizeReportFilterValue, rowPropertyVariants } from './helpers';
 import type { ReportParams, ReportResult } from './types';
@@ -33,7 +37,15 @@ export class ReportCenterService extends OperationsReports(
                 HrPayrollReports(
                   HrStaffReports(
                     HrPerformanceReports(
-                      BusinessKpisReports(ReportCenterContext),
+                      BusinessKpisReports(
+                        ConstructionReports(
+                          CeramicsReports(
+                            ActivityReports(
+                              ManufacturingReports(ReportCenterContext),
+                            ),
+                          ),
+                        ),
+                      ),
                     ),
                   ),
                 ),

@@ -167,63 +167,63 @@ export function PosReportsPage() {
         icon={<BarChart3 className="w-5 h-5" />}
         title="تقارير نقطة البيع (POS)"
         actions={<>
-          <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="px-3 py-2 border border-slate-200 rounded-xl text-sm" />
-          <span className="text-slate-400">إلى</span>
-          <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="px-3 py-2 border border-slate-200 rounded-xl text-sm" />
-          <button onClick={load} disabled={loading} className="px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white font-bold rounded-xl text-sm flex items-center gap-1.5 disabled:opacity-50">
+          <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="px-3 py-2 border border-line rounded-xl text-sm" />
+          <span className="text-muted">إلى</span>
+          <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="px-3 py-2 border border-line rounded-xl text-sm" />
+          <button onClick={load} disabled={loading} className="px-4 py-2 bg-primary hover:bg-primary text-white font-bold rounded-xl text-sm flex items-center gap-1.5 disabled:opacity-50">
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /> تحديث
           </button>
         </>}
       />
 
       {loadError && (
-        <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">
+        <div role="alert" className="rounded-xl border border-danger-border bg-danger-soft px-4 py-3 text-sm font-semibold text-danger">
           تعذر تحميل التقرير: {loadError}
         </div>
       )}
 
       {/* KPIs */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
-        <div className="bg-white rounded-2xl border border-slate-200 p-4">
-          <div className="text-xs text-slate-500">الفواتير</div>
-          <div className="text-2xl font-black text-slate-900">{fmt(totals.invoices)}</div>
+        <div className="bg-surface rounded-2xl border border-line p-4">
+          <div className="text-xs text-muted">الفواتير</div>
+          <div className="text-2xl font-black text-ink">{fmt(totals.invoices)}</div>
         </div>
-        <div className="bg-white rounded-2xl border border-slate-200 p-4">
-          <div className="text-xs text-slate-500">الإجمالي</div>
-          <div className="text-2xl font-black text-sky-600">{fmtMoney(totals.amount)}</div>
+        <div className="bg-surface rounded-2xl border border-line p-4">
+          <div className="text-xs text-muted">الإجمالي</div>
+          <div className="text-2xl font-black text-primary">{fmtMoney(totals.amount)}</div>
         </div>
-        <div className="bg-white rounded-2xl border border-slate-200 p-4">
-          <div className="text-xs text-slate-500">التحصيل المسجل فعلياً</div>
-          <div className="text-2xl font-black text-emerald-600">{fmtMoney(totals.collected)}</div>
+        <div className="bg-surface rounded-2xl border border-line p-4">
+          <div className="text-xs text-muted">التحصيل المسجل فعلياً</div>
+          <div className="text-2xl font-black text-success">{fmtMoney(totals.collected)}</div>
         </div>
-        <div className="bg-white rounded-2xl border border-slate-200 p-4">
-          <div className="text-xs text-slate-500">متوسط الفاتورة</div>
-          <div className="text-2xl font-black text-slate-900">{fmtMoney(totals.invoices ? totals.amount / totals.invoices : 0)}</div>
+        <div className="bg-surface rounded-2xl border border-line p-4">
+          <div className="text-xs text-muted">متوسط الفاتورة</div>
+          <div className="text-2xl font-black text-ink">{fmtMoney(totals.invoices ? totals.amount / totals.invoices : 0)}</div>
         </div>
-        <div className="bg-white rounded-2xl border border-slate-200 p-4">
-          <div className="text-xs text-slate-500">الخصومات</div>
-          <div className="text-2xl font-black text-rose-600">{fmtMoney(totals.discounts)}</div>
+        <div className="bg-surface rounded-2xl border border-line p-4">
+          <div className="text-xs text-muted">الخصومات</div>
+          <div className="text-2xl font-black text-danger">{fmtMoney(totals.discounts)}</div>
         </div>
-        <div className="bg-white rounded-2xl border border-slate-200 p-4">
-          <div className="text-xs text-slate-500">الملغاة</div>
-          <div className="text-2xl font-black text-amber-600">{fmt(totals.voids)}</div>
+        <div className="bg-surface rounded-2xl border border-line p-4">
+          <div className="text-xs text-muted">الملغاة</div>
+          <div className="text-2xl font-black text-warning">{fmt(totals.voids)}</div>
         </div>
-        <div className="bg-white rounded-2xl border border-slate-200 p-4">
-          <div className="text-xs text-slate-500">قيمة الملغاة</div>
-          <div className="text-2xl font-black text-amber-600">{fmtMoney(totals.voidAmount)}</div>
+        <div className="bg-surface rounded-2xl border border-line p-4">
+          <div className="text-xs text-muted">قيمة الملغاة</div>
+          <div className="text-2xl font-black text-warning">{fmtMoney(totals.voidAmount)}</div>
         </div>
-        <div className="bg-white rounded-2xl border border-slate-200 p-4">
-          <div className="text-xs text-slate-500">المبالغ المستردة نقداً</div>
-          <div className="text-2xl font-black text-rose-600">{fmtMoney(totals.refunds)}</div>
+        <div className="bg-surface rounded-2xl border border-line p-4">
+          <div className="text-xs text-muted">المبالغ المستردة نقداً</div>
+          <div className="text-2xl font-black text-danger">{fmtMoney(totals.refunds)}</div>
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Payment mix */}
-        <div className="bg-white rounded-2xl border border-slate-200 p-4">
+        <div className="bg-surface rounded-2xl border border-line p-4">
           <div className="flex items-center justify-between mb-3">
-            <h2 className="font-bold text-slate-900 flex items-center gap-2"><CreditCard className="w-4 h-4 text-sky-600" /> توزيع طرق الدفع</h2>
-            <button onClick={exportPaymentMix} className="text-xs text-sky-600 hover:underline flex items-center gap-1"><Download className="w-3 h-3" /> جدول بيانات</button>
+            <h2 className="font-bold text-ink flex items-center gap-2"><CreditCard className="w-4 h-4 text-primary" /> توزيع طرق الدفع</h2>
+            <button onClick={exportPaymentMix} className="text-xs text-primary hover:underline flex items-center gap-1"><Download className="w-3 h-3" /> جدول بيانات</button>
           </div>
           <DataTable
             ariaLabel="توزيع طرق الدفع"
@@ -240,34 +240,34 @@ export function PosReportsPage() {
         </div>
 
         {/* Hourly */}
-        <div className="bg-white rounded-2xl border border-slate-200 p-4">
-          <h2 className="font-bold text-slate-900 flex items-center gap-2 mb-3"><Clock className="w-4 h-4 text-sky-600" /> توزيع المبيعات حسب الساعة</h2>
+        <div className="bg-surface rounded-2xl border border-line p-4">
+          <h2 className="font-bold text-ink flex items-center gap-2 mb-3"><Clock className="w-4 h-4 text-primary" /> توزيع المبيعات حسب الساعة</h2>
           <div className="space-y-1.5">
             {hourly.map((r) => {
               const max = Math.max(...hourly.map((x) => x.amount), 1);
               const pct = (r.amount / max) * 100;
               return (
                 <div key={r.hour} className="flex items-center gap-2 text-xs">
-                  <span className="w-12 text-slate-500">{r.hour}</span>
-                  <div className="flex-1 bg-slate-100 rounded-full h-2 overflow-hidden">
-                    <div className="bg-sky-500 h-2 rounded-full" style={{ width: `${pct}%` }} />
+                  <span className="w-12 text-muted">{r.hour}</span>
+                  <div className="flex-1 bg-surface-sunken rounded-full h-2 overflow-hidden">
+                    <div className="bg-primary h-2 rounded-full" style={{ width: `${pct}%` }} />
                   </div>
                   <span className="w-20 text-left font-bold">{fmtMoney(r.amount)}</span>
-                  <span className="w-8 text-slate-400">({r.count})</span>
+                  <span className="w-8 text-muted">({r.count})</span>
                 </div>
               );
             })}
-            {hourly.length === 0 && <div className="text-center py-4 text-slate-400 text-sm">لا توجد بيانات</div>}
+            {hourly.length === 0 && <div className="text-center py-4 text-muted text-sm">لا توجد بيانات</div>}
           </div>
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Top items */}
-        <div className="bg-white rounded-2xl border border-slate-200 p-4">
+        <div className="bg-surface rounded-2xl border border-line p-4">
           <div className="flex items-center justify-between mb-3">
-            <h2 className="font-bold text-slate-900 flex items-center gap-2"><Package className="w-4 h-4 text-sky-600" /> الأصناف الأكثر مبيعاً (أفضل 15)</h2>
-            <button onClick={exportTopItems} className="text-xs text-sky-600 hover:underline flex items-center gap-1"><Download className="w-3 h-3" /> جدول بيانات</button>
+            <h2 className="font-bold text-ink flex items-center gap-2"><Package className="w-4 h-4 text-primary" /> الأصناف الأكثر مبيعاً (أفضل 15)</h2>
+            <button onClick={exportTopItems} className="text-xs text-primary hover:underline flex items-center gap-1"><Download className="w-3 h-3" /> جدول بيانات</button>
           </div>
           <DataTable
             ariaLabel="الأصناف الأكثر مبيعاً"
@@ -275,7 +275,7 @@ export function PosReportsPage() {
             rowKey={(r) => String(r._i)}
             dense
             columns={[
-              { key: 'rank', header: '#', render: (r) => <span className="text-slate-400">{r._i + 1}</span> },
+              { key: 'rank', header: '#', render: (r) => <span className="text-muted">{r._i + 1}</span> },
               { key: 'name', header: 'الصنف', render: (r) => r.name },
               { key: 'qty', header: 'الكمية', align: 'center', render: (r) => fmt(r.qty) },
               { key: 'amount', header: 'المبلغ', align: 'end', render: (r) => <span className="font-bold">{fmtMoney(r.amount)}</span> },
@@ -285,8 +285,8 @@ export function PosReportsPage() {
         </div>
 
         {/* Cashier performance */}
-        <div className="bg-white rounded-2xl border border-slate-200 p-4">
-          <h2 className="font-bold text-slate-900 flex items-center gap-2 mb-3"><Users className="w-4 h-4 text-sky-600" /> أداء الكاشيرات</h2>
+        <div className="bg-surface rounded-2xl border border-line p-4">
+          <h2 className="font-bold text-ink flex items-center gap-2 mb-3"><Users className="w-4 h-4 text-primary" /> أداء الكاشيرات</h2>
           <DataTable
             ariaLabel="أداء الكاشيرات"
             rows={cashiers.map((r, i) => ({ ...r, _i: i }))}

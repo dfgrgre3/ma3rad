@@ -57,7 +57,7 @@ export const ActivationModal: React.FC<ActivationModalProps> = ({
       >
         {activation && (
           <div className="space-y-3">
-            <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-[11px] font-semibold text-amber-800">
+            <div className="rounded-xl border border-warning-border bg-warning-soft p-3 text-[11px] font-semibold text-warning">
               تم تسجيل عملية التفعيل في سجل العميل. لا تشارك هذه البيانات إلا مع المسؤول المعتمد للعميل.
             </div>
             <div className="grid gap-2 sm:grid-cols-2">
@@ -66,7 +66,7 @@ export const ActivationModal: React.FC<ActivationModalProps> = ({
               <InfoItem label="اسم المستخدم" value={activation.username} ltr />
               <InfoItem
                 label="كلمة المرور المؤقتة"
-                value={activation.temporaryPassword ? <span className="font-mono text-emerald-700">{activation.temporaryPassword}</span> : 'غير متاحة — استخدم إعادة تعيين كلمة المرور'}
+                value={activation.temporaryPassword ? <span className="font-mono text-success">{activation.temporaryPassword}</span> : 'غير متاحة — استخدم إعادة تعيين كلمة المرور'}
                 ltr
               />
               <InfoItem label="كود التفعيل" value={activation.activationCode} ltr />
@@ -77,22 +77,22 @@ export const ActivationModal: React.FC<ActivationModalProps> = ({
               <InfoItem label="تاريخ التجهيز" value={formatDateTime(activation.generatedAt)} />
             </div>
             {activation.modules.length > 0 && (
-              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                <p className="mb-1.5 text-[10.5px] font-semibold text-slate-500">الوحدات المضمنة</p>
+              <div className="rounded-lg border border-line bg-surface-muted p-3">
+                <p className="mb-1.5 text-[10.5px] font-semibold text-muted">الوحدات المضمنة</p>
                 <div className="flex flex-wrap gap-1">
                   {activation.modules.map((module) => (
-                    <span key={module} className="rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold text-slate-600 ring-1 ring-slate-200" dir="ltr">
+                    <span key={module} className="rounded-full bg-surface px-2 py-0.5 text-[10px] font-semibold text-ink-secondary ring-1 ring-line-strong" dir="ltr">
                       {module}
                     </span>
                   ))}
                 </div>
               </div>
             )}
-            <div className="rounded-lg border border-slate-200 p-3">
-              <p className="mb-2 text-[10.5px] font-semibold text-slate-500">وسائل الإرسال</p>
+            <div className="rounded-lg border border-line p-3">
+              <p className="mb-2 text-[10.5px] font-semibold text-muted">وسائل الإرسال</p>
               <div className="flex flex-wrap gap-3">
                 {['EMAIL', 'SMS', 'WHATSAPP'].map((channel) => (
-                  <label key={channel} className="inline-flex items-center gap-1.5 text-[11.5px] font-semibold text-slate-700">
+                  <label key={channel} className="inline-flex items-center gap-1.5 text-[11.5px] font-semibold text-ink">
                     <input
                       type="checkbox"
                       checked={channels.includes(channel)}

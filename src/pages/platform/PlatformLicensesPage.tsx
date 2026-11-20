@@ -468,9 +468,9 @@ export const PlatformLicensesPage: React.FC = () => {
         }
       />
 
-      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface p-3 shadow-sm">
         <div className="relative min-w-[220px] flex-1">
-          <Search className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+          <Search className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted" />
           <input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
@@ -484,16 +484,16 @@ export const PlatformLicensesPage: React.FC = () => {
             <option key={value} value={value}>{LICENSE_STATUS_LABELS[value]}</option>
           ))}
         </select>
-        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-600">{licenses.length} ترخيص</span>
+        <span className="rounded-full bg-surface-sunken px-2.5 py-1 text-[11px] font-bold text-ink-secondary">{licenses.length} ترخيص</span>
       </div>
 
       {error && (
-        <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-2.5 text-xs font-semibold text-rose-700">{error}</div>
+        <div role="alert" className="rounded-lg border border-danger-border bg-danger-soft px-4 py-2.5 text-xs font-semibold text-danger">{error}</div>
       )}
 
-      <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+      <section className="overflow-hidden rounded-xl border border-line bg-surface shadow-sm">
         {loading ? (
-          <div className="py-16 text-center text-sm font-semibold text-slate-500">جارٍ تحميل التراخيص...</div>
+          <div className="py-16 text-center text-sm font-semibold text-muted">جارٍ تحميل التراخيص...</div>
         ) : licenses.length === 0 ? (
           <EmptyState
             icon={<KeyRound className="h-5 w-5" />}
@@ -509,36 +509,36 @@ export const PlatformLicensesPage: React.FC = () => {
               minWidth={1000}
               dense
               tableClassName="text-[11px]"
-              rowClassName={() => 'transition hover:bg-slate-50/60'}
+              rowClassName={() => 'transition hover:bg-surface-muted/60'}
               columns={[
                 {
                   key: 'key', header: 'المفتاح',
                   render: (license: any) => (
                     <span className="block">
-                      <span className="block font-mono text-[11px] font-bold text-slate-800" dir="ltr">{license.licenseKey}</span>
-                      <span className="text-[10px] text-slate-400">{formatDate(license.issuedAt)}</span>
+                      <span className="block font-mono text-[11px] font-bold text-ink" dir="ltr">{license.licenseKey}</span>
+                      <span className="text-[10px] text-muted">{formatDate(license.issuedAt)}</span>
                     </span>
                   ),
                 },
-                { key: 'tenant', header: 'العميل', render: (license: any) => <span className="text-[12px] font-semibold text-slate-700">{license.tenantName || '—'}</span> },
-                { key: 'plan', header: 'الخطة', render: (license: any) => <span className="text-[11.5px] text-slate-600">{license.planName || '—'}</span> },
+                { key: 'tenant', header: 'العميل', render: (license: any) => <span className="text-[12px] font-semibold text-ink">{license.tenantName || '—'}</span> },
+                { key: 'plan', header: 'الخطة', render: (license: any) => <span className="text-[11.5px] text-ink-secondary">{license.planName || '—'}</span> },
                 { key: 'status', header: 'الحالة', render: (license: any) => <StatusBadge value={license.status} label={LICENSE_STATUS_LABELS[license.status as keyof typeof LICENSE_STATUS_LABELS]} /> },
-                { key: 'start', header: 'يبدأ من', render: (license: any) => <span className="text-[11px] text-slate-600">{formatDate(license.startsAt)}</span> },
-                { key: 'end', header: 'ينتهي في', render: (license: any) => <span className="text-[11px] text-slate-600">{formatDate(license.expiresAt)}</span> },
-                { key: 'seats', header: 'المستخدمون', render: (license: any) => <span className="text-[11px] font-semibold text-slate-700">{license.seats}</span> },
-                { key: 'devices', header: 'الأجهزة', render: (license: any) => <span className="text-[11px] font-semibold text-slate-700">{license.deviceLimit}</span> },
-                { key: 'branches', header: 'الفروع', render: (license: any) => <span className="text-[11px] font-semibold text-slate-700">{license.branchesLimit}</span> },
-                { key: 'coupling', header: 'الربط', render: (license: any) => <span className="text-[10px] text-slate-500">{COUPLING_LABELS[(license.couplingMode ?? 'FULL') as keyof typeof COUPLING_LABELS]}</span> },
+                { key: 'start', header: 'يبدأ من', render: (license: any) => <span className="text-[11px] text-ink-secondary">{formatDate(license.startsAt)}</span> },
+                { key: 'end', header: 'ينتهي في', render: (license: any) => <span className="text-[11px] text-ink-secondary">{formatDate(license.expiresAt)}</span> },
+                { key: 'seats', header: 'المستخدمون', render: (license: any) => <span className="text-[11px] font-semibold text-ink">{license.seats}</span> },
+                { key: 'devices', header: 'الأجهزة', render: (license: any) => <span className="text-[11px] font-semibold text-ink">{license.deviceLimit}</span> },
+                { key: 'branches', header: 'الفروع', render: (license: any) => <span className="text-[11px] font-semibold text-ink">{license.branchesLimit}</span> },
+                { key: 'coupling', header: 'الربط', render: (license: any) => <span className="text-[10px] text-muted">{COUPLING_LABELS[(license.couplingMode ?? 'FULL') as keyof typeof COUPLING_LABELS]}</span> },
                 {
                   key: 'actions', header: 'إجراءات',
                   render: (license: any) => (
                     <span className="flex items-center gap-1">
                       {canManageLicenses && (
                         <>
-                          <button type="button" onClick={() => { setRenewTarget(license); setRenewMonths(12); }} className="rounded p-1.5 text-slate-500 hover:bg-emerald-50 hover:text-emerald-700" title="تجديد">
+                          <button type="button" onClick={() => { setRenewTarget(license); setRenewMonths(12); }} className="rounded p-1.5 text-muted hover:bg-success-soft hover:text-success" title="تجديد">
                             <RefreshCw className="h-3.5 w-3.5" />
                           </button>
-                          <button type="button" onClick={() => { setHardwareTarget(license); setHardwareId(license.hardwareId ?? ''); }} className="rounded p-1.5 text-slate-500 hover:bg-sky-50 hover:text-sky-700" title="ربط جهاز">
+                          <button type="button" onClick={() => { setHardwareTarget(license); setHardwareId(license.hardwareId ?? ''); }} className="rounded p-1.5 text-muted hover:bg-accent-soft hover:text-primary" title="ربط جهاز">
                             <Cpu className="h-3.5 w-3.5" />
                           </button>
                           <button
@@ -547,7 +547,7 @@ export const PlatformLicensesPage: React.FC = () => {
                               const next = license.status === 'ACTIVE' || license.status === 'ISSUED' ? 'SUSPENDED' : 'ACTIVE';
                               void changeStatus(license, next);
                             }}
-                            className="rounded p-1.5 text-slate-500 hover:bg-amber-50 hover:text-amber-700"
+                            className="rounded p-1.5 text-muted hover:bg-warning-soft hover:text-warning"
                             title={license.status === 'ACTIVE' || license.status === 'ISSUED' ? 'إيقاف' : 'تفعيل'}
                           >
                             {license.status === 'ACTIVE' || license.status === 'ISSUED' ? (
@@ -556,7 +556,7 @@ export const PlatformLicensesPage: React.FC = () => {
                               <CheckCircle2 className="h-3.5 w-3.5" />
                             )}
                           </button>
-                          <button type="button" onClick={() => void changeStatus(license, 'REVOKED')} className="rounded p-1.5 text-slate-500 hover:bg-rose-50 hover:text-rose-700" title="إلغاء">
+                          <button type="button" onClick={() => void changeStatus(license, 'REVOKED')} className="rounded p-1.5 text-muted hover:bg-danger-soft hover:text-danger" title="إلغاء">
                             <ShieldX className="h-3.5 w-3.5" />
                           </button>
                           {license.hardwareId && (!centralMode || deviceIdForLicense(license)) && (
@@ -566,7 +566,7 @@ export const PlatformLicensesPage: React.FC = () => {
                                 const deviceId = deviceIdForLicense(license);
                                 if (deviceId) openDeviceAction('release', { id: deviceId, hardwareId: license.hardwareId ?? '', tenantId: license.tenantId, status: license.status });
                               }}
-                              className="rounded p-1.5 text-slate-500 hover:bg-blue-50 hover:text-blue-700"
+                              className="rounded p-1.5 text-muted hover:bg-accent-soft hover:text-primary"
                               title="تحرير الجهاز"
                             >
                               <Link className="h-3.5 w-3.5" />
@@ -579,7 +579,7 @@ export const PlatformLicensesPage: React.FC = () => {
                                 const deviceId = deviceIdForLicense(license);
                                 if (deviceId) openDeviceAction('suspend', { id: deviceId, hardwareId: license.hardwareId ?? '', tenantId: license.tenantId, status: license.status });
                               }}
-                              className="rounded p-1.5 text-slate-500 hover:bg-orange-50 hover:text-orange-700"
+                              className="rounded p-1.5 text-muted hover:bg-warning-soft hover:text-warning"
                               title="إيقاف الجهاز"
                             >
                               <ShieldAlert className="h-3.5 w-3.5" />
@@ -678,7 +678,7 @@ export const PlatformLicensesPage: React.FC = () => {
           <input type="number" min={1} className={inputClass} value={renewMonths} onChange={(event) => setRenewMonths(Number(event.target.value))} />
         </Field>
         {renewTarget && (
-          <p className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-[11px] text-slate-600">
+          <p className="mt-3 rounded-lg bg-surface-muted px-3 py-2 text-[11px] text-ink-secondary">
             ينتهي حالياً في <b>{formatDate(renewTarget.expiresAt)}</b>
           </p>
         )}
@@ -702,20 +702,20 @@ export const PlatformLicensesPage: React.FC = () => {
           <input dir="ltr" className={inputClass} value={hardwareId} onChange={(event) => setHardwareId(event.target.value)} />
         </Field>
         {hardwareTarget && (
-          <p className="mt-3 rounded-lg bg-slate-50 px-3 py-2 font-mono text-[11px] text-slate-600" dir="ltr">
+          <p className="mt-3 rounded-lg bg-surface-muted px-3 py-2 font-mono text-[11px] text-ink-secondary" dir="ltr">
             {hardwareTarget.licenseKey}
           </p>
         )}
-        <p className="mt-3 text-[10.5px] text-slate-500">
+        <p className="mt-3 text-[10.5px] text-muted">
           آخر تحديث: {formatDateTime(hardwareTarget?.updatedAt)}
         </p>
       </Modal>
 
       {/* Clone alerts */}
       {cloneAlerts.length > 0 && (
-        <section className="rounded-lg border border-amber-200 bg-amber-50 p-4">
-          <h3 className="text-sm font-bold text-amber-800 mb-2">تنبيهات الاستنساخ المكتشفة</h3>
-          <ul className="text-[11px] text-amber-700 space-y-1 list-disc list-inside">
+        <section className="rounded-lg border border-warning-border bg-warning-soft p-4">
+          <h3 className="text-sm font-bold text-warning mb-2">تنبيهات الاستنساخ المكتشفة</h3>
+          <ul className="text-[11px] text-warning space-y-1 list-disc list-inside">
             {cloneAlerts.map((alert, i) => (
               <li key={i}>{alert}</li>
             ))}
@@ -740,10 +740,10 @@ export const PlatformLicensesPage: React.FC = () => {
       >
         {deviceTarget && (
           <>
-            <p className="text-[11px] text-slate-600 mb-3">
-              الجهاز: <span className="font-mono text-[10px] text-slate-800" dir="ltr">{deviceTarget.hardwareId}</span>
+            <p className="text-[11px] text-ink-secondary mb-3">
+              الجهاز: <span className="font-mono text-[10px] text-ink" dir="ltr">{deviceTarget.hardwareId}</span>
             </p>
-            <p className="text-[11px] text-slate-600 mb-1">
+            <p className="text-[11px] text-ink-secondary mb-1">
               الإجراء: {deviceAction === 'suspend' ? 'إيقاف' : deviceAction === 'release' ? 'تحرير' : 'إلغاء'}
             </p>
           </>

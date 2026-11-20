@@ -48,7 +48,7 @@ export function UpdateNotification() {
       <button
         type="button"
         onClick={() => setCollapsed(false)}
-        className="fixed bottom-4 right-4 z-[110] rounded-full bg-sky-700 px-4 py-2 text-sm font-bold text-white shadow-xl"
+        className="fixed bottom-4 right-4 z-[110] rounded-full bg-primary px-4 py-2 text-sm font-bold text-white shadow-xl"
       >
         تحديث {update.status === 'downloaded' ? 'جاهز' : 'جارٍ التحميل'} · v{update.version}
       </button>
@@ -57,14 +57,14 @@ export function UpdateNotification() {
 
   return (
     <div className={update.mandatory
-      ? 'fixed inset-0 z-[110] flex items-center justify-center bg-slate-950/70 p-4'
+      ? 'fixed inset-0 z-[110] flex items-center justify-center bg-primary/70 p-4'
       : 'fixed bottom-4 right-4 z-[110]'}>
       <section
         role={update.mandatory ? 'alert' : 'status'}
         aria-live={update.mandatory ? 'assertive' : 'polite'}
-        className="w-[min(92vw,420px)] overflow-hidden rounded-2xl border border-sky-200 bg-white text-slate-900 shadow-2xl dark:border-sky-800 dark:bg-slate-900 dark:text-white"
+        className="w-[min(92vw,420px)] overflow-hidden rounded-2xl border border-accent-border bg-surface text-ink shadow-2xl dark:text-white"
       >
-        <div className="flex items-start justify-between gap-3 bg-sky-700 px-4 py-3 text-white">
+        <div className="flex items-start justify-between gap-3 bg-primary px-4 py-3 text-white">
           <div>
             <div className="text-sm font-black">
               {isError
@@ -73,54 +73,54 @@ export function UpdateNotification() {
               {update.version && ` · v${update.version}`}
             </div>
             {hasRelease && title !== `الإصدار ${update.version || 'الجديد'}` && (
-              <div className="mt-1 text-xs text-sky-100">{title}</div>
+              <div className="mt-1 text-xs text-primary">{title}</div>
             )}
           </div>
           {optional && (
-            <button type="button" onClick={() => setCollapsed(true)} aria-label="تصغير إشعار التحديث" className="rounded px-2 text-lg leading-5 text-white/80 hover:bg-white/10">
+            <button type="button" onClick={() => setCollapsed(true)} aria-label="تصغير إشعار التحديث" className="rounded px-2 text-lg leading-5 text-white/80 hover:bg-surface/10">
               ×
             </button>
           )}
         </div>
         <div className="space-y-3 p-4">
-          <p className="text-xs text-slate-500 dark:text-slate-400">
+          <p className="text-xs text-muted ">
             الإصدار الحالي {update.currentVersion} · الإصدار الأحدث {update.version}
           </p>
           {!isError && update.releaseNotes && (
-            <div className="max-h-28 overflow-y-auto whitespace-pre-wrap rounded-lg bg-slate-50 p-3 text-xs leading-5 text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+            <div className="max-h-28 overflow-y-auto whitespace-pre-wrap rounded-lg bg-surface-muted p-3 text-xs leading-5 text-ink ">
               {update.releaseNotes}
             </div>
           )}
           {update.status === 'downloading' && (
             <div>
-              <div className="mb-1 flex justify-between text-xs text-slate-600 dark:text-slate-300">
+              <div className="mb-1 flex justify-between text-xs text-ink-secondary ">
                 <span>يتم تنزيل التحديث في الخلفية...</span>
                 <span>{Math.round(update.progress || 0)}%</span>
               </div>
-              <progress className="h-2 w-full accent-sky-600" max={100} value={update.progress || 0} />
+              <progress className="h-2 w-full accent-primary" max={100} value={update.progress || 0} />
             </div>
           )}
           {isError && (
             <div className="space-y-2" role="alert">
-              <p className="text-xs text-rose-700 dark:text-rose-300">
+              <p className="text-xs text-danger ">
                 تعذر فحص التحديث أو تنزيله. تحقق من اتصال الإنترنت وحاول مجدداً.
               </p>
-              {installError && <p className="text-xs text-rose-700 dark:text-rose-300">{installError}</p>}
+              {installError && <p className="text-xs text-danger ">{installError}</p>}
               <button
                 type="button"
                 onClick={() => void window.ceramisys?.updater?.check?.()}
-                className="rounded-lg bg-sky-700 px-3 py-2 text-xs font-bold text-white hover:bg-sky-800"
+                className="rounded-lg bg-primary px-3 py-2 text-xs font-bold text-white hover:bg-primary"
               >
                 إعادة المحاولة
               </button>
             </div>
           )}
           {installError && update.status !== 'error' && (
-            <p role="alert" className="text-xs text-rose-700 dark:text-rose-300">{installError}</p>
+            <p role="alert" className="text-xs text-danger ">{installError}</p>
           )}
           {update.status === 'downloaded' && (
             <div className="flex items-center justify-between gap-3">
-              <p className="text-xs text-emerald-700 dark:text-emerald-300">
+              <p className="text-xs text-success ">
                 اكتمل التنزيل والتحقق من سلامة التحديث.
               </p>
               <button
@@ -134,14 +134,14 @@ export function UpdateNotification() {
                     });
                   }
                 }}
-                className="shrink-0 rounded-lg bg-emerald-700 px-3 py-2 text-xs font-bold text-white hover:bg-emerald-800"
+                className="shrink-0 rounded-lg bg-success px-3 py-2 text-xs font-bold text-white hover:bg-success"
               >
                 تثبيت وإعادة التشغيل
               </button>
             </div>
           )}
           {!isError && update.mandatory && (
-            <p className="text-xs font-bold text-amber-700 dark:text-amber-300">
+            <p className="text-xs font-bold text-warning ">
               هذا التحديث إلزامي؛ لا يمكن استخدام البرنامج قبل تثبيته.
             </p>
           )}

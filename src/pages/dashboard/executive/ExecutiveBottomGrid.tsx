@@ -16,12 +16,12 @@ export const ExecutiveBottomGrid: React.FC<Props> = ({
   debtCustomers,
 }) => {
   const { isDark } = useTheme();
-  const cardBg = isDark ? 'bg-slate-800' : 'bg-white';
-  const cardBorder = isDark ? 'border-slate-700' : 'border-slate-200';
-  const textPrimary = isDark ? 'text-white' : 'text-slate-900';
-  const textSecondary = isDark ? 'text-slate-400' : 'text-slate-500';
-  const textMuted = isDark ? 'text-slate-500' : 'text-slate-600';
-  const borderColor = isDark ? 'border-slate-700' : 'border-slate-200';
+  const cardBg = isDark ? 'bg-primary' : 'bg-surface';
+  const cardBorder = isDark ? 'border-line-strong' : 'border-line';
+  const textPrimary = isDark ? 'text-white' : 'text-ink';
+  const textSecondary = isDark ? 'text-muted' : 'text-muted';
+  const textMuted = isDark ? 'text-muted' : 'text-ink-secondary';
+  const borderColor = isDark ? 'border-line-strong' : 'border-line';
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -59,7 +59,7 @@ export const ExecutiveBottomGrid: React.FC<Props> = ({
             <p className={`${textSecondary} text-xs text-center py-6`}>لا توجد فواتير</p>
           ) : (
             recentInvoices.map((inv) => {
-              const statusInfo = paymentStatusLabel[inv.status] ?? { label: inv.status, cls: 'bg-slate-200 text-slate-700' };
+              const statusInfo = paymentStatusLabel[inv.status] ?? { label: inv.status, cls: 'bg-surface-sunken text-ink' };
               return (
                 <div key={inv.id} className={`flex items-center gap-2 py-1.5 border-b last:border-0 ${borderColor}`}>
                   <div className="flex-1 min-w-0">
@@ -70,7 +70,7 @@ export const ExecutiveBottomGrid: React.FC<Props> = ({
                     </div>
                   </div>
                   <div className="text-right shrink-0">
-                    <div className="text-xs font-bold text-sky-500">{formatCurrency(inv.amount)}</div>
+                    <div className="text-xs font-bold text-primary">{formatCurrency(inv.amount)}</div>
                     <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold ${statusInfo.cls}`}>
                       {statusInfo.label}
                     </span>
@@ -86,7 +86,7 @@ export const ExecutiveBottomGrid: React.FC<Props> = ({
       <div className={`min-w-0 lg:col-span-1 rounded-xl border p-3 sm:p-4 ${cardBg} ${cardBorder}`}>
         <div className="flex items-center justify-between mb-3">
           <h3 className={`text-sm font-bold ${textPrimary}`}>أعلى الديون</h3>
-          <AlertTriangle className="w-4 h-4 text-rose-500" />
+          <AlertTriangle className="w-4 h-4 text-danger" />
         </div>
         <div className="space-y-2.5">
           {debtCustomers.length === 0 ? (
@@ -99,10 +99,10 @@ export const ExecutiveBottomGrid: React.FC<Props> = ({
                 <div key={i}>
                   <div className={`flex items-center justify-between text-xs mb-1 ${textPrimary}`}>
                     <span className="font-medium truncate">{c.name}</span>
-                    <span className="text-rose-500 font-bold shrink-0 mr-2">{formatCurrency(c.debt)}</span>
+                    <span className="text-danger font-bold shrink-0 mr-2">{formatCurrency(c.debt)}</span>
                   </div>
-                  <div className={`h-1.5 rounded-full overflow-hidden ${isDark ? 'bg-slate-700' : 'bg-slate-100'}`}>
-                    <div className="h-full bg-rose-500 rounded-full transition-all" style={{ width: `${pct}%` }} />
+                  <div className={`h-1.5 rounded-full overflow-hidden ${isDark ? 'bg-primary' : 'bg-surface-sunken'}`}>
+                    <div className="h-full bg-danger rounded-full transition-all" style={{ width: `${pct}%` }} />
                   </div>
                 </div>
               );

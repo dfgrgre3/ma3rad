@@ -4,12 +4,13 @@ import { getBusinessProfile, getProfileDashboard } from '../../config/businessPr
 import { AccountingService } from '../../services/domains/finance/AccountingService';
 import { CeramicMath } from '../../utils/products/ceramicMath';
 import { DashboardMetricsService } from '../../services/domains/dashboard/DashboardMetricsService';
+import { ProjectExecutionService } from '../../services/domains/projects/ProjectExecutionService';
 import { useTheme } from '../../contexts/useTheme';
 
 interface KpiWithValue {
   id: string;
   label: { ar: string; en: string };
-  source: 'sales' | 'inventory' | 'finance' | 'customers' | 'manufacturing' | 'restaurant';
+  source: 'sales' | 'inventory' | 'finance' | 'customers' | 'manufacturing' | 'restaurant' | 'projects';
   format?: 'number' | 'currency' | 'm2' | 'percent';
   value?: number | string;
   loading: boolean;
@@ -54,6 +55,16 @@ export const ProfileKpiPanel: React.FC = () => {
         // Get executive data for more KPIs
         const execData = await dashboardMetricsService.getExecutiveDashboardData(monthStart, today);
 
+        // Project-domain KPIs (construction/contracting profiles)
+        let projectPortfolio: ReturnType<ProjectExecutionService['getPortfolioSummary']> | null = null;
+        if (effectiveKpis.some((k) => k.source === 'projects')) {
+          try {
+            projectPortfolio = new ProjectExecutionService().getPortfolioSummary();
+          } catch {
+            projectPortfolio = null;
+          }
+        }
+
         const newValues = new Map<string, KpiWithValue>();
         
         for (const kpi of effectiveKpis) {
@@ -96,6 +107,24 @@ export const ProfileKpiPanel: React.FC = () => {
             case 'total_received':
               value = execData?.totalReceived ?? 0;
               break;
+            case 'active_projects':
+              value = projectPortfolio?.filter((p) => p.status === 'ACTIVE').length ?? 0;
+              break;
+            case 'overdue_projects':
+              value = projectPortfolio?.filter((p) => p.isOverdue).length ?? 0;
+              break;
+            case 'contract_value_total':
+              value = projectPortfolio?.reduce((s, p) => s + (Number(p.contractValue) || 0), 0) ?? 0;
+              break;
+            case 'certified_amount_total':
+              value = projectPortfolio?.reduce((s, p) => s + (Number(p.certifiedAmount) || 0), 0) ?? 0;
+              break;
+            case 'collection_gap_total':
+              value = projectPortfolio?.reduce((s, p) => s + (Number(p.collectionGap) || 0), 0) ?? 0;
+              break;
+            case 'actual_cost_total':
+              value = projectPortfolio?.reduce((s, p) => s + (Number(p.actualCost) || 0), 0) ?? 0;
+              break;
             default:
               // Try to match by source
               if (kpi.source === 'sales' && metrics.todaySales > 0) {
@@ -104,6 +133,8 @@ export const ProfileKpiPanel: React.FC = () => {
                 value = metrics.netProfit;
               } else if (kpi.source === 'inventory') {
                 value = metrics.inventoryValuationCost ?? metrics.lowStockCount;
+              } else if (kpi.source === 'projects' && projectPortfolio?.length) {
+                value = projectPortfolio.reduce((s, p) => s + (Number(p.contractValue) || 0), 0);
               }
           }
 
@@ -142,8 +173,8 @@ export const ProfileKpiPanel: React.FC = () => {
   if (effectiveKpis.length === 0) return null;
   
   return (
-    <div className={`min-w-0 rounded-xl border p-3 ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
-      <div className="mb-2 text-xs font-bold text-slate-500 dark:text-slate-400">
+    <div className={`min-w-0 rounded-xl border p-3 ${isDark ? 'bg-primary border-line-strong' : 'bg-surface border-line'}`}>
+      <div className="mb-2 text-xs font-bold text-muted ">
         مؤشرات النشاط: {profile.name.ar}
       </div>
       <div className="flex flex-wrap gap-2">
@@ -157,8 +188,8 @@ export const ProfileKpiPanel: React.FC = () => {
               key={kpi.id}
               className={`rounded-full border px-3 py-1 text-xs font-semibold transition-colors ${
                 isLoading 
-                  ? 'animate-pulse bg-slate-100 dark:bg-slate-700 border-slate-200 dark:border-slate-600 text-slate-500'
-                  : 'bg-slate-50 dark:bg-slate-700 border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-200'
+                  ? 'animate-pulse bg-surface-sunken border-line text-muted'
+                  : 'bg-surface-muted border-line text-ink '
               }`}
               title={`${kpi.source} · ${kpi.format ?? 'number'}`}
             >

@@ -279,11 +279,11 @@ export const PlatformCustomizationSettingsPage: React.FC = () => {
       />
 
       {/* Security Disclaimer Banner */}
-      <div className="bg-amber-950/20 border border-amber-800/40 p-3.5 rounded-xl flex items-start gap-3">
-        <ShieldAlert className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
+      <div className="bg-warning/20 border border-warning/40 p-3.5 rounded-xl flex items-start gap-3">
+        <ShieldAlert className="w-5 h-5 text-warning flex-shrink-0 mt-0.5" />
         <div className="text-xs">
-          <span className="font-semibold text-amber-300">ملاحظة معمارية هامة حول التخصيص:</span>
-          <p className="text-amber-200/80 mt-0.5 leading-relaxed">
+          <span className="font-semibold text-warning">ملاحظة معمارية هامة حول التخصيص:</span>
+          <p className="text-warning/80 mt-0.5 leading-relaxed">
             هذه الصفحة مخصصة لتبسيط الواجهة وإخفاء العناصر غير المرتبطة بنشاط العميل (UI/UX Visibility).
             إخفاء زر أو صفحة هنا **لا يُلغي صلاحية الوصول الأمنية (RBAC Permissions)** للمستخدم، فالتحكم الأمني الصارم يتم دائماً عبر طبقة الصلاحيات وأدوار النظام.
           </p>
@@ -291,11 +291,11 @@ export const PlatformCustomizationSettingsPage: React.FC = () => {
       </div>
 
       {/* Tenant Selector & Profile Status Bar */}
-      <div className="bg-zinc-900/60 p-4 rounded-xl border border-zinc-800 flex flex-wrap items-center justify-between gap-4">
+      <div className="bg-primary/60 p-4 rounded-xl border border-line-strong flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <Layout className="w-5 h-5 text-emerald-400" />
+          <Layout className="w-5 h-5 text-success" />
           <div>
-            <label className="text-xs font-semibold text-zinc-300 block mb-1">العميل المستهدف:</label>
+            <label className="text-xs font-semibold text-muted block mb-1">العميل المستهدف:</label>
             <select
               value={selectedTenantId}
               onChange={(e) => setSelectedTenantId(e.target.value)}
@@ -312,23 +312,23 @@ export const PlatformCustomizationSettingsPage: React.FC = () => {
 
         <div className="flex items-center gap-4 text-xs">
           {savedSuccess && (
-            <span className="flex items-center gap-1.5 text-emerald-400 font-semibold bg-emerald-950/40 px-3 py-1.5 rounded-lg border border-emerald-800/40">
+            <span className="flex items-center gap-1.5 text-success font-semibold bg-success/40 px-3 py-1.5 rounded-lg border border-success/40">
               <CheckCircle2 className="w-4 h-4" />
               تم حفظ الواجهة بنجاح
             </span>
           )}
-          <span className="text-zinc-400">
-            الإصدار النشط: <strong className="text-zinc-200">#{currentVersion}</strong>
+          <span className="text-muted">
+            الإصدار النشط: <strong className="text-muted">#{currentVersion}</strong>
           </span>
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b border-zinc-800 space-x-1 space-x-reverse overflow-x-auto">
+      <div className="flex border-b border-line-strong space-x-1 space-x-reverse overflow-x-auto">
         <button
           onClick={() => setActiveTab('pages')}
           className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
-            activeTab === 'pages' ? 'border-emerald-500 text-emerald-400' : 'border-transparent text-zinc-400 hover:text-zinc-200'
+            activeTab === 'pages' ? 'border-success text-success' : 'border-transparent text-muted hover:text-muted'
           }`}
         >
           <FolderTree className="w-4 h-4" />
@@ -337,7 +337,7 @@ export const PlatformCustomizationSettingsPage: React.FC = () => {
         <button
           onClick={() => setActiveTab('actions')}
           className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
-            activeTab === 'actions' ? 'border-emerald-500 text-emerald-400' : 'border-transparent text-zinc-400 hover:text-zinc-200'
+            activeTab === 'actions' ? 'border-success text-success' : 'border-transparent text-muted hover:text-muted'
           }`}
         >
           <Sliders className="w-4 h-4" />
@@ -346,7 +346,7 @@ export const PlatformCustomizationSettingsPage: React.FC = () => {
         <button
           onClick={() => setActiveTab('fields')}
           className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
-            activeTab === 'fields' ? 'border-emerald-500 text-emerald-400' : 'border-transparent text-zinc-400 hover:text-zinc-200'
+            activeTab === 'fields' ? 'border-success text-success' : 'border-transparent text-muted hover:text-muted'
           }`}
         >
           <FileText className="w-4 h-4" />
@@ -355,7 +355,7 @@ export const PlatformCustomizationSettingsPage: React.FC = () => {
         <button
           onClick={() => setActiveTab('profiles')}
           className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
-            activeTab === 'profiles' ? 'border-emerald-500 text-emerald-400' : 'border-transparent text-zinc-400 hover:text-zinc-200'
+            activeTab === 'profiles' ? 'border-success text-success' : 'border-transparent text-muted hover:text-muted'
           }`}
         >
           <Layers className="w-4 h-4" />
@@ -364,7 +364,7 @@ export const PlatformCustomizationSettingsPage: React.FC = () => {
         <button
           onClick={() => setActiveTab('history')}
           className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
-            activeTab === 'history' ? 'border-emerald-500 text-emerald-400' : 'border-transparent text-zinc-400 hover:text-zinc-200'
+            activeTab === 'history' ? 'border-success text-success' : 'border-transparent text-muted hover:text-muted'
           }`}
         >
           <History className="w-4 h-4" />
@@ -376,9 +376,9 @@ export const PlatformCustomizationSettingsPage: React.FC = () => {
       {/* ─── TAB 1: Pages Visibility ────────────────────────────────────────────── */}
       {activeTab === 'pages' && (
         <div className="space-y-4">
-          <div className="flex items-center justify-between gap-4 bg-zinc-900/40 p-3 rounded-lg border border-zinc-800">
+          <div className="flex items-center justify-between gap-4 bg-primary/40 p-3 rounded-lg border border-line-strong">
             <div className="relative flex-1 max-w-sm">
-              <Search className="w-4 h-4 absolute right-3 top-3 text-zinc-400" />
+              <Search className="w-4 h-4 absolute right-3 top-3 text-muted" />
               <input
                 type="text"
                 placeholder="بحث في الصفحات أو الأقسام..."
@@ -387,9 +387,9 @@ export const PlatformCustomizationSettingsPage: React.FC = () => {
                 className={`${inputClass} pr-9`}
               />
             </div>
-            <div className="text-xs text-zinc-400">
-              المخفية: <span className="text-rose-400 font-semibold">{hiddenPages.length}</span> | 
-              الظاهرة: <span className="text-emerald-400 font-semibold">{SYSTEM_PAGES.length - hiddenPages.length}</span>
+            <div className="text-xs text-muted">
+              المخفية: <span className="text-danger font-semibold">{hiddenPages.length}</span> | 
+              الظاهرة: <span className="text-success font-semibold">{SYSTEM_PAGES.length - hiddenPages.length}</span>
             </div>
           </div>
 
@@ -402,31 +402,31 @@ export const PlatformCustomizationSettingsPage: React.FC = () => {
                   onClick={() => handleTogglePage(page.path)}
                   className={`p-3.5 rounded-xl border cursor-pointer transition-all flex items-center justify-between ${
                     isHidden
-                      ? 'bg-zinc-950/40 border-zinc-800/60 opacity-60'
-                      : 'bg-zinc-900/60 border-zinc-800 hover:border-emerald-500/40'
+                      ? 'bg-primary/40 border-line-strong/60 opacity-60'
+                      : 'bg-primary/60 border-line-strong hover:border-success/40'
                   }`}
                 >
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
-                      <span className={`text-sm font-medium ${isHidden ? 'text-zinc-400 line-through' : 'text-zinc-100'}`}>
+                      <span className={`text-sm font-medium ${isHidden ? 'text-muted line-through' : 'text-muted'}`}>
                         {page.label}
                       </span>
                     </div>
-                    <div className="text-[11px] text-zinc-500 flex items-center gap-2 font-mono">
+                    <div className="text-[11px] text-muted flex items-center gap-2 font-mono">
                       <span>{page.path}</span>
                       <span>•</span>
-                      <span className="text-zinc-400">{page.category}</span>
+                      <span className="text-muted">{page.category}</span>
                     </div>
                   </div>
 
                   <div className="flex-shrink-0 mr-3">
                     {isHidden ? (
-                      <span className="flex items-center gap-1 text-xs px-2.5 py-1 rounded bg-rose-500/10 text-rose-400 border border-rose-500/20">
+                      <span className="flex items-center gap-1 text-xs px-2.5 py-1 rounded bg-danger/10 text-danger border border-danger/20">
                         <EyeOff className="w-3.5 h-3.5" />
                         مخفية
                       </span>
                     ) : (
-                      <span className="flex items-center gap-1 text-xs px-2.5 py-1 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                      <span className="flex items-center gap-1 text-xs px-2.5 py-1 rounded bg-success/10 text-success border border-success/20">
                         <Eye className="w-3.5 h-3.5" />
                         ظاهرة
                       </span>
@@ -442,7 +442,7 @@ export const PlatformCustomizationSettingsPage: React.FC = () => {
       {/* ─── TAB 2: Action Buttons Visibility ───────────────────────────────────── */}
       {activeTab === 'actions' && (
         <div className="space-y-3">
-          <div className="text-xs text-zinc-400 mb-2">
+          <div className="text-xs text-muted mb-2">
             حدد الأزرار السريعة المتاحة للمستخدمين لتسهيل وتبسيط واجهة النظام:
           </div>
 
@@ -455,23 +455,23 @@ export const PlatformCustomizationSettingsPage: React.FC = () => {
                   onClick={() => handleToggleAction(action.id)}
                   className={`p-4 rounded-xl border cursor-pointer transition-all flex items-start justify-between ${
                     isHidden
-                      ? 'bg-zinc-950/40 border-zinc-800/60 opacity-60'
-                      : 'bg-zinc-900/60 border-zinc-800 hover:border-emerald-500/40'
+                      ? 'bg-primary/40 border-line-strong/60 opacity-60'
+                      : 'bg-primary/60 border-line-strong hover:border-success/40'
                   }`}
                 >
                   <div className="space-y-1">
-                    <div className="font-semibold text-sm text-zinc-100">{action.label}</div>
-                    <div className="text-xs text-zinc-400 leading-relaxed">{action.description}</div>
+                    <div className="font-semibold text-sm text-muted">{action.label}</div>
+                    <div className="text-xs text-muted leading-relaxed">{action.description}</div>
                   </div>
 
                   <div className="flex-shrink-0 mr-3">
                     {isHidden ? (
-                      <span className="flex items-center gap-1 text-xs px-2.5 py-1 rounded bg-rose-500/10 text-rose-400 border border-rose-500/20">
+                      <span className="flex items-center gap-1 text-xs px-2.5 py-1 rounded bg-danger/10 text-danger border border-danger/20">
                         <EyeOff className="w-3.5 h-3.5" />
                         معطل شكلياً
                       </span>
                     ) : (
-                      <span className="flex items-center gap-1 text-xs px-2.5 py-1 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                      <span className="flex items-center gap-1 text-xs px-2.5 py-1 rounded bg-success/10 text-success border border-success/20">
                         <Eye className="w-3.5 h-3.5" />
                         متاح
                       </span>
@@ -487,28 +487,28 @@ export const PlatformCustomizationSettingsPage: React.FC = () => {
       {/* ─── TAB 3: Form Fields ─────────────────────────────────────────────────── */}
       {activeTab === 'fields' && (
         <div className="space-y-3">
-          <div className="text-xs text-zinc-400 mb-2">
+          <div className="text-xs text-muted mb-2">
             التحكم في الحقول الإضافية غير الإلزامية في بطاقات الأصناف ونماذج الفواتير:
           </div>
 
-          <div className="overflow-x-auto bg-zinc-900/40 rounded-lg border border-zinc-800">
+          <div className="overflow-x-auto bg-primary/40 rounded-lg border border-line-strong">
             <DataTable
             ariaLabel="حقول النماذج القابلة للتخصيص"
             rows={SYSTEM_FIELDS}
             rowKey={(field: any) => String(field.id)}
             tableClassName="text-sm"
-            rowClassName={() => 'transition-colors hover:bg-zinc-800/20'}
+            rowClassName={() => 'transition-colors hover:bg-primary/20'}
             columns={[
-              { key: 'label', header: 'اسم الحقل', render: (field: any) => <span className="font-medium text-zinc-200">{field.label}</span> },
-              { key: 'module', header: 'القسم / النموذج', render: (field: any) => <span className="text-xs text-zinc-400">{field.module}</span> },
+              { key: 'label', header: 'اسم الحقل', render: (field: any) => <span className="font-medium text-muted">{field.label}</span> },
+              { key: 'module', header: 'القسم / النموذج', render: (field: any) => <span className="text-xs text-muted">{field.module}</span> },
               {
                 key: 'visible', header: 'حالة الظهور',
                 render: (field: any) => {
                   const rule = formFieldRules[field.id as keyof typeof formFieldRules] ?? { visible: true };
                   return rule.visible ? (
-                    <span className="rounded border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-0.5 text-xs text-emerald-400">مُفعل وظاهر</span>
+                    <span className="rounded border border-success/20 bg-success/10 px-2.5 py-0.5 text-xs text-success">مُفعل وظاهر</span>
                   ) : (
-                    <span className="rounded bg-zinc-800 px-2.5 py-0.5 text-xs text-zinc-400">مخفي</span>
+                    <span className="rounded bg-primary px-2.5 py-0.5 text-xs text-muted">مخفي</span>
                   );
                 },
               },
@@ -536,7 +536,7 @@ export const PlatformCustomizationSettingsPage: React.FC = () => {
       {/* ─── TAB 4: Activity Profiles ───────────────────────────────────────────── */}
       {activeTab === 'profiles' && (
         <div className="space-y-4">
-          <div className="text-xs text-zinc-400">
+          <div className="text-xs text-muted">
             تطبيق قالب واجهة معد مسبقاً بما يلائم قطاع عمل العميل بضغطة زر واحدة:
           </div>
 
@@ -544,21 +544,21 @@ export const PlatformCustomizationSettingsPage: React.FC = () => {
             {profiles.map((prof) => (
               <div
                 key={prof.id}
-                className="bg-zinc-900/60 p-4 rounded-xl border border-zinc-800 space-y-3 flex flex-col justify-between"
+                className="bg-primary/60 p-4 rounded-xl border border-line-strong space-y-3 flex flex-col justify-between"
               >
                 <div>
                   <div className="flex items-center justify-between">
-                    <h4 className="font-semibold text-zinc-100 text-sm">{prof.name}</h4>
+                    <h4 className="font-semibold text-muted text-sm">{prof.name}</h4>
                     {prof.isDefault && (
-                      <span className="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded">
+                      <span className="text-[10px] bg-success/10 text-success border border-success/20 px-2 py-0.5 rounded">
                         افتراضي
                       </span>
                     )}
                   </div>
-                  <div className="text-xs text-zinc-500 font-mono mt-1">الرمز: {prof.code}</div>
-                  <div className="text-xs text-zinc-400 mt-2 space-y-1">
-                    <div>الصفحات المخفية: <strong className="text-zinc-200">{prof.hiddenPages.length}</strong></div>
-                    <div>الأزرار المعطلة: <strong className="text-zinc-200">{prof.hiddenActions.length}</strong></div>
+                  <div className="text-xs text-muted font-mono mt-1">الرمز: {prof.code}</div>
+                  <div className="text-xs text-muted mt-2 space-y-1">
+                    <div>الصفحات المخفية: <strong className="text-muted">{prof.hiddenPages.length}</strong></div>
+                    <div>الأزرار المعطلة: <strong className="text-muted">{prof.hiddenActions.length}</strong></div>
                   </div>
                 </div>
 
@@ -580,7 +580,7 @@ export const PlatformCustomizationSettingsPage: React.FC = () => {
       {/* ─── TAB 5: Version History ─────────────────────────────────────────────── */}
       {activeTab === 'history' && (
         <div className="space-y-3">
-          <div className="text-xs text-zinc-400">
+          <div className="text-xs text-muted">
             سجل الإصدارات واللقطات السابقة لتخصيصات واجهة هذا العميل:
           </div>
 
@@ -591,14 +591,14 @@ export const PlatformCustomizationSettingsPage: React.FC = () => {
               {versions.map((ver) => (
                 <div
                   key={ver.id}
-                  className="bg-zinc-950 p-3 rounded-lg border border-zinc-800 flex items-center justify-between text-xs"
+                  className="bg-primary p-3 rounded-lg border border-line-strong flex items-center justify-between text-xs"
                 >
                   <div>
-                    <div className="font-semibold text-zinc-200">
-                      إصدار #{ver.version} {ver.version === currentVersion && <span className="text-emerald-400 mr-2">(الحالي)</span>}
+                    <div className="font-semibold text-muted">
+                      إصدار #{ver.version} {ver.version === currentVersion && <span className="text-success mr-2">(الحالي)</span>}
                     </div>
-                    <div className="text-zinc-400 text-[11px] mt-0.5">{ver.changeSummary}</div>
-                    <div className="text-zinc-500 text-[10px]">{formatDateTime(ver.createdAt)}</div>
+                    <div className="text-muted text-[11px] mt-0.5">{ver.changeSummary}</div>
+                    <div className="text-muted text-[10px]">{formatDateTime(ver.createdAt)}</div>
                   </div>
                   {ver.version !== currentVersion && canManageCustomization && (
                     <Button

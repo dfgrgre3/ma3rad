@@ -46,7 +46,7 @@ export const ExecutiveDashboard: React.FC = () => {
   }, [refreshToken, refresh]);
 
   return (
-    <div className={`h-full min-w-0 overflow-y-auto p-3 sm:p-4 lg:p-5 space-y-4 lg:space-y-5 ${isDark ? 'bg-slate-900 text-white' : 'bg-slate-50 text-slate-900'}`}>
+    <div className={`h-full min-w-0 overflow-y-auto p-3 sm:p-4 lg:p-5 space-y-4 lg:space-y-5 ${isDark ? 'bg-primary text-white' : 'bg-surface-muted text-ink'}`}>
       {/* Header */}
       <PageHeader
         title="لوحة المعلومات التنفيذية"
@@ -58,10 +58,10 @@ export const ExecutiveDashboard: React.FC = () => {
               onClick={() => setRange(r.id)}
               className={`min-h-9 flex-1 px-2 sm:flex-none sm:px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                 range === r.id 
-                  ? 'bg-sky-600 text-white shadow-md shadow-sky-600/25' 
+                  ? 'bg-primary text-white shadow-md shadow-primary/25' 
                   : isDark 
-                    ? 'bg-slate-800 hover:bg-slate-700 text-slate-300' 
-                    : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                    ? 'bg-primary hover:bg-primary text-muted' 
+                    : 'bg-surface-sunken hover:bg-surface-sunken text-ink'
               }`}
             >
               {r.label}
@@ -73,8 +73,8 @@ export const ExecutiveDashboard: React.FC = () => {
             disabled={loading}
             className={`min-h-9 px-3 py-1.5 text-xs font-semibold rounded-lg transition disabled:cursor-not-allowed disabled:opacity-50 ${
               isDark 
-                ? 'bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white' 
-                : 'bg-slate-100 text-slate-500 hover:text-slate-900 hover:bg-slate-200'
+                ? 'bg-primary text-muted hover:bg-primary hover:text-white' 
+                : 'bg-surface-sunken text-muted hover:text-ink hover:bg-surface-sunken'
             }`}
             title="تحديث"
           >
@@ -86,15 +86,15 @@ export const ExecutiveDashboard: React.FC = () => {
       {loading ? (
         <div className="flex items-center justify-center h-64">
           <div className="flex flex-col items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-sky-600 animate-bounce" />
-            <p className="text-sm text-slate-500 dark:text-slate-400">جاري تحميل البيانات...</p>
+            <div className="w-10 h-10 rounded-xl bg-primary animate-bounce" />
+            <p className="text-sm text-muted ">جاري تحميل البيانات...</p>
           </div>
         </div>
       ) : (
         <>
           {loadError && (
             <div role="alert" className={`rounded-xl border px-4 py-3 text-sm ${
-              isDark ? 'border-rose-900 bg-rose-950/30 text-rose-300' : 'border-rose-300 bg-rose-50 text-rose-800'
+              isDark ? 'border-danger bg-danger/30 text-danger' : 'border-danger bg-danger-soft text-danger'
             }`}>
               تعذر تحميل بعض المؤشرات: {loadError}
             </div>

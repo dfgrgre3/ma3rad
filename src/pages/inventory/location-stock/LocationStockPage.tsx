@@ -125,28 +125,28 @@ export const LocationStockPage: React.FC<LocationStockPageProps> = ({ mode }) =>
   }, [comparisonFilter, searchableProducts, showroomWarehouseId, stock, storeWarehouseId]);
 
   const renderQuantity = (row: StockRow | undefined, locationSelected: boolean) => {
-    if (!locationSelected) return <span className="font-semibold text-slate-400">اختر المخزن أولًا</span>;
-    if (!row) return <span className="font-bold text-rose-600">غير مسجل</span>;
-    if (row.quantityM2 <= 0) return <span className="font-bold text-amber-600">غير متوفر (الرصيد صفر)</span>;
+    if (!locationSelected) return <span className="font-semibold text-muted">اختر المخزن أولًا</span>;
+    if (!row) return <span className="font-bold text-danger">غير مسجل</span>;
+    if (row.quantityM2 <= 0) return <span className="font-bold text-warning">غير متوفر (الرصيد صفر)</span>;
     return (
       <div>
-        <div className="font-black text-emerald-700">{formatProductQuantity(row.quantityM2, row)}</div>
-        {row.productType !== 'GENERAL' && <div className="mt-1 text-[11px] text-slate-500">{formatBoxes(row.quantityBoxes)} كرتونة</div>}
+        <div className="font-black text-success">{formatProductQuantity(row.quantityM2, row)}</div>
+        {row.productType !== 'GENERAL' && <div className="mt-1 text-[11px] text-muted">{formatBoxes(row.quantityBoxes)} كرتونة</div>}
       </div>
     );
   };
 
   if (!canView) {
     return (
-      <div className="m-8 rounded-2xl border border-amber-200 bg-amber-50 p-6 text-sm font-bold text-amber-900">
+      <div className="m-8 rounded-2xl border border-warning-border bg-warning-soft p-6 text-sm font-bold text-warning">
         لا تملك صلاحية عرض أرصدة المخازن.
       </div>
     );
   }
 
   return (
-    <div className="h-full overflow-y-auto bg-slate-50 p-4 sm:p-6">
-      <div className="mb-5 bg-white px-5 pt-4 rounded-2xl border border-slate-200 shadow-sm">
+    <div className="h-full overflow-y-auto bg-surface-muted p-4 sm:p-6">
+      <div className="mb-5 bg-surface px-5 pt-4 rounded-2xl border border-line shadow-sm">
         <PageHeader
           icon={isComparison
             ? <Building2 className="h-5 w-5" />
@@ -160,7 +160,7 @@ export const LocationStockPage: React.FC<LocationStockPageProps> = ({ mode }) =>
               type="button"
               onClick={loadData}
               disabled={loading}
-              className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-100 disabled:opacity-50"
+              className="flex items-center justify-center gap-2 rounded-xl border border-line bg-surface px-3 py-2 text-xs font-bold text-ink transition hover:bg-surface-sunken disabled:opacity-50"
             >
               <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
               تحديث البيانات
@@ -169,21 +169,21 @@ export const LocationStockPage: React.FC<LocationStockPageProps> = ({ mode }) =>
         />
       </div>
 
-      <div className="mb-4 grid gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm md:grid-cols-2">
+      <div className="mb-4 grid gap-3 rounded-2xl border border-line bg-surface p-3 shadow-sm md:grid-cols-2">
         <label className="relative block">
-          <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
           <input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             placeholder="بحث باسم الصنف أو الكود أو المقاس..."
-            className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-3 pr-9 text-xs focus:border-sky-400 focus:outline-none"
+            className="w-full rounded-xl border border-line bg-surface-muted py-2.5 pl-3 pr-9 text-xs focus:border-primary focus:outline-none"
           />
         </label>
 
         {isComparison ? (
           <>
             <label className="flex items-center gap-2">
-              <span className="shrink-0 text-xs font-bold text-slate-600">مخزن المعرض</span>
+              <span className="shrink-0 text-xs font-bold text-ink-secondary">مخزن المعرض</span>
               <select
                 value={showroomWarehouseId}
                 onChange={(event) => {
@@ -191,14 +191,14 @@ export const LocationStockPage: React.FC<LocationStockPageProps> = ({ mode }) =>
                   setShowroomWarehouseId(nextId);
                   if (nextId && nextId === storeWarehouseId) setStoreWarehouseId('');
                 }}
-                className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-semibold"
+                className="min-w-0 flex-1 rounded-xl border border-line bg-surface px-3 py-2.5 text-xs font-semibold"
               >
                 <option value="">اختر مخزن المعرض</option>
                 {showroomWarehouses.map((warehouse) => <option key={warehouse.id} value={warehouse.id}>{warehouse.name}</option>)}
               </select>
             </label>
             <label className="flex items-center gap-2">
-              <span className="shrink-0 text-xs font-bold text-slate-600">المخزن</span>
+              <span className="shrink-0 text-xs font-bold text-ink-secondary">المخزن</span>
               <select
                 value={storeWarehouseId}
                 onChange={(event) => {
@@ -206,18 +206,18 @@ export const LocationStockPage: React.FC<LocationStockPageProps> = ({ mode }) =>
                   setStoreWarehouseId(nextId);
                   if (nextId && nextId === showroomWarehouseId) setShowroomWarehouseId('');
                 }}
-                className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-semibold"
+                className="min-w-0 flex-1 rounded-xl border border-line bg-surface px-3 py-2.5 text-xs font-semibold"
               >
                 <option value="">اختر المخزن</option>
                 {storeWarehouses.map((warehouse) => <option key={warehouse.id} value={warehouse.id}>{warehouse.name}</option>)}
               </select>
             </label>
             <label className="flex items-center gap-2">
-              <span className="shrink-0 text-xs font-bold text-slate-600">فلترة الأصناف</span>
+              <span className="shrink-0 text-xs font-bold text-ink-secondary">فلترة الأصناف</span>
               <select
                 value={comparisonFilter}
                 onChange={(event) => setComparisonFilter(event.target.value as ComparisonFilter)}
-                className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-semibold"
+                className="min-w-0 flex-1 rounded-xl border border-line bg-surface px-3 py-2.5 text-xs font-semibold"
               >
                 <option value="all">كل الأصناف</option>
                 <option value="showroom-only">موجود في المعرض فقط</option>
@@ -229,11 +229,11 @@ export const LocationStockPage: React.FC<LocationStockPageProps> = ({ mode }) =>
           </>
         ) : (
           <label className="flex items-center gap-2">
-            <span className="shrink-0 text-xs font-bold text-slate-600">المخزن</span>
+            <span className="shrink-0 text-xs font-bold text-ink-secondary">المخزن</span>
             <select
               value={selectedWarehouseId}
               onChange={(event) => setSelectedWarehouseId(event.target.value)}
-              className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-semibold"
+              className="min-w-0 flex-1 rounded-xl border border-line bg-surface px-3 py-2.5 text-xs font-semibold"
             >
               <option value="">كل المخازن</option>
               {warehouses.map((warehouse) => <option key={warehouse.id} value={warehouse.id}>{warehouse.name}</option>)}
@@ -242,11 +242,11 @@ export const LocationStockPage: React.FC<LocationStockPageProps> = ({ mode }) =>
         )}
       </div>
 
-      {error && <div role="alert" className="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs font-semibold text-rose-700">{error}</div>}
+      {error && <div role="alert" className="mb-4 rounded-xl border border-danger-border bg-danger-soft px-4 py-3 text-xs font-semibold text-danger">{error}</div>}
 
-      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <div className="overflow-hidden rounded-2xl border border-line bg-surface shadow-sm">
         {loading ? (
-          <div className="py-16 text-center text-sm font-semibold text-slate-500">جاري تحميل بيانات المخزون...</div>
+          <div className="py-16 text-center text-sm font-semibold text-muted">جاري تحميل بيانات المخزون...</div>
         ) : isComparison ? (
           <div className="overflow-x-auto">
             <DataTable
@@ -261,10 +261,10 @@ export const LocationStockPage: React.FC<LocationStockPageProps> = ({ mode }) =>
                   key: 'product', header: 'الصنف',
                   render: ({ product }) => (
                     <span className="flex items-start gap-2">
-                      <Package className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
+                      <Package className="mt-0.5 h-4 w-4 shrink-0 text-muted" />
                       <span>
-                        <span className="block font-bold text-slate-900">{product.name}</span>
-                        <span className="mt-1 block text-[10px] text-slate-500">كود: {product.sku} · المقاس: {product.size}</span>
+                        <span className="block font-bold text-ink">{product.name}</span>
+                        <span className="mt-1 block text-[10px] text-muted">كود: {product.sku} · المقاس: {product.size}</span>
                       </span>
                     </span>
                   ),
@@ -285,19 +285,19 @@ export const LocationStockPage: React.FC<LocationStockPageProps> = ({ mode }) =>
               dense
               tableClassName="text-xs"
               columns={[
-                { key: 'warehouse', header: 'المخزن', render: (row) => <span className="font-bold text-violet-700">{row.warehouseName}</span> },
+                { key: 'warehouse', header: 'المخزن', render: (row) => <span className="font-bold text-primary">{row.warehouseName}</span> },
                 {
                   key: 'product', header: 'الصنف',
                   render: (row) => (
                     <span>
-                      <span className="block font-bold text-slate-900">{row.productName}</span>
-                      <span className="mt-1 block text-[10px] text-slate-500">كود: {row.sku}</span>
+                      <span className="block font-bold text-ink">{row.productName}</span>
+                      <span className="mt-1 block text-[10px] text-muted">كود: {row.sku}</span>
                     </span>
                   ),
                 },
-                { key: 'size', header: 'المقاس', render: (row) => <span className="font-semibold text-slate-700">{row.size}</span> },
-                { key: 'qty', header: 'الرصيد بوحدة الصنف', render: (row) => <span className="font-black text-emerald-700">{formatProductQuantity(row.quantityM2, row)}</span> },
-                { key: 'boxes', header: 'الرصيد بالكرتونة', render: (row) => <span className="font-semibold text-slate-700">{row.productType === 'GENERAL' ? '—' : `${formatBoxes(row.quantityBoxes)} كرتونة`}</span> },
+                { key: 'size', header: 'المقاس', render: (row) => <span className="font-semibold text-ink">{row.size}</span> },
+                { key: 'qty', header: 'الرصيد بوحدة الصنف', render: (row) => <span className="font-black text-success">{formatProductQuantity(row.quantityM2, row)}</span> },
+                { key: 'boxes', header: 'الرصيد بالكرتونة', render: (row) => <span className="font-semibold text-ink">{row.productType === 'GENERAL' ? '—' : `${formatBoxes(row.quantityBoxes)} كرتونة`}</span> },
               ]}
               emptyTitle="لا يوجد رصيد متوفر في المخزن المحدد."
             />
@@ -306,7 +306,7 @@ export const LocationStockPage: React.FC<LocationStockPageProps> = ({ mode }) =>
       </div>
 
       {!loading && (
-        <p className="mt-3 text-[11px] font-medium text-slate-500">
+        <p className="mt-3 text-[11px] font-medium text-muted">
           {isComparison ? `عدد الأصناف المعروضة: ${comparisonItems.length}` : `عدد سجلات الأصناف المتوفرة: ${warehouseItems.length}`}
         </p>
       )}

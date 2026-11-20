@@ -30,10 +30,10 @@ export const CHANNEL_LABELS: Record<string, string> = {
 };
 
 export const TARGET_STATUS_LABELS: Record<string, { label: string; color: string; icon: any }> = {
-  PENDING: { label: 'قيد الانتظار', color: 'bg-amber-50 text-amber-700 border-amber-200', icon: Clock },
-  SUCCESS: { label: 'تم بنجاح', color: 'bg-emerald-50 text-emerald-700 border-emerald-200', icon: CheckCircle2 },
-  FAILED: { label: 'فشل التحديث', color: 'bg-rose-50 text-rose-700 border-rose-200', icon: XCircle },
-  SKIPPED: { label: 'تم التخطي', color: 'bg-slate-100 text-slate-700 border-slate-200', icon: Clock },
+  PENDING: { label: 'قيد الانتظار', color: 'bg-warning-soft text-warning border-warning-border', icon: Clock },
+  SUCCESS: { label: 'تم بنجاح', color: 'bg-success-soft text-success border-success-border', icon: CheckCircle2 },
+  FAILED: { label: 'فشل التحديث', color: 'bg-danger-soft text-danger border-danger-border', icon: XCircle },
+  SKIPPED: { label: 'تم التخطي', color: 'bg-surface-sunken text-ink border-line', icon: Clock },
 };
 
 export const emptyFeature = {

@@ -272,8 +272,8 @@ export const SupplierStatementPage: React.FC = () => {
   const invalidDateRange = Boolean(dateFrom && dateTo && dateFrom > dateTo);
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-slate-50 text-slate-900">
-      <div className="border-b border-slate-200 bg-white px-4 pt-4 sm:px-6">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-surface-muted text-ink">
+      <div className="border-b border-line bg-surface px-4 pt-4 sm:px-6">
         <PageHeader
           icon={<FileText className="h-5 w-5" />}
           title="كشف حساب المورد"
@@ -284,7 +284,7 @@ export const SupplierStatementPage: React.FC = () => {
                 type="button"
                 onClick={() => handleExport('excel')}
                 disabled={!statementData || loading}
-                className="inline-flex items-center gap-2 rounded-md border border-emerald-700 bg-emerald-700 px-3 py-2 text-xs font-bold text-white transition hover:bg-emerald-800 focus:outline-none focus:ring-2 focus:ring-emerald-700 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex items-center gap-2 rounded-md border border-success bg-success px-3 py-2 text-xs font-bold text-white transition hover:bg-success focus:outline-none focus:ring-2 focus:ring-success focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <Download className="h-3.5 w-3.5" /> تصدير Excel
               </button>
@@ -292,7 +292,7 @@ export const SupplierStatementPage: React.FC = () => {
                 type="button"
                 onClick={() => handleExport('pdf')}
                 disabled={!statementData || loading}
-                className="inline-flex items-center gap-2 rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-xs font-bold text-white transition hover:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-700 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex items-center gap-2 rounded-md border border-line-strong bg-primary px-3 py-2 text-xs font-bold text-white transition hover:bg-primary focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <Printer className="h-3.5 w-3.5" /> طباعة / PDF
               </button>
@@ -301,24 +301,24 @@ export const SupplierStatementPage: React.FC = () => {
         />
       </div>
 
-      <section className="border-b border-slate-200 bg-white px-4 py-3 sm:px-6" aria-label="مرشحات كشف الحساب">
+      <section className="border-b border-line bg-surface px-4 py-3 sm:px-6" aria-label="مرشحات كشف الحساب">
         <div className="flex flex-wrap items-end gap-3">
-          <label className="min-w-[220px] flex-1 text-xs font-bold text-slate-600">
+          <label className="min-w-[220px] flex-1 text-xs font-bold text-ink-secondary">
             المورد
-            <span className="mt-1 flex items-center rounded-md border border-slate-300 bg-white focus-within:ring-2 focus-within:ring-sky-600/25">
-              <Search className="mr-3 h-4 w-4 shrink-0 text-slate-400" />
+            <span className="mt-1 flex items-center rounded-md border border-line-strong bg-surface focus-within:ring-2 focus-within:ring-primary/25">
+              <Search className="mr-3 h-4 w-4 shrink-0 text-muted" />
               <input
                 aria-label="بحث عن مورد"
                 value={supplierSearch}
                 onChange={(event) => setSupplierSearch(event.target.value)}
                 placeholder="ابحث بالاسم أو الكود"
-                className="min-w-0 flex-1 border-0 bg-transparent px-2 py-2 text-sm font-medium text-slate-800 outline-none placeholder:font-normal placeholder:text-slate-400"
+                className="min-w-0 flex-1 border-0 bg-transparent px-2 py-2 text-sm font-medium text-ink outline-none placeholder:font-normal placeholder:text-muted"
               />
               <select
                 aria-label="اختيار المورد"
                 value={selectedSupplierId}
                 onChange={(event) => setSelectedSupplierId(event.target.value)}
-                className="max-w-[52%] border-0 border-r border-slate-200 bg-slate-50 py-2 pl-2 pr-2 text-xs font-bold text-slate-800 outline-none focus:ring-0"
+                className="max-w-[52%] border-0 border-r border-line bg-surface-muted py-2 pl-2 pr-2 text-xs font-bold text-ink outline-none focus:ring-0"
               >
                 {supplierOptions.map((supplier) => (
                   <option key={supplier.id} value={supplier.id}>{supplier.name} · {supplier.code}</option>
@@ -326,33 +326,33 @@ export const SupplierStatementPage: React.FC = () => {
               </select>
             </span>
           </label>
-          <label className="text-xs font-bold text-slate-600">
+          <label className="text-xs font-bold text-ink-secondary">
             من تاريخ
             <input
               type="date"
               value={dateFrom}
               max={dateTo || undefined}
               onChange={(event) => setDateFrom(event.target.value)}
-              className="mt-1 block rounded-md border border-slate-300 bg-white px-2.5 py-2 text-xs text-slate-800 focus:border-sky-600 focus:outline-none focus:ring-2 focus:ring-sky-600/20"
+              className="mt-1 block rounded-md border border-line-strong bg-surface px-2.5 py-2 text-xs text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
             />
           </label>
-          <label className="text-xs font-bold text-slate-600">
+          <label className="text-xs font-bold text-ink-secondary">
             إلى تاريخ
             <input
               type="date"
               value={dateTo}
               min={dateFrom || undefined}
               onChange={(event) => setDateTo(event.target.value)}
-              className="mt-1 block rounded-md border border-slate-300 bg-white px-2.5 py-2 text-xs text-slate-800 focus:border-sky-600 focus:outline-none focus:ring-2 focus:ring-sky-600/20"
+              className="mt-1 block rounded-md border border-line-strong bg-surface px-2.5 py-2 text-xs text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
             />
           </label>
-          <div className="inline-flex rounded-md border border-slate-300 bg-slate-100 p-1" role="tablist" aria-label="طريقة عرض الحساب">
+          <div className="inline-flex rounded-md border border-line-strong bg-surface-sunken p-1" role="tablist" aria-label="طريقة عرض الحساب">
             <div role="tab" aria-selected={viewMode === 'statement'} className="contents">
               <button
                 type="button"
                 aria-selected={viewMode === 'statement'}
                 onClick={() => setViewMode('statement')}
-                className={`rounded px-3 py-2 text-xs font-bold transition focus:outline-none focus:ring-2 focus:ring-sky-600/30 ${viewMode === 'statement' ? 'bg-white text-sky-800 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
+                className={`rounded px-3 py-2 text-xs font-bold transition focus:outline-none focus:ring-2 focus:ring-primary/30 ${viewMode === 'statement' ? 'bg-surface text-primary shadow-sm' : 'text-ink-secondary hover:text-ink'}`}
               >
                 كشف الحساب
               </button>
@@ -362,44 +362,44 @@ export const SupplierStatementPage: React.FC = () => {
                 type="button"
                 aria-selected={viewMode === 'matching'}
                 onClick={() => setViewMode('matching')}
-                className={`rounded px-3 py-2 text-xs font-bold transition focus:outline-none focus:ring-2 focus:ring-sky-600/30 ${viewMode === 'matching' ? 'bg-white text-sky-800 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
+                className={`rounded px-3 py-2 text-xs font-bold transition focus:outline-none focus:ring-2 focus:ring-primary/30 ${viewMode === 'matching' ? 'bg-surface text-primary shadow-sm' : 'text-ink-secondary hover:text-ink'}`}
               >
                 المطابقة
               </button>
             </div>
           </div>
         </div>
-        {invalidDateRange && <p className="mt-2 text-xs font-semibold text-rose-700">تاريخ البداية يجب أن يسبق تاريخ النهاية.</p>}
+        {invalidDateRange && <p className="mt-2 text-xs font-semibold text-danger">تاريخ البداية يجب أن يسبق تاريخ النهاية.</p>}
       </section>
 
       {selectedSupplier && statementData && !loading && !loadError && !invalidDateRange && (
-        <section className="grid grid-cols-2 border-b border-slate-200 bg-white sm:grid-cols-3 xl:grid-cols-5" aria-label="ملخص الفترة">
+        <section className="grid grid-cols-2 border-b border-line bg-surface sm:grid-cols-3 xl:grid-cols-5" aria-label="ملخص الفترة">
           {[
-            { label: 'الرصيد الافتتاحي', value: statementData.openingBalance, icon: Clock, tone: 'text-slate-700', emphasis: 'normal' },
-            { label: 'مشتريات الفترة', value: periodPurchases, icon: ArrowUpRight, tone: 'text-sky-700', emphasis: 'normal' },
-            { label: 'مسدد / خصومات الفترة', value: periodCredits, icon: ArrowDownRight, tone: 'text-emerald-700', emphasis: 'normal' },
-            { label: 'الرصيد الختامي للفترة', value: statementData.closingBalance, icon: CheckCircle2, tone: 'text-amber-800', emphasis: 'closing' },
-            { label: 'الرصيد الحالي للمورد', value: selectedSupplier.currentBalance, icon: FileText, tone: 'text-rose-300', emphasis: 'current' }
+            { label: 'الرصيد الافتتاحي', value: statementData.openingBalance, icon: Clock, tone: 'text-ink', emphasis: 'normal' },
+            { label: 'مشتريات الفترة', value: periodPurchases, icon: ArrowUpRight, tone: 'text-primary', emphasis: 'normal' },
+            { label: 'مسدد / خصومات الفترة', value: periodCredits, icon: ArrowDownRight, tone: 'text-success', emphasis: 'normal' },
+            { label: 'الرصيد الختامي للفترة', value: statementData.closingBalance, icon: CheckCircle2, tone: 'text-warning', emphasis: 'closing' },
+            { label: 'الرصيد الحالي للمورد', value: selectedSupplier.currentBalance, icon: FileText, tone: 'text-danger', emphasis: 'current' }
           ].map(({ label, value, icon: Icon, tone, emphasis }) => (
             <div
               key={label}
               className={`min-w-0 border-b border-l px-4 py-3 last:border-l-0 sm:border-b-0 ${
                 emphasis === 'current'
-                  ? 'border-slate-700 bg-slate-900'
+                  ? 'border-line-strong bg-primary'
                   : emphasis === 'closing'
-                    ? 'border-amber-200 bg-amber-50'
-                    : 'border-slate-100 bg-white'
+                    ? 'border-warning-border bg-warning-soft'
+                    : 'border-line bg-surface'
               }`}
             >
-              <div className={`flex items-center gap-2 text-xs font-bold ${emphasis === 'current' ? 'text-slate-100' : emphasis === 'closing' ? 'text-amber-950' : 'text-slate-600'}`}>
+              <div className={`flex items-center gap-2 text-xs font-bold ${emphasis === 'current' ? 'text-muted' : emphasis === 'closing' ? 'text-warning' : 'text-ink-secondary'}`}>
                 <Icon className={`h-3.5 w-3.5 ${tone}`} /> {label}
               </div>
               <div className={`mt-1 font-mono font-black tabular-nums ${
                 emphasis === 'current'
                   ? 'text-base leading-tight text-white sm:text-lg xl:text-xl'
                   : emphasis === 'closing'
-                    ? 'text-base text-amber-950'
-                    : 'text-sm text-slate-900'
+                    ? 'text-base text-warning'
+                    : 'text-sm text-ink'
               }`}>{fmt(Number(value || 0))}</div>
             </div>
           ))}
@@ -408,39 +408,39 @@ export const SupplierStatementPage: React.FC = () => {
 
       <main className="min-h-0 flex-1 overflow-y-auto p-3 sm:p-5">
         {!selectedSupplierId && !loading && !loadError && (
-          <div className="rounded-md border border-dashed border-slate-300 bg-white px-5 py-16 text-center">
-            <FileText className="mx-auto h-8 w-8 text-slate-400" />
-            <h2 className="mt-3 text-sm font-black text-slate-800">لا يوجد مورد مطابق للبحث</h2>
-            <p className="mt-1 text-xs text-slate-500">غيّر عبارة البحث أو امسحها لعرض الموردين المتاحين.</p>
+          <div className="rounded-md border border-dashed border-line-strong bg-surface px-5 py-16 text-center">
+            <FileText className="mx-auto h-8 w-8 text-muted" />
+            <h2 className="mt-3 text-sm font-black text-ink">لا يوجد مورد مطابق للبحث</h2>
+            <p className="mt-1 text-xs text-muted">غيّر عبارة البحث أو امسحها لعرض الموردين المتاحين.</p>
           </div>
         )}
         {loading && (
-          <div className="flex items-center justify-center gap-2 rounded-md border border-slate-200 bg-white p-12 text-sm font-bold text-slate-600" role="status">
-            <RefreshCw className="h-4 w-4 animate-spin text-sky-700" /> جارٍ تحميل بيانات المورد…
+          <div className="flex items-center justify-center gap-2 rounded-md border border-line bg-surface p-12 text-sm font-bold text-ink-secondary" role="status">
+            <RefreshCw className="h-4 w-4 animate-spin text-primary" /> جارٍ تحميل بيانات المورد…
           </div>
         )}
         {!loading && loadError && (
-          <div className="rounded-md border border-rose-200 bg-rose-50 p-5 text-center" role="alert">
-            <AlertCircle className="mx-auto h-6 w-6 text-rose-700" />
-            <p className="mt-2 text-sm font-bold text-rose-800">{loadError}</p>
-            <button type="button" onClick={loadStatement} className="mt-3 inline-flex items-center gap-2 rounded-md border border-rose-300 bg-white px-3 py-2 text-xs font-bold text-rose-800 hover:bg-rose-100">
+          <div className="rounded-md border border-danger-border bg-danger-soft p-5 text-center" role="alert">
+            <AlertCircle className="mx-auto h-6 w-6 text-danger" />
+            <p className="mt-2 text-sm font-bold text-danger">{loadError}</p>
+            <button type="button" onClick={loadStatement} className="mt-3 inline-flex items-center gap-2 rounded-md border border-danger bg-surface px-3 py-2 text-xs font-bold text-danger hover:bg-danger-soft">
               <RefreshCw className="h-3.5 w-3.5" /> إعادة المحاولة
             </button>
           </div>
         )}
         {!loading && !loadError && invalidDateRange && (
-          <div className="rounded-md border border-amber-200 bg-amber-50 p-5 text-center text-sm font-semibold text-amber-900">
+          <div className="rounded-md border border-warning-border bg-warning-soft p-5 text-center text-sm font-semibold text-warning">
             عدّل نطاق التاريخ لعرض كشف حساب متسق.
           </div>
         )}
         {!loading && !loadError && statementData && !invalidDateRange && viewMode === 'statement' && (
-          <section className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3">
+          <section className="overflow-hidden rounded-md border border-line bg-surface shadow-sm">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line bg-surface-muted px-4 py-3">
               <div>
-                <h2 className="text-sm font-black text-slate-900">حركات الحساب</h2>
-                <p className="mt-0.5 text-xs text-slate-500">{selectedSupplier?.name} · {dateFrom || 'بداية السجل'} — {dateTo || 'حتى اليوم'}</p>
+                <h2 className="text-sm font-black text-ink">حركات الحساب</h2>
+                <p className="mt-0.5 text-xs text-muted">{selectedSupplier?.name} · {dateFrom || 'بداية السجل'} — {dateTo || 'حتى اليوم'}</p>
               </div>
-              <span className="text-xs font-bold text-slate-500">{transactions.length} حركة</span>
+              <span className="text-xs font-bold text-muted">{transactions.length} حركة</span>
             </div>
             <div className="overflow-x-auto">
               <DataTable
@@ -453,35 +453,35 @@ export const SupplierStatementPage: React.FC = () => {
                 minWidth={820}
                 dense
                 tableClassName="border-collapse text-xs"
-                rowClassName={(tx: any) => `${tx.__opening ? 'bg-slate-50 font-bold text-slate-700' : 'transition-colors hover:bg-slate-50'} ${tx.balanceAfter != null && !tx.__opening ? 'bg-slate-50/60' : ''}`}
+                rowClassName={(tx: any) => `${tx.__opening ? 'bg-surface-muted font-bold text-ink' : 'transition-colors hover:bg-surface-muted'} ${tx.balanceAfter != null && !tx.__opening ? 'bg-surface-muted/60' : ''}`}
                 columns={[
-                  { key: 'date', header: 'التاريخ', render: (tx: any) => <span className={`whitespace-nowrap text-slate-600 ${tx.__opening ? '' : 'font-mono'}`}>{tx.date}</span> },
-                  { key: 'doc', header: 'رقم المستند', render: (tx: any) => <span className="whitespace-nowrap font-mono font-bold text-slate-800">{tx.docNumber || '—'}</span> },
-                  { key: 'desc', header: 'البيان', render: (tx: any) => <span className={`min-w-[260px] text-slate-700 ${tx.__opening ? '' : ''}`}>{tx.description}</span> },
+                  { key: 'date', header: 'التاريخ', render: (tx: any) => <span className={`whitespace-nowrap text-ink-secondary ${tx.__opening ? '' : 'font-mono'}`}>{tx.date}</span> },
+                  { key: 'doc', header: 'رقم المستند', render: (tx: any) => <span className="whitespace-nowrap font-mono font-bold text-ink">{tx.docNumber || '—'}</span> },
+                  { key: 'desc', header: 'البيان', render: (tx: any) => <span className={`min-w-[260px] text-ink ${tx.__opening ? '' : ''}`}>{tx.description}</span> },
                   {
-                    key: 'credit', header: 'دائن — فاتورة', align: 'end', headerClassName: 'font-bold text-sky-800',
+                    key: 'credit', header: 'دائن — فاتورة', align: 'end', headerClassName: 'font-bold text-primary',
                     render: (tx: any) => tx.__opening ? <span className="text-left">—</span> : (
-                      <span className="whitespace-nowrap font-mono font-bold tabular-nums text-sky-800">{Number(tx.credit) > 0 ? fmt(tx.credit) : '—'}</span>
+                      <span className="whitespace-nowrap font-mono font-bold tabular-nums text-primary">{Number(tx.credit) > 0 ? fmt(tx.credit) : '—'}</span>
                     ),
                   },
                   {
-                    key: 'debit', header: 'مدين — سداد / تسوية', align: 'end', headerClassName: 'font-bold text-emerald-800',
+                    key: 'debit', header: 'مدين — سداد / تسوية', align: 'end', headerClassName: 'font-bold text-success',
                     render: (tx: any) => tx.__opening ? <span className="text-left">—</span> : (
-                      <span className="whitespace-nowrap font-mono font-bold tabular-nums text-emerald-800">{Number(tx.debit) > 0 ? fmt(tx.debit) : '—'}</span>
+                      <span className="whitespace-nowrap font-mono font-bold tabular-nums text-success">{Number(tx.debit) > 0 ? fmt(tx.debit) : '—'}</span>
                     ),
                   },
                   {
                     key: 'balance', header: 'الرصيد', align: 'end',
-                    render: (tx: any) => <span className="whitespace-nowrap font-mono font-black tabular-nums text-slate-900">{fmt(tx.balanceAfter)}</span>,
+                    render: (tx: any) => <span className="whitespace-nowrap font-mono font-black tabular-nums text-ink">{fmt(tx.balanceAfter)}</span>,
                   },
                 ]}
                 footer={(
-                  <tr className="border-t border-slate-300 bg-slate-100 font-black text-slate-900">
+                  <tr className="border-t border-line-strong bg-surface-sunken font-black text-ink">
                     <td className="px-4 py-3">{dateTo || '—'}</td>
                     <td className="px-4 py-3 font-mono">—</td>
                     <td className="px-4 py-3">الرصيد الختامي للفترة</td>
-                    <td className="px-4 py-3 text-left font-mono tabular-nums text-sky-800">{fmt(periodPurchases)}</td>
-                    <td className="px-4 py-3 text-left font-mono tabular-nums text-emerald-800">{fmt(periodCredits)}</td>
+                    <td className="px-4 py-3 text-left font-mono tabular-nums text-primary">{fmt(periodPurchases)}</td>
+                    <td className="px-4 py-3 text-left font-mono tabular-nums text-success">{fmt(periodCredits)}</td>
                     <td className="px-4 py-3 text-left font-mono tabular-nums">{fmt(statementData.closingBalance)}</td>
                   </tr>
                 )}
@@ -496,33 +496,33 @@ export const SupplierStatementPage: React.FC = () => {
           <div className="space-y-4">
             <section className="grid grid-cols-2 gap-2 sm:grid-cols-4" aria-label="ملخص المطابقة">
               {[
-                { label: 'المسدد على الفواتير', value: invoicePaid, tone: 'text-emerald-800' },
-                { label: 'المتبقي على الفواتير', value: invoiceOutstanding, tone: 'text-rose-800' },
-                { label: 'مخصص من سندات الفترة', value: allocatedTotal, tone: 'text-sky-800' },
-                { label: 'غير مخصص من سندات الفترة', value: unappliedTotal, tone: 'text-amber-800' }
+                { label: 'المسدد على الفواتير', value: invoicePaid, tone: 'text-success' },
+                { label: 'المتبقي على الفواتير', value: invoiceOutstanding, tone: 'text-danger' },
+                { label: 'مخصص من سندات الفترة', value: allocatedTotal, tone: 'text-primary' },
+                { label: 'غير مخصص من سندات الفترة', value: unappliedTotal, tone: 'text-warning' }
               ].map((item) => (
-                <div key={item.label} className="rounded-md border border-slate-200 bg-white px-3 py-3">
-                  <p className="text-xs font-bold text-slate-600">{item.label}</p>
+                <div key={item.label} className="rounded-md border border-line bg-surface px-3 py-3">
+                  <p className="text-xs font-bold text-ink-secondary">{item.label}</p>
                   <p className={`mt-1 font-mono text-sm font-black tabular-nums ${item.tone}`}>{fmt(item.value)}</p>
                 </div>
               ))}
             </section>
             <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-2">
-              <section className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
-                <div className="border-b border-slate-200 px-4 py-3">
+              <section className="overflow-hidden rounded-md border border-line bg-surface shadow-sm">
+                <div className="border-b border-line px-4 py-3">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div>
-                      <h2 className="text-sm font-black text-slate-900">فواتير الشراء</h2>
-                      <p className="mt-0.5 text-xs text-slate-600">المسدد والمتبقي حسب بيانات الفاتورة الحالية</p>
+                      <h2 className="text-sm font-black text-ink">فواتير الشراء</h2>
+                      <p className="mt-0.5 text-xs text-ink-secondary">المسدد والمتبقي حسب بيانات الفاتورة الحالية</p>
                     </div>
-                    <span className="text-xs font-bold text-slate-500">{visibleInvoices.length} من {periodInvoices.length}</span>
+                    <span className="text-xs font-bold text-muted">{visibleInvoices.length} من {periodInvoices.length}</span>
                   </div>
                   <div className="mt-3 flex flex-wrap gap-2">
-                    <label className="flex min-w-[180px] flex-1 items-center gap-2 rounded-md border border-slate-300 px-2.5 focus-within:ring-2 focus-within:ring-sky-600/20">
-                      <Search className="h-3.5 w-3.5 text-slate-400" />
-                      <input aria-label="بحث في الفواتير" value={invoiceSearch} onChange={(event) => setInvoiceSearch(event.target.value)} placeholder="رقم الفاتورة…" className="w-full bg-transparent py-2 text-xs outline-none placeholder:text-slate-400" />
+                    <label className="flex min-w-[180px] flex-1 items-center gap-2 rounded-md border border-line-strong px-2.5 focus-within:ring-2 focus-within:ring-primary/20">
+                      <Search className="h-3.5 w-3.5 text-muted" />
+                      <input aria-label="بحث في الفواتير" value={invoiceSearch} onChange={(event) => setInvoiceSearch(event.target.value)} placeholder="رقم الفاتورة…" className="w-full bg-transparent py-2 text-xs outline-none placeholder:text-muted" />
                     </label>
-                    <select aria-label="حالة الفاتورة" value={invoiceStatus} onChange={(event) => setInvoiceStatus(event.target.value as InvoiceStatus)} className="rounded-md border border-slate-300 bg-white px-2.5 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-sky-600/20">
+                    <select aria-label="حالة الفاتورة" value={invoiceStatus} onChange={(event) => setInvoiceStatus(event.target.value as InvoiceStatus)} className="rounded-md border border-line-strong bg-surface px-2.5 py-2 text-xs font-semibold text-ink focus:outline-none focus:ring-2 focus:ring-primary/20">
                       <option value="all">كل الحالات</option>
                       <option value="outstanding">عليها متبقي</option>
                       <option value="paid">مسددة</option>
@@ -533,30 +533,30 @@ export const SupplierStatementPage: React.FC = () => {
                   {visibleInvoices.length ? visibleInvoices.map((invoice) => {
                     const paid = Number(invoice.remaining_amount) <= 0.01;
                     return (
-                      <article key={invoice.id} className="border-b border-slate-100 px-4 py-3 last:border-0">
+                      <article key={invoice.id} className="border-b border-line px-4 py-3 last:border-0">
                         <div className="flex flex-wrap items-start justify-between gap-2">
                           <div>
-                            <h3 className="font-mono text-xs font-black text-slate-900">{invoice.invoice_number}</h3>
-                            {invoice.supplier_invoice_number && <p className="mt-0.5 text-xs text-slate-600">رقم المورد: {invoice.supplier_invoice_number}</p>}
-                            <p className="mt-1 text-xs text-slate-600">{invoice.date}</p>
+                            <h3 className="font-mono text-xs font-black text-ink">{invoice.invoice_number}</h3>
+                            {invoice.supplier_invoice_number && <p className="mt-0.5 text-xs text-ink-secondary">رقم المورد: {invoice.supplier_invoice_number}</p>}
+                            <p className="mt-1 text-xs text-ink-secondary">{invoice.date}</p>
                           </div>
-                          <span className={`rounded border px-2 py-1 text-xs font-bold ${paid ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-rose-200 bg-rose-50 text-rose-800'}`}>
+                          <span className={`rounded border px-2 py-1 text-xs font-bold ${paid ? 'border-success-border bg-success-soft text-success' : 'border-danger-border bg-danger-soft text-danger'}`}>
                             {paid ? 'مسددة' : `متبقي ${fmt(invoice.remaining_amount)}`}
                           </span>
                         </div>
-                        <div className="mt-3 grid grid-cols-3 gap-2 border-t border-slate-100 pt-2 text-xs">
-                          <div><p className="text-slate-500">قيمة الفاتورة</p><p className="mt-0.5 font-mono font-bold tabular-nums">{fmt(invoice.total_amount)}</p></div>
-                          <div><p className="text-slate-500">المسدد</p><p className="mt-0.5 font-mono font-bold tabular-nums text-emerald-800">{fmt(invoice.paid_amount)}</p></div>
-                          <div><p className="text-slate-500">المتبقي</p><p className="mt-0.5 font-mono font-bold tabular-nums text-rose-800">{fmt(invoice.remaining_amount)}</p></div>
+                        <div className="mt-3 grid grid-cols-3 gap-2 border-t border-line pt-2 text-xs">
+                          <div><p className="text-muted">قيمة الفاتورة</p><p className="mt-0.5 font-mono font-bold tabular-nums">{fmt(invoice.total_amount)}</p></div>
+                          <div><p className="text-muted">المسدد</p><p className="mt-0.5 font-mono font-bold tabular-nums text-success">{fmt(invoice.paid_amount)}</p></div>
+                          <div><p className="text-muted">المتبقي</p><p className="mt-0.5 font-mono font-bold tabular-nums text-danger">{fmt(invoice.remaining_amount)}</p></div>
                         </div>
                         {invoice.allocations?.length > 0 && (
-                          <details className="mt-2 border-t border-slate-100 pt-2 text-xs">
-                            <summary className="cursor-pointer font-bold text-slate-600 focus:outline-none focus:ring-2 focus:ring-sky-600/20">عرض تخصيصات السداد ({invoice.allocations.length})</summary>
+                          <details className="mt-2 border-t border-line pt-2 text-xs">
+                            <summary className="cursor-pointer font-bold text-ink-secondary focus:outline-none focus:ring-2 focus:ring-primary/20">عرض تخصيصات السداد ({invoice.allocations.length})</summary>
                             <ul className="mt-2 space-y-1">
                               {invoice.allocations.map((allocation) => (
-                                <li key={allocation.id} className="flex justify-between gap-3 rounded bg-slate-50 px-2 py-1.5 text-xs">
-                                  <span className="text-slate-600">{allocation.receiptNumber} · {allocation.paymentDate}</span>
-                                  <span className="font-mono font-bold tabular-nums text-emerald-800">{fmt(allocation.amount)}</span>
+                                <li key={allocation.id} className="flex justify-between gap-3 rounded bg-surface-muted px-2 py-1.5 text-xs">
+                                  <span className="text-ink-secondary">{allocation.receiptNumber} · {allocation.paymentDate}</span>
+                                  <span className="font-mono font-bold tabular-nums text-success">{fmt(allocation.amount)}</span>
                                 </li>
                               ))}
                             </ul>
@@ -566,28 +566,28 @@ export const SupplierStatementPage: React.FC = () => {
                     );
                   }) : (
                     <div className="px-4 py-10 text-center">
-                      <Search className="mx-auto h-5 w-5 text-slate-300" />
-                      <p className="mt-2 text-xs font-bold text-slate-600">{periodInvoices.length ? 'لا توجد فواتير تطابق المرشحات' : 'لا توجد فواتير في الفترة المحددة'}</p>
+                      <Search className="mx-auto h-5 w-5 text-muted" />
+                      <p className="mt-2 text-xs font-bold text-ink-secondary">{periodInvoices.length ? 'لا توجد فواتير تطابق المرشحات' : 'لا توجد فواتير في الفترة المحددة'}</p>
                     </div>
                   )}
                 </div>
               </section>
 
-              <section className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
-                <div className="border-b border-slate-200 px-4 py-3">
+              <section className="overflow-hidden rounded-md border border-line bg-surface shadow-sm">
+                <div className="border-b border-line px-4 py-3">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div>
-                      <h2 className="text-sm font-black text-slate-900">سندات الصرف</h2>
-                      <p className="mt-0.5 text-xs text-slate-600">المبالغ المخصصة والمتبقية دون تخصيص</p>
+                      <h2 className="text-sm font-black text-ink">سندات الصرف</h2>
+                      <p className="mt-0.5 text-xs text-ink-secondary">المبالغ المخصصة والمتبقية دون تخصيص</p>
                     </div>
-                    <span className="text-xs font-bold text-slate-500">{visiblePayments.length} من {periodPayments.length}</span>
+                    <span className="text-xs font-bold text-muted">{visiblePayments.length} من {periodPayments.length}</span>
                   </div>
                   <div className="mt-3 flex flex-wrap gap-2">
-                    <label className="flex min-w-[180px] flex-1 items-center gap-2 rounded-md border border-slate-300 px-2.5 focus-within:ring-2 focus-within:ring-sky-600/20">
-                      <Search className="h-3.5 w-3.5 text-slate-400" />
-                      <input aria-label="بحث في سندات الصرف" value={paymentSearch} onChange={(event) => setPaymentSearch(event.target.value)} placeholder="رقم السند أو البيان…" className="w-full bg-transparent py-2 text-xs outline-none placeholder:text-slate-400" />
+                    <label className="flex min-w-[180px] flex-1 items-center gap-2 rounded-md border border-line-strong px-2.5 focus-within:ring-2 focus-within:ring-primary/20">
+                      <Search className="h-3.5 w-3.5 text-muted" />
+                      <input aria-label="بحث في سندات الصرف" value={paymentSearch} onChange={(event) => setPaymentSearch(event.target.value)} placeholder="رقم السند أو البيان…" className="w-full bg-transparent py-2 text-xs outline-none placeholder:text-muted" />
                     </label>
-                    <select aria-label="حالة تخصيص السند" value={paymentStatus} onChange={(event) => setPaymentStatus(event.target.value as PaymentStatus)} className="rounded-md border border-slate-300 bg-white px-2.5 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-sky-600/20">
+                    <select aria-label="حالة تخصيص السند" value={paymentStatus} onChange={(event) => setPaymentStatus(event.target.value as PaymentStatus)} className="rounded-md border border-line-strong bg-surface px-2.5 py-2 text-xs font-semibold text-ink focus:outline-none focus:ring-2 focus:ring-primary/20">
                       <option value="all">كل الحالات</option>
                       <option value="allocated">مخصص بالكامل</option>
                       <option value="partial">مخصص جزئياً</option>
@@ -597,43 +597,43 @@ export const SupplierStatementPage: React.FC = () => {
                 </div>
                 <div className="max-h-[65vh] overflow-y-auto">
                   {visiblePayments.length ? visiblePayments.map((payment) => (
-                    <article key={payment.id} className="border-b border-slate-100 px-4 py-3 last:border-0">
+                    <article key={payment.id} className="border-b border-line px-4 py-3 last:border-0">
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div>
-                          <h3 className="font-mono text-xs font-black text-slate-900">{payment.receipt_number}</h3>
-                          <p className="mt-1 text-xs text-slate-600">{payment.date} · {payment.payment_type}</p>
-                          {payment.notes && <p className="mt-1 text-xs text-slate-700">{payment.notes}</p>}
+                          <h3 className="font-mono text-xs font-black text-ink">{payment.receipt_number}</h3>
+                          <p className="mt-1 text-xs text-ink-secondary">{payment.date} · {payment.payment_type}</p>
+                          {payment.notes && <p className="mt-1 text-xs text-ink">{payment.notes}</p>}
                         </div>
                         <div className="text-left">
-                          <p className="font-mono text-sm font-black tabular-nums text-slate-900">{fmt(payment.amount)}</p>
+                          <p className="font-mono text-sm font-black tabular-nums text-ink">{fmt(payment.amount)}</p>
                           {canUpdate && (
-                            <button type="button" onClick={() => handleOpenReallocate(payment)} className="mt-1 inline-flex items-center gap-1 text-xs font-bold text-sky-800 hover:text-sky-950 focus:outline-none focus:ring-2 focus:ring-sky-600/30">
+                            <button type="button" onClick={() => handleOpenReallocate(payment)} className="mt-1 inline-flex items-center gap-1 text-xs font-bold text-primary hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary/30">
                               <SlidersHorizontal className="h-3 w-3" /> إعادة توزيع
                             </button>
                           )}
                         </div>
                       </div>
-                      <div className="mt-3 grid grid-cols-2 gap-2 border-y border-slate-100 py-2 text-xs">
-                        <div><p className="text-slate-500">مخصص للفواتير</p><p className="mt-0.5 font-mono font-bold tabular-nums text-sky-800">{fmt(payment.allocatedAmount)}</p></div>
-                        <div><p className="text-slate-500">غير مخصص</p><p className="mt-0.5 font-mono font-bold tabular-nums text-amber-800">{fmt(payment.unallocatedAmount)}</p></div>
+                      <div className="mt-3 grid grid-cols-2 gap-2 border-y border-line py-2 text-xs">
+                        <div><p className="text-muted">مخصص للفواتير</p><p className="mt-0.5 font-mono font-bold tabular-nums text-primary">{fmt(payment.allocatedAmount)}</p></div>
+                        <div><p className="text-muted">غير مخصص</p><p className="mt-0.5 font-mono font-bold tabular-nums text-warning">{fmt(payment.unallocatedAmount)}</p></div>
                       </div>
                       {payment.allocations?.length > 0 ? (
                         <ul className="mt-2 space-y-1">
                           {payment.allocations.map((allocation) => (
-                            <li key={allocation.id} className="flex justify-between gap-3 rounded bg-slate-50 px-2 py-1.5 text-xs">
-                              <span className="text-slate-600">فاتورة {allocation.invoiceNumber} · {allocation.invoiceDate}</span>
-                              <span className="font-mono font-bold tabular-nums text-sky-800">{fmt(allocation.amount)}</span>
+                            <li key={allocation.id} className="flex justify-between gap-3 rounded bg-surface-muted px-2 py-1.5 text-xs">
+                              <span className="text-ink-secondary">فاتورة {allocation.invoiceNumber} · {allocation.invoiceDate}</span>
+                              <span className="font-mono font-bold tabular-nums text-primary">{fmt(allocation.amount)}</span>
                             </li>
                           ))}
                         </ul>
                       ) : (
-                        <p className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-amber-900"><Clock className="h-3.5 w-3.5" /> السند غير مخصص لفاتورة محددة.</p>
+                        <p className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-warning"><Clock className="h-3.5 w-3.5" /> السند غير مخصص لفاتورة محددة.</p>
                       )}
                     </article>
                   )) : (
                     <div className="px-4 py-10 text-center">
-                      <Search className="mx-auto h-5 w-5 text-slate-300" />
-                      <p className="mt-2 text-xs font-bold text-slate-600">{periodPayments.length ? 'لا توجد سندات تطابق المرشحات' : 'لا توجد سندات في الفترة المحددة'}</p>
+                      <Search className="mx-auto h-5 w-5 text-muted" />
+                      <p className="mt-2 text-xs font-bold text-ink-secondary">{periodPayments.length ? 'لا توجد سندات تطابق المرشحات' : 'لا توجد سندات في الفترة المحددة'}</p>
                     </div>
                   )}
                 </div>
@@ -644,20 +644,20 @@ export const SupplierStatementPage: React.FC = () => {
       </main>
 
       {reallocModal && selectedPayment && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-3 sm:p-5" role="presentation">
-          <section role="dialog" aria-modal="true" aria-labelledby="allocation-title" className="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-2xl">
-            <header className="flex items-start justify-between gap-3 border-b border-slate-200 bg-slate-50 px-4 py-4 sm:px-5">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-primary/45 p-3 sm:p-5" role="presentation">
+          <section role="dialog" aria-modal="true" aria-labelledby="allocation-title" className="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-lg border border-line bg-surface shadow-2xl">
+            <header className="flex items-start justify-between gap-3 border-b border-line bg-surface-muted px-4 py-4 sm:px-5">
               <div>
-                <h2 id="allocation-title" className="text-sm font-black text-slate-900">إعادة توزيع سند {selectedPayment.receipt_number}</h2>
-                <p className="mt-1 text-xs text-slate-600">سقف السند {fmt(paymentCap)} · التوزيعات السابقة {fmt(Object.values(priorAllocationByInvoice).reduce((sum, value) => sum + value, 0))}</p>
+                <h2 id="allocation-title" className="text-sm font-black text-ink">إعادة توزيع سند {selectedPayment.receipt_number}</h2>
+                <p className="mt-1 text-xs text-ink-secondary">سقف السند {fmt(paymentCap)} · التوزيعات السابقة {fmt(Object.values(priorAllocationByInvoice).reduce((sum, value) => sum + value, 0))}</p>
               </div>
-              <button type="button" aria-label="إغلاق" onClick={() => setReallocModal(false)} className="rounded p-1.5 text-slate-500 hover:bg-slate-200 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-600/30">
+              <button type="button" aria-label="إغلاق" onClick={() => setReallocModal(false)} className="rounded p-1.5 text-muted hover:bg-surface-sunken hover:text-ink focus:outline-none focus:ring-2 focus:ring-primary/30">
                 <X className="h-4 w-4" />
               </button>
             </header>
             <form onSubmit={handleSaveReallocation} className="flex min-h-0 flex-1 flex-col">
               <div className="overflow-y-auto px-4 py-4 sm:px-5">
-                <p className="mb-3 text-xs leading-5 text-slate-600">المتاح لكل فاتورة هو رصيدها الحالي مضافاً إليه تخصيص هذا السند السابق فقط؛ أي مبالغ مسددة أخرى تظل محجوزة.</p>
+                <p className="mb-3 text-xs leading-5 text-ink-secondary">المتاح لكل فاتورة هو رصيدها الحالي مضافاً إليه تخصيص هذا السند السابق فقط؛ أي مبالغ مسددة أخرى تظل محجوزة.</p>
                 <div className="space-y-2">
                   {invoicesWithAlloc.map((invoice) => {
                     const prior = Number(priorAllocationByInvoice[invoice.id] || 0);
@@ -665,16 +665,16 @@ export const SupplierStatementPage: React.FC = () => {
                     const value = Number(allocDraft[invoice.id] || 0);
                     const invalid = value > capacity + 0.001;
                     return (
-                      <div key={invoice.id} className={`grid grid-cols-1 gap-2 rounded-md border p-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center ${invalid ? 'border-rose-300 bg-rose-50/50' : 'border-slate-200 bg-white'}`}>
+                      <div key={invoice.id} className={`grid grid-cols-1 gap-2 rounded-md border p-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center ${invalid ? 'border-danger bg-danger-soft/50' : 'border-line bg-surface'}`}>
                         <div className="min-w-0">
-                          <p className="font-mono text-xs font-black text-slate-900">{invoice.invoice_number} <span className="font-sans font-medium text-slate-500">· {invoice.date}</span></p>
-                          <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-600">
+                          <p className="font-mono text-xs font-black text-ink">{invoice.invoice_number} <span className="font-sans font-medium text-muted">· {invoice.date}</span></p>
+                          <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-ink-secondary">
                             <span>قيمة الفاتورة: {fmt(invoice.total_amount)}</span>
                             <span>تخصيص هذا السند سابقاً: {fmt(prior)}</span>
-                            <span className="font-bold text-slate-700">السعة المتبقية للتخصيص: {fmt(capacity)}</span>
+                            <span className="font-bold text-ink">السعة المتبقية للتخصيص: {fmt(capacity)}</span>
                           </div>
                         </div>
-                        <label className="flex items-center gap-2 text-xs font-bold text-slate-700">
+                        <label className="flex items-center gap-2 text-xs font-bold text-ink">
                           التخصيص الجديد
                           <input
                             type="number"
@@ -686,29 +686,29 @@ export const SupplierStatementPage: React.FC = () => {
                             onChange={(event) => setAllocDraft((draft) => ({ ...draft, [invoice.id]: event.target.value === '' ? 0 : Number(event.target.value) }))}
                             aria-label={`مبلغ التخصيص للفاتورة ${invoice.invoice_number}`}
                             aria-invalid={invalid}
-                            className={`w-28 rounded border px-2 py-2 text-left font-mono text-xs font-bold tabular-nums outline-none focus:ring-2 focus:ring-sky-600/20 ${invalid ? 'border-rose-400 bg-white text-rose-800' : 'border-slate-300 bg-white text-slate-900'}`}
+                            className={`w-28 rounded border px-2 py-2 text-left font-mono text-xs font-bold tabular-nums outline-none focus:ring-2 focus:ring-primary/20 ${invalid ? 'border-danger bg-surface text-danger' : 'border-line-strong bg-surface text-ink'}`}
                           />
                           <span>ج.م</span>
                         </label>
                       </div>
                     );
                   })}
-                  {!invoicesWithAlloc.length && <p className="rounded border border-dashed border-slate-300 p-8 text-center text-xs text-slate-500">لا توجد فواتير متاحة لهذا المورد.</p>}
+                  {!invoicesWithAlloc.length && <p className="rounded border border-dashed border-line-strong p-8 text-center text-xs text-muted">لا توجد فواتير متاحة لهذا المورد.</p>}
                 </div>
               </div>
-              <footer className="border-t border-slate-200 bg-slate-50 px-4 py-4 sm:px-5">
-                <div className={`mb-3 grid grid-cols-2 gap-2 rounded-md border p-3 text-xs sm:grid-cols-3 ${hasInvalidAllocation ? 'border-rose-200 bg-rose-50' : 'border-slate-200 bg-white'}`}>
-                  <div><p className="text-slate-500">سقف السند</p><p className="mt-1 font-mono font-black tabular-nums">{fmt(paymentCap)}</p></div>
-                  <div><p className="text-slate-500">إجمالي المخصص</p><p className="mt-1 font-mono font-black tabular-nums">{fmt(allocationTotal)}</p></div>
+              <footer className="border-t border-line bg-surface-muted px-4 py-4 sm:px-5">
+                <div className={`mb-3 grid grid-cols-2 gap-2 rounded-md border p-3 text-xs sm:grid-cols-3 ${hasInvalidAllocation ? 'border-danger-border bg-danger-soft' : 'border-line bg-surface'}`}>
+                  <div><p className="text-muted">سقف السند</p><p className="mt-1 font-mono font-black tabular-nums">{fmt(paymentCap)}</p></div>
+                  <div><p className="text-muted">إجمالي المخصص</p><p className="mt-1 font-mono font-black tabular-nums">{fmt(allocationTotal)}</p></div>
                   <div className="col-span-2 sm:col-span-1">
-                    <p className="text-slate-500">المتبقي غير المخصص</p>
-                    <p className={`mt-1 font-mono font-black tabular-nums ${allocationRemainder < -0.001 ? 'text-rose-800' : 'text-amber-800'}`}>{fmt(Math.max(0, allocationRemainder))}</p>
+                    <p className="text-muted">المتبقي غير المخصص</p>
+                    <p className={`mt-1 font-mono font-black tabular-nums ${allocationRemainder < -0.001 ? 'text-danger' : 'text-warning'}`}>{fmt(Math.max(0, allocationRemainder))}</p>
                   </div>
                 </div>
-                {hasInvalidAllocation && <p className="mb-2 text-xs font-bold text-rose-800" role="alert">التخصيص يتجاوز سقف السند أو السعة المتبقية لإحدى الفواتير.</p>}
+                {hasInvalidAllocation && <p className="mb-2 text-xs font-bold text-danger" role="alert">التخصيص يتجاوز سقف السند أو السعة المتبقية لإحدى الفواتير.</p>}
                 <div className="flex flex-wrap justify-end gap-2">
-                  <button type="button" onClick={() => setReallocModal(false)} className="rounded-md border border-slate-300 bg-white px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-500/30">إلغاء</button>
-                  <button type="submit" disabled={!canUpdate || hasInvalidAllocation || savingAllocation} className="inline-flex items-center gap-2 rounded-md border border-sky-800 bg-sky-800 px-4 py-2 text-xs font-bold text-white hover:bg-sky-900 focus:outline-none focus:ring-2 focus:ring-sky-700 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
+                  <button type="button" onClick={() => setReallocModal(false)} className="rounded-md border border-line-strong bg-surface px-4 py-2 text-xs font-bold text-ink hover:bg-surface-sunken focus:outline-none focus:ring-2 focus:ring-primary/30">إلغاء</button>
+                  <button type="submit" disabled={!canUpdate || hasInvalidAllocation || savingAllocation} className="inline-flex items-center gap-2 rounded-md border border-primary bg-primary px-4 py-2 text-xs font-bold text-white hover:bg-primary focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
                     {savingAllocation ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
                     حفظ التوزيع
                   </button>

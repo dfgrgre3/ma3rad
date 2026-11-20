@@ -121,17 +121,17 @@ export interface TransactionFormState {
 export type EmployeeTab = 'directory' | 'finance' | 'attendance' | 'analytics';
 
 export const STATUS_LABELS: Record<Employee['status'], { label: string; color: string }> = {
-  PROBATION: { label: 'تحت الاختبار', color: 'bg-sky-500/10 text-sky-600 border-sky-500/25' },
-  ACTIVE: { label: 'على رأس العمل', color: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/25' },
-  ON_LEAVE: { label: 'في إجازة رسمية', color: 'bg-amber-500/10 text-amber-600 border-amber-500/25' },
-  SUSPENDED: { label: 'موقوف مؤقتاً', color: 'bg-rose-500/10 text-rose-600 border-rose-500/25' },
-  RESIGNED: { label: 'مستقيل', color: 'bg-slate-500/10 text-slate-600 border-slate-500/25' },
-  TERMINATED: { label: 'منتهية خدمته', color: 'bg-slate-500/10 text-slate-600 border-slate-500/25' },
+  PROBATION: { label: 'تحت الاختبار', color: 'bg-primary/10 text-primary border-primary/25' },
+  ACTIVE: { label: 'على رأس العمل', color: 'bg-success/10 text-success border-success/25' },
+  ON_LEAVE: { label: 'في إجازة رسمية', color: 'bg-warning/10 text-warning border-warning/25' },
+  SUSPENDED: { label: 'موقوف مؤقتاً', color: 'bg-danger/10 text-danger border-danger/25' },
+  RESIGNED: { label: 'مستقيل', color: 'bg-line-strong/10 text-ink-secondary border-line-strong/25' },
+  TERMINATED: { label: 'منتهية خدمته', color: 'bg-line-strong/10 text-ink-secondary border-line-strong/25' },
 };
 
 export const TX_TYPES = {
-  ADVANCE: { label: 'سُلفة', color: 'text-amber-600 bg-amber-500/10 border-amber-500/20' },
-  BONUS: { label: 'مكافأة / حافز', color: 'text-emerald-600 bg-emerald-500/10 border-emerald-500/20' },
-  DEDUCTION: { label: 'خصم جزائي', color: 'text-rose-600 bg-rose-500/10 border-rose-500/20' },
-  SALARY_PAYOUT: { label: 'صرف راتب / دفعة لليد', color: 'text-sky-600 bg-sky-500/10 border-sky-500/20' },
+  ADVANCE: { label: 'سُلفة', color: 'text-warning bg-warning/10 border-warning/20' },
+  BONUS: { label: 'مكافأة / حافز', color: 'text-success bg-success/10 border-success/20' },
+  DEDUCTION: { label: 'خصم جزائي', color: 'text-danger bg-danger/10 border-danger/20' },
+  SALARY_PAYOUT: { label: 'صرف راتب / دفعة لليد', color: 'text-primary bg-primary/10 border-primary/20' },
 };

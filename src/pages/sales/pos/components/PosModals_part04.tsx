@@ -24,7 +24,7 @@ export const NewCustomerModal: React.FC<{
       <Field label="رقم الهاتف *" id="new-customer-phone">
         <input value={phone} onChange={(e) => onPhoneChange(e.target.value)} placeholder="01xxxxxxxxx" className={inputCls} />
       </Field>
-      {error && <div className="rounded-lg bg-amber-50 border border-amber-200 p-2 text-xs text-amber-800">{error}</div>}
+      {error && <div className="rounded-lg bg-warning-soft border border-warning-border p-2 text-xs text-warning">{error}</div>}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <Field label="نوع العميل" id="new-customer-type">
           <select value={type} onChange={(e) => onTypeChange(e.target.value as Customer['customerType'])} className={inputCls}>
@@ -40,7 +40,7 @@ export const NewCustomerModal: React.FC<{
       </div>
       <button
         onClick={onSave}
-        className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-sm flex items-center justify-center gap-2"
+        className="w-full py-2.5 bg-success hover:bg-success text-white font-bold rounded-xl text-sm flex items-center justify-center gap-2"
       >
         <UserPlus className="w-4 h-4" /> حفظ واختيار العميل
       </button>

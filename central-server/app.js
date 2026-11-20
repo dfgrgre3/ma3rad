@@ -7,6 +7,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 
 const { requestContext, requireHttps } = require('./middleware/request');
+const { ipBanGuard } = require('./middleware/ipBan');
 const { notFoundHandler, errorHandler } = require('./middleware/errors');
 const { installEnvelope } = require('./lib/envelope');
 const { createApiRouter } = require('./routes');
@@ -52,6 +53,7 @@ function createApp() {
   // Installed globally on purpose: `app.use('/api/v1', fn)` strips the mount
   // prefix before the handler runs, so `req.path` no longer starts with it.
   app.use(installEnvelope);
+  app.use('/api/v1', ipBanGuard);
 
   app.use('/api/v1', createApiRouter());
 

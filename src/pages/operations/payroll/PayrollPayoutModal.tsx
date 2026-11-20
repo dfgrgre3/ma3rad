@@ -91,26 +91,26 @@ export const PayrollPayoutModal: React.FC<{
     && items.some((item) => rows[item.id]?.method === 'BANK_TRANSFER');
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4">
-      <form onSubmit={submit} className="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
-        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-primary/40 p-4">
+      <form onSubmit={submit} className="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-surface shadow-2xl">
+        <div className="flex items-center justify-between border-b border-line px-5 py-4">
           <div>
-            <h2 className="text-sm font-black text-slate-900">صرف دورة رواتب {run.period}</h2>
-            <p className="mt-1 text-[11px] text-slate-500">حدد وسيلة الصرف لكل موظف وسجّل مرجع العملية وإثبات التحويل.</p>
+            <h2 className="text-sm font-black text-ink">صرف دورة رواتب {run.period}</h2>
+            <p className="mt-1 text-[11px] text-muted">حدد وسيلة الصرف لكل موظف وسجّل مرجع العملية وإثبات التحويل.</p>
           </div>
-          <button type="button" onClick={onClose} className="rounded-lg p-2 text-slate-400 hover:bg-slate-100">
+          <button type="button" onClick={onClose} className="rounded-lg p-2 text-muted hover:bg-surface-sunken">
             <X className="h-4 w-4" />
           </button>
         </div>
 
-        <div className="border-b border-slate-100 bg-slate-50 px-5 py-3">
-          <label className="text-xs font-bold text-slate-600">
+        <div className="border-b border-line bg-surface-muted px-5 py-3">
+          <label className="text-xs font-bold text-ink-secondary">
             مرجع الدفعة المجمّع (يُستخدم افتراضياً لكل سطر)
             <input
               value={batchReference}
               onChange={(event) => setBatchReference(event.target.value)}
               placeholder="مثال: PAY-2026-0101 أو رقم حوالة البنك"
-              className="mr-2 w-72 rounded-lg border border-slate-200 bg-white px-2 py-1.5 font-mono text-xs"
+              className="mr-2 w-72 rounded-lg border border-line bg-surface px-2 py-1.5 font-mono text-xs"
             />
           </label>
         </div>
@@ -131,13 +131,13 @@ export const PayrollPayoutModal: React.FC<{
                   const row = rows[item.id];
                   return (
                     <span className="block align-top">
-                      <span className="block font-bold text-slate-800">{item.employeeName}</span>
-                      <span className="mt-1 block text-[10px] text-slate-400">{item.details.bankName || item.details.walletProvider || '—'}</span>
+                      <span className="block font-bold text-ink">{item.employeeName}</span>
+                      <span className="mt-1 block text-[10px] text-muted">{item.details.bankName || item.details.walletProvider || '—'}</span>
                     </span>
                   );
                 },
               },
-              { key: 'net', header: 'الصافي', render: (item: any) => <span className="font-mono font-black text-sky-700">{item.netAmount.toFixed(2)}</span> },
+              { key: 'net', header: 'الصافي', render: (item: any) => <span className="font-mono font-black text-primary">{item.netAmount.toFixed(2)}</span> },
               {
                 key: 'method', header: 'الوسيلة',
                 render: (item: any) => {
@@ -145,11 +145,11 @@ export const PayrollPayoutModal: React.FC<{
                   const Icon = METHOD_ICONS[row.method as keyof typeof METHOD_ICONS];
                   return (
                     <span className="flex items-center gap-1">
-                      <Icon className="h-3.5 w-3.5 text-slate-400" />
+                      <Icon className="h-3.5 w-3.5 text-muted" />
                       <select
                         value={row.method}
                         onChange={(event) => update(item.id, { method: event.target.value as PayrollPaymentMethod })}
-                        className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 font-bold"
+                        className="rounded-lg border border-line bg-surface px-2 py-1.5 font-bold"
                       >
                         {(['CASH', 'BANK_TRANSFER', 'WALLET'] as PayrollPaymentMethod[]).map((method) => (
                           <option key={method} value={method}>{METHOD_LABELS[method as keyof typeof METHOD_LABELS]}</option>
@@ -168,7 +168,7 @@ export const PayrollPayoutModal: React.FC<{
                       <select
                         value={row.registerId}
                         onChange={(event) => update(item.id, { registerId: event.target.value })}
-                        className="w-full min-w-[150px] rounded-lg border border-slate-200 bg-white px-2 py-1.5"
+                        className="w-full min-w-[150px] rounded-lg border border-line bg-surface px-2 py-1.5"
                       >
                         {options.registers.map((register) => (
                           <option key={register.id} value={register.id}>{register.name}</option>
@@ -181,7 +181,7 @@ export const PayrollPayoutModal: React.FC<{
                       <select
                         value={row.bankAccountId}
                         onChange={(event) => update(item.id, { bankAccountId: event.target.value })}
-                        className="w-full min-w-[170px] rounded-lg border border-slate-200 bg-white px-2 py-1.5"
+                        className="w-full min-w-[170px] rounded-lg border border-line bg-surface px-2 py-1.5"
                       >
                         {options.bankAccounts.map((account) => (
                           <option key={account.id} value={account.id}>
@@ -199,13 +199,13 @@ export const PayrollPayoutModal: React.FC<{
                           value={row.walletProvider}
                           onChange={(event) => update(item.id, { walletProvider: event.target.value })}
                           placeholder="المزود"
-                          className="w-1/2 rounded-lg border border-slate-200 px-2 py-1.5"
+                          className="w-1/2 rounded-lg border border-line px-2 py-1.5"
                         />
                         <input
                           value={row.walletNumber}
                           onChange={(event) => update(item.id, { walletNumber: event.target.value })}
                           placeholder="رقم المحفظة"
-                          className="w-1/2 rounded-lg border border-slate-200 px-2 py-1.5"
+                          className="w-1/2 rounded-lg border border-line px-2 py-1.5"
                         />
                       </span>
                     );
@@ -222,7 +222,7 @@ export const PayrollPayoutModal: React.FC<{
                       value={row.referenceNumber}
                       onChange={(event) => update(item.id, { referenceNumber: event.target.value })}
                       placeholder="مرجع / رقم حوالة"
-                      className="w-full min-w-[120px] rounded-lg border border-slate-200 px-2 py-1.5 font-mono"
+                      className="w-full min-w-[120px] rounded-lg border border-line px-2 py-1.5 font-mono"
                     />
                   );
                 },
@@ -236,28 +236,28 @@ export const PayrollPayoutModal: React.FC<{
                       value={row.proofReference}
                       onChange={(event) => update(item.id, { proofReference: event.target.value })}
                       placeholder="رقم مرفق / إشعار"
-                      className="w-full min-w-[120px] rounded-lg border border-slate-200 px-2 py-1.5"
+                      className="w-full min-w-[120px] rounded-lg border border-line px-2 py-1.5"
                     />
                   );
                 },
               },
             ]}
-            rowClassName={() => 'align-top hover:bg-slate-50/60'}
+            rowClassName={() => 'align-top hover:bg-surface-muted/60'}
           />
         </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 bg-slate-50 px-5 py-4">
-          <div className="text-xs text-slate-500">
-            {needsBankAccount && <span className="font-bold text-rose-600">لا يوجد حساب بنكي مسجل؛ أضف حساباً من المالية أو اختر وسيلة أخرى.</span>}
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line bg-surface-muted px-5 py-4">
+          <div className="text-xs text-muted">
+            {needsBankAccount && <span className="font-bold text-danger">لا يوجد حساب بنكي مسجل؛ أضف حساباً من المالية أو اختر وسيلة أخرى.</span>}
           </div>
           <div className="flex items-center gap-2">
-            <button type="button" onClick={onClose} className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-600">
+            <button type="button" onClick={onClose} className="rounded-lg border border-line bg-surface px-4 py-2 text-xs font-bold text-ink-secondary">
               إلغاء
             </button>
             <button
               type="submit"
               disabled={saving || needsBankAccount}
-              className="flex items-center gap-1 rounded-lg bg-sky-600 px-4 py-2 text-xs font-bold text-white disabled:opacity-50"
+              className="flex items-center gap-1 rounded-lg bg-primary px-4 py-2 text-xs font-bold text-white disabled:opacity-50"
             >
               <Landmark className="h-3.5 w-3.5" /> تأكيد الصرف
             </button>

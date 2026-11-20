@@ -9,9 +9,9 @@ interface PaymentMethodsCardProps {
 
 export const PaymentMethodsCard: React.FC<PaymentMethodsCardProps> = ({ paymentDistribution }) => {
   return (
-    <div className="bg-white dark:bg-slate-900 p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs">
-      <h3 className="text-xs font-bold text-slate-900 dark:text-white mb-0.5">طرق الدفع</h3>
-      <p className="text-[11px] text-slate-400 mb-2">توزيع إيرادات الدفع المستخدمة</p>
+    <div className="bg-surface p-3.5 rounded-xl border border-line shadow-xs">
+      <h3 className="text-xs font-bold text-ink dark:text-white mb-0.5">طرق الدفع</h3>
+      <p className="text-[11px] text-muted mb-2">توزيع إيرادات الدفع المستخدمة</p>
       <div className="h-44 w-full" dir="ltr">
         <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 800, height: 176 }}>
           <BarChart data={paymentDistribution} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>

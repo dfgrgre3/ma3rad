@@ -39,9 +39,9 @@ export const KpiTile: React.FC<KpiTileProps> = ({ label, value, hint, icon: Icon
       {hint && <div className="truncate text-[9px] text-[#767676] dark:text-[#a6a6a6] sm:text-[10px]">{hint}</div>}
     </>
   );
-  const className = `group relative flex min-w-0 flex-col gap-1.5 overflow-hidden rounded-[2px] border border-[#d9d9d9] bg-white p-2.5 dark:border-[#3d3d3d] dark:bg-[#2b2b2b] sm:p-3 ${
-    to ? 'transition-colors hover:border-[#0078d4] hover:bg-[#f8fbfe] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0078d4] dark:hover:bg-[#30363b]' : ''
-  }`;
+  const className = `group relative flex min-w-0 flex-col gap-1.5 overflow-hidden rounded-[2px] border border-[#d9d9d9] bg-surface p-2.5 dark:border-[#3d3d3d] dark:bg-[#2b2b2b] sm:p-3 ${
+ to ? 'transition-colors hover:border-[#0078d4] hover:bg-[#f8fbfe] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0078d4] dark:hover:bg-[#30363b]' : ''
+ }`;
 
   return to ? (
     <Link to={to} className={className} aria-label={`فتح سجلات ${label}`}>

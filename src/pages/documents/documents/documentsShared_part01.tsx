@@ -1,9 +1,9 @@
 import type { ContractEffectiveStatus, ContractPartyType, DocumentConfidentiality, DocumentStatus } from '../../../types';
 
 export const inputCls =
-  'w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-sky-500/30';
+  'w-full px-3 py-2 bg-surface-muted rounded-xl border border-line text-ink text-xs focus:outline-none focus:ring-2 focus:ring-primary/30';
 
-export const labelCls = 'font-bold text-slate-700 dark:text-slate-300 block mb-1';
+export const labelCls = 'font-bold text-ink block mb-1';
 
 export const DOC_STATUS_LABEL: Record<DocumentStatus, string> = {
   DRAFT: 'مسودة',
@@ -12,9 +12,9 @@ export const DOC_STATUS_LABEL: Record<DocumentStatus, string> = {
 };
 
 export const DOC_STATUS_STYLE: Record<DocumentStatus, string> = {
-  DRAFT: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:border-amber-500/30',
-  ACTIVE: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:border-emerald-500/30',
-  ARCHIVED: 'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700',
+  DRAFT: 'bg-warning-soft text-warning border-warning-border dark:bg-warning/10 dark:border-warning/30',
+  ACTIVE: 'bg-success-soft text-success border-success-border dark:bg-success/10 dark:border-success/30',
+  ARCHIVED: 'bg-surface-sunken text-ink-secondary border-line ',
 };
 
 export const CONFIDENTIALITY_LABEL: Record<DocumentConfidentiality, string> = {
@@ -33,12 +33,12 @@ export const CONTRACT_STATUS_LABEL: Record<ContractEffectiveStatus, string> = {
 };
 
 export const CONTRACT_STATUS_STYLE: Record<ContractEffectiveStatus, string> = {
-  DRAFT: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:border-amber-500/30',
-  SCHEDULED: 'bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-500/10 dark:text-sky-300 dark:border-sky-500/30',
-  ACTIVE: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:border-emerald-500/30',
-  EXPIRING: 'bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-500/10 dark:text-orange-300 dark:border-orange-500/30',
-  EXPIRED: 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-500/10 dark:text-rose-300 dark:border-rose-500/30',
-  TERMINATED: 'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700',
+  DRAFT: 'bg-warning-soft text-warning border-warning-border dark:bg-warning/10 dark:border-warning/30',
+  SCHEDULED: 'bg-accent-soft text-primary border-accent-border dark:bg-primary/10 dark:border-primary/30',
+  ACTIVE: 'bg-success-soft text-success border-success-border dark:bg-success/10 dark:border-success/30',
+  EXPIRING: 'bg-warning-soft text-warning border-warning-border dark:bg-warning/10 dark:border-warning/30',
+  EXPIRED: 'bg-danger-soft text-danger border-danger-border dark:bg-danger/10 dark:border-danger/30',
+  TERMINATED: 'bg-surface-sunken text-ink-secondary border-line ',
 };
 
 export const PARTY_LABEL: Record<ContractPartyType, string> = {

@@ -27,7 +27,7 @@ export const OperationsTab: React.FC<OperationsTabProps> = ({
 }) => (
   <div className="space-y-6">
     {/* إعدادات نقطة البيع والفواتير المطابقة للتصميم */}
-    <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 p-5 space-y-4">
+    <div className="rounded-2xl border border-line bg-surface dark:bg-primary/60 p-5 space-y-4">
       <OperationsPosSection
         settings={settings}
         set={set}

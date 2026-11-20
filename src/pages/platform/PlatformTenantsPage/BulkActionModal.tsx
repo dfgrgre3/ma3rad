@@ -71,7 +71,7 @@ export const BulkActionModal: React.FC<BulkActionModalProps> = ({
                 {STATUSES.map((value) => <option key={value} value={value}>{PLATFORM_TENANT_STATUS_LABELS[value]}</option>)}
               </select>
             </Field>
-            <p className="text-[11px] text-amber-700">سيتم تحديث حالة العميل والتراخيص والاشتراكات المرتبطة.</p>
+            <p className="text-[11px] text-warning">سيتم تحديث حالة العميل والتراخيص والاشتراكات المرتبطة.</p>
           </div>
         )}
         {bulkActionType === 'plan' && (
@@ -87,15 +87,15 @@ export const BulkActionModal: React.FC<BulkActionModalProps> = ({
             <Field label="المدة (أشهر)">
               <input type="number" min={1} className={inputClass} value={bulkMonths} onChange={(e) => setBulkMonths(Math.max(1, Number(e.target.value)))} />
             </Field>
-            <p className="text-[11px] text-amber-700 sm:col-span-2">سيتم إلغاء التراخيص والاشتراكات الحالية وإصدار تراخيص جديدة بالباقة المختارة.</p>
+            <p className="text-[11px] text-warning sm:col-span-2">سيتم إلغاء التراخيص والاشتراكات الحالية وإصدار تراخيص جديدة بالباقة المختارة.</p>
           </div>
         )}
         {bulkActionType === 'activation' && (
           <div className="grid gap-3">
-            <p className="text-[11px] font-semibold text-slate-700">وسائل الإرسال</p>
+            <p className="text-[11px] font-semibold text-ink">وسائل الإرسال</p>
             <div className="flex flex-wrap gap-3">
               {['EMAIL', 'SMS', 'WHATSAPP'].map((channel) => (
-                <label key={channel} className="inline-flex items-center gap-1.5 text-[11.5px] font-semibold text-slate-700">
+                <label key={channel} className="inline-flex items-center gap-1.5 text-[11.5px] font-semibold text-ink">
                   <input
                     type="checkbox"
                     checked={bulkChannels.includes(channel)}
@@ -110,7 +110,7 @@ export const BulkActionModal: React.FC<BulkActionModalProps> = ({
           </div>
         )}
         {bulkActionType === 'export' && (
-          <p className="text-[11px] text-slate-600">سيتم تصدير بيانات العملاء المحددين إلى ملف CSV.</p>
+          <p className="text-[11px] text-ink-secondary">سيتم تصدير بيانات العملاء المحددين إلى ملف CSV.</p>
         )}
       </Modal>
 );

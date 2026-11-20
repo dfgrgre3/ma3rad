@@ -97,52 +97,52 @@ export const AdjustmentModals: React.FC<AdjustmentModalsProps> = ({
   <>
 {/* Detail Modal */}
 {showDetailModal && selectedAdjustment && (
-  <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-white backdrop-blur-sm">
-    <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-3xl overflow-hidden shadow-2xl">
-      <div className="bg-slate-50 px-6 py-4 flex items-center justify-between border-b border-slate-200">
+  <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-surface backdrop-blur-sm">
+    <div className="bg-surface border border-line rounded-2xl w-full max-w-3xl overflow-hidden shadow-2xl">
+      <div className="bg-surface-muted px-6 py-4 flex items-center justify-between border-b border-line">
         <div className="flex items-center gap-2">
-          <FileText className="w-5 h-5 text-orange-600" />
-          <h3 className="text-base font-black text-slate-900">تفاصيل تسوية المخزون: {selectedAdjustment.code}</h3>
+          <FileText className="w-5 h-5 text-warning" />
+          <h3 className="text-base font-black text-ink">تفاصيل تسوية المخزون: {selectedAdjustment.code}</h3>
         </div>
-        <button onClick={() => setShowDetailModal(false)} className="text-slate-500 hover:text-slate-900 transition">
+        <button onClick={() => setShowDetailModal(false)} className="text-muted hover:text-ink transition">
           <X className="w-5 h-5" />
         </button>
       </div>
       <div className="p-6 space-y-6">
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 text-xs bg-white p-4 rounded-xl border border-slate-200/60">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 text-xs bg-surface p-4 rounded-xl border border-line/60">
           <div>
-            <div className="text-slate-500 mb-0.5">المستودع</div>
-            <div className="font-bold text-slate-900">{selectedAdjustment.warehouse}</div>
+            <div className="text-muted mb-0.5">المستودع</div>
+            <div className="font-bold text-ink">{selectedAdjustment.warehouse}</div>
           </div>
           <div>
-            <div className="text-slate-500 mb-0.5">نوع التسوية</div>
-            <div className="font-bold text-slate-900">
+            <div className="text-muted mb-0.5">نوع التسوية</div>
+            <div className="font-bold text-ink">
               {selectedAdjustment.type === 'ADD' ? 'زيادة / إضافة (+)' : selectedAdjustment.type === 'DAMAGE' ? 'تالف (-)' : 'عجز / صرف (-)'}
             </div>
           </div>
           <div>
-            <div className="text-slate-500 mb-0.5">السبب</div>
-            <div className="font-bold text-slate-900">{selectedAdjustment.reason}</div>
+            <div className="text-muted mb-0.5">السبب</div>
+            <div className="font-bold text-ink">{selectedAdjustment.reason}</div>
           </div>
           <div>
-            <div className="text-slate-500 mb-0.5">التاريخ</div>
-            <div className="font-bold text-slate-900 font-mono">{selectedAdjustment.date}</div>
+            <div className="text-muted mb-0.5">التاريخ</div>
+            <div className="font-bold text-ink font-mono">{selectedAdjustment.date}</div>
           </div>
           <div>
-            <div className="text-slate-500 mb-0.5">منشئ الطلب</div>
-            <div className="font-bold text-slate-900">{selectedAdjustment.adjustedBy}</div>
+            <div className="text-muted mb-0.5">منشئ الطلب</div>
+            <div className="font-bold text-ink">{selectedAdjustment.adjustedBy}</div>
           </div>
           <div>
-            <div className="text-slate-500 mb-0.5">المعتمد</div>
-            <div className="font-bold text-slate-900">{selectedAdjustment.approvedByName || 'لم يعتمد بعد'}</div>
+            <div className="text-muted mb-0.5">المعتمد</div>
+            <div className="font-bold text-ink">{selectedAdjustment.approvedByName || 'لم يعتمد بعد'}</div>
           </div>
           <div>
-            <div className="text-slate-500 mb-0.5">المرحّل</div>
-            <div className="font-bold text-slate-900">{selectedAdjustment.postedByName || 'لم ترحّل بعد'}</div>
+            <div className="text-muted mb-0.5">المرحّل</div>
+            <div className="font-bold text-ink">{selectedAdjustment.postedByName || 'لم ترحّل بعد'}</div>
           </div>
         </div>
 
-        <div className="border border-slate-200 rounded-xl overflow-hidden">
+        <div className="border border-line rounded-xl overflow-hidden">
           <DataTable
             ariaLabel="أصناف التسوية"
             rows={selectedItems}
@@ -150,19 +150,19 @@ export const AdjustmentModals: React.FC<AdjustmentModalsProps> = ({
             dense
             tableClassName="text-xs"
             columns={[
-              { key: 'name', header: 'الصنف', render: (item: any) => <span className="font-medium text-slate-900">{item.productName}</span> },
-              { key: 'qty', header: 'الكمية', render: (item: any) => <span className="font-mono font-bold text-sky-600">{formatProductQuantity(item.quantityM2, item)}</span> },
-              { key: 'boxes', header: 'عدد الصناديق', render: (item: any) => <span className="font-mono text-slate-700">{item.boxesCount} صندوق</span> },
-              { key: 'cost', header: 'سعر التكلفة', render: (item: any) => <span className="font-mono text-slate-500">{fmt(item.unitCost)}</span> },
-              { key: 'total', header: 'القيمة الإجمالية', render: (item: any) => <span className="font-mono font-bold text-emerald-600">{fmt(item.totalValue)}</span> },
+              { key: 'name', header: 'الصنف', render: (item: any) => <span className="font-medium text-ink">{item.productName}</span> },
+              { key: 'qty', header: 'الكمية', render: (item: any) => <span className="font-mono font-bold text-primary">{formatProductQuantity(item.quantityM2, item)}</span> },
+              { key: 'boxes', header: 'عدد الصناديق', render: (item: any) => <span className="font-mono text-ink">{item.boxesCount} صندوق</span> },
+              { key: 'cost', header: 'سعر التكلفة', render: (item: any) => <span className="font-mono text-muted">{fmt(item.unitCost)}</span> },
+              { key: 'total', header: 'القيمة الإجمالية', render: (item: any) => <span className="font-mono font-bold text-success">{fmt(item.totalValue)}</span> },
             ]}
           />
         </div>
       </div>
-      <div className="bg-slate-50 px-6 py-4 flex justify-end gap-2 border-t border-slate-200">
+      <div className="bg-surface-muted px-6 py-4 flex justify-end gap-2 border-t border-line">
         <button
           onClick={() => setShowDetailModal(false)}
-          className="px-4 py-2 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-xl text-xs font-bold transition border border-slate-200"
+          className="px-4 py-2 bg-surface-muted hover:bg-surface-sunken text-ink-secondary rounded-xl text-xs font-bold transition border border-line"
         >
           إغلاق التفاصيل
         </button>
@@ -173,28 +173,28 @@ export const AdjustmentModals: React.FC<AdjustmentModalsProps> = ({
 
 {/* Create Modal Form */}
 {showCreateModal && (
-  <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-white backdrop-blur-sm">
-    <form onSubmit={handleCreateAdjustment} className="bg-white border border-slate-200 rounded-2xl w-full max-w-xl overflow-hidden shadow-2xl">
-      <div className="bg-slate-50 px-6 py-4 flex items-center justify-between border-b border-slate-200">
+  <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-surface backdrop-blur-sm">
+    <form onSubmit={handleCreateAdjustment} className="bg-surface border border-line rounded-2xl w-full max-w-xl overflow-hidden shadow-2xl">
+      <div className="bg-surface-muted px-6 py-4 flex items-center justify-between border-b border-line">
         <div className="flex items-center gap-2">
-          <Wrench className="w-5 h-5 text-orange-600" />
-          <h3 className="text-base font-black text-slate-900">طلب تسوية مخزنية جديدة</h3>
+          <Wrench className="w-5 h-5 text-warning" />
+          <h3 className="text-base font-black text-ink">طلب تسوية مخزنية جديدة</h3>
         </div>
-        <button type="button" onClick={() => setShowCreateModal(false)} className="text-slate-500 hover:text-slate-900 transition">
+        <button type="button" onClick={() => setShowCreateModal(false)} className="text-muted hover:text-ink transition">
           <X className="w-5 h-5" />
         </button>
       </div>
 
       <div className="p-6 space-y-4">
         {errorMsg && (
-          <div className="flex items-center gap-2 p-3 bg-rose-500/10 border border-rose-500/20 text-rose-600 text-xs font-semibold rounded-xl">
+          <div className="flex items-center gap-2 p-3 bg-danger/10 border border-danger/20 text-danger text-xs font-semibold rounded-xl">
             <AlertTriangle className="w-4 h-4 shrink-0" />
             <span>{errorMsg}</span>
           </div>
         )}
 
         <div className="space-y-1.5">
-          <label className="text-xs text-slate-500 font-bold block">المخزن المستهدف</label>
+          <label className="text-xs text-muted font-bold block">المخزن المستهدف</label>
           <select
             value={selectedWarehouseId}
             onChange={(e) => setSelectedWarehouseId(e.target.value)}
@@ -205,26 +205,26 @@ export const AdjustmentModals: React.FC<AdjustmentModalsProps> = ({
         </div>
 
         <div className="space-y-1.5">
-          <label className="text-xs text-slate-455 font-bold block">نوع التسوية</label>
+          <label className="text-xs text-muted font-bold block">نوع التسوية</label>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
             <button
               type="button"
               onClick={() => setAdjType('ADD')}
-              className={`px-3 py-2 text-xs font-bold rounded-xl border transition ${adjType === 'ADD' ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/50' : 'bg-slate-50 border-slate-200 hover:bg-white text-slate-500'}`}
+              className={`px-3 py-2 text-xs font-bold rounded-xl border transition ${adjType === 'ADD' ? 'bg-success/10 text-success border-success/50' : 'bg-surface-muted border-line hover:bg-surface text-muted'}`}
             >
               إضافة رصيد (+)
             </button>
             <button
               type="button"
               onClick={() => setAdjType('SUBTRACT')}
-              className={`px-3 py-2 text-xs font-bold rounded-xl border transition ${adjType === 'SUBTRACT' ? 'bg-rose-500/10 text-rose-600 border-rose-500/50' : 'bg-slate-50 border-slate-200 hover:bg-white text-slate-500'}`}
+              className={`px-3 py-2 text-xs font-bold rounded-xl border transition ${adjType === 'SUBTRACT' ? 'bg-danger/10 text-danger border-danger/50' : 'bg-surface-muted border-line hover:bg-surface text-muted'}`}
             >
               عجز / سحب (-)
             </button>
             <button
               type="button"
               onClick={() => setAdjType('DAMAGE')}
-              className={`px-3 py-2 text-xs font-bold rounded-xl border transition ${adjType === 'DAMAGE' ? 'bg-amber-500/10 text-amber-600 border-amber-500/50' : 'bg-slate-50 border-slate-200 hover:bg-white text-slate-500'}`}
+              className={`px-3 py-2 text-xs font-bold rounded-xl border transition ${adjType === 'DAMAGE' ? 'bg-warning/10 text-warning border-warning/50' : 'bg-surface-muted border-line hover:bg-surface text-muted'}`}
             >
               تالف (-)
             </button>
@@ -232,19 +232,19 @@ export const AdjustmentModals: React.FC<AdjustmentModalsProps> = ({
         </div>
 
         <div className="space-y-1.5">
-          <label className="text-xs text-slate-455 font-bold block">الصنف المراد تسويته</label>
+          <label className="text-xs text-muted font-bold block">الصنف المراد تسويته</label>
           <ProductPicker
             value={selectedProductId}
             selectedLabel={selectedProduct?.name}
             ariaLabel="استعراض أصناف التسوية المخزنية"
             onChange={setSelectedProductId}
-            className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-orange-500"
+            className="w-full px-3.5 py-2.5 bg-surface-muted border border-line rounded-xl text-xs text-ink focus:outline-none focus:border-warning"
           />
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-1.5">
-            <label className="text-xs text-slate-455 font-bold block">الكمية ({selectedUnit})</label>
+            <label className="text-xs text-muted font-bold block">الكمية ({selectedUnit})</label>
             <input
               type="number"
               step={selectedProduct?.productType === 'GENERAL' && ['BOX', 'PIECE', 'SET'].includes(selectedProduct.baseUnit ?? '') ? 1 : 0.01}
@@ -252,45 +252,45 @@ export const AdjustmentModals: React.FC<AdjustmentModalsProps> = ({
               value={qtyM2 || ''}
               onChange={(e) => setQtyM2(Number.parseFloat(e.target.value) || 0)}
               placeholder={`كمية ${selectedUnit}`}
-              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-orange-500"
+              className="w-full px-3.5 py-2.5 bg-surface-muted border border-line rounded-xl text-xs text-ink focus:outline-none focus:border-warning"
             />
           </div>
           <div className="space-y-1.5">
-            <label className="text-xs text-slate-455 font-bold block">سبب التسوية</label>
+            <label className="text-xs text-muted font-bold block">سبب التسوية</label>
             <input
               type="text"
               required
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               placeholder="مثال: تلف أثناء الترتيب، زيادة في الشحنة"
-              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-orange-500"
+              className="w-full px-3.5 py-2.5 bg-surface-muted border border-line rounded-xl text-xs text-ink focus:outline-none focus:border-warning"
             />
           </div>
         </div>
 
         <div className="space-y-1.5">
-          <label className="text-xs text-slate-455 font-bold block">ملاحظات إضافية</label>
+          <label className="text-xs text-muted font-bold block">ملاحظات إضافية</label>
           <textarea
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             placeholder="ملاحظات أو تفاصيل أكثر..."
             rows={2}
-            className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-orange-500 resize-none"
+            className="w-full px-3.5 py-2.5 bg-surface-muted border border-line rounded-xl text-xs text-ink focus:outline-none focus:border-warning resize-none"
           />
         </div>
       </div>
 
-      <div className="bg-slate-50 px-6 py-4 flex justify-end gap-2 border-t border-slate-200">
+      <div className="bg-surface-muted px-6 py-4 flex justify-end gap-2 border-t border-line">
         <button
           type="button"
           onClick={() => setShowCreateModal(false)}
-          className="px-4 py-2 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-xl text-xs font-bold transition border border-slate-200"
+          className="px-4 py-2 bg-surface-muted hover:bg-surface-sunken text-ink-secondary rounded-xl text-xs font-bold transition border border-line"
         >
           إلغاء
         </button>
         <button
           type="submit"
-          className="px-4 py-2 bg-orange-600 hover:bg-orange-500 text-white rounded-xl text-xs font-bold transition"
+          className="px-4 py-2 bg-warning hover:bg-warning text-white rounded-xl text-xs font-bold transition"
         >
           حفظ التسوية
         </button>

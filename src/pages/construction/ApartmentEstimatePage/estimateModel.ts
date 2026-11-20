@@ -111,7 +111,7 @@ export const measureLabel: Record<Measure, string> = {
 };
 
 export function fieldClass() {
-  return 'w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100';
+  return 'w-full rounded-xl border border-line bg-surface px-3 py-2 text-sm text-ink outline-none transition focus:border-primary focus:ring-2 focus:ring-primary';
 }
 
 export function isUnitCompatible(product: Product, unit: string): boolean {

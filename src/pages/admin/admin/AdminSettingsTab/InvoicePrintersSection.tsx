@@ -23,15 +23,15 @@ export const InvoicePrintersSection: React.FC<InvoicePrintersSectionProps> = ({
   isScanningPrinters,
   scanPrinters,
 }) => (
-  <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 space-y-4">
-    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-slate-100 dark:border-slate-800 pb-3">
+  <div className="rounded-2xl border border-line bg-surface p-4 space-y-4">
+    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-line pb-3">
       <div className="flex items-center gap-2">
-        <SlidersHorizontal className="w-4 h-4 text-sky-600" />
+        <SlidersHorizontal className="w-4 h-4 text-primary" />
         <div>
-          <h4 className="text-xs font-black text-slate-800 dark:text-slate-200">
+          <h4 className="text-xs font-black text-ink ">
             طابعة كل مقاس من مكان واحد (Unified Printers Hub)
           </h4>
-          <p className="text-[11px] text-slate-500">
+          <p className="text-[11px] text-muted">
             اضبط الطابعة المخصصة لكل حجم (A4، A5، إيصالات كاشير، باركود) بسهولة مع إمكانية تجربة الطباعة فوراً
           </p>
         </div>
@@ -41,7 +41,7 @@ export const InvoicePrintersSection: React.FC<InvoicePrintersSectionProps> = ({
         <button
           type="button"
           onClick={() => scanPrinters(true)}
-          className="text-[11px] font-bold text-sky-600 hover:text-sky-700 hover:underline flex items-center gap-1"
+          className="text-[11px] font-bold text-primary hover:text-primary hover:underline flex items-center gap-1"
         >
           <RefreshCw className={`w-3 h-3 ${isScanningPrinters ? 'animate-spin' : ''}`} />
           تحديث طابعات ويندوز
@@ -51,16 +51,16 @@ export const InvoicePrintersSection: React.FC<InvoicePrintersSectionProps> = ({
 
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
       {/* A4 Printer */}
-      <div className="rounded-xl border border-slate-200 dark:border-slate-700/80 bg-slate-50/50 dark:bg-slate-800/40 p-3.5 space-y-2">
+      <div className="rounded-xl border border-line bg-surface-muted/50 dark:bg-primary/40 p-3.5 space-y-2">
         <div className="flex items-center justify-between">
-          <label className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
-            <Printer className="w-3.5 h-3.5 text-sky-600" />
+          <label className="text-xs font-bold text-ink flex items-center gap-1.5">
+            <Printer className="w-3.5 h-3.5 text-primary" />
             طابعة مقاس A4 (فواتير كاملة)
           </label>
           <button
             type="button"
             onClick={() => printService.printTestPage('a4', (settings.defaultInvoiceTemplate as InvoiceTemplateId) || 'table')}
-            className="text-[11px] font-bold text-sky-600 hover:underline"
+            className="text-[11px] font-bold text-primary hover:underline"
           >
             تجربة طباعة A4
           </button>
@@ -94,20 +94,20 @@ export const InvoicePrintersSection: React.FC<InvoicePrintersSectionProps> = ({
             className={inputCls}
           />
         )}
-        <p className="text-[10px] text-slate-400">تُستخدم لطباعة الفواتير، عروض الأسعار، وسندات المرتجع بمقاس A4.</p>
+        <p className="text-[10px] text-muted">تُستخدم لطباعة الفواتير، عروض الأسعار، وسندات المرتجع بمقاس A4.</p>
       </div>
 
       {/* A5 Printer */}
-      <div className="rounded-xl border border-slate-200 dark:border-slate-700/80 bg-slate-50/50 dark:bg-slate-800/40 p-3.5 space-y-2">
+      <div className="rounded-xl border border-line bg-surface-muted/50 dark:bg-primary/40 p-3.5 space-y-2">
         <div className="flex items-center justify-between">
-          <label className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
-            <Printer className="w-3.5 h-3.5 text-sky-600" />
+          <label className="text-xs font-bold text-ink flex items-center gap-1.5">
+            <Printer className="w-3.5 h-3.5 text-primary" />
             طابعة مقاس A5 (نصف صفحة)
           </label>
           <button
             type="button"
             onClick={() => printService.printTestPage('a5', (settings.defaultInvoiceTemplate as InvoiceTemplateId) || 'table')}
-            className="text-[11px] font-bold text-sky-600 hover:underline"
+            className="text-[11px] font-bold text-primary hover:underline"
           >
             تجربة طباعة A5
           </button>
@@ -141,20 +141,20 @@ export const InvoicePrintersSection: React.FC<InvoicePrintersSectionProps> = ({
             className={inputCls}
           />
         )}
-        <p className="text-[10px] text-slate-400">تُستخدم للطباعة على دفاتر أو ورق A5 الاقتصادي نصف الحجم.</p>
+        <p className="text-[10px] text-muted">تُستخدم للطباعة على دفاتر أو ورق A5 الاقتصادي نصف الحجم.</p>
       </div>
 
       {/* Thermal Printer */}
-      <div className="rounded-xl border border-slate-200 dark:border-slate-700/80 bg-slate-50/50 dark:bg-slate-800/40 p-3.5 space-y-2.5 md:col-span-2">
-        <div className="flex items-center justify-between border-b border-slate-200/60 dark:border-slate-700/60 pb-2">
-          <label className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
-            <Printer className="w-3.5 h-3.5 text-amber-600" />
+      <div className="rounded-xl border border-line bg-surface-muted/50 dark:bg-primary/40 p-3.5 space-y-2.5 md:col-span-2">
+        <div className="flex items-center justify-between border-b border-line/60 dark:border-line-strong/60 pb-2">
+          <label className="text-xs font-bold text-ink flex items-center gap-1.5">
+            <Printer className="w-3.5 h-3.5 text-warning" />
             طابعة الإيصالات الحرارية (كاشير ونقاط البيع POS Thermal)
           </label>
           <button
             type="button"
             onClick={() => printService.printTestPage('thermal')}
-            className="text-[11px] font-bold text-amber-600 hover:underline"
+            className="text-[11px] font-bold text-warning hover:underline"
           >
             تجربة طباعة إيصال حراري
           </button>
@@ -242,7 +242,7 @@ export const InvoicePrintersSection: React.FC<InvoicePrintersSectionProps> = ({
               </div>
               <div>
                 <label className={labelCls}>منفذ الطباعة (Port)</label>
-                <input value="9100" readOnly className={`${inputCls} bg-slate-100 dark:bg-slate-700/50`} />
+                <input value="9100" readOnly className={`${inputCls} bg-surface-sunken dark:bg-primary/50`} />
               </div>
             </>
           )}
@@ -250,10 +250,10 @@ export const InvoicePrintersSection: React.FC<InvoicePrintersSectionProps> = ({
       </div>
 
       {/* Barcode / Labels Printer */}
-      <div className="rounded-xl border border-slate-200 dark:border-slate-700/80 bg-slate-50/50 dark:bg-slate-800/40 p-3.5 space-y-2 md:col-span-2">
+      <div className="rounded-xl border border-line bg-surface-muted/50 dark:bg-primary/40 p-3.5 space-y-2 md:col-span-2">
         <div className="flex items-center justify-between">
-          <label className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
-            <Printer className="w-3.5 h-3.5 text-indigo-600" />
+          <label className="text-xs font-bold text-ink flex items-center gap-1.5">
+            <Printer className="w-3.5 h-3.5 text-primary" />
             طابعة ملصقات الباركود والأصناف (Barcode Labels Printer)
           </label>
         </div>
@@ -285,7 +285,7 @@ export const InvoicePrintersSection: React.FC<InvoicePrintersSectionProps> = ({
             className={inputCls}
           />
         )}
-        <p className="text-[10px] text-slate-400">تُستخدم لطباعة ملصقات الباركود، كود التخزين، وأسعار البضائع على الرفوف.</p>
+        <p className="text-[10px] text-muted">تُستخدم لطباعة ملصقات الباركود، كود التخزين، وأسعار البضائع على الرفوف.</p>
       </div>
     </div>
   </div>

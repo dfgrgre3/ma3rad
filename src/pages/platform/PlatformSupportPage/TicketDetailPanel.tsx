@@ -59,18 +59,18 @@ export const TicketDetailPanel: React.FC<TicketDetailPanelProps> = ({
   onStartSession,
   onEndRemoteSession,
 }) => (
-  <div className="lg:col-span-7 flex flex-col rounded-xl border border-slate-800 bg-slate-900/90 shadow-sm overflow-hidden min-h-[620px]">
+  <div className="lg:col-span-7 flex flex-col rounded-xl border border-line-strong bg-primary/90 shadow-sm overflow-hidden min-h-[620px]">
     {!selectedTicketId ? (
-      <div className="flex flex-1 flex-col items-center justify-center p-8 text-center text-slate-400">
-        <LifeBuoy className="h-12 w-12 text-slate-600 mb-3 animate-pulse" />
-        <h3 className="text-base font-bold text-slate-200">اختر تذكرة لعرض تفاصيلها</h3>
-        <p className="mt-1 text-xs text-slate-500 max-w-sm">
+      <div className="flex flex-1 flex-col items-center justify-center p-8 text-center text-muted">
+        <LifeBuoy className="h-12 w-12 text-ink-secondary mb-3 animate-pulse" />
+        <h3 className="text-base font-bold text-muted">اختر تذكرة لعرض تفاصيلها</h3>
+        <p className="mt-1 text-xs text-muted max-w-sm">
           اختر تذكرة من القائمة لعرض تفاصيلها بالكامل، ومتابعة المحادثة مع العميل، وإدارة جلسات الوصول عن بُعد وتقييم الخدمة.
         </p>
       </div>
     ) : detailsLoading || !details ? (
-      <div className="flex flex-1 items-center justify-center p-8 text-slate-400">
-        <RefreshCw className="h-6 w-6 animate-spin text-emerald-400" />
+      <div className="flex flex-1 items-center justify-center p-8 text-muted">
+        <RefreshCw className="h-6 w-6 animate-spin text-success" />
       </div>
     ) : (
       <div className="flex flex-col h-full">

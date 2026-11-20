@@ -103,4 +103,18 @@ function requireHttps(req, res, next) {
   next();
 }
 
-module.exports = { requestContext, requireHttps };
+/**
+ * Best-effort client IP for security decisions (rate limits, IP bans).
+ * X-Forwarded-For is only honored when the direct peer is a trusted proxy;
+ * otherwise the socket address is authoritative and cannot be spoofed.
+ */
+function resolveClientIp(req) {
+  const remoteAddress = req.socket && req.socket.remoteAddress;
+  if (isTrustedProxy(remoteAddress)) {
+    const forwarded = firstForwardedValue(req.headers['x-forwarded-for']);
+    if (forwarded) return normalizeIp(forwarded);
+  }
+  return normalizeIp(remoteAddress) || (req.ip ? normalizeIp(req.ip) : '');
+}
+
+module.exports = { requestContext, requireHttps, isTrustedProxy, resolveClientIp, normalizeIp, ipv4ToInt, ipv4CidrMatch };

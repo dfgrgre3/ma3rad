@@ -71,7 +71,7 @@ const TAB_PERMISSIONS: Partial<Record<Tab, string>> = {
   prices: 'pricing.view',
 };
 
-const PAY_STATUS: Record<string, string> = { PAID: 'bg-emerald-50 text-emerald-600', PARTIAL: 'bg-amber-50 text-amber-600', UNPAID: 'bg-rose-50 text-rose-600' };
+const PAY_STATUS: Record<string, string> = { PAID: 'bg-success-soft text-success', PARTIAL: 'bg-warning-soft text-warning', UNPAID: 'bg-danger-soft text-danger' };
 const PAY_LABEL: Record<string, string> = { PAID: 'مدفوع', PARTIAL: 'جزئي', UNPAID: 'آجل' };
 
 const DataTable: React.FC<{ headers: string[]; rows: React.ReactNode[][]; empty: string }> = ({ headers, rows, empty }) => {
@@ -281,22 +281,22 @@ export const CustomerDetailPage: React.FC = () => {
     return isValid(parsed) ? format(parsed, 'dd/MM/yyyy') : '—';
   };
 
-  if (loading) return <div role="status" aria-label="جارٍ تحميل بيانات العميل" className="flex items-center justify-center h-full bg-slate-50"><Loader2 className="w-8 h-8 animate-spin text-sky-600" /></div>;
+  if (loading) return <div role="status" aria-label="جارٍ تحميل بيانات العميل" className="flex items-center justify-center h-full bg-surface-muted"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
   if (loadError) return (
-    <div role="alert" className="flex flex-col items-center justify-center h-full bg-slate-50 gap-4 p-6 text-center">
-      <AlertTriangle className="w-10 h-10 text-rose-600" />
-      <p className="text-slate-700">{loadError}</p>
+    <div role="alert" className="flex flex-col items-center justify-center h-full bg-surface-muted gap-4 p-6 text-center">
+      <AlertTriangle className="w-10 h-10 text-danger" />
+      <p className="text-ink">{loadError}</p>
       <div className="flex items-center gap-2">
-        <button onClick={() => setReloadKey((key) => key + 1)} className="px-4 py-2 bg-sky-600 text-white rounded-lg text-sm">إعادة المحاولة</button>
-        <button onClick={() => navigate('/customers')} className="px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg text-sm">رجوع</button>
+        <button onClick={() => setReloadKey((key) => key + 1)} className="px-4 py-2 bg-primary text-white rounded-lg text-sm">إعادة المحاولة</button>
+        <button onClick={() => navigate('/customers')} className="px-4 py-2 bg-surface border border-line text-ink rounded-lg text-sm">رجوع</button>
       </div>
     </div>
   );
   if (!customer) return (
-    <div className="flex flex-col items-center justify-center h-full bg-slate-50 gap-4">
-      <AlertTriangle className="w-10 h-10 text-amber-600" />
-      <p className="text-slate-700">{customerSingularLabel} غير موجود</p>
-      <button onClick={() => navigate('/customers')} className="px-4 py-2 bg-sky-600 text-white rounded-lg text-sm">رجوع</button>
+    <div className="flex flex-col items-center justify-center h-full bg-surface-muted gap-4">
+      <AlertTriangle className="w-10 h-10 text-warning" />
+      <p className="text-ink">{customerSingularLabel} غير موجود</p>
+      <button onClick={() => navigate('/customers')} className="px-4 py-2 bg-primary text-white rounded-lg text-sm">رجوع</button>
     </div>
   );
 
@@ -345,35 +345,35 @@ export const CustomerDetailPage: React.FC = () => {
   };
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
-      <div className="bg-white border-b border-slate-200 px-6 py-4">
+    <div className="h-full flex flex-col bg-surface-muted text-ink overflow-hidden">
+      <div className="bg-surface border-b border-line px-6 py-4">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex items-center gap-4">
-            <div className="w-14 h-14 rounded-xl bg-pink-500/10 border border-pink-500/20 flex items-center justify-center">
-              <span className="text-xl font-black text-pink-600">{customer.name?.trim().charAt(0) || '؟'}</span>
+            <div className="w-14 h-14 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center">
+              <span className="text-xl font-black text-primary">{customer.name?.trim().charAt(0) || '؟'}</span>
             </div>
             <div>
               <div className="flex items-center gap-2 mb-1">
-                <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-slate-100 text-slate-500">{customer.customerType}</span>
-                {can('finance.debts.view') && customer.currentBalance > 0 && <span className="text-[10px] px-2 py-0.5 rounded-full bg-rose-50 text-rose-600 font-bold">مديون {fmt(customer.currentBalance)}</span>}
+                <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-surface-sunken text-muted">{customer.customerType}</span>
+                {can('finance.debts.view') && customer.currentBalance > 0 && <span className="text-[10px] px-2 py-0.5 rounded-full bg-danger-soft text-danger font-bold">مديون {fmt(customer.currentBalance)}</span>}
               </div>
-              <h1 className="text-lg font-black text-slate-900">{customer.name}</h1>
-              <div className="mt-1 text-[11px] font-bold text-sky-700">{customersLabel} · {businessProfileLabel}</div>
-              <div className="flex items-center gap-3 text-xs text-slate-500 mt-0.5">
+              <h1 className="text-lg font-black text-ink">{customer.name}</h1>
+              <div className="mt-1 text-[11px] font-bold text-primary">{customersLabel} · {businessProfileLabel}</div>
+              <div className="flex items-center gap-3 text-xs text-muted mt-0.5">
                 <span className="font-mono">{customer.code}</span>
-                {customer.phone && <a href={`tel:${customer.phone}`} className="flex items-center gap-1 hover:text-sky-600"><Phone className="w-3 h-3" />{customer.phone}</a>}
+                {customer.phone && <a href={`tel:${customer.phone}`} className="flex items-center gap-1 hover:text-primary"><Phone className="w-3 h-3" />{customer.phone}</a>}
                 {customer.address && <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{customer.address}</span>}
               </div>
             </div>
           </div>
           <div className="flex items-center gap-2">
             {[
-              { label: 'إجمالي المشتريات', value: fmt(customer.totalPurchases), color: 'text-sky-600' },
-              { label: 'الرصيد المستحق', value: fmt(customer.currentBalance), color: customer.currentBalance > 0 ? 'text-rose-600' : 'text-emerald-600' },
+              { label: 'إجمالي المشتريات', value: fmt(customer.totalPurchases), color: 'text-primary' },
+              { label: 'الرصيد المستحق', value: fmt(customer.currentBalance), color: customer.currentBalance > 0 ? 'text-danger' : 'text-success' },
               ].filter((s) => s.label === 'إجمالي المشتريات' ? can('sales.view') : can('finance.debts.view')).map((s) => (
-              <div key={s.label} className="text-center px-4 py-2 bg-slate-100 rounded-xl">
+              <div key={s.label} className="text-center px-4 py-2 bg-surface-sunken rounded-xl">
                 <div className={`text-base font-black ${s.color}`}>{s.value}</div>
-                <div className="text-[10px] text-slate-500">{s.label}</div>
+                <div className="text-[10px] text-muted">{s.label}</div>
               </div>
             ))}
           </div>
@@ -388,7 +388,7 @@ export const CustomerDetailPage: React.FC = () => {
                 ? projectsLabel
                 : t.label;
             return (
-              <button key={t.id} onClick={() => setTab(t.id)} className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${tab === t.id ? 'bg-sky-600 text-white' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'}`}>
+              <button key={t.id} onClick={() => setTab(t.id)} className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${tab === t.id ? 'bg-primary text-white' : 'text-muted hover:bg-surface-sunken hover:text-ink'}`}>
                 <Icon className="w-3.5 h-3.5" />{label}
               </button>
             );
@@ -399,8 +399,8 @@ export const CustomerDetailPage: React.FC = () => {
       <div className="flex-1 overflow-y-auto p-6">
         {tab === 'overview' && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="bg-white rounded-xl border border-slate-200 p-5">
-              <h3 className="text-sm font-bold text-slate-900 mb-4">البيانات الأساسية</h3>
+            <div className="bg-surface rounded-xl border border-line p-5">
+              <h3 className="text-sm font-bold text-ink mb-4">البيانات الأساسية</h3>
               <dl className="space-y-3">
                 {[
                   { label: 'الاسم', value: customer.name },
@@ -417,36 +417,36 @@ export const CustomerDetailPage: React.FC = () => {
                   { label: 'آخر تحديث للبيانات', value: date(customer.updatedAt) },
                   { label: 'ملاحظات', value: customer.notes },
                 ].filter((r) => r.value).map((row) => (
-                  <div key={row.label} className="flex justify-between py-1.5 border-b border-slate-100 last:border-0">
-                    <dt className="text-xs text-slate-500">{row.label}</dt>
-                    <dd className="text-sm font-semibold text-slate-900 text-left">{row.value}</dd>
+                  <div key={row.label} className="flex justify-between py-1.5 border-b border-line last:border-0">
+                    <dt className="text-xs text-muted">{row.label}</dt>
+                    <dd className="text-sm font-semibold text-ink text-left">{row.value}</dd>
                   </div>
                 ))}
               </dl>
             </div>
-            {(can('sales.view') || can('finance.debts.view')) && <div className="bg-white rounded-xl border border-slate-200 p-5">
-              <h3 className="text-sm font-bold text-slate-900 mb-4">ملخص الحساب</h3>
+            {(can('sales.view') || can('finance.debts.view')) && <div className="bg-surface rounded-xl border border-line p-5">
+              <h3 className="text-sm font-bold text-ink mb-4">ملخص الحساب</h3>
               <div className="space-y-3">
                 {[
                   ...(can('sales.view') ? [
-                    { label: 'إجمالي المشتريات', value: fmt(customer.totalPurchases), color: 'text-sky-600' },
-                    { label: 'عدد الفواتير', value: String(L('sales').length), color: 'text-slate-700' },
+                    { label: 'إجمالي المشتريات', value: fmt(customer.totalPurchases), color: 'text-primary' },
+                    { label: 'عدد الفواتير', value: String(L('sales').length), color: 'text-ink' },
                   ] : []),
                   ...(can('finance.debts.view') ? [
-                    { label: 'الرصيد الحالي', value: fmt(customer.currentBalance), color: customer.currentBalance > 0 ? 'text-rose-600' : 'text-emerald-600' },
-                    { label: 'حد الائتمان', value: customer.creditLimit ? fmt(customer.creditLimit) : 'غير محدد', color: 'text-violet-600' },
+                    { label: 'الرصيد الحالي', value: fmt(customer.currentBalance), color: customer.currentBalance > 0 ? 'text-danger' : 'text-success' },
+                    { label: 'حد الائتمان', value: customer.creditLimit ? fmt(customer.creditLimit) : 'غير محدد', color: 'text-primary' },
                   ] : []),
                 ].map((row) => (
-                  <div key={row.label} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                    <span className="text-xs text-slate-500">{row.label}</span>
+                  <div key={row.label} className="flex items-center justify-between p-3 bg-surface-muted rounded-lg">
+                    <span className="text-xs text-muted">{row.label}</span>
                     <span className={`text-sm font-black ${row.color}`}>{row.value}</span>
                   </div>
                 ))}
               </div>
             </div>}
-            <div className="bg-white rounded-xl border border-slate-200 p-5 md:col-span-2">
-              <h3 className="text-sm font-bold text-slate-900 mb-2">حساب الدخول وكلمة المرور</h3>
-              <p className="text-xs leading-6 text-slate-600">
+            <div className="bg-surface rounded-xl border border-line p-5 md:col-span-2">
+              <h3 className="text-sm font-bold text-ink mb-2">حساب الدخول وكلمة المرور</h3>
+              <p className="text-xs leading-6 text-ink-secondary">
                 هذا سجل عميل وبيانات تعاملات، وليس حساب مستخدم للبرنامج. لا يخزّن النظام اسم دخول أو كلمة مرور مرتبطة بهذا العميل، لذلك لا توجد كلمة مرور لعرضها أو استعادتها.
               </p>
             </div>
@@ -471,47 +471,47 @@ export const CustomerDetailPage: React.FC = () => {
             ]}
             empty="لا توجد فواتير"
             rows={L('sales').map((r) => [
-              <span className="font-mono text-sky-600">{r.n1}</span>,
+              <span className="font-mono text-primary">{r.n1}</span>,
               date(r.date),
               <b>{fmt(r.amount)}</b>,
               ...(can('finance.debts.view') ? [
-                <span className="text-emerald-600">{fmt(r.paid)}</span>,
-                <span className="text-rose-600">{Number(r.remaining) > 0 ? fmt(r.remaining) : '—'}</span>,
-                <span className={`text-[10px] px-2 py-1 rounded-full font-bold ${PAY_STATUS[r.status || ''] || 'bg-slate-100 text-slate-600'}`}>{PAY_LABEL[r.status || ''] || r.status}</span>,
+                <span className="text-success">{fmt(r.paid)}</span>,
+                <span className="text-danger">{Number(r.remaining) > 0 ? fmt(r.remaining) : '—'}</span>,
+                <span className={`text-[10px] px-2 py-1 rounded-full font-bold ${PAY_STATUS[r.status || ''] || 'bg-surface-sunken text-ink-secondary'}`}>{PAY_LABEL[r.status || ''] || r.status}</span>,
               ] : []),
-              <button onClick={() => r.id && navigate(`/customers/${id}/imported-products?invoiceId=${encodeURIComponent(r.id)}`)} disabled={!r.id} className="px-2.5 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 text-[11px] font-bold whitespace-nowrap disabled:opacity-50">متابعة {productsLabel} الخارجية</button>,
+              <button onClick={() => r.id && navigate(`/customers/${id}/imported-products?invoiceId=${encodeURIComponent(r.id)}`)} disabled={!r.id} className="px-2.5 py-1.5 rounded-lg bg-success-soft text-success hover:bg-success-soft text-[11px] font-bold whitespace-nowrap disabled:opacity-50">متابعة {productsLabel} الخارجية</button>,
             ])}
           />
         )}
 
         {tab === 'quotations' && can('quotations.view') && (
           <DataTable headers={['رقم العرض', 'التاريخ', 'الإجمالي', 'صالح حتى', 'الحالة']} empty="لا توجد عروض أسعار"
-            rows={L('quotations').map((r) => [<span className="font-mono text-sky-600">{r.n1}</span>, date(r.date), <b>{fmt(r.amount)}</b>, date(r.extra), r.status])} />
+            rows={L('quotations').map((r) => [<span className="font-mono text-primary">{r.n1}</span>, date(r.date), <b>{fmt(r.amount)}</b>, date(r.extra), r.status])} />
         )}
 
         {tab === 'orders' && can('orders.view') && (
           <DataTable headers={['رقم الطلب', 'التاريخ', 'الإجمالي', 'التسليم المتوقع', 'الحالة']} empty="لا توجد طلبات"
-            rows={L('orders').map((r) => [<span className="font-mono text-sky-600">{r.n1}</span>, date(r.date), <b>{fmt(r.amount)}</b>, date(r.extra), r.status])} />
+            rows={L('orders').map((r) => [<span className="font-mono text-primary">{r.n1}</span>, date(r.date), <b>{fmt(r.amount)}</b>, date(r.extra), r.status])} />
         )}
 
         {tab === 'needs' && can('sales.view') && (
           <div className="space-y-4">
-            {supplyRequestsError && <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{supplyRequestsError}</div>}
+            {supplyRequestsError && <div role="alert" className="rounded-xl border border-danger-border bg-danger-soft px-4 py-3 text-sm text-danger">{supplyRequestsError}</div>}
             {supplyRequests.length === 0 && !supplyRequestsError ? (
-              <div className="rounded-xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-500">لا توجد منتجات أو احتياجات توريد مسجلة لهذا العميل.</div>
+              <div className="rounded-xl border border-line bg-surface p-8 text-center text-sm text-muted">لا توجد منتجات أو احتياجات توريد مسجلة لهذا العميل.</div>
             ) : supplyRequests.map((request) => (
-              <section key={request.id} className="overflow-hidden rounded-xl border border-slate-200 bg-white">
-                <header className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 p-4">
+              <section key={request.id} className="overflow-hidden rounded-xl border border-line bg-surface">
+                <header className="flex flex-wrap items-center justify-between gap-3 border-b border-line p-4">
                   <div>
-                    <h3 className="text-sm font-bold text-slate-900">طلب {request.invoiceNumber || request.id}</h3>
-                    <p className="mt-1 text-xs text-slate-500">
+                    <h3 className="text-sm font-bold text-ink">طلب {request.invoiceNumber || request.id}</h3>
+                    <p className="mt-1 text-xs text-muted">
                       {date(request.createdAt)} · التسليم المتوقع: {date(request.expectedDeliveryDate)}
                       {request.warehouseName ? ` · ${request.warehouseName}` : ''}
                     </p>
                   </div>
                   <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${
-                    request.status === 'READY' ? 'bg-emerald-50 text-emerald-700' :
-                    request.status === 'PARTIAL' ? 'bg-amber-50 text-amber-700' : 'bg-sky-50 text-sky-700'
+                    request.status === 'READY' ? 'bg-success-soft text-success' :
+                    request.status === 'PARTIAL' ? 'bg-warning-soft text-warning' : 'bg-accent-soft text-primary'
                   }`}>
                     {request.status === 'READY' ? 'متوفر بالكامل' : request.status === 'PARTIAL' ? 'متوفر جزئيًا' : 'قيد التوريد'}
                   </span>
@@ -520,7 +520,7 @@ export const CustomerDetailPage: React.FC = () => {
                   headers={['المنتج المطلوب', 'المقاس', 'الكمية المطلوبة', 'المتوفر', 'المتبقي', 'سعر الوحدة', 'الإجمالي', 'الحالة']}
                   empty="لا توجد منتجات ضمن هذا الطلب"
                   rows={request.items.map((item) => [
-                    <div className="font-semibold">{item.productName}<div className="text-[10px] text-slate-500">{item.productSku || ''}</div></div>,
+                    <div className="font-semibold">{item.productName}<div className="text-[10px] text-muted">{item.productSku || ''}</div></div>,
                     item.size || '—',
                     `${item.quantityRequested} ${item.unit}`,
                     `${item.quantityReceived} ${item.unit}`,
@@ -530,7 +530,7 @@ export const CustomerDetailPage: React.FC = () => {
                     item.status === 'READY' ? 'متوفر' : item.status === 'PARTIAL' ? 'جزئي' : 'مطلوب',
                   ])}
                 />
-                {request.notes && <p className="border-t border-slate-100 px-4 py-3 text-xs text-slate-600">ملاحظات الطلب: {request.notes}</p>}
+                {request.notes && <p className="border-t border-line px-4 py-3 text-xs text-ink-secondary">ملاحظات الطلب: {request.notes}</p>}
               </section>
             ))}
           </div>
@@ -538,14 +538,14 @@ export const CustomerDetailPage: React.FC = () => {
 
         {tab === 'payments' && can('finance.debts.view') && (
           <DataTable headers={['رقم الإيصال', 'التاريخ', 'المبلغ', 'طريقة الدفع', 'ملاحظات']} empty="لا توجد مدفوعات"
-            rows={L('payments').map((r) => [<span className="font-mono text-sky-600">{r.n1}</span>, date(r.date), <b className="text-emerald-600">{fmt(r.amount)}</b>, r.kind, r.notes || '—'])} />
+            rows={L('payments').map((r) => [<span className="font-mono text-primary">{r.n1}</span>, date(r.date), <b className="text-success">{fmt(r.amount)}</b>, r.kind, r.notes || '—'])} />
         )}
 
         {tab === 'returns' && can('returns.view') && (
           <DataTable headers={['رقم المرتجع', 'التاريخ', 'صافي قبل الضريبة', 'الضريبة', 'الإجمالي شامل الضريبة', 'السبب']} empty="لا توجد مرتجعات"
             rows={L('returns').map((r) => [
-              <span className="font-mono text-rose-600">{r.n1}</span>, date(r.date),
-              <b className="text-rose-600">{fmt(r.amount)}</b>,
+              <span className="font-mono text-danger">{r.n1}</span>, date(r.date),
+              <b className="text-danger">{fmt(r.amount)}</b>,
               r.returnTaxAmount == null ? 'غير مسجلة' : fmt(r.returnTaxAmount),
               r.returnTaxAmount == null ? 'غير معلوم' : fmt(Number(r.amount || 0) + Number(r.returnTaxAmount)),
               r.notes,
@@ -554,12 +554,12 @@ export const CustomerDetailPage: React.FC = () => {
 
         {tab === 'debts' && can('finance.debts.view') && (
           <DataTable headers={['رقم الفاتورة', 'التاريخ', 'الإجمالي', 'المدفوع', 'المتبقي', 'الحالة']} empty="لا توجد مديونيات"
-            rows={L('debts').map((r) => [<span className="font-mono">{r.n1}</span>, date(r.date), fmt(r.amount), fmt(r.paid), <b className="text-rose-600">{fmt(r.remaining)}</b>, PAY_LABEL[r.status || ''] || r.status])} />
+            rows={L('debts').map((r) => [<span className="font-mono">{r.n1}</span>, date(r.date), fmt(r.amount), fmt(r.paid), <b className="text-danger">{fmt(r.remaining)}</b>, PAY_LABEL[r.status || ''] || r.status])} />
         )}
 
         {tab === 'projects' && can('projects.view') && (
           <DataTable headers={['كود المشروع', 'اسم المشروع', 'القيمة', 'الحالة']} empty="لا توجد مشاريع"
-            rows={L('projects').map((r) => [<span className="font-mono text-sky-600">{r.n1}</span>, r.name, <b>{fmt(r.amount)}</b>, r.status])} />
+            rows={L('projects').map((r) => [<span className="font-mono text-primary">{r.n1}</span>, r.name, <b>{fmt(r.amount)}</b>, r.status])} />
         )}
 
         {tab === 'activities' && can('crm.view') && (
@@ -574,18 +574,18 @@ export const CustomerDetailPage: React.FC = () => {
 
         {tab === 'prices' && can('pricing.view') && (
           <div className="space-y-5">
-            {pricingError && <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{pricingError}</div>}
-            {can('pricing.update') && can('products.view') && <div className="bg-white rounded-xl border border-slate-200 p-5">
+            {pricingError && <div role="alert" className="rounded-xl border border-danger-border bg-danger-soft px-4 py-3 text-sm text-danger">{pricingError}</div>}
+            {can('pricing.update') && can('products.view') && <div className="bg-surface rounded-xl border border-line p-5">
               <div className="flex items-center gap-2 mb-1">
-                <Tag className="w-4 h-4 text-sky-600" />
-                <h3 className="text-sm font-bold text-slate-900">سعر خاص لـ {customerSingularLabel}</h3>
+                <Tag className="w-4 h-4 text-primary" />
+                <h3 className="text-sm font-bold text-ink">سعر خاص لـ {customerSingularLabel}</h3>
               </div>
-              <p className="text-xs text-slate-500 mb-4">
+              <p className="text-xs text-muted mb-4">
                 يتجاوز هذا السعر قوائم الأسعار والعروض الترويجية عند البيع من نقطة البيع لهذا السجل.
               </p>
               <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
                 <div className="md:col-span-2">
-                  <label htmlFor="customer-override-product" className="block text-[11px] font-semibold text-slate-600 mb-1">{productSingularLabel}</label>
+                  <label htmlFor="customer-override-product" className="block text-[11px] font-semibold text-ink-secondary mb-1">{productSingularLabel}</label>
                   <ProductPicker
                     id="customer-override-product"
                     value={overrideForm.productId}
@@ -596,33 +596,33 @@ export const CustomerDetailPage: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label htmlFor="customer-override-price" className="block text-[11px] font-semibold text-slate-600 mb-1">السعر / م²</label>
+                  <label htmlFor="customer-override-price" className="block text-[11px] font-semibold text-ink-secondary mb-1">السعر / م²</label>
                   <input
                     id="customer-override-price"
                     type="number" min="0.01" step="0.01"
                     value={overrideForm.priceM2}
                     onChange={(e) => setOverrideForm((f) => ({ ...f, priceM2: e.target.value }))}
-                    className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500"
+                    className="w-full px-3 py-2 text-sm border border-line-strong rounded-lg focus:ring-2 focus:ring-primary"
                   />
                 </div>
                 <div>
-                  <label htmlFor="customer-override-valid-from" className="block text-[11px] font-semibold text-slate-600 mb-1">ساري من</label>
+                  <label htmlFor="customer-override-valid-from" className="block text-[11px] font-semibold text-ink-secondary mb-1">ساري من</label>
                   <input
                     id="customer-override-valid-from"
                     type="date"
                     value={overrideForm.validFrom}
                     onChange={(e) => setOverrideForm((f) => ({ ...f, validFrom: e.target.value }))}
-                    className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500"
+                    className="w-full px-3 py-2 text-sm border border-line-strong rounded-lg focus:ring-2 focus:ring-primary"
                   />
                 </div>
                 <div>
-                  <label htmlFor="customer-override-valid-to" className="block text-[11px] font-semibold text-slate-600 mb-1">ساري حتى</label>
+                  <label htmlFor="customer-override-valid-to" className="block text-[11px] font-semibold text-ink-secondary mb-1">ساري حتى</label>
                   <input
                     id="customer-override-valid-to"
                     type="date"
                     value={overrideForm.validTo}
                     onChange={(e) => setOverrideForm((f) => ({ ...f, validTo: e.target.value }))}
-                    className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500"
+                    className="w-full px-3 py-2 text-sm border border-line-strong rounded-lg focus:ring-2 focus:ring-primary"
                   />
                 </div>
               </div>
@@ -630,7 +630,7 @@ export const CustomerDetailPage: React.FC = () => {
                 <button
                   onClick={saveOverride}
                   disabled={savingOverride}
-                  className="flex items-center gap-2 px-4 py-2 bg-sky-600 text-white rounded-lg text-sm font-semibold hover:bg-sky-700 disabled:opacity-60"
+                  className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg text-sm font-semibold hover:bg-primary disabled:opacity-60"
                 >
                   {savingOverride ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
                   حفظ السعر
@@ -641,15 +641,15 @@ export const CustomerDetailPage: React.FC = () => {
             <DataTable
               headers={[productSingularLabel, 'السعر / م²', 'ساري من', 'ساري حتى', ...(can('pricing.update') ? [''] : [])]}
               rows={overrides.map((row) => [
-                <span key="n" className="font-semibold text-slate-900">{row.productName}</span>,
-                <span key="p" className="font-black text-sky-600">{fmt(row.priceM2)}</span>,
-                <span key="f" className="text-slate-500">{row.validFrom ? date(row.validFrom) : '—'}</span>,
-                <span key="t" className="text-slate-500">{row.validTo ? date(row.validTo) : '—'}</span>,
+                <span key="n" className="font-semibold text-ink">{row.productName}</span>,
+                <span key="p" className="font-black text-primary">{fmt(row.priceM2)}</span>,
+                <span key="f" className="text-muted">{row.validFrom ? date(row.validFrom) : '—'}</span>,
+                <span key="t" className="text-muted">{row.validTo ? date(row.validTo) : '—'}</span>,
                 ...(can('pricing.update') ? [(
                   <button
                     key="d"
                     onClick={() => removeOverride(row.productId)}
-                    className="p-1.5 rounded-lg text-rose-600 hover:bg-rose-50"
+                    className="p-1.5 rounded-lg text-danger hover:bg-danger-soft"
                     title="حذف السعر الخاص"
                   >
                     <Trash2 className="w-4 h-4" />

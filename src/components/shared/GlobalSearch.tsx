@@ -218,7 +218,7 @@ export function GlobalSearch({ open, onClose, currentUser }: GlobalSearchProps) 
 
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-[110] flex items-start justify-center bg-slate-950/30 p-4 pt-[12vh] backdrop-blur-sm">
+    <div className="fixed inset-0 z-[110] flex items-start justify-center bg-primary/30 p-4 pt-[12vh] backdrop-blur-sm">
       <button
         type="button"
         aria-label="إغلاق البحث"
@@ -237,10 +237,10 @@ export function GlobalSearch({ open, onClose, currentUser }: GlobalSearchProps) 
             inputRef.current?.focus();
           }
         }}
-        className="relative z-10 w-full max-w-2xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900"
+        className="relative z-10 w-full max-w-2xl overflow-hidden rounded-2xl border border-line bg-surface shadow-2xl "
       >
-        <div className="flex items-center gap-3 border-b border-slate-200 px-4 ">
-          <Search className="h-5 w-5 text-sky-500" />
+        <div className="flex items-center gap-3 border-b border-line px-4 ">
+          <Search className="h-5 w-5 text-primary" />
           <input
             ref={inputRef}
             role="combobox"
@@ -252,22 +252,22 @@ export function GlobalSearch({ open, onClose, currentUser }: GlobalSearchProps) 
             value={query}
             onChange={(e) => { setQuery(e.target.value); setActive(0); }}
             placeholder={`ابحث في الصفحات و${productsLabel} و${customersLabel} و${suppliersLabel} والفواتير...`}
-            className="h-14 flex-1 select-text bg-transparent text-sm outline-none text-slate-900 dark:text-slate-100"
+            className="h-14 flex-1 select-text bg-transparent text-sm outline-none text-ink "
           />
-          <button onClick={onClose} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100" aria-label="إغلاق"><X className="h-4 w-4" /></button>
+          <button onClick={onClose} className="rounded-lg p-2 text-muted hover:bg-surface-sunken" aria-label="إغلاق"><X className="h-4 w-4" /></button>
         </div>
         <div id="global-search-results" role="listbox" aria-label="نتائج البحث" className="max-h-[52vh] overflow-y-auto p-2">
-          {error && <div role="alert" className="px-4 py-3 text-center text-sm text-rose-600">تعذر البحث في بيانات النظام. يمكنك متابعة التنقل بين الصفحات.</div>}
+          {error && <div role="alert" className="px-4 py-3 text-center text-sm text-danger">تعذر البحث في بيانات النظام. يمكنك متابعة التنقل بين الصفحات.</div>}
           {favoriteResults.length > 0 && (
-            <section role="group" aria-label="الصفحات المفضلة" className="mb-2 border-b border-slate-100 pb-2 dark:border-slate-800">
-              <h3 className="flex items-center gap-2 px-3 py-2 text-[11px] font-extrabold text-amber-700 dark:text-amber-400"><Star className="h-3.5 w-3.5" /> المفضلة</h3>
+            <section role="group" aria-label="الصفحات المفضلة" className="mb-2 border-b border-line pb-2 ">
+              <h3 className="flex items-center gap-2 px-3 py-2 text-[11px] font-extrabold text-warning "><Star className="h-3.5 w-3.5" /> المفضلة</h3>
               {favoriteResults.map((item) => (
-                <div key={`favorite-${item.path}`} className="flex items-center gap-2 rounded-lg px-2 hover:bg-slate-50 dark:hover:bg-slate-800">
+                <div key={`favorite-${item.path}`} className="flex items-center gap-2 rounded-lg px-2 hover:bg-surface-muted dark:hover:bg-primary">
                   <button type="button" role="option" aria-selected="false" onClick={() => { navigate(item.path); onClose(); }} className="min-w-0 flex-1 py-2 text-right">
-                    <span className="block truncate text-sm font-bold text-slate-800 dark:text-slate-200">{item.label}</span>
-                    <span className="block truncate text-xs text-slate-500">{item.meta}</span>
+                    <span className="block truncate text-sm font-bold text-ink ">{item.label}</span>
+                    <span className="block truncate text-xs text-muted">{item.meta}</span>
                   </button>
-                  <button type="button" aria-label={`إزالة ${item.label} من المفضلة`} aria-pressed="true" onClick={() => toggleFavorite(item.path)} className="rounded-lg p-2 text-amber-600 hover:bg-amber-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber-500 dark:hover:bg-amber-950">
+                  <button type="button" aria-label={`إزالة ${item.label} من المفضلة`} aria-pressed="true" onClick={() => toggleFavorite(item.path)} className="rounded-lg p-2 text-warning hover:bg-warning-soft focus-visible:outline focus-visible:outline-2 focus-visible:outline-warning dark:hover:bg-warning">
                     <Star className="h-4 w-4 fill-current" />
                   </button>
                 </div>
@@ -275,20 +275,20 @@ export function GlobalSearch({ open, onClose, currentUser }: GlobalSearchProps) 
             </section>
           )}
           {recentResults.length > 0 && (
-            <section role="group" aria-label="الصفحات التي زرتها مؤخراً" className="mb-2 border-b border-slate-100 pb-2 dark:border-slate-800">
-              <h3 className="flex items-center gap-2 px-3 py-2 text-[11px] font-extrabold text-slate-500"><Clock3 className="h-3.5 w-3.5" /> زُرت مؤخراً</h3>
+            <section role="group" aria-label="الصفحات التي زرتها مؤخراً" className="mb-2 border-b border-line pb-2 ">
+              <h3 className="flex items-center gap-2 px-3 py-2 text-[11px] font-extrabold text-muted"><Clock3 className="h-3.5 w-3.5" /> زُرت مؤخراً</h3>
               {recentResults.map((item) => (
-                <button key={`recent-${item.path}`} type="button" role="option" aria-selected="false" onClick={() => { navigate(item.path); onClose(); }} className="block w-full rounded-lg px-3 py-2 text-right hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-500 dark:hover:bg-slate-800">
-                  <span className="block truncate text-sm font-bold text-slate-800 dark:text-slate-200">{item.label}</span>
-                  <span className="block truncate text-xs text-slate-500">{item.meta}</span>
+                <button key={`recent-${item.path}`} type="button" role="option" aria-selected="false" onClick={() => { navigate(item.path); onClose(); }} className="block w-full rounded-lg px-3 py-2 text-right hover:bg-surface-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary dark:hover:bg-primary">
+                  <span className="block truncate text-sm font-bold text-ink ">{item.label}</span>
+                  <span className="block truncate text-xs text-muted">{item.meta}</span>
                 </button>
               ))}
             </section>
           )}
-          {results.length === 0 ? <div className="px-4 py-12 text-center text-sm text-slate-500">لا توجد نتائج مطابقة</div> : results.map((item, index) => {
+          {results.length === 0 ? <div className="px-4 py-12 text-center text-sm text-muted">لا توجد نتائج مطابقة</div> : results.map((item, index) => {
             const Icon = ICONS[item.kind];
             return (
-              <div key={`${item.kind}-${item.path}-${index}`} onMouseEnter={() => setActive(index)} className={`flex items-center rounded-xl transition ${index === active ? 'bg-sky-50 text-sky-700 dark:bg-sky-950' : 'text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800'}`}>
+              <div key={`${item.kind}-${item.path}-${index}`} onMouseEnter={() => setActive(index)} className={`flex items-center rounded-xl transition ${index === active ? 'bg-accent-soft text-primary dark:bg-primary' : 'text-ink hover:bg-surface-muted dark:hover:bg-primary'}`}>
                 <button
                   id={`global-search-result-${index}`}
                   type="button"
@@ -297,9 +297,9 @@ export function GlobalSearch({ open, onClose, currentUser }: GlobalSearchProps) 
                   onClick={() => { navigate(item.path); onClose(); }}
                   className="flex min-w-0 flex-1 items-center gap-3 px-3 py-3 text-right"
                 >
-                  <span className="rounded-lg bg-slate-100 p-2"><Icon className="h-4 w-4" aria-hidden="true" /></span>
-                  <span className="min-w-0 flex-1"><span className="block truncate text-sm font-bold">{item.label}</span><span className="block truncate text-xs text-slate-500">{item.meta}</span></span>
-                  {index === active && <CornerDownLeft className="h-4 w-4 text-sky-500" aria-hidden="true" />}
+                  <span className="rounded-lg bg-surface-sunken p-2"><Icon className="h-4 w-4" aria-hidden="true" /></span>
+                  <span className="min-w-0 flex-1"><span className="block truncate text-sm font-bold">{item.label}</span><span className="block truncate text-xs text-muted">{item.meta}</span></span>
+                  {index === active && <CornerDownLeft className="h-4 w-4 text-primary" aria-hidden="true" />}
                 </button>
                 {item.kind === 'page' && (
                   <button
@@ -307,16 +307,16 @@ export function GlobalSearch({ open, onClose, currentUser }: GlobalSearchProps) 
                     aria-label={`${shortcuts.favorites.includes(item.path) ? 'إزالة' : 'إضافة'} ${item.label} ${shortcuts.favorites.includes(item.path) ? 'من' : 'إلى'} المفضلة`}
                     aria-pressed={shortcuts.favorites.includes(item.path)}
                     onClick={() => toggleFavorite(item.path)}
-                    className="rounded-lg p-2 text-slate-400 hover:text-amber-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber-500"
+                    className="rounded-lg p-2 text-muted hover:text-warning focus-visible:outline focus-visible:outline-2 focus-visible:outline-warning"
                   >
-                    <Star className={`h-4 w-4 ${shortcuts.favorites.includes(item.path) ? 'fill-amber-400 text-amber-500' : ''}`} />
+                    <Star className={`h-4 w-4 ${shortcuts.favorites.includes(item.path) ? 'fill-warning text-warning' : ''}`} />
                   </button>
                 )}
               </div>
             );
           })}
         </div>
-        <div className="flex items-center gap-4 border-t border-slate-200 px-4 py-2 text-[11px] text-slate-500 "><span><ArrowDown className="ml-1 inline h-3 w-3" /> للتنقل</span><span><ArrowUp className="ml-1 inline h-3 w-3" /> للتنقل</span><span><CornerDownLeft className="ml-1 inline h-3 w-3" /> للفتح</span><span><Command className="ml-1 inline h-3 w-3" /> K للبحث</span></div>
+        <div className="flex items-center gap-4 border-t border-line px-4 py-2 text-[11px] text-muted "><span><ArrowDown className="ml-1 inline h-3 w-3" /> للتنقل</span><span><ArrowUp className="ml-1 inline h-3 w-3" /> للتنقل</span><span><CornerDownLeft className="ml-1 inline h-3 w-3" /> للفتح</span><span><Command className="ml-1 inline h-3 w-3" /> K للبحث</span></div>
       </div>
     </div>
   );

@@ -235,7 +235,7 @@ export const InventoryCountPage: React.FC = () => {
   const varianceItems = countVarianceItems(sessionItems);
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
+    <div className="h-full flex flex-col bg-surface-muted text-ink overflow-hidden">
       {/* Header */}
       <InventoryCountHeader
         onCreateSession={() => { setErrorMsg(''); setSelectedProductIds([]); setProductSearch(''); loadProducts(); setShowCreateModal(true); }}

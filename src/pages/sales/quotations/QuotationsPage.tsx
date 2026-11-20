@@ -6,7 +6,7 @@ import {
   MessageCircle, CalendarClock, ShoppingBag, PhoneCall,
 } from 'lucide-react';
 import { PageHeader } from '../../../components/ui/PageHeader';
-import { useActivityPageCopy } from '../../../hooks/domains/config/useBusinessTerm';
+import { useActivityPageCopy, useBusinessTerm } from '../../../hooks/domains/config/useBusinessTerm';
 import { QuotationService, Quotation, QuotationStats, QuotationStatus } from '../../../services/domains/sales/QuotationService';
 import { EmployeeService } from '../../../services/domains/hr/EmployeeService';
 import { CustomerService } from '../../../services/domains/customers/CustomerService';
@@ -28,16 +28,17 @@ import { emptyForm } from './QuotationModals';
 import type { FormState, Line } from './QuotationModals';
 import { OperationalFieldService, type OperationalFieldDefinition } from '../../../services/domains/products/OperationalFieldService';
 import { OperationalFieldsFilter, matchesOperationalFieldFilters, type OperationalFieldFilters } from '../../../components/products/OperationalFieldsFilter';
+import { OperationalFieldsChips } from '../../../components/products/OperationalFieldsChips';
 
 
 import { useToast } from '../../../components/ui/Toast';
 const PAGE_SIZE = 12;
 
 const STATUS_LABELS: Record<QuotationStatus, { label: string; color: string }> = {
-  PENDING: { label: 'بانتظار الموافقة', color: 'bg-amber-500/10 text-amber-600 border-amber-500/20' },
-  CONVERTED: { label: 'محوّل إلى فاتورة', color: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' },
-  EXPIRED: { label: 'منتهي الصلاحية', color: 'bg-slate-200 text-slate-500 border-slate-300' },
-  CANCELLED: { label: 'ملغي', color: 'bg-rose-500/10 text-rose-600 border-rose-500/20' },
+  PENDING: { label: 'بانتظار الموافقة', color: 'bg-warning/10 text-warning border-warning/20' },
+  CONVERTED: { label: 'محوّل إلى فاتورة', color: 'bg-success/10 text-success border-success/20' },
+  EXPIRED: { label: 'منتهي الصلاحية', color: 'bg-surface-sunken text-muted border-line-strong' },
+  CANCELLED: { label: 'ملغي', color: 'bg-danger/10 text-danger border-danger/20' },
 };
 
 const fmt = (n: number) => new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 2 }).format(Number(n) || 0) + ' ج';
@@ -56,6 +57,7 @@ export const QuotationsPage: React.FC = () => {
   const canDelete = PermissionService.can(user, 'ui.quotations.quotations.delete');
   const canApprove = PermissionService.can(user, 'ui.quotations.quotations.approve');
   const pageCopy = useActivityPageCopy('quotations');
+  const newQuotationLabel = useBusinessTerm('actions.newQuotation');
 
   const [docPreview, setDocPreview] = useState<{
     title: string;
@@ -84,7 +86,7 @@ export const QuotationsPage: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [operationalFields, setOperationalFields] = useState<OperationalFieldDefinition[]>([]);
   const [operationalFieldValues, setOperationalFieldValues] = useState<Record<string, string>>({});
-  const [, setValuesByQuotation] = useState<Record<string, Record<string, string>>>({});
+  const [valuesByQuotation, setValuesByQuotation] = useState<Record<string, Record<string, string>>>({});
   const [fieldFilters, setFieldFilters] = useState<OperationalFieldFilters>({});
 
   const [detail, setDetail] = useState<Quotation | null>(null);
@@ -441,112 +443,117 @@ export const QuotationsPage: React.FC = () => {
   };
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
-      <div className="bg-white border-b border-slate-200 px-6 pt-4">
+    <div className="h-full flex flex-col bg-surface-muted text-ink overflow-hidden">
+      <div className="bg-surface border-b border-line px-6 pt-4">
         <PageHeader
           icon={<FileText className="w-5 h-5" />}
           title={pageCopy?.title || 'عروض الأسعار والمقايسات'}
           description={pageCopy?.description || 'إنشاء المقايسات، متابعة صلاحيتها، وتحويلها إلى فواتير مبيعات معتمدة'}
           meta={<OperationalFieldsFilter fields={operationalFields} values={fieldFilters} onChange={setFieldFilters} />}
           actions={<>
-            <button onClick={() => doExport('excel')} className="flex items-center gap-1.5 px-3 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold"><FileSpreadsheet className="w-4 h-4 text-emerald-600" /> جدول بيانات</button>
-            <button onClick={() => doExport('pdf')} className="flex items-center gap-1.5 px-3 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold"><FileDown className="w-4 h-4 text-rose-600" /> مستند</button>
+            <button onClick={() => doExport('excel')} className="flex items-center gap-1.5 px-3 py-2 bg-surface border border-line hover:bg-surface-muted text-ink rounded-xl text-xs font-bold"><FileSpreadsheet className="w-4 h-4 text-success" /> جدول بيانات</button>
+            <button onClick={() => doExport('pdf')} className="flex items-center gap-1.5 px-3 py-2 bg-surface border border-line hover:bg-surface-muted text-ink rounded-xl text-xs font-bold"><FileDown className="w-4 h-4 text-danger" /> مستند</button>
             {canCreate && (
-              <button onClick={openCreate} className="flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition"><Plus className="w-4 h-4" /> عرض أسعار جديد</button>
+              <button onClick={openCreate} className="flex items-center gap-2 px-4 py-2 bg-warning hover:bg-warning text-white rounded-xl text-xs font-bold transition"><Plus className="w-4 h-4" /> {newQuotationLabel}</button>
             )}
           </>}
         />
       </div>
 
-      <div className="p-4 bg-white border-b border-slate-200 space-y-3">
+      <div className="p-4 bg-surface border-b border-line space-y-3">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-3">
-          <Stat label="إجمالي العروض" value={String(stats?.total ?? 0)} icon={FileText} tone="text-slate-700 bg-slate-50 border-slate-200" />
-          <Stat label="بانتظار الموافقة" value={`${stats?.pending ?? 0} • ${fmt(stats?.pendingValue ?? 0)}`} icon={Clock} tone="text-amber-700 bg-amber-50 border-amber-200" />
-          <Stat label="محوّلة لفواتير" value={`${stats?.converted ?? 0} • ${fmt(stats?.convertedValue ?? 0)}`} icon={CheckCircle2} tone="text-emerald-700 bg-emerald-50 border-emerald-200" />
-          <Stat label="منتهية الصلاحية" value={String(stats?.expired ?? 0)} icon={AlertTriangle} tone="text-slate-600 bg-slate-50 border-slate-200" />
-          <Stat label="متابعات مستحقة" value={String(stats?.followUpDue ?? 0)} icon={PhoneCall} tone="text-rose-700 bg-rose-50 border-rose-200" />
-          <Stat label="تنتهي قريباً" value={String(stats?.expiringSoon ?? 0)} icon={CalendarClock} tone="text-violet-700 bg-violet-50 border-violet-200" />
-          <Stat label="إجمالي القيمة" value={fmt(stats?.totalValue ?? 0)} icon={Percent} tone="text-sky-700 bg-sky-50 border-sky-200" />
+          <Stat label="إجمالي العروض" value={String(stats?.total ?? 0)} icon={FileText} tone="text-ink bg-surface-muted border-line" />
+          <Stat label="بانتظار الموافقة" value={`${stats?.pending ?? 0} • ${fmt(stats?.pendingValue ?? 0)}`} icon={Clock} tone="text-warning bg-warning-soft border-warning-border" />
+          <Stat label="محوّلة لفواتير" value={`${stats?.converted ?? 0} • ${fmt(stats?.convertedValue ?? 0)}`} icon={CheckCircle2} tone="text-success bg-success-soft border-success-border" />
+          <Stat label="منتهية الصلاحية" value={String(stats?.expired ?? 0)} icon={AlertTriangle} tone="text-ink-secondary bg-surface-muted border-line" />
+          <Stat label="متابعات مستحقة" value={String(stats?.followUpDue ?? 0)} icon={PhoneCall} tone="text-danger bg-danger-soft border-danger-border" />
+          <Stat label="تنتهي قريباً" value={String(stats?.expiringSoon ?? 0)} icon={CalendarClock} tone="text-primary bg-accent-soft border-accent-border" />
+          <Stat label="إجمالي القيمة" value={fmt(stats?.totalValue ?? 0)} icon={Percent} tone="text-primary bg-accent-soft border-accent-border" />
         </div>
 
         <div className="flex flex-col xl:flex-row gap-2">
           <div className="relative flex-1">
-            <Search className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="بحث برقم العرض أو العميل أو الهاتف أو الفاتورة..." className="w-full pl-4 pr-10 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:border-amber-400" />
+            <Search className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
+            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="بحث برقم العرض أو العميل أو الهاتف أو الفاتورة..." className="w-full pl-4 pr-10 py-2 bg-surface-muted border border-line rounded-xl text-xs font-medium focus:outline-none focus:border-warning" />
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2 py-1.5">
-              <Calendar className="w-3.5 h-3.5 text-slate-400" />
+            <div className="flex items-center gap-1.5 bg-surface-muted border border-line rounded-xl px-2 py-1.5">
+              <Calendar className="w-3.5 h-3.5 text-muted" />
               <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="bg-transparent text-[11px] font-bold outline-none" />
-              <span className="text-slate-300">—</span>
+              <span className="text-muted">—</span>
               <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="bg-transparent text-[11px] font-bold outline-none" />
             </div>
-            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as any)} className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-[11px] font-bold">
+            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as any)} className="px-3 py-2 bg-surface-muted border border-line rounded-xl text-[11px] font-bold">
               <option value="ALL">كل الحالات</option>
               {Object.entries(STATUS_LABELS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
             </select>
             <button
               type="button"
               onClick={() => setFollowUpOnly((v) => !v)}
-              className={`px-3 py-2 rounded-xl text-[11px] font-bold border flex items-center gap-1.5 ${followUpOnly ? 'bg-rose-600 text-white border-rose-600' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'}`}
+              className={`px-3 py-2 rounded-xl text-[11px] font-bold border flex items-center gap-1.5 ${followUpOnly ? 'bg-danger text-white border-danger' : 'bg-surface-muted text-ink-secondary border-line hover:bg-surface-sunken'}`}
             >
               <PhoneCall className="w-3.5 h-3.5" /> متابعات مستحقة
             </button>
-            <button onClick={load} className="p-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-600 hover:bg-slate-100" title="تحديث"><RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /></button>
+            <button onClick={load} className="p-2 bg-surface-muted border border-line rounded-xl text-ink-secondary hover:bg-surface-sunken" title="تحديث"><RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /></button>
           </div>
         </div>
       </div>
 
       <div className="flex-1 overflow-y-auto p-4">
-        {error && <div className="mb-3 px-4 py-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold">{error}</div>}
-        {loading ? <div className="py-16 flex justify-center"><Loader2 className="w-7 h-7 animate-spin text-amber-500" /></div> : (
+        {error && <div className="mb-3 px-4 py-2.5 rounded-xl bg-danger-soft border border-danger-border text-danger text-xs font-semibold">{error}</div>}
+        {loading ? <div className="py-16 flex justify-center"><Loader2 className="w-7 h-7 animate-spin text-warning" /></div> : (
           <>
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
               {pageItems.map((q) => {
                 const st = STATUS_LABELS[q.status];
                 return (
-                  <div key={q.id} className="bg-white border border-slate-200 hover:border-amber-300 rounded-2xl p-5 transition flex flex-col justify-between shadow-sm">
+                  <div key={q.id} className="bg-surface border border-line hover:border-warning rounded-2xl p-5 transition flex flex-col justify-between shadow-sm">
                     <div>
                       <div className="flex items-center justify-between mb-3">
-                        <span className="text-xs font-mono font-bold text-amber-600 bg-amber-500/10 px-2 py-0.5 rounded-lg border border-amber-500/20">{q.quotationNumber}</span>
+                        <span className="text-xs font-mono font-bold text-warning bg-warning/10 px-2 py-0.5 rounded-lg border border-warning/20">{q.quotationNumber}</span>
                         <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold border ${st.color}`}>{st.label}</span>
                       </div>
-                      <h3 className="font-bold text-slate-900 text-sm">{q.customerName}</h3>
-                      <p className="text-[11px] text-slate-500 mb-3 font-mono">{q.customerPhone || '—'}</p>
-                      <div className="space-y-1.5 text-[11px] text-slate-500 bg-slate-50 p-3 rounded-xl border border-slate-100">
-                        <div className="flex justify-between"><span>تاريخ العرض</span><span className="font-mono text-slate-700">{q.date}</span></div>
+                      <h3 className="font-bold text-ink text-sm">{q.customerName}</h3>
+                      <p className="text-[11px] text-muted mb-3 font-mono">{q.customerPhone || '—'}</p>
+                      <div className="space-y-1.5 text-[11px] text-muted bg-surface-muted p-3 rounded-xl border border-line">
+                        <div className="flex justify-between"><span>تاريخ العرض</span><span className="font-mono text-ink">{q.date}</span></div>
                         <div className="flex justify-between">
                           <span>صالح لغاية</span>
-                          <span className="font-mono text-slate-700 flex items-center gap-1.5">
+                          <span className="font-mono text-ink flex items-center gap-1.5">
                             {q.validUntil}
                             {q.status === 'PENDING' && (() => {
                               const days = Math.ceil((new Date(q.validUntil).getTime() - Date.now()) / 86400000);
-                              if (days < 0) return <span className="text-[9px] font-bold text-slate-400">(منتهي)</span>;
-                              if (days <= 7) return <span className="text-[9px] font-bold text-rose-600 bg-rose-50 border border-rose-200 rounded px-1">باقي {days} يوم</span>;
+                              if (days < 0) return <span className="text-[9px] font-bold text-muted">(منتهي)</span>;
+                              if (days <= 7) return <span className="text-[9px] font-bold text-danger bg-danger-soft border border-danger-border rounded px-1">باقي {days} يوم</span>;
                               return null;
                             })()}
                           </span>
                         </div>
-                        <div className="flex justify-between"><span>البنود</span><span className="font-mono text-slate-700">{q.itemsCount || 0}</span></div>
+                        <div className="flex justify-between"><span>البنود</span><span className="font-mono text-ink">{q.itemsCount || 0}</span></div>
                         {q.followUpDate && (
                           <div className="flex justify-between">
                             <span>المتابعة القادمة</span>
-                            <span className={`font-mono ${q.status === 'PENDING' && q.followUpDate <= localDateString() ? 'text-rose-600 font-bold' : 'text-slate-700'}`}>{q.followUpDate}</span>
+                            <span className={`font-mono ${q.status === 'PENDING' && q.followUpDate <= localDateString() ? 'text-danger font-bold' : 'text-ink'}`}>{q.followUpDate}</span>
                           </div>
                         )}
-                        {(q.contactCount || 0) > 0 && <div className="flex justify-between"><span>مرات التواصل</span><span className="font-mono text-slate-700">{q.contactCount}</span></div>}
-                        {q.convertedOrderNumber && <div className="flex justify-between"><span>الطلب</span><span className="font-mono text-sky-600">{q.convertedOrderNumber}</span></div>}
-                        {q.convertedInvoiceNumber && <div className="flex justify-between"><span>الفاتورة</span><span className="font-mono text-emerald-600">{q.convertedInvoiceNumber}</span></div>}
+                        {(q.contactCount || 0) > 0 && <div className="flex justify-between"><span>مرات التواصل</span><span className="font-mono text-ink">{q.contactCount}</span></div>}
+                        {q.convertedOrderNumber && <div className="flex justify-between"><span>الطلب</span><span className="font-mono text-primary">{q.convertedOrderNumber}</span></div>}
+                        {q.convertedInvoiceNumber && <div className="flex justify-between"><span>الفاتورة</span><span className="font-mono text-success">{q.convertedInvoiceNumber}</span></div>}
                       </div>
-                      <div className="bg-white rounded-xl p-3 border border-slate-200 flex items-center justify-between mt-3">
-                        <span className="text-xs text-slate-500">إجمالي المقايسة</span>
-                        <span className="text-sm font-black text-emerald-600">{fmt(q.totalAmount)}</span>
+                      <div className="bg-surface rounded-xl p-3 border border-line flex items-center justify-between mt-3">
+                        <span className="text-xs text-muted">إجمالي المقايسة</span>
+                        <span className="text-sm font-black text-success">{fmt(q.totalAmount)}</span>
                       </div>
+                      {operationalFields.length > 0 && (
+                        <div className="mt-2">
+                          <OperationalFieldsChips fields={operationalFields} values={valuesByQuotation[q.id]} max={4} />
+                        </div>
+                      )}
                     </div>
-                    <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-end gap-1.5 flex-wrap">
+                    <div className="mt-4 pt-3 border-t border-line flex items-center justify-end gap-1.5 flex-wrap">
                       <Btn onClick={() => setDetail(service.getQuotation(q.id))} tone="slate"><Eye className="w-3.5 h-3.5" /> تفاصيل</Btn>
                       <Btn onClick={() => printService.printQuotation(service.getQuotation(q.id))} tone="slate"><Printer className="w-3.5 h-3.5" /> طباعة</Btn>
-                      <Btn onClick={() => shareOnWhatsApp(q)} tone="slate"><MessageCircle className="w-3.5 h-3.5 text-emerald-600" /> واتساب</Btn>
+                      <Btn onClick={() => shareOnWhatsApp(q)} tone="slate"><MessageCircle className="w-3.5 h-3.5 text-success" /> واتساب</Btn>
                       {canCreate && q.status === 'PENDING' && (
                         <Btn onClick={() => openFollowUp(q)} tone="sky"><CalendarClock className="w-3.5 h-3.5" /> متابعة</Btn>
                       )}
@@ -567,17 +574,17 @@ export const QuotationsPage: React.FC = () => {
                 );
               })}
               {quotations.length === 0 && (
-                <div className="col-span-full py-16 text-center text-slate-400 border-2 border-dashed border-slate-200 rounded-2xl bg-white">لا توجد عروض أسعار مطابقة.</div>
+                <div className="col-span-full py-16 text-center text-muted border-2 border-dashed border-line rounded-2xl bg-surface">لا توجد عروض أسعار مطابقة.</div>
               )}
             </div>
 
             {quotations.length > PAGE_SIZE && (
-              <div className="flex items-center justify-between mt-4 text-xs text-slate-500">
+              <div className="flex items-center justify-between mt-4 text-xs text-muted">
                 <span>{(page - 1) * PAGE_SIZE + 1} — {Math.min(page * PAGE_SIZE, quotations.length)} من {quotations.length}</span>
                 <div className="flex items-center gap-1">
-                  <button disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))} className="p-1.5 rounded-lg border border-slate-200 bg-white disabled:opacity-40"><ChevronRight className="w-4 h-4" /></button>
+                  <button disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))} className="p-1.5 rounded-lg border border-line bg-surface disabled:opacity-40"><ChevronRight className="w-4 h-4" /></button>
                   <span className="px-3 font-bold">{page} / {totalPages}</span>
-                  <button disabled={page >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))} className="p-1.5 rounded-lg border border-slate-200 bg-white disabled:opacity-40"><ChevronLeft className="w-4 h-4" /></button>
+                  <button disabled={page >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))} className="p-1.5 rounded-lg border border-line bg-surface disabled:opacity-40"><ChevronLeft className="w-4 h-4" /></button>
                 </div>
               </div>
             )}
@@ -667,9 +674,9 @@ const Stat: React.FC<{ label: string; value: string; icon: React.ElementType; to
 
 const Btn: React.FC<{ onClick: () => void; tone: 'slate' | 'sky' | 'emerald'; children: React.ReactNode }> = ({ onClick, tone, children }) => {
   const styles: Record<string, string> = {
-    slate: 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200',
-    sky: 'bg-sky-50 hover:bg-sky-100 text-sky-700 border-sky-200',
-    emerald: 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600',
+    slate: 'bg-surface-sunken hover:bg-surface-sunken text-ink border-line',
+    sky: 'bg-accent-soft hover:bg-accent-soft text-primary border-accent-border',
+    emerald: 'bg-success hover:bg-success text-white border-success',
   };
   return <button onClick={onClick} className={`px-3 py-1.5 border rounded-xl text-xs font-bold flex items-center gap-1.5 transition ${styles[tone]}`}>{children}</button>;
 };

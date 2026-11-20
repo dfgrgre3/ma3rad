@@ -187,3 +187,73 @@ test('warehouse administration requires an approved stock transfer before deacti
   operations.setWarehouseActive(emptyWarehouse.id, true);
   assert.equal(operations.getWarehouses().find((warehouse) => warehouse.id === emptyWarehouse.id)?.isActive, true);
 });
+
+test('delivery packing links batches and pre-shipment QC gates dispatch', async () => {
+  const db = await boot();
+  const operations = new OperationsService();
+
+  const companyId = db.query<{ companyId: string }>(
+    'SELECT company_id AS companyId FROM branches WHERE is_main = 1 LIMIT 1'
+  )[0]?.companyId;
+  db.run(
+    `INSERT OR REPLACE INTO customers (id, code, name, phone, company_id)
+     VALUES ('cust_ship_qc', 'SHIP-QC', 'Shipping QC Customer', '', ?)`,
+    [companyId]
+  );
+  const categoryId = db.query<{ id: string }>('SELECT id FROM categories LIMIT 1')[0]?.id;
+  const brandId = db.query<{ id: string }>('SELECT id FROM brands LIMIT 1')[0]?.id;
+  db.run(
+    `INSERT OR REPLACE INTO products (id, sku, barcode, name, category_id, brand_id, size, base_unit, cost_price)
+     VALUES ('prod_ship_qc', 'SHIP-QC', 'SHIP-QC', 'Shipping QC product', ?, ?, '60x60', 'M2', 10)`,
+    [categoryId, brandId]
+  );
+  const deliveryWarehouse = db.query<{ id: string }>(
+    `SELECT id FROM warehouses WHERE is_active = 1 ORDER BY is_default DESC LIMIT 1`
+  )[0].id;
+  db.run(
+    `INSERT OR REPLACE INTO product_batches
+       (id, product_id, warehouse_id, batch_number, tone_shade, quantity_m2, quantity_remaining_m2)
+     VALUES ('pb_ship_qc', 'prod_ship_qc', ?, 'LOT-2026-001', '', 5, 5)`,
+    [deliveryWarehouse]
+  );
+
+  const delivery = operations.createDelivery({
+    customerId: 'cust_ship_qc', address: 'Test address', requiresShipmentQc: true,
+  });
+  assert.equal(delivery.requiresShipmentQc, true);
+
+  // Packing a line against the tracked lot.
+  const item = operations.addDeliveryItem(delivery.id, {
+    productId: 'prod_ship_qc', quantityM2: 2, boxesCount: 1, productBatchId: 'pb_ship_qc',
+  });
+  assert.equal(item.lotNumber, 'LOT-2026-001');
+  assert.equal(item.batchNumber, 'LOT-2026-001');
+  assert.equal(operations.getDeliveryItems(delivery.id).length, 1);
+  assert.throws(
+    () => operations.addDeliveryItem(delivery.id, { productId: 'prod_ship_qc', quantityM2: 99, productBatchId: 'pb_ship_qc' }),
+    /الرصيد المتاح/
+  );
+
+  // QC gate: cannot dispatch until a PASS check exists.
+  assert.throws(() => operations.updateDeliveryStatus(delivery.id, 'IN_TRANSIT'), /فحص ما قبل الشحن/);
+  operations.recordShipmentQc(delivery.id, { result: 'FAIL', findings: 'تالف' });
+  assert.throws(() => operations.updateDeliveryStatus(delivery.id, 'IN_TRANSIT'), /فحص ما قبل الشحن/);
+  operations.recordShipmentQc(delivery.id, { result: 'PASS', packagingOk: true, quantitiesOk: true });
+  operations.updateDeliveryStatus(delivery.id, 'IN_TRANSIT');
+  assert.equal(
+    db.query<{ status: string }>('SELECT status FROM deliveries WHERE id = ?', [delivery.id])[0].status,
+    'IN_TRANSIT'
+  );
+
+  const checks = operations.getShipmentQcChecks(delivery.id);
+  assert.equal(checks.length, 2);
+  assert.equal(checks[0].result, 'PASS');
+  assert.equal(checks[0].packagingOk, true);
+
+  // Packing is locked once delivered.
+  operations.updateDeliveryStatus(delivery.id, 'DELIVERED');
+  assert.throws(
+    () => operations.addDeliveryItem(delivery.id, { productId: 'prod_ship_qc', quantityM2: 1 }),
+    /منتهي/
+  );
+});

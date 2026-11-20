@@ -252,27 +252,27 @@ export const QuickSaleModal: React.FC<{ onClose: () => void; onSaved: () => void
     <ModalShell title="بيع سريع" subtitle="تسجيل فاتورة بيع مباشرة من صفحة مبيعات اليوم" onClose={onClose} wide busy={saving}>
       <div className="space-y-4">
         <form className="flex gap-2" onSubmit={(event) => { event.preventDefault(); const input = event.currentTarget.elements.namedItem('barcode') as HTMLInputElement; addBarcodeProduct(input.value); input.value = ''; }}>
-          <div className="relative flex-1"><Barcode className="absolute right-3 top-2.5 h-4 w-4 text-slate-400" /><input id="sale-barcode" name="barcode" autoComplete="off" placeholder="امسح الباركود أو أدخل كود الصنف (F2)" className={`${input} pr-9`} /></div>
-          <button type="submit" className="rounded-lg bg-slate-800 px-4 text-xs font-bold text-white">إضافة</button>
+          <div className="relative flex-1"><Barcode className="absolute right-3 top-2.5 h-4 w-4 text-muted" /><input id="sale-barcode" name="barcode" autoComplete="off" placeholder="امسح الباركود أو أدخل كود الصنف (F2)" className={`${input} pr-9`} /></div>
+          <button type="submit" className="rounded-lg bg-primary px-4 text-xs font-bold text-white">إضافة</button>
         </form>
         {listsError && <LoadErrorNotice message={listsError} />}
         {!listsError && customers.length === 0 && (
-          <div role="status" className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          <div role="status" className="rounded-lg border border-warning-border bg-warning-soft px-3 py-2 text-xs text-warning">
             لا يوجد عملاء نشطون. أضف عميلًا من إدارة العملاء أو تحقق من وجود عميل نقدي.
           </div>
         )}
         {!listsError && products.length === 0 && (
-          <div role="status" className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          <div role="status" className="rounded-lg border border-warning-border bg-warning-soft px-3 py-2 text-xs text-warning">
             لا توجد أصناف نشطة للاختيار. أضف صنفًا أو أعد تفعيل صنف من إدارة الأصناف.
           </div>
         )}
         {!listsError && warehouses.length === 0 && (
-          <div role="status" className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          <div role="status" className="rounded-lg border border-warning-border bg-warning-soft px-3 py-2 text-xs text-warning">
             لا توجد مخازن متاحة لحسابك. تحقق من صلاحيات الفروع والمخازن.
           </div>
         )}
         {stockError && (
-          <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+          <div role="alert" className="rounded-lg border border-danger-border bg-danger-soft px-3 py-2 text-xs text-danger">
             تعذر تحميل رصيد المخزن: {stockError} ستظل صلاحية الكمية تُراجع عند حفظ الفاتورة.
           </div>
         )}
@@ -302,20 +302,20 @@ export const QuickSaleModal: React.FC<{ onClose: () => void; onSaved: () => void
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 rounded-xl border border-slate-200 p-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 rounded-xl border border-line p-3">
           <div><label htmlFor="sale-discount" className={label}><Percent className="inline h-3 w-3" /> خصم الفاتورة</label><input id="sale-discount" type="number" min="0" step="0.01" value={discountAmount} onChange={(e) => setDiscountAmount(e.target.value)} className={input} placeholder="0.00" /></div>
           <div><label htmlFor="sale-tax" className={label}><Percent className="inline h-3 w-3" /> ضريبة %</label><input id="sale-tax" type="number" min="0" max="100" step="0.01" value={taxPercentage} onChange={(e) => setTaxPercentage(e.target.value)} className={input} placeholder="0" /></div>
           <div><label htmlFor="sale-shipping" className={label}><Truck className="inline h-3 w-3" /> مشال / نقل</label><input id="sale-shipping" type="number" min="0" step="0.01" value={shippingCost} onChange={(e) => setShippingCost(e.target.value)} className={input} placeholder="0.00" /></div>
         </div>
 
-        <div className="rounded-xl border border-slate-200 overflow-hidden">
-          <div className="px-3 py-2 bg-slate-50 flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-700">الأصناف</span>
-            <button type="button" onClick={() => setLines((prev) => [...prev, emptyLine()])} className="flex items-center gap-1 text-[11px] font-bold text-sky-600">
+        <div className="rounded-xl border border-line overflow-hidden">
+          <div className="px-3 py-2 bg-surface-muted flex items-center justify-between">
+            <span className="text-xs font-bold text-ink">الأصناف</span>
+            <button type="button" onClick={() => setLines((prev) => [...prev, emptyLine()])} className="flex items-center gap-1 text-[11px] font-bold text-primary">
               <Plus className="w-3.5 h-3.5" /> إضافة صنف
             </button>
           </div>
-          <div className="divide-y divide-slate-100">
+          <div className="divide-y divide-line-strong">
             {lines.map((line, index) => {
               const product = productOf(line.productId);
               const unit = product ? getProductUnitLabel(product) : 'م²';
@@ -337,14 +337,14 @@ export const QuickSaleModal: React.FC<{ onClose: () => void; onSaved: () => void
                       disabled={Boolean(listsError)}
                     />
                   ) : (
-                    <div className="rounded-lg border border-dashed border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800" role="status">
+                    <div className="rounded-lg border border-dashed border-warning bg-warning-soft px-3 py-2 text-xs text-warning" role="status">
                       لا توجد أصناف نشطة متاحة. أضف صنفًا أو أعد تفعيله قبل تسجيل البيع.
                     </div>
                   )}
                   {product && warehouseId && (
-                    <p className="mt-1 text-[11px] text-slate-500" aria-live="polite">
+                    <p className="mt-1 text-[11px] text-muted" aria-live="polite">
                       {stockError ? 'الرصيد غير متاح حاليًا' : (
-                        <>المتاح: {fmt(stock?.available || 0)} {unit} · المتبقي بعد البيع: <span className={stock && stock.remaining < 0 ? 'font-bold text-rose-600' : ''}>{fmt(stock?.remaining || 0)} {unit}</span></>
+                        <>المتاح: {fmt(stock?.available || 0)} {unit} · المتبقي بعد البيع: <span className={stock && stock.remaining < 0 ? 'font-bold text-danger' : ''}>{fmt(stock?.remaining || 0)} {unit}</span></>
                       )}
                     </p>
                   )}
@@ -357,12 +357,12 @@ export const QuickSaleModal: React.FC<{ onClose: () => void; onSaved: () => void
                   <label htmlFor={priceId} className={label}>سعر {unit}</label>
                   <input id={priceId} type="number" min="0" step="0.01" value={line.unitPrice} onChange={(e) => setLine(index, { unitPrice: e.target.value })} className={input} disabled={products.length === 0 || Boolean(listsError)} />
                 </div>
-                <div className="sm:col-span-1 pb-2 text-xs font-bold text-slate-600" aria-label={`إجمالي السطر ${index + 1}`}>
-                  <span className="block text-[10px] font-medium text-slate-500">المجموع</span>
+                <div className="sm:col-span-1 pb-2 text-xs font-bold text-ink-secondary" aria-label={`إجمالي السطر ${index + 1}`}>
+                  <span className="block text-[10px] font-medium text-muted">المجموع</span>
                   {fmt(round2((Number(line.quantityM2) || 0) * (Number(line.unitPrice) || 0)))}
                 </div>
                 <div className="sm:col-span-1 pb-1">
-                  <button type="button" aria-label="حذف الصنف" onClick={() => setLines((prev) => prev.length > 1 ? prev.filter((_, i) => i !== index) : prev)} className="p-2 text-rose-500 hover:bg-rose-50 rounded-lg">
+                  <button type="button" aria-label="حذف الصنف" onClick={() => setLines((prev) => prev.length > 1 ? prev.filter((_, i) => i !== index) : prev)} className="p-2 text-danger hover:bg-danger-soft rounded-lg">
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
@@ -374,8 +374,8 @@ export const QuickSaleModal: React.FC<{ onClose: () => void; onSaved: () => void
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <div>
             <label htmlFor="sale-paid-amount" className={label}>المبلغ المدفوع</label>
-            <input id="sale-paid-amount" type="number" min="0" max={total} step="0.01" value={paidAmount} placeholder={`افتراضي: ${fmt(paymentType === 'CREDIT' ? 0 : total)}`} onChange={(e) => setPaidAmount(e.target.value)} aria-invalid={!isPaidAmountValid} className={`${input} ${isPaidAmountValid ? '' : 'border-rose-500 focus:ring-rose-500'}`} />
-            {!isPaidAmountValid && <p role="alert" className="mt-1 text-[11px] text-rose-600">أدخل مبلغًا بين صفر وإجمالي الفاتورة.</p>}
+            <input id="sale-paid-amount" type="number" min="0" max={total} step="0.01" value={paidAmount} placeholder={`افتراضي: ${fmt(paymentType === 'CREDIT' ? 0 : total)}`} onChange={(e) => setPaidAmount(e.target.value)} aria-invalid={!isPaidAmountValid} className={`${input} ${isPaidAmountValid ? '' : 'border-danger focus:ring-danger'}`} />
+            {!isPaidAmountValid && <p role="alert" className="mt-1 text-[11px] text-danger">أدخل مبلغًا بين صفر وإجمالي الفاتورة.</p>}
           </div>
           <div className="md:col-span-2">
             <label htmlFor="sale-notes" className={label}>ملاحظات</label>
@@ -383,26 +383,26 @@ export const QuickSaleModal: React.FC<{ onClose: () => void; onSaved: () => void
           </div>
         </div>
 
-        <div className="grid grid-cols-1  sm:grid-cols-5 gap-2 rounded-xl bg-slate-50 border border-slate-200 px-4 py-3 text-center">
+        <div className="grid grid-cols-1 sm:grid-cols-5 gap-2 rounded-xl bg-surface-muted border border-line px-4 py-3 text-center">
           <div>
-            <span className="block text-[11px] text-slate-500">قيمة الأصناف</span>
-            <span className="text-sm font-black text-slate-900">{fmt(subtotal)}</span>
+            <span className="block text-[11px] text-muted">قيمة الأصناف</span>
+            <span className="text-sm font-black text-ink">{fmt(subtotal)}</span>
           </div>
-          <div><span className="block text-[11px] text-slate-500">الخصم والضريبة والنقل</span><span className="text-sm font-black text-slate-700">-{fmt(discount)} · +{fmt(tax + shipping)}</span></div>
-          <div><span className="block text-[11px] text-slate-500">الإجمالي</span><span className="text-sm font-black text-slate-900">{fmt(total)}</span></div>
+          <div><span className="block text-[11px] text-muted">الخصم والضريبة والنقل</span><span className="text-sm font-black text-ink">-{fmt(discount)} · +{fmt(tax + shipping)}</span></div>
+          <div><span className="block text-[11px] text-muted">الإجمالي</span><span className="text-sm font-black text-ink">{fmt(total)}</span></div>
           <div>
-            <span className="block text-[11px] text-slate-500">المدفوع</span>
-            <span className="text-sm font-black text-emerald-700">{fmt(effectivePaid)}</span>
+            <span className="block text-[11px] text-muted">المدفوع</span>
+            <span className="text-sm font-black text-success">{fmt(effectivePaid)}</span>
           </div>
           <div>
-            <span className="block text-[11px] text-slate-500">المتبقي</span>
-            <span className="text-sm font-black text-amber-700">{fmt(remainingAmount)}</span>
+            <span className="block text-[11px] text-muted">المتبقي</span>
+            <span className="text-sm font-black text-warning">{fmt(remainingAmount)}</span>
           </div>
         </div>
 
         <div className="flex justify-end gap-2">
-          <button type="button" onClick={onClose} disabled={saving} className="px-4 py-2 text-sm font-semibold text-slate-600 rounded-lg hover:bg-slate-100 disabled:opacity-50">إلغاء</button>
-          <button type="button" onClick={save} disabled={saving || Boolean(listsError)} className="flex items-center gap-1.5 px-5 py-2 bg-emerald-600 text-white rounded-lg text-sm font-bold hover:bg-emerald-700 disabled:opacity-50">
+          <button type="button" onClick={onClose} disabled={saving} className="px-4 py-2 text-sm font-semibold text-ink-secondary rounded-lg hover:bg-surface-sunken disabled:opacity-50">إلغاء</button>
+          <button type="button" onClick={save} disabled={saving || Boolean(listsError)} className="flex items-center gap-1.5 px-5 py-2 bg-success text-white rounded-lg text-sm font-bold hover:bg-success disabled:opacity-50">
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} حفظ الفاتورة <span className="text-[10px] opacity-80">Ctrl+إدخال</span>
           </button>
         </div>

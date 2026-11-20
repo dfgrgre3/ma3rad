@@ -42,7 +42,7 @@ const isLegacyTab = (value: string | null): value is LegacyTab =>
 
 const LegacyReport: React.FC<{ tab: LegacyTab }> = ({ tab }) => (
   <Suspense
-    fallback={<div className="p-10 text-center text-sm text-slate-500">جارٍ تحميل التقرير…</div>}
+    fallback={<div className="p-10 text-center text-sm text-muted">جارٍ تحميل التقرير…</div>}
   >
     {tab === 'sales' && <div className="h-full overflow-auto"><SalesReportsPage /></div>}
     {tab === 'purchases' && <div className="h-full overflow-auto"><PurchaseInventoryReportPage /></div>}
@@ -58,7 +58,8 @@ export const ReportsHubPage: React.FC = () => {
   const params = useParams<{ reportId?: string; categoryId?: string }>();
   const currentUser = AuthService.getCurrentUser();
   const canSeeReport = (report: ReportDefinition) =>
-    PermissionService.can(currentUser, reportPermission(report));
+    PermissionService.can(currentUser, reportPermission(report))
+    && (!report.activityOnly || report.activityOnly === getEffectiveBusinessType());
   const [searchParams] = useSearchParams();
   const [search, setSearch] = useState('');
   const pageCopy = useActivityPageCopy('reports');
@@ -98,23 +99,23 @@ export const ReportsHubPage: React.FC = () => {
   if (selectedReport) {
     if (!canSeeReport(selectedReport)) {
       return (
-        <div className="flex h-full items-center justify-center p-6 text-sm font-bold text-slate-500">
+        <div className="flex h-full items-center justify-center p-6 text-sm font-bold text-muted">
           لا تملك صلاحية عرض هذا التقرير.
         </div>
       );
     }
     if (selectedReport.legacyTab) {
       return (
-        <div className="flex h-full flex-col bg-slate-50">
-          <div className="flex items-center gap-2 border-b border-slate-200 bg-white px-4 py-2">
+        <div className="flex h-full flex-col bg-surface-muted">
+          <div className="flex items-center gap-2 border-b border-line bg-surface px-4 py-2">
             <button
               type="button"
               onClick={backToHub}
-              className="flex items-center gap-2 rounded-lg px-2 py-1 text-xs font-bold text-slate-600 transition hover:bg-slate-100"
+              className="flex items-center gap-2 rounded-lg px-2 py-1 text-xs font-bold text-ink-secondary transition hover:bg-surface-sunken"
             >
               <ArrowLeft className="h-4 w-4" /> مركز التقارير
             </button>
-            <span className="text-xs font-bold text-slate-400">/ {selectedReport.title}</span>
+            <span className="text-xs font-bold text-muted">/ {selectedReport.title}</span>
           </div>
           <div className="min-h-0 flex-1 overflow-auto">
             <LegacyReport tab={selectedReport.legacyTab} />
@@ -129,22 +130,22 @@ export const ReportsHubPage: React.FC = () => {
     const legacy = REPORT_DEFINITIONS.find((report) => report.legacyTab === tabParam);
     if (legacy && !canSeeReport(legacy)) {
       return (
-        <div className="flex h-full items-center justify-center p-6 text-sm font-bold text-slate-500">
+        <div className="flex h-full items-center justify-center p-6 text-sm font-bold text-muted">
           لا تملك صلاحية عرض هذا التقرير.
         </div>
       );
     }
     return (
-      <div className="flex h-full flex-col bg-slate-50">
-        <div className="flex items-center gap-2 border-b border-slate-200 bg-white px-4 py-2">
+      <div className="flex h-full flex-col bg-surface-muted">
+        <div className="flex items-center gap-2 border-b border-line bg-surface px-4 py-2">
           <button
             type="button"
             onClick={backToHub}
-            className="flex items-center gap-2 rounded-lg px-2 py-1 text-xs font-bold text-slate-600 transition hover:bg-slate-100"
+            className="flex items-center gap-2 rounded-lg px-2 py-1 text-xs font-bold text-ink-secondary transition hover:bg-surface-sunken"
           >
             <ArrowLeft className="h-4 w-4" /> مركز التقارير
           </button>
-          <span className="text-xs font-bold text-slate-400">/ {legacy?.title || tabParam}</span>
+          <span className="text-xs font-bold text-muted">/ {legacy?.title || tabParam}</span>
         </div>
         <div className="min-h-0 flex-1 overflow-auto">
           <LegacyReport tab={tabParam} />

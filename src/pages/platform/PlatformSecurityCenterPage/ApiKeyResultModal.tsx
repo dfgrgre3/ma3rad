@@ -26,9 +26,9 @@ export const ApiKeyResultModal: React.FC<ApiKeyResultModalProps> = ({ result, on
       title="تم إنشاء مفتاح الـ API بنجاح"
     >
       <div className="space-y-4 text-right">
-        <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg flex items-start gap-2.5">
-          <AlertTriangle className="h-5 w-5 text-amber-400 shrink-0 mt-0.5" />
-          <div className="text-xs text-amber-200">
+        <div className="p-3 bg-warning/10 border border-warning/20 rounded-lg flex items-start gap-2.5">
+          <AlertTriangle className="h-5 w-5 text-warning shrink-0 mt-0.5" />
+          <div className="text-xs text-warning">
             <strong className="font-bold block mb-1">تنبيه أمان فائق الأهمية:</strong>
             هذه هي المرة الوحيدة التي سيظهر فيها مفتاح الـ API السري كاملاً. قم بنسخه وحفظه في بيئة آمنة فوراً؛ لن تتمكن من رؤيته مرة أخرى!
           </div>
@@ -36,13 +36,13 @@ export const ApiKeyResultModal: React.FC<ApiKeyResultModalProps> = ({ result, on
 
         {result && (
           <div className="space-y-2">
-            <label className="block text-xs font-semibold text-slate-300">مفتاح الـ API السري الكامل (Secret Key):</label>
+            <label className="block text-xs font-semibold text-muted">مفتاح الـ API السري الكامل (Secret Key):</label>
             <div className="flex items-center gap-2">
               <input
                 type="text"
                 readOnly
                 value={result.plainTextKey}
-                className={`${inputClass} font-mono text-emerald-400 select-all`}
+                className={`${inputClass} font-mono text-success select-all`}
               />
               <Button
                 size="sm"
@@ -57,7 +57,7 @@ export const ApiKeyResultModal: React.FC<ApiKeyResultModalProps> = ({ result, on
               </Button>
             </div>
 
-            <div className="mt-3 p-3 bg-slate-950/60 rounded-lg border border-slate-800 text-xs space-y-1 text-slate-300">
+            <div className="mt-3 p-3 bg-primary/60 rounded-lg border border-line-strong text-xs space-y-1 text-muted">
               <p><strong>اسم المفتاح:</strong> {result.key.name}</p>
               <p><strong>البادئة:</strong> <span className="font-mono">{result.key.keyPrefix}</span></p>
               <p><strong>الصلاحيات:</strong> {result.key.scopes.join(', ') || 'الكل'}</p>
@@ -66,7 +66,7 @@ export const ApiKeyResultModal: React.FC<ApiKeyResultModalProps> = ({ result, on
           </div>
         )}
 
-        <div className="flex justify-end pt-3 border-t border-slate-800">
+        <div className="flex justify-end pt-3 border-t border-line-strong">
           <Button size="sm" onClick={onClose}>
             لقد قمت بحفظ المفتاح بأمان، إغلاق
           </Button>

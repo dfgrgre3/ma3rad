@@ -12,11 +12,11 @@ interface BranchStepProps {
 
 export const BranchStep: React.FC<BranchStepProps> = ({ options, form, set, optionControl }) => (
   <div className="space-y-4">
-    <div className="flex items-start gap-3 rounded-xl border border-sky-100 bg-sky-50 p-3">
-      <Warehouse className="mt-0.5 h-5 w-5 shrink-0 text-sky-700" />
+    <div className="flex items-start gap-3 rounded-xl border border-accent-border bg-accent-soft p-3">
+      <Warehouse className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
       <div>
-        <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100">جهّز موقع التشغيل الافتراضي</h2>
-        <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">ستُربط المبيعات والمخزون بالفرع والمخزن الافتراضيين، ويمكن إضافة مواقع أخرى لاحقًا.</p>
+        <h2 className="text-sm font-bold text-ink ">جهّز موقع التشغيل الافتراضي</h2>
+        <p className="mt-1 text-xs text-ink-secondary ">ستُربط المبيعات والمخزون بالفرع والمخزن الافتراضيين، ويمكن إضافة مواقع أخرى لاحقًا.</p>
       </div>
     </div>
     {optionControl('branch', 'تخصيص الفرع والمخزن الآن', 'يمكن تخطي تعديل أسمائهما وبياناتهما؛ يظل الفرع والمخزن الافتراضيان الموجودان مطلوبين لتشغيل النظام.')}

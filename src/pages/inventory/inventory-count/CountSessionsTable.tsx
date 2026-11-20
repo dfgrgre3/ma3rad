@@ -15,7 +15,7 @@ export const CountSessionsTable: React.FC<CountSessionsTableProps> = ({ loading,
     {
       key: 'code',
       header: 'كود الجلسة',
-      className: 'font-mono font-bold text-sky-600',
+      className: 'font-mono font-bold text-primary',
       render: (session) => session.code,
     },
     {
@@ -51,15 +51,15 @@ export const CountSessionsTable: React.FC<CountSessionsTableProps> = ({ loading,
       key: 'status',
       header: 'الحالة',
       render: (session) => session.status === 'POSTED' ? (
-        <span className="inline-flex w-fit items-center gap-1 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-600">
+        <span className="inline-flex w-fit items-center gap-1 rounded-full border border-success/20 bg-success/10 px-2 py-0.5 text-[10px] font-bold text-success">
           <CheckCircle2 className="h-3 w-3" aria-hidden="true" /> مطابق ومرحل
         </span>
       ) : session.status === 'REVIEW' ? (
-        <span className="rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[10px] font-bold text-sky-700">بانتظار المراجعة</span>
+        <span className="rounded-full border border-accent-border bg-accent-soft px-2 py-0.5 text-[10px] font-bold text-primary">بانتظار المراجعة</span>
       ) : session.status === 'CANCELLED' ? (
-        <span className="rounded-full border border-slate-200 bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-500">ملغى</span>
+        <span className="rounded-full border border-line bg-surface-sunken px-2 py-0.5 text-[10px] font-bold text-muted">ملغى</span>
       ) : (
-        <span className="inline-flex w-fit items-center gap-1 rounded-full border border-amber-500/20 bg-amber-500/10 px-2 py-0.5 text-[10px] font-bold text-amber-600">
+        <span className="inline-flex w-fit items-center gap-1 rounded-full border border-warning/20 bg-warning/10 px-2 py-0.5 text-[10px] font-bold text-warning">
           قيد الجرد والتعبئة
         </span>
       ),
@@ -71,7 +71,7 @@ export const CountSessionsTable: React.FC<CountSessionsTableProps> = ({ loading,
         <button
           type="button"
           onClick={() => onOpenSession(session)}
-          className="inline-flex items-center gap-1 rounded px-1 py-1 text-xs font-bold text-sky-600 transition-colors hover:text-sky-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--cerami-primary)]"
+          className="inline-flex items-center gap-1 rounded px-1 py-1 text-xs font-bold text-primary transition-colors hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--cerami-primary)]"
         >
           <FileText className="h-3.5 w-3.5" aria-hidden="true" />
           <span>{session.status === 'POSTED' ? 'عرض التقرير' : 'إدخال الجرد'}</span>

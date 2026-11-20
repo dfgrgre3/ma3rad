@@ -16,9 +16,9 @@ export const PartnerTransactionModal: React.FC<{ vm: PartnersPageVm }> = ({ vm }
   return (
     <ModalShell title={TRANSACTION_LABELS[action]} onClose={() => setModal(null)}>
       <form onSubmit={saveTransaction} className="space-y-3">
-        <p className="rounded-lg bg-slate-50 px-3 py-2 text-sm font-bold text-slate-700 dark:bg-slate-800 dark:text-slate-200">{selected.name}</p>
+        <p className="rounded-lg bg-surface-muted px-3 py-2 text-sm font-bold text-ink ">{selected.name}</p>
         {action === 'CAPITAL_CONTRIBUTION' && (
-          <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs font-bold text-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
+          <p className="rounded-lg bg-warning-soft px-3 py-2 text-xs font-bold text-warning dark:bg-warning/30 ">
             المتبقي غير المسدد من رأس المال المتفق عليه: {formatMoney(selected.remainingCapital)}
           </p>
         )}
@@ -51,10 +51,10 @@ export const PartnerTransactionModal: React.FC<{ vm: PartnersPageVm }> = ({ vm }
           </div>
         )}
         {CASH_ACTIONS.includes(action) && transactionDraft.paymentType === 'CASH' && registers.length === 0 && (
-          <p role="alert" className="text-xs font-bold text-rose-600">لا توجد خزينة نشطة متاحة في الفرع الحالي؛ اختر طريقة دفع أخرى أو فعّل خزينة.</p>
+          <p role="alert" className="text-xs font-bold text-danger">لا توجد خزينة نشطة متاحة في الفرع الحالي؛ اختر طريقة دفع أخرى أو فعّل خزينة.</p>
         )}
         {CASH_ACTIONS.includes(action) && transactionDraft.paymentType === 'BANK_TRANSFER' && bankAccounts.length === 0 && (
-          <p role="alert" className="text-xs font-bold text-rose-600">لا يوجد حساب بنكي نشط متاح للتحصيل أو الصرف.</p>
+          <p role="alert" className="text-xs font-bold text-danger">لا يوجد حساب بنكي نشط متاح للتحصيل أو الصرف.</p>
         )}
         <Field label="رقم مرجعي (اختياري)"><input value={transactionDraft.referenceNumber} onChange={(event) => setTransactionDraft({ ...transactionDraft, referenceNumber: event.target.value })} placeholder="يُنشأ مرجع فريد تلقائيًا إذا تُرك فارغًا" /></Field>
         <Field label="البيان" required><textarea required rows={3} value={transactionDraft.description} onChange={(event) => setTransactionDraft({ ...transactionDraft, description: event.target.value })} placeholder="سبب العملية أو تفاصيلها" /></Field>
@@ -79,9 +79,9 @@ export const PartnerTransactionModal: React.FC<{ vm: PartnersPageVm }> = ({ vm }
             }} />
         </Field>
         {transactionAttachments.length > 0 && (
-          <p className="text-xs text-slate-500">{transactionAttachments.map((file) => file.name).join('، ')}</p>
+          <p className="text-xs text-muted">{transactionAttachments.map((file) => file.name).join('، ')}</p>
         )}
-        <p className="text-xs text-amber-700 dark:text-amber-300">
+        <p className="text-xs text-warning ">
           {action === 'PARTNER_LOAN' && 'تُسجل النقدية الداخلة من الشريك كالتزام على الشركة في حسابه الجاري.'}
           {action === 'LOAN_REPAYMENT' && 'يُخصم السداد من رصيد قروض الشريك المستحقة فقط.'}
           {action === 'PERSONAL_DRAWING' && 'تُسجل المسحوبات الشخصية على الحساب الجاري للشريك.'}

@@ -1,4 +1,10 @@
 import type { CartItem, Toast } from '../../../../types/pos';
+import type { PosActivityCopy } from '../../../../config/posActivityCopy';
+
+export type CustomerDisplayLabels = Pick<
+  PosActivityCopy,
+  'displayWaiting' | 'displaySubtotal' | 'displayDiscount' | 'displayTax' | 'displayTotal' | 'displayPaid' | 'displayChange'
+>;
 
 export interface CustomerDisplayData {
   items: Array<{ name: string; qty: number; price: number }>;
@@ -10,7 +16,7 @@ export interface CustomerDisplayData {
   change: number;
 }
 
-export const renderCustomerDisplay = (display: Window, data: CustomerDisplayData) => {
+export const renderCustomerDisplay = (display: Window, data: CustomerDisplayData, labels: CustomerDisplayLabels) => {
   const root = display.document.getElementById('root');
   if (!root) return;
   const esc = (value: unknown) => String(value ?? '').replace(/[&<>"']/g, (char) => ({
@@ -25,12 +31,12 @@ export const renderCustomerDisplay = (display: Window, data: CustomerDisplayData
     html += data.items.map((item) => `<div class="item"><span>${esc(item.name)}</span><span>${esc(item.qty)} × ${esc(item.price)}</span></div>`).join('');
   }
   html += '<div style="margin-top:16px;border-top:2px solid #38bdf8;padding-top:12px;">';
-  html += `<div class="item"><span>المجموع الفرعي</span><span>${esc(data.subtotal)}</span></div>`;
-  if (data.discount > 0) html += `<div class="item"><span>خصم</span><span>-${esc(data.discount)}</span></div>`;
-  if (data.tax > 0) html += `<div class="item"><span>ضريبة</span><span>${esc(data.tax)}</span></div>`;
-  html += `<div class="total">الإجمالي: ${esc(data.total)}</div>`;
-  if (data.paid > 0) html += `<div class="item"><span>المدفوع</span><span>${esc(data.paid)}</span></div>`;
-  if (data.change > 0) html += `<div class="change">الباقي: ${esc(data.change)}</div>`;
+  html += `<div class="item"><span>${esc(labels.displaySubtotal)}</span><span>${esc(data.subtotal)}</span></div>`;
+  if (data.discount > 0) html += `<div class="item"><span>${esc(labels.displayDiscount)}</span><span>-${esc(data.discount)}</span></div>`;
+  if (data.tax > 0) html += `<div class="item"><span>${esc(labels.displayTax)}</span><span>${esc(data.tax)}</span></div>`;
+  html += `<div class="total">${esc(labels.displayTotal)}: ${esc(data.total)}</div>`;
+  if (data.paid > 0) html += `<div class="item"><span>${esc(labels.displayPaid)}</span><span>${esc(data.paid)}</span></div>`;
+  if (data.change > 0) html += `<div class="change">${esc(labels.displayChange)}: ${esc(data.change)}</div>`;
   root.innerHTML = `${html}</div>`;
 };
 

@@ -67,7 +67,7 @@ export const PartnerFormModal: React.FC<{ vm: PartnersPageVm }> = ({ vm }) => {
               onChange={(event) => setPartnerDraft({ ...partnerDraft, ownershipPercent: Number(event.target.value) })} />
           </Field>
         </div>
-        <p className="rounded-lg bg-sky-50 px-3 py-2 text-xs text-sky-800 dark:bg-sky-950/30 dark:text-sky-200">
+        <p className="rounded-lg bg-accent-soft px-3 py-2 text-xs text-primary dark:bg-primary/30 ">
           {partnerDraft.ownershipMode === 'AUTO'
             ? `النسبة المتوقعة لهذا الشريك ${formatNumber.format(ownershipPreview)}%. عند الحفظ تُعاد موازنة نسب الشركاء النشطين وتُحفظ التغييرات بتاريخ وسبب.`
             : 'النسب اليدوية لا تتجاوز 100% إجمالًا، وتُحفظ تغييراتها في سجل تاريخي.'}
@@ -148,12 +148,12 @@ export const PartnerFormModal: React.FC<{ vm: PartnersPageVm }> = ({ vm }) => {
                       {bankAccounts.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}
                     </select>
                   </Field>
-                ) : <span className="self-center text-xs text-slate-500">سيُسجل المبلغ دون تعديل رصيد الخزينة.</span>}
+                ) : <span className="self-center text-xs text-muted">سيُسجل المبلغ دون تعديل رصيد الخزينة.</span>}
               </div>
             )}
             {Number(partnerDraft.initialPaidAmount || 0) > 0
               && partnerDraft.initialPaymentType === 'BANK_TRANSFER' && bankAccounts.length === 0 && (
-                <p role="alert" className="text-xs font-bold text-rose-600">لا يوجد حساب بنكي نشط متاح للتحصيل.</p>
+                <p role="alert" className="text-xs font-bold text-danger">لا يوجد حساب بنكي نشط متاح للتحصيل.</p>
               )}
           </>
         )}
@@ -167,12 +167,12 @@ export const PartnerFormModal: React.FC<{ vm: PartnersPageVm }> = ({ vm }) => {
           <Field label="ملاحظات"><input value={partnerDraft.notes || ''} onChange={(event) => setPartnerDraft({ ...partnerDraft, notes: event.target.value })} /></Field>
         </div>
         {editingPartner && (
-          <label className="flex items-center gap-2 text-sm font-bold text-slate-700 dark:text-slate-300">
+          <label className="flex items-center gap-2 text-sm font-bold text-ink ">
             <input type="checkbox" checked={partnerDraft.isActive !== false} onChange={(event) => setPartnerDraft({ ...partnerDraft, isActive: event.target.checked })} />
             شريك نشط
           </label>
         )}
-        <p className="text-xs text-slate-500">
+        <p className="text-xs text-muted">
           مجموع نسب الشركاء النشطين حاليًا: {formatNumber.format(activeOwnership)}% (الحد الأقصى 100%).
           {' '}المدفوع من هذا الشريك: {formatMoney(editingPartner?.capitalContributions || 0)}.
           {editingPartner && Math.abs(editingPartner.netBalance) > 0.005 && ' لا يمكن إيقاف الشريك قبل تسوية رصيده.'}

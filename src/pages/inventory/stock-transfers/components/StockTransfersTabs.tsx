@@ -10,14 +10,14 @@ export const StockTransfersTabs: React.FC<StockTransfersTabsProps> = ({
   onStatusFilterChange,
   canViewSummary = true,
 }) => (
-  <div className="px-6 pt-4 bg-white border-b border-slate-200 flex items-center justify-between">
+  <div className="px-6 pt-4 bg-surface border-b border-line flex items-center justify-between">
     <div className="flex gap-2">
       <button
         onClick={() => onTabChange('workflow')}
         className={`pb-3 px-3 text-xs font-black border-b-2 transition ${
           activeTab === 'workflow'
-            ? 'border-sky-600 text-sky-600'
-            : 'border-transparent text-slate-400 hover:text-slate-600'
+            ? 'border-primary text-primary'
+            : 'border-transparent text-muted hover:text-ink-secondary'
         }`}
       >
         أوامر التحويل النشطة ({workflowCount})
@@ -26,8 +26,8 @@ export const StockTransfersTabs: React.FC<StockTransfersTabsProps> = ({
         onClick={() => onTabChange('history')}
         className={`pb-3 px-3 text-xs font-black border-b-2 transition ${
           activeTab === 'history'
-            ? 'border-sky-600 text-sky-600'
-            : 'border-transparent text-slate-400 hover:text-slate-600'
+            ? 'border-primary text-primary'
+            : 'border-transparent text-muted hover:text-ink-secondary'
         }`}
       >
         سجل حركات التحويل المنفذة ({historyCount})
@@ -37,8 +37,8 @@ export const StockTransfersTabs: React.FC<StockTransfersTabsProps> = ({
         onClick={() => onTabChange('summary')}
         className={`pb-3 px-3 text-xs font-black border-b-2 transition ${
           activeTab === 'summary'
-            ? 'border-sky-600 text-sky-600'
-            : 'border-transparent text-slate-400 hover:text-slate-600'
+            ? 'border-primary text-primary'
+            : 'border-transparent text-muted hover:text-ink-secondary'
         }`}
       >
         ملخص حركة المخازن
@@ -51,7 +51,7 @@ export const StockTransfersTabs: React.FC<StockTransfersTabsProps> = ({
         <select
           value={statusFilter}
           onChange={(e) => onStatusFilterChange(e.target.value)}
-          className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold"
+          className="px-3 py-1.5 bg-surface-muted border border-line rounded-xl text-xs font-bold"
         >
           <option value="ALL">جميع الحالات</option>
           <option value="REQUESTED">طلبات جديدة</option>

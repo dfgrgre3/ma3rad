@@ -15,33 +15,33 @@ export const ReportsTab: FC<ReportsTabProps> = ({ state }) => {
   } = state;
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-5 space-y-4">
+    <div className="rounded-2xl border border-line bg-surface p-5 space-y-4">
       <div className="flex items-end gap-3 flex-wrap">
-        <label className="text-xs font-bold text-slate-600">من
+        <label className="text-xs font-bold text-ink-secondary">من
           <input type="date" value={reportFrom} onChange={(e) => setReportFrom(e.target.value)}
-            className="block mt-1 rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+            className="block mt-1 rounded-lg border border-line px-3 py-2 text-sm" />
         </label>
-        <label className="text-xs font-bold text-slate-600">إلى
+        <label className="text-xs font-bold text-ink-secondary">إلى
           <input type="date" value={reportTo} onChange={(e) => setReportTo(e.target.value)}
-            className="block mt-1 rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+            className="block mt-1 rounded-lg border border-line px-3 py-2 text-sm" />
         </label>
         <button type="button"
           onClick={() => {
             try { setReport(service.getShiftReport(reportFrom, reportTo)); }
             catch (e: any) { notify(e.message || 'تعذر تحميل التقرير.', true); }
           }}
-          className="px-4 py-2 rounded-lg bg-teal-600 text-white text-sm font-bold">تشغيل التقرير</button>
+          className="px-4 py-2 rounded-lg bg-success text-white text-sm font-bold">تشغيل التقرير</button>
       </div>
-      <div className="overflow-x-auto rounded-xl border border-slate-200">
+      <div className="overflow-x-auto rounded-xl border border-line">
         <DataTable
           ariaLabel="تقرير الورديات"
           rows={report}
           rowKey={(row: any) => String(row.shiftId)}
           dense
           tableClassName="whitespace-nowrap text-xs"
-          rowClassName={() => 'border-t border-slate-100'}
+          rowClassName={() => 'border-t border-line'}
           columns={[
-            { key: 'shift', header: 'الوردية', render: (row: any) => <span className="font-bold text-slate-700">{row.definitionName}</span> },
+            { key: 'shift', header: 'الوردية', render: (row: any) => <span className="font-bold text-ink">{row.definitionName}</span> },
             { key: 'date', header: 'التاريخ', render: (row: any) => <span>{row.businessDate}</span> },
             { key: 'status', header: 'الحالة', render: (row: any) => <span>{STATUS_LABELS[row.status as keyof typeof STATUS_LABELS] || row.status}</span> },
             { key: 'supervisor', header: 'المشرف', render: (row: any) => <span>{row.supervisorName || '—'}</span> },

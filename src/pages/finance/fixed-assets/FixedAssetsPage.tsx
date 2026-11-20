@@ -248,34 +248,34 @@ export const FixedAssetsPage: React.FC = () => {
   const hasFilters = Boolean(search || categoryFilter !== 'ALL' || statusFilter !== 'ALL');
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-slate-50 text-slate-900 dark:bg-[var(--cerami-canvas)] dark:text-[var(--cerami-text)]">
-      <div className="shrink-0 bg-white px-4 pt-4 dark:bg-[var(--cerami-surface)] sm:px-6">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-surface-muted text-ink dark:bg-[var(--cerami-canvas)] dark:text-[var(--cerami-text)]">
+      <div className="shrink-0 bg-surface px-4 pt-4 dark:bg-[var(--cerami-surface)] sm:px-6">
         <PageHeader
           icon={<Building2 aria-hidden="true" className="h-5 w-5" />}
-          title={<>الأصول الثابتة <span className="mr-2 rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 align-middle text-[10px] font-bold text-slate-500">إدارة مالية</span></>}
+          title={<>الأصول الثابتة <span className="mr-2 rounded-md border border-line bg-surface-muted px-2 py-0.5 align-middle text-[10px] font-bold text-muted">إدارة مالية</span></>}
           description="سجل الاقتناء والقيمة الدفترية ومتابعة الإهلاك"
           actions={<>
             {canExport && (
               <>
                 <button type="button" onClick={() => exportAssets()} disabled={loading || visibleRows.length === 0}
-                  className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-xs font-bold text-slate-700 transition hover:border-violet-300 hover:bg-violet-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:text-slate-200">
+                  className="inline-flex items-center gap-2 rounded-lg border border-line bg-surface px-3 py-2.5 text-xs font-bold text-ink transition hover:border-accent-border hover:bg-accent-soft disabled:cursor-not-allowed disabled:opacity-50 ">
                   <Download aria-hidden="true" className="h-4 w-4" /> تصدير Excel
                 </button>
                 <button type="button" onClick={() => exportAssets(true)} disabled={loading || visibleRows.length === 0}
-                  className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-xs font-bold text-slate-700 disabled:opacity-50 dark:border-slate-700 dark:text-slate-200">
+                  className="rounded-lg border border-line bg-surface px-3 py-2.5 text-xs font-bold text-ink disabled:opacity-50 ">
                   تصدير PDF
                 </button>
               </>
             )}
             <button type="button" onClick={() => setWorkflowsOpen(true)}
-              className="inline-flex items-center gap-2 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2.5 text-xs font-bold text-violet-800 hover:bg-violet-100 dark:border-violet-800 dark:bg-violet-950/40 dark:text-violet-200">
+              className="inline-flex items-center gap-2 rounded-lg border border-accent-border bg-accent-soft px-3 py-2.5 text-xs font-bold text-primary hover:bg-accent-soft dark:bg-primary/40 ">
               <ClipboardList aria-hidden="true" className="h-4 w-4" /> عمليات الأصول
             </button>
             {canManage && (
               <button
                 type="button"
                 onClick={openNew}
-                className="inline-flex items-center gap-2 rounded-lg bg-violet-700 px-4 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-violet-800 focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:ring-offset-2"
+                className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-primary focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
               >
                 <Plus aria-hidden="true" className="h-4 w-4" /> إضافة أصل جديد
               </button>
@@ -296,28 +296,28 @@ export const FixedAssetsPage: React.FC = () => {
         />
       </div>
 
-      <section aria-label="مسارات إدارة الأصول" className="shrink-0 border-b border-slate-200 bg-white px-4 py-3 dark:border-slate-700 dark:bg-[var(--cerami-surface)] sm:px-6">
-        <div className="flex flex-col gap-3 rounded-lg border border-violet-200 bg-violet-50/60 p-3 dark:border-violet-900/70 dark:bg-violet-950/30 sm:flex-row sm:items-center sm:justify-between sm:px-4">
+      <section aria-label="مسارات إدارة الأصول" className="shrink-0 border-b border-line bg-surface px-4 py-3 dark:bg-[var(--cerami-surface)] sm:px-6">
+        <div className="flex flex-col gap-3 rounded-lg border border-accent-border bg-accent-soft/60 p-3 dark:border-primary/70 dark:bg-primary/30 sm:flex-row sm:items-center sm:justify-between sm:px-4">
           <div className="flex items-start gap-3">
-            <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-violet-700 text-white">
+            <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary text-white">
               {view === 'register' ? <Building2 aria-hidden="true" className="h-4 w-4" /> : <TrendingDown aria-hidden="true" className="h-4 w-4" />}
             </div>
             <div>
-              <h2 className="text-xs font-black text-violet-950 dark:text-violet-100">مسارات إدارة الأصول</h2>
-              <p className="mt-1 text-[10px] leading-4 text-violet-800 dark:text-violet-200">
+              <h2 className="text-xs font-black text-primary ">مسارات إدارة الأصول</h2>
+              <p className="mt-1 text-[10px] leading-4 text-primary ">
                 {view === 'register'
                   ? 'مراجعة بيانات الاقتناء والقيمة المتبقية في سجل الأصول.'
                   : 'متابعة الإهلاك الشهري المرحّل والقيمة الدفترية المتبقية.'}
               </p>
             </div>
           </div>
-          <div className="inline-flex w-fit shrink-0 rounded-lg border border-violet-200 bg-white p-1 dark:border-violet-800 dark:bg-slate-900/70" role="tablist" aria-label="طريقة عرض الأصول">
+          <div className="inline-flex w-fit shrink-0 rounded-lg border border-accent-border bg-surface p-1 dark:bg-primary/70" role="tablist" aria-label="طريقة عرض الأصول">
             <div role="tab" aria-selected={view === 'register'} className="contents">
               <button
                 type="button"
                 aria-selected={view === 'register'}
                 onClick={() => setView('register')}
-                className={`rounded-md px-3 py-2 text-xs font-bold transition focus-visible:ring-2 focus-visible:ring-violet-400 ${view === 'register' ? 'bg-violet-700 text-white shadow-sm' : 'text-slate-600 hover:bg-violet-50 hover:text-violet-900 dark:text-slate-300 dark:hover:bg-violet-950/50 dark:hover:text-violet-100'}`}
+                className={`rounded-md px-3 py-2 text-xs font-bold transition focus-visible:ring-2 focus-visible:ring-primary ${view === 'register' ? 'bg-primary text-white shadow-sm' : 'text-ink-secondary hover:bg-accent-soft hover:text-primary dark:text-muted dark:hover:bg-primary/50 dark:hover:text-primary'}`}
               >
                 سجل الأصول
               </button>
@@ -327,7 +327,7 @@ export const FixedAssetsPage: React.FC = () => {
                 type="button"
                 aria-selected={view === 'depreciation'}
                 onClick={() => setView('depreciation')}
-                className={`rounded-md px-3 py-2 text-xs font-bold transition focus-visible:ring-2 focus-visible:ring-violet-400 ${view === 'depreciation' ? 'bg-violet-700 text-white shadow-sm' : 'text-slate-600 hover:bg-violet-50 hover:text-violet-900 dark:text-slate-300 dark:hover:bg-violet-950/50 dark:hover:text-violet-100'}`}
+                className={`rounded-md px-3 py-2 text-xs font-bold transition focus-visible:ring-2 focus-visible:ring-primary ${view === 'depreciation' ? 'bg-primary text-white shadow-sm' : 'text-ink-secondary hover:bg-accent-soft hover:text-primary dark:text-muted dark:hover:bg-primary/50 dark:hover:text-primary'}`}
               >
                 متابعة الإهلاك
               </button>
@@ -336,65 +336,65 @@ export const FixedAssetsPage: React.FC = () => {
         </div>
       </section>
 
-      <section aria-label="ملخص الأصول الثابتة" className="grid shrink-0 grid-cols-2 gap-2 border-b border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-[var(--cerami-surface)] sm:grid-cols-4 sm:gap-3 sm:px-6 sm:py-4">
-        <div className="relative overflow-hidden rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 dark:border-slate-700 dark:bg-slate-800/60 sm:px-4">
-          <div className="absolute inset-y-0 right-0 w-1 bg-violet-500" />
+      <section aria-label="ملخص الأصول الثابتة" className="grid shrink-0 grid-cols-2 gap-2 border-b border-line bg-surface p-3 dark:bg-[var(--cerami-surface)] sm:grid-cols-4 sm:gap-3 sm:px-6 sm:py-4">
+        <div className="relative overflow-hidden rounded-lg border border-line bg-surface-muted px-3 py-3 dark:bg-primary/60 sm:px-4">
+          <div className="absolute inset-y-0 right-0 w-1 bg-primary" />
           <div className="flex items-center justify-between gap-2">
-            <span className="text-[10px] font-bold text-slate-500 sm:text-xs">عدد الأصول</span>
-            <ClipboardList aria-hidden="true" className="h-4 w-4 text-violet-600" />
+            <span className="text-[10px] font-bold text-muted sm:text-xs">عدد الأصول</span>
+            <ClipboardList aria-hidden="true" className="h-4 w-4 text-primary" />
           </div>
-          <div className="mt-2 text-xl font-black tabular-nums text-slate-900">{new Intl.NumberFormat('ar-EG').format(rows.length)}</div>
-          <div className="mt-0.5 text-[10px] text-slate-500">إجمالي السجل</div>
+          <div className="mt-2 text-xl font-black tabular-nums text-ink">{new Intl.NumberFormat('ar-EG').format(rows.length)}</div>
+          <div className="mt-0.5 text-[10px] text-muted">إجمالي السجل</div>
         </div>
-        <div className="relative overflow-hidden rounded-lg border border-slate-200 bg-white px-3 py-3 dark:border-slate-700 dark:bg-slate-800/40 sm:px-4">
-          <div className="absolute inset-y-0 right-0 w-1 bg-sky-500" />
+        <div className="relative overflow-hidden rounded-lg border border-line bg-surface px-3 py-3 dark:bg-primary/40 sm:px-4">
+          <div className="absolute inset-y-0 right-0 w-1 bg-primary" />
           <div className="flex items-center justify-between gap-2">
-            <span className="text-[10px] font-bold text-slate-500 sm:text-xs">تكلفة الاقتناء</span>
-            <Wallet aria-hidden="true" className="h-4 w-4 text-sky-600" />
+            <span className="text-[10px] font-bold text-muted sm:text-xs">تكلفة الاقتناء</span>
+            <Wallet aria-hidden="true" className="h-4 w-4 text-primary" />
           </div>
-          <div className="mt-2 truncate text-base font-black tabular-nums text-slate-900 sm:text-lg" dir="ltr">{fmt(totals.cost)}</div>
-          <div className="mt-0.5 text-[10px] text-slate-500">إجمالي التكلفة المسجلة</div>
+          <div className="mt-2 truncate text-base font-black tabular-nums text-ink sm:text-lg" dir="ltr">{fmt(totals.cost)}</div>
+          <div className="mt-0.5 text-[10px] text-muted">إجمالي التكلفة المسجلة</div>
         </div>
-        <div className="relative overflow-hidden rounded-lg border border-rose-200 bg-rose-50/60 px-3 py-3 dark:border-rose-900/70 dark:bg-rose-950/30 sm:px-4">
-          <div className="absolute inset-y-0 right-0 w-1 bg-rose-500" />
+        <div className="relative overflow-hidden rounded-lg border border-danger-border bg-danger-soft/60 px-3 py-3 dark:border-danger/70 dark:bg-danger/30 sm:px-4">
+          <div className="absolute inset-y-0 right-0 w-1 bg-danger" />
           <div className="flex items-center justify-between gap-2">
-            <span className="text-[10px] font-bold text-rose-700 dark:text-rose-300 sm:text-xs">مجمع الإهلاك</span>
-            <TrendingDown aria-hidden="true" className="h-4 w-4 text-rose-600" />
+            <span className="text-[10px] font-bold text-danger sm:text-xs">مجمع الإهلاك</span>
+            <TrendingDown aria-hidden="true" className="h-4 w-4 text-danger" />
           </div>
-          <div className="mt-2 truncate text-base font-black tabular-nums text-rose-800 dark:text-rose-200 sm:text-lg" dir="ltr">{fmt(totals.accumulated)}</div>
-          <div className="mt-0.5 text-[10px] text-rose-700/80 dark:text-rose-300">إهلاك مرحّل فعليًا</div>
+          <div className="mt-2 truncate text-base font-black tabular-nums text-danger sm:text-lg" dir="ltr">{fmt(totals.accumulated)}</div>
+          <div className="mt-0.5 text-[10px] text-danger/80 dark:text-danger">إهلاك مرحّل فعليًا</div>
         </div>
-        <div className="relative overflow-hidden rounded-lg border border-emerald-200 bg-emerald-50/70 px-3 py-3 dark:border-emerald-900/70 dark:bg-emerald-950/30 sm:px-4">
-          <div className="absolute inset-y-0 right-0 w-1 bg-emerald-500" />
+        <div className="relative overflow-hidden rounded-lg border border-success-border bg-success-soft/70 px-3 py-3 dark:border-success/70 dark:bg-success/30 sm:px-4">
+          <div className="absolute inset-y-0 right-0 w-1 bg-success" />
           <div className="flex items-center justify-between gap-2">
-            <span className="text-[10px] font-bold text-emerald-800 dark:text-emerald-300 sm:text-xs">القيمة الدفترية</span>
-            <Check aria-hidden="true" className="h-4 w-4 text-emerald-700" />
+            <span className="text-[10px] font-bold text-success sm:text-xs">القيمة الدفترية</span>
+            <Check aria-hidden="true" className="h-4 w-4 text-success" />
           </div>
-          <div className="mt-2 truncate text-base font-black tabular-nums text-emerald-900 dark:text-emerald-200 sm:text-lg" dir="ltr">{fmt(totals.bookValue)}</div>
-          <div className="mt-0.5 text-[10px] text-emerald-800/80 dark:text-emerald-300">التكلفة بعد الإهلاك المرحّل</div>
+          <div className="mt-2 truncate text-base font-black tabular-nums text-success sm:text-lg" dir="ltr">{fmt(totals.bookValue)}</div>
+          <div className="mt-0.5 text-[10px] text-success/80 dark:text-success">التكلفة بعد الإهلاك المرحّل</div>
         </div>
       </section>
 
-      <section aria-label="البحث والتصفية" className="shrink-0 border-b border-slate-200 bg-white px-4 py-3 dark:border-slate-700 dark:bg-[var(--cerami-surface)] sm:px-6">
+      <section aria-label="البحث والتصفية" className="shrink-0 border-b border-line bg-surface px-4 py-3 dark:bg-[var(--cerami-surface)] sm:px-6">
         <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
           <label className="relative min-w-0 flex-1 xl:max-w-md">
             <span className="sr-only">بحث بالاسم أو الكود أو الموقع أو الفئة</span>
-            <Search aria-hidden="true" className="absolute right-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <Search aria-hidden="true" className="absolute right-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
             <input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               placeholder="بحث بالاسم أو الكود أو الموقع..."
-              className="w-full rounded-lg border border-slate-200 bg-slate-50 py-2.5 pl-4 pr-10 text-sm placeholder:text-slate-400 focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-100 dark:border-slate-700 dark:placeholder:text-slate-500 dark:focus:ring-violet-950"
+              className="w-full rounded-lg border border-line bg-surface-muted py-2.5 pl-4 pr-10 text-sm placeholder:text-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary dark:placeholder:text-muted dark:focus:ring-primary"
             />
           </label>
           <div className="flex flex-wrap items-center gap-2">
-            <SlidersHorizontal aria-hidden="true" className="hidden h-4 w-4 text-slate-400 sm:block" />
+            <SlidersHorizontal aria-hidden="true" className="hidden h-4 w-4 text-muted sm:block" />
             <label className="sr-only" htmlFor="fixed-assets-category">الفئة</label>
             <select
               id="fixed-assets-category"
               value={categoryFilter}
               onChange={(event) => setCategoryFilter(event.target.value)}
-              className="min-w-32 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-xs font-bold text-slate-700 focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-100 dark:border-slate-700 dark:text-slate-200 dark:focus:ring-violet-950"
+              className="min-w-32 rounded-lg border border-line bg-surface px-3 py-2.5 text-xs font-bold text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-primary"
             >
               <option value="ALL">كل الفئات</option>
               {Object.entries(CATEGORY_LABELS).map(([category, label]) => (
@@ -406,7 +406,7 @@ export const FixedAssetsPage: React.FC = () => {
               id="fixed-assets-status"
               value={statusFilter}
               onChange={(event) => setStatusFilter(event.target.value as StatusFilter)}
-              className="min-w-32 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-xs font-bold text-slate-700 focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-100 dark:border-slate-700 dark:text-slate-200 dark:focus:ring-violet-950"
+              className="min-w-32 rounded-lg border border-line bg-surface px-3 py-2.5 text-xs font-bold text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-primary"
             >
               <option value="ALL">كل الحالات</option>
               {Object.entries(STATUS_LABELS).map(([status, label]) => (
@@ -415,11 +415,11 @@ export const FixedAssetsPage: React.FC = () => {
             </select>
             <label className="relative">
               <span className="sr-only">ترتيب الأصول</span>
-              <ArrowDownUp aria-hidden="true" className="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+              <ArrowDownUp aria-hidden="true" className="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted" />
               <select
                 value={sortField}
                 onChange={(event) => setSortField(event.target.value as SortField)}
-                className="min-w-40 rounded-lg border border-slate-200 bg-white py-2.5 pl-3 pr-8 text-xs font-bold text-slate-700 focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-100 dark:border-slate-700 dark:text-slate-200 dark:focus:ring-violet-950"
+                className="min-w-40 rounded-lg border border-line bg-surface py-2.5 pl-3 pr-8 text-xs font-bold text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-primary"
               >
                 <option value="code">ترتيب حسب الكود</option>
                 <option value="name">ترتيب حسب الاسم</option>
@@ -432,62 +432,62 @@ export const FixedAssetsPage: React.FC = () => {
               <button
                 type="button"
                 onClick={resetFilters}
-                className="rounded-lg px-2 py-2 text-xs font-bold text-slate-500 transition hover:bg-slate-100 hover:text-slate-800 focus-visible:ring-2 focus-visible:ring-violet-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
+                className="rounded-lg px-2 py-2 text-xs font-bold text-muted transition hover:bg-surface-sunken hover:text-ink focus-visible:ring-2 focus-visible:ring-primary dark:hover:bg-primary dark:hover:text-muted"
               >
                 مسح التصفية
               </button>
             )}
-            <span className="mr-auto text-xs font-semibold text-slate-500">{visibleRows.length} من {rows.length} أصل</span>
+            <span className="mr-auto text-xs font-semibold text-muted">{visibleRows.length} من {rows.length} أصل</span>
           </div>
         </div>
       </section>
 
       <main className="min-h-0 flex-1 overflow-auto p-4 sm:p-6">
-        <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700">
-          <div className="flex flex-col gap-3 border-b border-slate-200 px-4 py-3 dark:border-slate-700 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+        <section className="overflow-hidden rounded-xl border border-line bg-surface shadow-sm ">
+          <div className="flex flex-col gap-3 border-b border-line px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
             <div>
-              <h2 className="text-sm font-black text-slate-900">{view === 'register' ? 'سجل الأصول' : 'خطة الإهلاك الشهري'}</h2>
-              <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+              <h2 className="text-sm font-black text-ink">{view === 'register' ? 'سجل الأصول' : 'خطة الإهلاك الشهري'}</h2>
+              <p className="mt-1 text-[11px] text-muted ">
                 {view === 'register' ? 'بيانات الاقتناء والتكلفة والقيمة الدفترية لكل أصل' : 'معدل الإهلاك المحسوب ومتابعة القيمة المتبقية'}
               </p>
             </div>
           </div>
 
           {loading ? (
-            <div className="flex min-h-64 flex-col items-center justify-center gap-3 text-slate-500">
-              <Loader2 aria-hidden="true" className="h-6 w-6 animate-spin text-violet-600" />
+            <div className="flex min-h-64 flex-col items-center justify-center gap-3 text-muted">
+              <Loader2 aria-hidden="true" className="h-6 w-6 animate-spin text-primary" />
               <span className="text-xs font-semibold">جارٍ تحميل سجل الأصول...</span>
             </div>
           ) : error ? (
             <div role="alert" className="flex min-h-64 flex-col items-center justify-center px-6 py-12 text-center">
-              <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl border border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900/70 dark:bg-rose-950/40 dark:text-rose-300">
+              <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl border border-danger-border bg-danger-soft text-danger dark:border-danger/70 dark:bg-danger/40 ">
                 <Building2 aria-hidden="true" className="h-5 w-5" />
               </div>
-              <h3 className="text-sm font-black text-slate-800 dark:text-slate-100">تعذر تحميل سجل الأصول</h3>
-              <p className="mt-1 max-w-sm text-xs leading-5 text-slate-500 dark:text-slate-400">{error}</p>
+              <h3 className="text-sm font-black text-ink ">تعذر تحميل سجل الأصول</h3>
+              <p className="mt-1 max-w-sm text-xs leading-5 text-muted ">{error}</p>
               <button
                 type="button"
                 onClick={load}
-                className="mt-4 rounded-lg border border-rose-200 bg-white px-3 py-2 text-xs font-bold text-rose-800 transition hover:bg-rose-50 focus-visible:ring-2 focus-visible:ring-rose-400 dark:border-rose-900 dark:bg-slate-800 dark:text-rose-200 dark:hover:bg-rose-950/40"
+                className="mt-4 rounded-lg border border-danger-border bg-surface px-3 py-2 text-xs font-bold text-danger transition hover:bg-danger-soft focus-visible:ring-2 focus-visible:ring-danger dark:hover:bg-danger/40"
               >
                 إعادة المحاولة
               </button>
             </div>
           ) : visibleRows.length === 0 ? (
             <div className="flex min-h-64 flex-col items-center justify-center px-6 py-12 text-center">
-              <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-400 dark:border-slate-700 dark:bg-slate-800">
+              <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl border border-line bg-surface-muted text-muted ">
                 {hasFilters ? <Search aria-hidden="true" className="h-5 w-5" /> : <Building2 aria-hidden="true" className="h-5 w-5" />}
               </div>
-              <h3 className="text-sm font-black text-slate-800 dark:text-slate-100">{hasFilters ? 'لا توجد نتائج مطابقة' : 'لا توجد أصول مسجلة'}</h3>
-              <p className="mt-1 max-w-sm text-xs leading-5 text-slate-500 dark:text-slate-400">
+              <h3 className="text-sm font-black text-ink ">{hasFilters ? 'لا توجد نتائج مطابقة' : 'لا توجد أصول مسجلة'}</h3>
+              <p className="mt-1 max-w-sm text-xs leading-5 text-muted ">
                 {hasFilters ? 'جرّب تغيير كلمات البحث أو خيارات التصفية.' : 'ابدأ بإضافة أصل ثابت ليظهر سجل الاقتناء والإهلاك هنا.'}
               </p>
               {hasFilters ? (
-                <button type="button" onClick={resetFilters} className="mt-4 rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50">
+                <button type="button" onClick={resetFilters} className="mt-4 rounded-lg border border-line px-3 py-2 text-xs font-bold text-ink hover:bg-surface-muted">
                   مسح التصفية
                 </button>
               ) : canManage && (
-                <button type="button" onClick={openNew} className="mt-4 inline-flex items-center gap-2 rounded-lg bg-violet-700 px-3 py-2 text-xs font-bold text-white hover:bg-violet-800">
+                <button type="button" onClick={openNew} className="mt-4 inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-xs font-bold text-white hover:bg-primary">
                   <Plus aria-hidden="true" className="h-4 w-4" /> إضافة أول أصل
                 </button>
               )}
@@ -503,47 +503,47 @@ export const FixedAssetsPage: React.FC = () => {
                   dense
                   tableClassName="text-xs"
                   columns={[
-                    { key: 'code', header: 'كود الأصل', render: (row: any) => <span className="whitespace-nowrap font-mono font-bold text-slate-600 dark:text-slate-300" dir="ltr">{row.code}</span> },
+                    { key: 'code', header: 'كود الأصل', render: (row: any) => <span className="whitespace-nowrap font-mono font-bold text-ink-secondary " dir="ltr">{row.code}</span> },
                     {
                       key: 'asset', header: 'الأصل والفئة',
                       render: (row: any) => (
                         <span className="block min-w-48">
-                          <span className="block font-bold text-slate-900">{row.name}</span>
-                          <span className="mt-1 block text-[10px] text-slate-500 dark:text-slate-400">{CATEGORY_LABELS[row.category] || row.category}</span>
+                          <span className="block font-bold text-ink">{row.name}</span>
+                          <span className="mt-1 block text-[10px] text-muted ">{CATEGORY_LABELS[row.category] || row.category}</span>
                         </span>
                       ),
                     },
                     ...(view === 'register' ? [
-                      { key: 'purchaseDate', header: 'تاريخ الشراء', render: (row: any) => <span className="whitespace-nowrap text-slate-600 dark:text-slate-300" dir="ltr">{row.purchaseDate}</span> },
-                      { key: 'life', header: 'العمر الإنتاجي', render: (row: any) => <span className="whitespace-nowrap text-slate-600 dark:text-slate-300">{row.usefulLifeYears} سنة</span> },
-                      { key: 'cost', header: 'تكلفة الشراء', align: 'end' as const, render: (row: any) => <span className="whitespace-nowrap font-mono font-semibold tabular-nums text-slate-700 dark:text-slate-200" dir="ltr">{fmt(Number(row.purchaseCost || 0))}</span> },
-                      { key: 'accum', header: 'مجمع الإهلاك', align: 'end' as const, render: (row: any) => <span className="whitespace-nowrap font-mono tabular-nums text-rose-700 dark:text-rose-300" dir="ltr">{fmt(Number(row.accumulatedDepreciation || 0))}</span> },
+                      { key: 'purchaseDate', header: 'تاريخ الشراء', render: (row: any) => <span className="whitespace-nowrap text-ink-secondary " dir="ltr">{row.purchaseDate}</span> },
+                      { key: 'life', header: 'العمر الإنتاجي', render: (row: any) => <span className="whitespace-nowrap text-ink-secondary ">{row.usefulLifeYears} سنة</span> },
+                      { key: 'cost', header: 'تكلفة الشراء', align: 'end' as const, render: (row: any) => <span className="whitespace-nowrap font-mono font-semibold tabular-nums text-ink " dir="ltr">{fmt(Number(row.purchaseCost || 0))}</span> },
+                      { key: 'accum', header: 'مجمع الإهلاك', align: 'end' as const, render: (row: any) => <span className="whitespace-nowrap font-mono tabular-nums text-danger " dir="ltr">{fmt(Number(row.accumulatedDepreciation || 0))}</span> },
                       {
                         key: 'book', header: 'القيمة الدفترية', align: 'end' as const,
                         render: (row: any) => (
                           <span className="block min-w-40 text-left" dir="ltr">
-                            <span className="block font-mono font-black tabular-nums text-emerald-800 dark:text-emerald-300">{fmt(bookValueOf(row))}</span>
+                            <span className="block font-mono font-black tabular-nums text-success ">{fmt(bookValueOf(row))}</span>
                             <DepreciationBar progress={depreciationProgressOf(row)} />
                           </span>
                         ),
                       },
                       {
                         key: 'location', header: 'الموقع',
-                        render: (row: any) => <span className="whitespace-nowrap text-slate-600 dark:text-slate-300"><MapPin aria-hidden="true" className="ml-1 inline h-3 w-3 text-slate-400 dark:text-slate-500" />{row.location || '—'}</span>,
+                        render: (row: any) => <span className="whitespace-nowrap text-ink-secondary "><MapPin aria-hidden="true" className="ml-1 inline h-3 w-3 text-muted " />{row.location || '—'}</span>,
                       },
                     ] : [
                       {
                         key: 'monthly', header: 'الإهلاك الشهري', align: 'end' as const,
-                        render: (row: any) => <span className="whitespace-nowrap font-mono font-bold tabular-nums text-violet-800 dark:text-violet-300" dir={row.depreciationMethod === 'UNITS_OF_PRODUCTION' ? 'rtl' : 'ltr'}>{row.depreciationMethod === 'UNITS_OF_PRODUCTION' ? 'حسب الاستخدام' : fmt(monthlyDepreciationOf(row))}</span>,
+                        render: (row: any) => <span className="whitespace-nowrap font-mono font-bold tabular-nums text-primary " dir={row.depreciationMethod === 'UNITS_OF_PRODUCTION' ? 'rtl' : 'ltr'}>{row.depreciationMethod === 'UNITS_OF_PRODUCTION' ? 'حسب الاستخدام' : fmt(monthlyDepreciationOf(row))}</span>,
                       },
-                      { key: 'life', header: 'العمر الإنتاجي', render: (row: any) => <span className="whitespace-nowrap text-slate-600 dark:text-slate-300">{row.usefulLifeYears} سنة</span> },
-                      { key: 'cost', header: 'تكلفة الاقتناء', align: 'end' as const, render: (row: any) => <span className="whitespace-nowrap font-mono tabular-nums text-slate-700 dark:text-slate-200" dir="ltr">{fmt(Number(row.purchaseCost || 0))}</span> },
-                      { key: 'accum', header: 'مجمع الإهلاك', align: 'end' as const, render: (row: any) => <span className="whitespace-nowrap font-mono tabular-nums text-rose-700 dark:text-rose-300" dir="ltr">{fmt(Number(row.accumulatedDepreciation || 0))}</span> },
+                      { key: 'life', header: 'العمر الإنتاجي', render: (row: any) => <span className="whitespace-nowrap text-ink-secondary ">{row.usefulLifeYears} سنة</span> },
+                      { key: 'cost', header: 'تكلفة الاقتناء', align: 'end' as const, render: (row: any) => <span className="whitespace-nowrap font-mono tabular-nums text-ink " dir="ltr">{fmt(Number(row.purchaseCost || 0))}</span> },
+                      { key: 'accum', header: 'مجمع الإهلاك', align: 'end' as const, render: (row: any) => <span className="whitespace-nowrap font-mono tabular-nums text-danger " dir="ltr">{fmt(Number(row.accumulatedDepreciation || 0))}</span> },
                       {
                         key: 'book', header: 'القيمة الدفترية', align: 'end' as const,
                         render: (row: any) => (
                           <span className="block min-w-40 text-left" dir="ltr">
-                            <span className="block font-mono font-black tabular-nums text-emerald-800 dark:text-emerald-300">{fmt(bookValueOf(row))}</span>
+                            <span className="block font-mono font-black tabular-nums text-success ">{fmt(bookValueOf(row))}</span>
                             <DepreciationBar progress={depreciationProgressOf(row)} />
                           </span>
                         ),
@@ -555,11 +555,11 @@ export const FixedAssetsPage: React.FC = () => {
                       render: (row: any) => <AssetActions row={row} canManage={canManage} onDepreciate={depreciate} onEdit={openEdit} onRemove={remove} />,
                     },
                   ]}
-                  rowClassName={() => 'group transition hover:bg-violet-50/30 dark:hover:bg-violet-950/25'}
+                  rowClassName={() => 'group transition hover:bg-accent-soft/30 dark:hover:bg-primary/25'}
                 />
               </div>
 
-              <div className="divide-y divide-slate-100 dark:divide-slate-800 md:hidden">
+              <div className="divide-y divide-line-strong dark:divide-primary md:hidden">
                 {visibleRows.map((row) => {
                   const progress = depreciationProgressOf(row);
                   return (
@@ -567,18 +567,18 @@ export const FixedAssetsPage: React.FC = () => {
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-2">
-                            <span className="font-mono text-[10px] font-bold text-slate-500 dark:text-slate-400" dir="ltr">{row.code}</span>
+                            <span className="font-mono text-[10px] font-bold text-muted " dir="ltr">{row.code}</span>
                             <StatusBadge status={row.status} />
                           </div>
-                          <h3 className="mt-1 truncate text-sm font-black text-slate-900">{row.name}</h3>
-                          <p className="mt-1 text-[10px] text-slate-500 dark:text-slate-400">{CATEGORY_LABELS[row.category] || row.category}</p>
+                          <h3 className="mt-1 truncate text-sm font-black text-ink">{row.name}</h3>
+                          <p className="mt-1 text-[10px] text-muted ">{CATEGORY_LABELS[row.category] || row.category}</p>
                         </div>
                         <div className="shrink-0 text-left" dir="ltr">
-                          <div className="text-sm font-black tabular-nums text-emerald-800 dark:text-emerald-300">{fmt(bookValueOf(row))}</div>
-                          <div className="mt-1 text-[9px] text-slate-400 dark:text-slate-500">القيمة الدفترية</div>
+                          <div className="text-sm font-black tabular-nums text-success ">{fmt(bookValueOf(row))}</div>
+                          <div className="mt-1 text-[9px] text-muted ">القيمة الدفترية</div>
                         </div>
                       </div>
-                      <div className="grid grid-cols-2 gap-x-4 gap-y-2 border-y border-slate-100 py-3 text-[10px] dark:border-slate-800">
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-2 border-y border-line py-3 text-[10px] ">
                         {view === 'register' ? (
                           <>
                             <AssetDatum label="تاريخ الشراء" value={row.purchaseDate} icon={<CalendarDays aria-hidden="true" className="h-3 w-3" />} />
@@ -598,12 +598,12 @@ export const FixedAssetsPage: React.FC = () => {
                         )}
                       </div>
                       <div>
-                        <div className="mb-1 flex justify-between text-[10px] text-slate-500">
+                        <div className="mb-1 flex justify-between text-[10px] text-muted">
                           <span>نسبة الإهلاك</span><span className="font-mono font-bold tabular-nums">{progress.toFixed(0)}%</span>
                         </div>
                         <DepreciationBar progress={progress} />
                       </div>
-                      <div className="flex justify-end border-t border-slate-100 pt-2 dark:border-slate-800">
+                      <div className="flex justify-end border-t border-line pt-2 ">
                         <AssetActions
                           row={row}
                           canManage={canManage}
@@ -620,7 +620,7 @@ export const FixedAssetsPage: React.FC = () => {
           )}
 
           {!loading && visibleRows.length > 0 && (
-            <div className="flex items-center justify-between border-t border-slate-200 bg-slate-50 px-4 py-2.5 text-[10px] font-semibold text-slate-500 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-400">
+            <div className="flex items-center justify-between border-t border-line bg-surface-muted px-4 py-2.5 text-[10px] font-semibold text-muted dark:bg-primary/60 ">
               <span>يعرض {visibleRows.length} أصل</span>
               <span>القيم بالجنيه المصري</span>
             </div>
@@ -644,21 +644,21 @@ export const FixedAssetsPage: React.FC = () => {
 
 const DepreciationBar: React.FC<{ progress: number }> = ({ progress }) => (
   <div className="mt-1.5 flex items-center gap-2">
-    <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-700">
+    <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface-sunken ">
       <div
-        className={`h-full rounded-full transition-[width] ${progress >= 100 ? 'bg-emerald-500' : 'bg-violet-500'}`}
+        className={`h-full rounded-full transition-[width] ${progress >= 100 ? 'bg-success' : 'bg-primary'}`}
         style={{ width: `${progress}%` }}
       />
     </div>
-    <span className="font-mono text-[9px] tabular-nums text-slate-500 dark:text-slate-400">{progress.toFixed(0)}%</span>
+    <span className="font-mono text-[9px] tabular-nums text-muted ">{progress.toFixed(0)}%</span>
   </div>
 );
 
 const StatusBadge: React.FC<{ status: FixedAsset['status'] }> = ({ status }) => {
   const styles: Record<FixedAsset['status'], string> = {
-    ACTIVE: 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/50 dark:text-emerald-300',
-    FULLY_DEPRECIATED: 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900 dark:bg-amber-950/50 dark:text-amber-200',
-    DISPOSED: 'border-slate-200 bg-slate-100 text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300',
+    ACTIVE: 'border-success-border bg-success-soft text-success dark:bg-success/50 ',
+    FULLY_DEPRECIATED: 'border-warning-border bg-warning-soft text-warning dark:bg-warning/50 ',
+    DISPOSED: 'border-line bg-surface-sunken text-ink-secondary ',
   };
   return (
     <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[9px] font-bold ${styles[status]}`}>
@@ -669,8 +669,8 @@ const StatusBadge: React.FC<{ status: FixedAsset['status'] }> = ({ status }) => 
 
 const AssetDatum: React.FC<{ label: string; value: string; icon?: React.ReactNode; numeric?: boolean }> = ({ label, value, icon, numeric }) => (
   <div className="min-w-0">
-    <div className="mb-0.5 text-slate-400">{label}</div>
-    <div className={`flex items-center gap-1 font-semibold text-slate-700 dark:text-slate-200 ${numeric ? 'font-mono tabular-nums' : ''}`} dir={numeric ? 'ltr' : undefined}>
+    <div className="mb-0.5 text-muted">{label}</div>
+    <div className={`flex items-center gap-1 font-semibold text-ink ${numeric ? 'font-mono tabular-nums' : ''}`} dir={numeric ? 'ltr' : undefined}>
       {icon}{value}
     </div>
   </div>
@@ -683,7 +683,7 @@ const AssetActions: React.FC<{
   onEdit: (row: FixedAsset) => void;
   onRemove: (row: FixedAsset) => void;
 }> = ({ row, canManage, onDepreciate, onEdit, onRemove }) => {
-  if (!canManage) return <span className="text-[10px] text-slate-400">—</span>;
+  if (!canManage) return <span className="text-[10px] text-muted">—</span>;
   return (
     <div className="flex items-center justify-end gap-1">
       <button
@@ -692,7 +692,7 @@ const AssetActions: React.FC<{
         disabled={row.status !== 'ACTIVE'}
         title="طلب مراجعة إهلاك شهر واحد"
         aria-label={`طلب مراجعة إهلاك شهر واحد للأصل ${row.name}`}
-        className="inline-flex items-center gap-1 rounded-md border border-violet-200 bg-violet-50 px-2 py-1.5 text-[10px] font-bold text-violet-800 transition hover:bg-violet-100 focus-visible:ring-2 focus-visible:ring-violet-400 disabled:cursor-not-allowed disabled:opacity-40 dark:border-violet-900 dark:bg-violet-950/40 dark:text-violet-200 dark:hover:bg-violet-950/70"
+        className="inline-flex items-center gap-1 rounded-md border border-accent-border bg-accent-soft px-2 py-1.5 text-[10px] font-bold text-primary transition hover:bg-accent-soft focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-40 dark:bg-primary/40 dark:hover:bg-primary/70"
       >
         <TrendingDown aria-hidden="true" className="h-3.5 w-3.5" /><span className="hidden xl:inline">طلب مراجعة الإهلاك</span>
       </button>
@@ -701,7 +701,7 @@ const AssetActions: React.FC<{
         onClick={() => onEdit(row)}
         title="تعديل الأصل"
         aria-label={`تعديل الأصل ${row.name}`}
-        className="rounded-md p-2 text-slate-500 transition hover:bg-slate-100 hover:text-violet-700 focus-visible:ring-2 focus-visible:ring-violet-400 dark:hover:bg-slate-800 dark:hover:text-violet-300"
+        className="rounded-md p-2 text-muted transition hover:bg-surface-sunken hover:text-primary focus-visible:ring-2 focus-visible:ring-primary dark:hover:bg-primary dark:hover:text-primary"
       >
         <Pencil aria-hidden="true" className="h-3.5 w-3.5" />
       </button>
@@ -710,7 +710,7 @@ const AssetActions: React.FC<{
         onClick={() => onRemove(row)}
         title="حذف الأصل"
         aria-label={`حذف الأصل ${row.name}`}
-        className="rounded-md p-2 text-slate-400 transition hover:bg-rose-50 hover:text-rose-700 focus-visible:ring-2 focus-visible:ring-rose-400 dark:hover:bg-rose-950/50 dark:hover:text-rose-300"
+        className="rounded-md p-2 text-muted transition hover:bg-danger-soft hover:text-danger focus-visible:ring-2 focus-visible:ring-danger dark:hover:bg-danger/50 dark:hover:text-danger"
       >
         <Trash2 aria-hidden="true" className="h-3.5 w-3.5" />
       </button>

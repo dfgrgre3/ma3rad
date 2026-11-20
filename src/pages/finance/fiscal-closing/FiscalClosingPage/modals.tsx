@@ -14,11 +14,11 @@ import {
   type YearFormState,
 } from './utils';
 
-const modalShell = 'fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4';
-const closeButton = 'rounded-lg p-2 text-slate-500 hover:bg-slate-100';
-const inputClass = 'mt-1.5 w-full rounded-xl border border-slate-300 px-3 py-2.5';
-const labelClass = 'block text-sm font-semibold text-slate-700';
-const cancelButton = 'rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-100';
+const modalShell = 'fixed inset-0 z-50 flex items-center justify-center bg-primary/50 p-4';
+const closeButton = 'rounded-lg p-2 text-muted hover:bg-surface-sunken';
+const inputClass = 'mt-1.5 w-full rounded-xl border border-line-strong px-3 py-2.5';
+const labelClass = 'block text-sm font-semibold text-ink';
+const cancelButton = 'rounded-xl px-4 py-2.5 text-sm font-semibold text-ink-secondary hover:bg-surface-sunken';
 
 interface CreateYearModalProps {
   years: FiscalYear[];
@@ -31,9 +31,9 @@ interface CreateYearModalProps {
 
 export const CreateYearModal: FC<CreateYearModalProps> = ({ years, yearForm, setYearForm, onSubmit, onClose, busy }) => (
   <div className={modalShell}>
-    <section role="dialog" aria-modal="true" className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl sm:p-6">
+    <section role="dialog" aria-modal="true" className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-2xl bg-surface p-5 shadow-2xl sm:p-6">
       <div className="mb-5 flex items-center justify-between">
-        <h2 className="font-black text-slate-800">إنشاء سنة مالية</h2>
+        <h2 className="font-black text-ink">إنشاء سنة مالية</h2>
         <button type="button" onClick={onClose} aria-label="إغلاق" className={closeButton}><X className="h-4 w-4" /></button>
       </div>
       <form onSubmit={onSubmit} className="space-y-4">
@@ -59,12 +59,12 @@ export const CreateYearModal: FC<CreateYearModalProps> = ({ years, yearForm, set
             </select>
           </label>
         </div>
-        <p className="rounded-xl bg-slate-50 p-3 text-xs leading-5 text-slate-500">
+        <p className="rounded-xl bg-surface-muted p-3 text-xs leading-5 text-muted">
           سيتم منع إنشاء سنة متداخلة لنفس الشركة، وتوليد فترة شهرية لكل شهر داخل النطاق. يمكن إضافة فترات تسوية إضافية من طبقة الخدمة.
         </p>
         <div className="flex justify-end gap-2 pt-2">
           <button type="button" onClick={onClose} className={cancelButton}>إلغاء</button>
-          <button type="submit" disabled={busy} className="rounded-xl bg-cyan-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-cyan-800 disabled:opacity-50">{busy ? 'جارٍ الحفظ...' : 'إنشاء السنة والفترات'}</button>
+          <button type="submit" disabled={busy} className="rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-white hover:bg-primary disabled:opacity-50">{busy ? 'جارٍ الحفظ...' : 'إنشاء السنة والفترات'}</button>
         </div>
       </form>
     </section>
@@ -84,13 +84,13 @@ interface ClosePeriodModalProps {
 
 export const ClosePeriodModal: FC<ClosePeriodModalProps> = ({ period, checks, notes, setNotes, canConfirm, onConfirm, onClose, busy }) => (
   <div className={modalShell}>
-    <section role="dialog" aria-modal="true" className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl sm:p-6">
+    <section role="dialog" aria-modal="true" className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-surface p-5 shadow-2xl sm:p-6">
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-start gap-3">
-          <div className="rounded-xl bg-cyan-50 p-2.5 text-cyan-700"><FileCheck2 className="h-5 w-5" /></div>
+          <div className="rounded-xl bg-accent-soft p-2.5 text-primary"><FileCheck2 className="h-5 w-5" /></div>
           <div>
-            <h2 className="font-black text-slate-800">فحص وإقفال الفترة</h2>
-            <p className="mt-1 text-sm text-slate-500">{period.name} · {formatDate(period.startDate)} إلى {formatDate(period.endDate)}</p>
+            <h2 className="font-black text-ink">فحص وإقفال الفترة</h2>
+            <p className="mt-1 text-sm text-muted">{period.name} · {formatDate(period.startDate)} إلى {formatDate(period.endDate)}</p>
           </div>
         </div>
         <button type="button" onClick={onClose} aria-label="إغلاق" className={closeButton}><X className="h-4 w-4" /></button>
@@ -117,14 +117,14 @@ export const ClosePeriodModal: FC<ClosePeriodModalProps> = ({ period, checks, no
         })}
       </div>
 
-      <label className="mt-4 block text-sm font-semibold text-slate-700">
+      <label className="mt-4 block text-sm font-semibold text-ink">
         ملاحظات الإقفال أو رقم محضر المطابقة
-        <textarea value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="أضف ملاحظات أو مرجع محضر الإقفال..." className="mt-1.5 min-h-20 w-full rounded-xl border border-slate-300 p-3 text-sm font-normal" />
+        <textarea value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="أضف ملاحظات أو مرجع محضر الإقفال..." className="mt-1.5 min-h-20 w-full rounded-xl border border-line-strong p-3 text-sm font-normal" />
       </label>
 
       <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
         <button type="button" onClick={onClose} className={cancelButton}>إلغاء</button>
-        <button type="button" onClick={onConfirm} disabled={busy || !canConfirm} className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-bold text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-40">
+        <button type="button" onClick={onConfirm} disabled={busy || !canConfirm} className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-white hover:bg-primary disabled:cursor-not-allowed disabled:opacity-40">
           <ShieldCheck className="h-4 w-4" />
           {busy ? 'جارٍ الإقفال...' : 'تأكيد إقفال الفترة'}
         </button>
@@ -144,19 +144,19 @@ interface ReopenPeriodModalProps {
 
 export const ReopenPeriodModal: FC<ReopenPeriodModalProps> = ({ period, reason, setReason, onConfirm, onClose, busy }) => (
   <div className={modalShell}>
-    <section role="dialog" aria-modal="true" className="w-full max-w-lg rounded-2xl bg-white p-5 shadow-2xl sm:p-6">
+    <section role="dialog" aria-modal="true" className="w-full max-w-lg rounded-2xl bg-surface p-5 shadow-2xl sm:p-6">
       <div className="flex items-center gap-2">
-        <Unlock className="h-5 w-5 text-amber-600" />
-        <h2 className="font-black text-slate-800">إعادة فتح {period.name}</h2>
+        <Unlock className="h-5 w-5 text-warning" />
+        <h2 className="font-black text-ink">إعادة فتح {period.name}</h2>
       </div>
-      <p className="mt-2 text-sm text-slate-500">إعادة الفتح إجراء منفصل يتطلب سببًا ويسجل في سجل التدقيق.</p>
-      <label className="mt-4 block text-sm font-semibold text-slate-700">
+      <p className="mt-2 text-sm text-muted">إعادة الفتح إجراء منفصل يتطلب سببًا ويسجل في سجل التدقيق.</p>
+      <label className="mt-4 block text-sm font-semibold text-ink">
         سبب إعادة الفتح
-        <textarea required value={reason} onChange={(event) => setReason(event.target.value)} className="mt-1.5 min-h-24 w-full rounded-xl border border-slate-300 p-3 text-sm font-normal" />
+        <textarea required value={reason} onChange={(event) => setReason(event.target.value)} className="mt-1.5 min-h-24 w-full rounded-xl border border-line-strong p-3 text-sm font-normal" />
       </label>
       <div className="mt-5 flex justify-end gap-2">
         <button type="button" onClick={onClose} className={cancelButton}>إلغاء</button>
-        <button type="button" onClick={onConfirm} disabled={busy || !reason.trim()} className="rounded-xl bg-amber-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-amber-800 disabled:opacity-50">{busy ? 'جارٍ التنفيذ...' : 'تأكيد إعادة الفتح'}</button>
+        <button type="button" onClick={onConfirm} disabled={busy || !reason.trim()} className="rounded-xl bg-warning px-4 py-2.5 text-sm font-bold text-white hover:bg-warning disabled:opacity-50">{busy ? 'جارٍ التنفيذ...' : 'تأكيد إعادة الفتح'}</button>
       </div>
     </section>
   </div>
@@ -174,12 +174,12 @@ interface CloseYearModalProps {
 
 export const CloseYearModal: FC<CloseYearModalProps> = ({ year, readiness, retainedEarningsAccount, setRetainedEarningsAccount, onConfirm, onClose, busy }) => (
   <div className={modalShell}>
-    <section role="dialog" aria-modal="true" className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl sm:p-6">
+    <section role="dialog" aria-modal="true" className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-surface p-5 shadow-2xl sm:p-6">
       <div className="flex items-center gap-2">
-        <Lock className="h-5 w-5 text-rose-700" />
-        <h2 className="font-black text-slate-800">إقفال {year.name}</h2>
+        <Lock className="h-5 w-5 text-danger" />
+        <h2 className="font-black text-ink">إقفال {year.name}</h2>
       </div>
-      <p className="mt-2 text-sm text-slate-500">سيتم تصفير الإيرادات والمصروفات، وترحيل صافي النتيجة إلى الأرباح المرحلة، ثم إنشاء أرصدة افتتاحية للسنة التالية إن وُجدت.</p>
+      <p className="mt-2 text-sm text-muted">سيتم تصفير الإيرادات والمصروفات، وترحيل صافي النتيجة إلى الأرباح المرحلة، ثم إنشاء أرصدة افتتاحية للسنة التالية إن وُجدت.</p>
       <div className="mt-4 space-y-2">
         {readiness.map((check) => {
           const style = checkStatusStyle(check.status);
@@ -196,13 +196,13 @@ export const CloseYearModal: FC<CloseYearModalProps> = ({ year, readiness, retai
           );
         })}
       </div>
-      <label className="mt-4 block text-sm font-semibold text-slate-700">
+      <label className="mt-4 block text-sm font-semibold text-ink">
         رمز حساب الأرباح المرحلة (يجب أن يكون حساب حقوق ملكية نشطًا)
         <input required value={retainedEarningsAccount} onChange={(event) => setRetainedEarningsAccount(event.target.value)} className={inputClass} />
       </label>
       <div className="mt-5 flex justify-end gap-2">
         <button type="button" onClick={onClose} className={cancelButton}>إلغاء</button>
-        <button type="button" onClick={onConfirm} disabled={busy || !retainedEarningsAccount.trim() || readiness.some((check) => check.status === 'FAIL')} className="rounded-xl bg-rose-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-rose-800 disabled:opacity-50">{busy ? 'جارٍ الإقفال...' : 'تأكيد الإقفال السنوي'}</button>
+        <button type="button" onClick={onConfirm} disabled={busy || !retainedEarningsAccount.trim() || readiness.some((check) => check.status === 'FAIL')} className="rounded-xl bg-danger px-4 py-2.5 text-sm font-bold text-white hover:bg-danger disabled:opacity-50">{busy ? 'جارٍ الإقفال...' : 'تأكيد الإقفال السنوي'}</button>
       </div>
     </section>
   </div>
@@ -218,14 +218,14 @@ interface TaskModalProps {
 
 export const TaskModal: FC<TaskModalProps> = ({ taskForm, setTaskForm, onSubmit, onClose, busy }) => (
   <div className={modalShell}>
-    <section role="dialog" aria-modal="true" className="w-full max-w-lg rounded-2xl bg-white p-5 shadow-2xl sm:p-6">
+    <section role="dialog" aria-modal="true" className="w-full max-w-lg rounded-2xl bg-surface p-5 shadow-2xl sm:p-6">
       <div className="mb-4 flex items-center justify-between">
-        <h2 className="font-black text-slate-800">إضافة مهمة إقفال</h2>
+        <h2 className="font-black text-ink">إضافة مهمة إقفال</h2>
         <button type="button" onClick={onClose} aria-label="إغلاق" className={closeButton}><X className="h-4 w-4" /></button>
       </div>
       <form onSubmit={onSubmit} className="space-y-3">
         <label className={labelClass}>عنوان المهمة<input required value={taskForm.title} onChange={(event) => setTaskForm({ ...taskForm, title: event.target.value })} className={inputClass} /></label>
-        <label className={labelClass}>الوصف<textarea value={taskForm.description} onChange={(event) => setTaskForm({ ...taskForm, description: event.target.value })} className="mt-1.5 min-h-16 w-full rounded-xl border border-slate-300 p-3 text-sm font-normal" /></label>
+        <label className={labelClass}>الوصف<textarea value={taskForm.description} onChange={(event) => setTaskForm({ ...taskForm, description: event.target.value })} className="mt-1.5 min-h-16 w-full rounded-xl border border-line-strong p-3 text-sm font-normal" /></label>
         <div className="grid gap-3 sm:grid-cols-2">
           <label className={labelClass}>القسم<input value={taskForm.department} onChange={(event) => setTaskForm({ ...taskForm, department: event.target.value })} className={inputClass} /></label>
           <label className={labelClass}>المسؤول (معرف المستخدم)<input value={taskForm.assigneeUserId} onChange={(event) => setTaskForm({ ...taskForm, assigneeUserId: event.target.value })} className={inputClass} /></label>
@@ -238,7 +238,7 @@ export const TaskModal: FC<TaskModalProps> = ({ taskForm, setTaskForm, onSubmit,
         </div>
         <div className="flex justify-end gap-2 pt-2">
           <button type="button" onClick={onClose} className={cancelButton}>إلغاء</button>
-          <button type="submit" disabled={busy} className="rounded-xl bg-cyan-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-cyan-800 disabled:opacity-50">حفظ المهمة</button>
+          <button type="submit" disabled={busy} className="rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-white hover:bg-primary disabled:opacity-50">حفظ المهمة</button>
         </div>
       </form>
     </section>
@@ -255,9 +255,9 @@ interface AdjustmentModalProps {
 
 export const AdjustmentModal: FC<AdjustmentModalProps> = ({ adjustmentForm, setAdjustmentForm, onSubmit, onClose, busy }) => (
   <div className={modalShell}>
-    <section role="dialog" aria-modal="true" className="w-full max-w-lg rounded-2xl bg-white p-5 shadow-2xl sm:p-6">
+    <section role="dialog" aria-modal="true" className="w-full max-w-lg rounded-2xl bg-surface p-5 shadow-2xl sm:p-6">
       <div className="mb-4 flex items-center justify-between">
-        <h2 className="font-black text-slate-800">إنشاء تسوية شهرية</h2>
+        <h2 className="font-black text-ink">إنشاء تسوية شهرية</h2>
         <button type="button" onClick={onClose} aria-label="إغلاق" className={closeButton}><X className="h-4 w-4" /></button>
       </div>
       <form onSubmit={onSubmit} className="space-y-3">
@@ -274,7 +274,7 @@ export const AdjustmentModal: FC<AdjustmentModalProps> = ({ adjustmentForm, setA
         </div>
         <div className="flex justify-end gap-2 pt-2">
           <button type="button" onClick={onClose} className={cancelButton}>إلغاء</button>
-          <button type="submit" disabled={busy} className="rounded-xl bg-cyan-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-cyan-800 disabled:opacity-50">حفظ المسودة</button>
+          <button type="submit" disabled={busy} className="rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-white hover:bg-primary disabled:opacity-50">حفظ المسودة</button>
         </div>
       </form>
     </section>
@@ -292,14 +292,14 @@ interface LegacyReconcileModalProps {
 
 export const LegacyReconcileModal: FC<LegacyReconcileModalProps> = ({ target, form, setForm, onSubmit, onClose, busy }) => (
   <div className={modalShell}>
-    <form onSubmit={onSubmit} className="w-full max-w-lg space-y-4 rounded-2xl bg-white p-5 shadow-xl">
+    <form onSubmit={onSubmit} className="w-full max-w-lg space-y-4 rounded-2xl bg-surface p-5 shadow-xl">
       <div>
-        <h2 className="text-lg font-black text-slate-900">مطابقة تاريخية — {target.label}</h2>
-        <p className="mt-1 text-sm leading-6 text-slate-600">
+        <h2 className="text-lg font-black text-ink">مطابقة تاريخية — {target.label}</h2>
+        <p className="mt-1 text-sm leading-6 text-ink-secondary">
           أدخل رصيد دفتر الأطراف بعد مراجعته مقابل الأستاذ العام، وسجّل مرجع التقرير أو المستند المؤيد. لن تُقبل المطابقة إذا لم يتساوَ الرصيدان.
         </p>
       </div>
-      <label className="block space-y-1 text-sm font-bold text-slate-700">
+      <label className="block space-y-1 text-sm font-bold text-ink">
         رصيد دفتر الأطراف في نهاية الفترة
         <input
           type="number"
@@ -307,33 +307,33 @@ export const LegacyReconcileModal: FC<LegacyReconcileModalProps> = ({ target, fo
           required
           value={form.balance}
           onChange={(event) => setForm((current) => ({ ...current, balance: event.target.value }))}
-          className="w-full rounded-lg border border-slate-300 px-3 py-2"
+          className="w-full rounded-lg border border-line-strong px-3 py-2"
         />
       </label>
-      <label className="block space-y-1 text-sm font-bold text-slate-700">
+      <label className="block space-y-1 text-sm font-bold text-ink">
         مرجع مستند المطابقة
         <input
           required
           value={form.evidenceReference}
           onChange={(event) => setForm((current) => ({ ...current, evidenceReference: event.target.value }))}
-          className="w-full rounded-lg border border-slate-300 px-3 py-2"
+          className="w-full rounded-lg border border-line-strong px-3 py-2"
           placeholder="رقم تقرير أو ملف أو مستند"
         />
       </label>
-      <label className="block space-y-1 text-sm font-bold text-slate-700">
+      <label className="block space-y-1 text-sm font-bold text-ink">
         ملاحظات
         <textarea
           value={form.notes}
           onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))}
-          className="w-full rounded-lg border border-slate-300 px-3 py-2"
+          className="w-full rounded-lg border border-line-strong px-3 py-2"
           rows={3}
         />
       </label>
       <div className="flex justify-end gap-2">
-        <button type="button" onClick={onClose} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-bold text-slate-700">
+        <button type="button" onClick={onClose} className="rounded-lg border border-line-strong px-4 py-2 text-sm font-bold text-ink">
           إلغاء
         </button>
-        <button type="submit" disabled={busy} className="rounded-lg bg-amber-700 px-4 py-2 text-sm font-bold text-white disabled:opacity-50">
+        <button type="submit" disabled={busy} className="rounded-lg bg-warning px-4 py-2 text-sm font-bold text-white disabled:opacity-50">
           حفظ المطابقة
         </button>
       </div>

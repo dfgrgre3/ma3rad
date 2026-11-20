@@ -252,8 +252,8 @@ export const PayrollSocialInsurancePage: React.FC = () => {
   const activeTab: Tab = canTab(tab) ? tab : (visibleTabs[0]?.id ?? tab);
 
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-slate-50 text-slate-900">
-      <div className="border-b border-slate-200 bg-white px-6 pt-4">
+    <div className="flex h-full flex-col overflow-hidden bg-surface-muted text-ink">
+      <div className="border-b border-line bg-surface px-6 pt-4">
         <PageHeader
           icon={<Landmark className="h-5 w-5" />}
           title="التأمينات الاجتماعية ونهاية الخدمة"
@@ -262,14 +262,14 @@ export const PayrollSocialInsurancePage: React.FC = () => {
       </div>
 
       <div className="flex-1 space-y-4 overflow-auto p-6">
-        {error && <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-xs font-semibold text-rose-700">{error}</div>}
-        {notice && <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-xs font-semibold text-emerald-700">{notice}</div>}
+        {error && <div className="rounded-xl border border-danger-border bg-danger-soft px-4 py-2.5 text-xs font-semibold text-danger">{error}</div>}
+        {notice && <div className="rounded-xl border border-success-border bg-success-soft px-4 py-2.5 text-xs font-semibold text-success">{notice}</div>}
 
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <StatCard label="قواعد تأمينات نشطة" value={String(stats.activeSi)} hint={`من ${siRules.length} قاعدة`} icon={<Landmark className="h-4 w-4" />} tone="border-indigo-200 bg-indigo-50 text-indigo-600" />
-          <StatCard label="نسبة الموظف" value={`${stats.employeeShare}%`} hint="من الأساس الخاضع للاشتراك" icon={<Wallet className="h-4 w-4" />} tone="border-sky-200 bg-sky-50 text-sky-600" />
-          <StatCard label="نسبة صاحب العمل" value={`${stats.employerShare}%`} hint="من الأساس الخاضع للاشتراك" icon={<Wallet className="h-4 w-4" />} tone="border-emerald-200 bg-emerald-50 text-emerald-600" />
-          <StatCard label="قواعد نهاية خدمة" value={String(stats.activeEos)} hint={`من ${eosRules.length} قاعدة`} icon={<ShieldCheck className="h-4 w-4" />} tone="border-violet-200 bg-violet-50 text-violet-600" />
+          <StatCard label="قواعد تأمينات نشطة" value={String(stats.activeSi)} hint={`من ${siRules.length} قاعدة`} icon={<Landmark className="h-4 w-4" />} tone="border-accent-border bg-accent-soft text-primary" />
+          <StatCard label="نسبة الموظف" value={`${stats.employeeShare}%`} hint="من الأساس الخاضع للاشتراك" icon={<Wallet className="h-4 w-4" />} tone="border-accent-border bg-accent-soft text-primary" />
+          <StatCard label="نسبة صاحب العمل" value={`${stats.employerShare}%`} hint="من الأساس الخاضع للاشتراك" icon={<Wallet className="h-4 w-4" />} tone="border-success-border bg-success-soft text-success" />
+          <StatCard label="قواعد نهاية خدمة" value={String(stats.activeEos)} hint={`من ${eosRules.length} قاعدة`} icon={<ShieldCheck className="h-4 w-4" />} tone="border-accent-border bg-accent-soft text-primary" />
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
@@ -277,92 +277,92 @@ export const PayrollSocialInsurancePage: React.FC = () => {
             <button
               key={item.id}
               onClick={() => setTab(item.id)}
-              className={`flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-bold transition ${activeTab === item.id ? 'bg-indigo-600 text-white' : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}
+              className={`flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-bold transition ${activeTab === item.id ? 'bg-primary text-white' : 'border border-line bg-surface text-ink hover:bg-surface-muted'}`}
             >
               {item.icon} {item.label}
             </button>
           ))}
-          <button onClick={load} className="mr-auto flex items-center gap-1 rounded-lg bg-slate-800 px-3 py-2 text-xs font-bold text-white hover:bg-slate-700">
+          <button onClick={load} className="mr-auto flex items-center gap-1 rounded-lg bg-primary px-3 py-2 text-xs font-bold text-white hover:bg-primary">
             <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} /> تحديث
           </button>
         </div>
 
         {loading ? (
-          <div className="flex justify-center py-16"><RefreshCw className="h-6 w-6 animate-spin text-indigo-500" /></div>
+          <div className="flex justify-center py-16"><RefreshCw className="h-6 w-6 animate-spin text-primary" /></div>
         ) : (
           <>
             {activeTab === 'insurance' && canTab('insurance') && (
               <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_400px]">
                 <div className="space-y-3">
                   {siRules.map((rule) => (
-                    <div key={rule.id} className="rounded-xl border border-slate-200 bg-white p-4">
+                    <div key={rule.id} className="rounded-xl border border-line bg-surface p-4">
                       <div className="flex flex-wrap items-start justify-between gap-2">
                         <div>
                           <div className="flex items-center gap-2">
                             <h3 className="text-sm font-black">{rule.name}</h3>
-                            <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${rule.isActive ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-slate-50 text-slate-500'}`}>{rule.isActive ? 'نشطة' : 'موقوفة'}</span>
+                            <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${rule.isActive ? 'border-success-border bg-success-soft text-success' : 'border-line bg-surface-muted text-muted'}`}>{rule.isActive ? 'نشطة' : 'موقوفة'}</span>
                           </div>
-                          <p className="mt-1 text-[10px] text-slate-500">سريان من {rule.effectiveFrom}{rule.effectiveTo ? ` إلى ${rule.effectiveTo}` : ' — مفتوحة'}</p>
+                          <p className="mt-1 text-[10px] text-muted">سريان من {rule.effectiveFrom}{rule.effectiveTo ? ` إلى ${rule.effectiveTo}` : ' — مفتوحة'}</p>
                         </div>
                         <div className="flex gap-1">
-                          <button onClick={() => startEditSi(rule)} className="rounded border border-slate-200 px-2 py-1 text-[10px] font-bold text-slate-600 hover:bg-slate-50" aria-label="تعديل"><Pencil className="h-3 w-3" /></button>
-                          <button onClick={() => { if (window.confirm('حذف قاعدة التأمينات؟ سيتم حذف مساهماتها المرتبطة.')) run(() => PayrollSocialInsuranceService.deleteSocialInsuranceRule(rule.id), 'تم حذف القاعدة.'); }} className="rounded border border-rose-200 px-2 py-1 text-[10px] font-bold text-rose-600 hover:bg-rose-50" aria-label="حذف"><Trash2 className="h-3 w-3" /></button>
+                          <button onClick={() => startEditSi(rule)} className="rounded border border-line px-2 py-1 text-[10px] font-bold text-ink-secondary hover:bg-surface-muted" aria-label="تعديل"><Pencil className="h-3 w-3" /></button>
+                          <button onClick={() => { if (window.confirm('حذف قاعدة التأمينات؟ سيتم حذف مساهماتها المرتبطة.')) run(() => PayrollSocialInsuranceService.deleteSocialInsuranceRule(rule.id), 'تم حذف القاعدة.'); }} className="rounded border border-danger-border px-2 py-1 text-[10px] font-bold text-danger hover:bg-danger-soft" aria-label="حذف"><Trash2 className="h-3 w-3" /></button>
                         </div>
                       </div>
                       <div className="mt-3 grid grid-cols-2 gap-2 text-[10px] sm:grid-cols-4">
-                        <div className="rounded-lg bg-slate-50 px-2.5 py-2"><div className="text-slate-400">حصة الموظف</div><div className="font-black text-slate-800">{rule.employeeSharePercent}%</div></div>
-                        <div className="rounded-lg bg-slate-50 px-2.5 py-2"><div className="text-slate-400">حصة صاحب العمل</div><div className="font-black text-slate-800">{rule.employerSharePercent}%</div></div>
-                        <div className="rounded-lg bg-slate-50 px-2.5 py-2"><div className="text-slate-400">الحد الأقصى للاشتراك</div><div className="font-bold">{money(rule.contributionCeiling)}</div></div>
-                        <div className="rounded-lg bg-slate-50 px-2.5 py-2"><div className="text-slate-400">الحد الأدنى/الأقصى للأساس</div><div className="font-bold">{money(rule.minimumContributionBase)} / {money(rule.maximumContributionBase)}</div></div>
+                        <div className="rounded-lg bg-surface-muted px-2.5 py-2"><div className="text-muted">حصة الموظف</div><div className="font-black text-ink">{rule.employeeSharePercent}%</div></div>
+                        <div className="rounded-lg bg-surface-muted px-2.5 py-2"><div className="text-muted">حصة صاحب العمل</div><div className="font-black text-ink">{rule.employerSharePercent}%</div></div>
+                        <div className="rounded-lg bg-surface-muted px-2.5 py-2"><div className="text-muted">الحد الأقصى للاشتراك</div><div className="font-bold">{money(rule.contributionCeiling)}</div></div>
+                        <div className="rounded-lg bg-surface-muted px-2.5 py-2"><div className="text-muted">الحد الأدنى/الأقصى للأساس</div><div className="font-bold">{money(rule.minimumContributionBase)} / {money(rule.maximumContributionBase)}</div></div>
                       </div>
-                      <div className="mt-2 text-[10px] text-slate-500">مكافأة نهاية الخدمة: {rule.endOfServicePerYearPercent}% لكل سنة • {rule.endOfServiceMonthsPerYear} شهر لكل سنة</div>
+                      <div className="mt-2 text-[10px] text-muted">مكافأة نهاية الخدمة: {rule.endOfServicePerYearPercent}% لكل سنة • {rule.endOfServiceMonthsPerYear} شهر لكل سنة</div>
                     </div>
                   ))}
-                  {!siRules.length && <div className="rounded-xl border border-dashed border-slate-300 bg-white px-4 py-12 text-center text-xs text-slate-400">لا توجد قواعد تأمينات مسجلة.</div>}
+                  {!siRules.length && <div className="rounded-xl border border-dashed border-line-strong bg-surface px-4 py-12 text-center text-xs text-muted">لا توجد قواعد تأمينات مسجلة.</div>}
                 </div>
 
-                <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-4">
+                <div className="space-y-3 rounded-xl border border-line bg-surface p-4">
                   <div className="flex items-center justify-between">
                     <h2 className="text-sm font-black">{editingSiId ? 'تعديل قاعدة' : 'قاعدة تأمينات جديدة'}</h2>
-                    {editingSiId && <button onClick={resetSiForm} className="text-[10px] font-bold text-slate-500 hover:text-slate-800">إلغاء</button>}
+                    {editingSiId && <button onClick={resetSiForm} className="text-[10px] font-bold text-muted hover:text-ink">إلغاء</button>}
                   </div>
-                  <label className="block text-[10px] font-bold text-slate-500">اسم القاعدة
-                    <input value={siForm.name} onChange={(e) => setSiForm((prev) => ({ ...prev, name: e.target.value }))} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" placeholder="مثال: قانون التأمينات 2026" />
+                  <label className="block text-[10px] font-bold text-muted">اسم القاعدة
+                    <input value={siForm.name} onChange={(e) => setSiForm((prev) => ({ ...prev, name: e.target.value }))} className="mt-1 w-full rounded-lg border border-line px-3 py-2 text-sm" placeholder="مثال: قانون التأمينات 2026" />
                   </label>
                   <div className="grid grid-cols-2 gap-2">
-                    <label className="block text-[10px] font-bold text-slate-500">بداية السريان
-                      <input type="date" value={siForm.effectiveFrom} onChange={(e) => setSiForm((prev) => ({ ...prev, effectiveFrom: e.target.value }))} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+                    <label className="block text-[10px] font-bold text-muted">بداية السريان
+                      <input type="date" value={siForm.effectiveFrom} onChange={(e) => setSiForm((prev) => ({ ...prev, effectiveFrom: e.target.value }))} className="mt-1 w-full rounded-lg border border-line px-3 py-2 text-sm" />
                     </label>
-                    <label className="block text-[10px] font-bold text-slate-500">نهاية السريان
-                      <input type="date" value={siForm.effectiveTo} onChange={(e) => setSiForm((prev) => ({ ...prev, effectiveTo: e.target.value }))} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+                    <label className="block text-[10px] font-bold text-muted">نهاية السريان
+                      <input type="date" value={siForm.effectiveTo} onChange={(e) => setSiForm((prev) => ({ ...prev, effectiveTo: e.target.value }))} className="mt-1 w-full rounded-lg border border-line px-3 py-2 text-sm" />
                     </label>
-                    <label className="block text-[10px] font-bold text-slate-500">حصة الموظف %
-                      <input type="number" min="0" max="100" value={siForm.employeeSharePercent} onChange={(e) => setSiForm((prev) => ({ ...prev, employeeSharePercent: e.target.value }))} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+                    <label className="block text-[10px] font-bold text-muted">حصة الموظف %
+                      <input type="number" min="0" max="100" value={siForm.employeeSharePercent} onChange={(e) => setSiForm((prev) => ({ ...prev, employeeSharePercent: e.target.value }))} className="mt-1 w-full rounded-lg border border-line px-3 py-2 text-sm" />
                     </label>
-                    <label className="block text-[10px] font-bold text-slate-500">حصة صاحب العمل %
-                      <input type="number" min="0" max="100" value={siForm.employerSharePercent} onChange={(e) => setSiForm((prev) => ({ ...prev, employerSharePercent: e.target.value }))} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+                    <label className="block text-[10px] font-bold text-muted">حصة صاحب العمل %
+                      <input type="number" min="0" max="100" value={siForm.employerSharePercent} onChange={(e) => setSiForm((prev) => ({ ...prev, employerSharePercent: e.target.value }))} className="mt-1 w-full rounded-lg border border-line px-3 py-2 text-sm" />
                     </label>
-                    <label className="block text-[10px] font-bold text-slate-500">الحد الأقصى للاشتراك
-                      <input type="number" min="0" value={siForm.contributionCeiling} onChange={(e) => setSiForm((prev) => ({ ...prev, contributionCeiling: e.target.value }))} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+                    <label className="block text-[10px] font-bold text-muted">الحد الأقصى للاشتراك
+                      <input type="number" min="0" value={siForm.contributionCeiling} onChange={(e) => setSiForm((prev) => ({ ...prev, contributionCeiling: e.target.value }))} className="mt-1 w-full rounded-lg border border-line px-3 py-2 text-sm" />
                     </label>
-                    <label className="block text-[10px] font-bold text-slate-500">الحد الأدنى للأساس
-                      <input type="number" min="0" value={siForm.minimumContributionBase} onChange={(e) => setSiForm((prev) => ({ ...prev, minimumContributionBase: e.target.value }))} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+                    <label className="block text-[10px] font-bold text-muted">الحد الأدنى للأساس
+                      <input type="number" min="0" value={siForm.minimumContributionBase} onChange={(e) => setSiForm((prev) => ({ ...prev, minimumContributionBase: e.target.value }))} className="mt-1 w-full rounded-lg border border-line px-3 py-2 text-sm" />
                     </label>
-                    <label className="block text-[10px] font-bold text-slate-500">الحد الأقصى للأساس
-                      <input type="number" min="0" value={siForm.maximumContributionBase} onChange={(e) => setSiForm((prev) => ({ ...prev, maximumContributionBase: e.target.value }))} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+                    <label className="block text-[10px] font-bold text-muted">الحد الأقصى للأساس
+                      <input type="number" min="0" value={siForm.maximumContributionBase} onChange={(e) => setSiForm((prev) => ({ ...prev, maximumContributionBase: e.target.value }))} className="mt-1 w-full rounded-lg border border-line px-3 py-2 text-sm" />
                     </label>
-                    <label className="block text-[10px] font-bold text-slate-500">شهور نهاية الخدمة/سنة
-                      <input type="number" min="0" max="12" step="0.5" value={siForm.endOfServiceMonthsPerYear} onChange={(e) => setSiForm((prev) => ({ ...prev, endOfServiceMonthsPerYear: e.target.value }))} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+                    <label className="block text-[10px] font-bold text-muted">شهور نهاية الخدمة/سنة
+                      <input type="number" min="0" max="12" step="0.5" value={siForm.endOfServiceMonthsPerYear} onChange={(e) => setSiForm((prev) => ({ ...prev, endOfServiceMonthsPerYear: e.target.value }))} className="mt-1 w-full rounded-lg border border-line px-3 py-2 text-sm" />
                     </label>
                   </div>
-                  <label className="flex items-center gap-2 text-[11px] font-bold text-slate-600">
-                    <input type="checkbox" checked={siForm.isActive} onChange={(e) => setSiForm((prev) => ({ ...prev, isActive: e.target.checked }))} className="h-4 w-4 rounded border-slate-300" />
+                  <label className="flex items-center gap-2 text-[11px] font-bold text-ink-secondary">
+                    <input type="checkbox" checked={siForm.isActive} onChange={(e) => setSiForm((prev) => ({ ...prev, isActive: e.target.checked }))} className="h-4 w-4 rounded border-line-strong" />
                     قاعدة نشطة
                   </label>
-                  <button onClick={saveSi} className="w-full rounded-lg bg-indigo-600 px-4 py-2.5 text-xs font-bold text-white hover:bg-indigo-700">
+                  <button onClick={saveSi} className="w-full rounded-lg bg-primary px-4 py-2.5 text-xs font-bold text-white hover:bg-primary">
                     {editingSiId ? 'حفظ التعديلات' : 'إضافة القاعدة'}
                   </button>
-                  <p className="text-[10px] leading-4 text-slate-400">لا يمكن أن تتداخل فترة السريان لقاعدتين نشطتين لنفس الشركة.</p>
+                  <p className="text-[10px] leading-4 text-muted">لا يمكن أن تتداخل فترة السريان لقاعدتين نشطتين لنفس الشركة.</p>
                 </div>
               </div>
             )}
@@ -371,70 +371,70 @@ export const PayrollSocialInsurancePage: React.FC = () => {
               <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_380px]">
                 <div className="space-y-3">
                   {eosRules.map((rule) => (
-                    <div key={rule.id} className="rounded-xl border border-slate-200 bg-white p-4">
+                    <div key={rule.id} className="rounded-xl border border-line bg-surface p-4">
                       <div className="flex flex-wrap items-start justify-between gap-2">
                         <div>
                           <div className="flex items-center gap-2">
                             <h3 className="text-sm font-black">{rule.name}</h3>
-                            <span className="rounded-full border border-violet-200 bg-violet-50 px-2 py-0.5 text-[10px] font-bold text-violet-700">{systemTypeLabel[rule.systemType]}</span>
-                            <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${rule.isActive ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-slate-50 text-slate-500'}`}>{rule.isActive ? 'نشطة' : 'موقوفة'}</span>
+                            <span className="rounded-full border border-accent-border bg-accent-soft px-2 py-0.5 text-[10px] font-bold text-primary">{systemTypeLabel[rule.systemType]}</span>
+                            <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${rule.isActive ? 'border-success-border bg-success-soft text-success' : 'border-line bg-surface-muted text-muted'}`}>{rule.isActive ? 'نشطة' : 'موقوفة'}</span>
                           </div>
-                          <p className="mt-1 text-[10px] text-slate-500">سريان من {rule.effectiveFrom}{rule.effectiveTo ? ` إلى ${rule.effectiveTo}` : ' — مفتوحة'}</p>
+                          <p className="mt-1 text-[10px] text-muted">سريان من {rule.effectiveFrom}{rule.effectiveTo ? ` إلى ${rule.effectiveTo}` : ' — مفتوحة'}</p>
                         </div>
                         <div className="flex gap-1">
-                          <button onClick={() => startEditEos(rule)} className="rounded border border-slate-200 px-2 py-1 text-[10px] font-bold text-slate-600 hover:bg-slate-50" aria-label="تعديل"><Pencil className="h-3 w-3" /></button>
-                          <button onClick={() => { if (window.confirm('حذف قاعدة نهاية الخدمة؟')) run(() => PayrollSocialInsuranceService.deleteEndOfServiceRule(rule.id), 'تم حذف القاعدة.'); }} className="rounded border border-rose-200 px-2 py-1 text-[10px] font-bold text-rose-600 hover:bg-rose-50" aria-label="حذف"><Trash2 className="h-3 w-3" /></button>
+                          <button onClick={() => startEditEos(rule)} className="rounded border border-line px-2 py-1 text-[10px] font-bold text-ink-secondary hover:bg-surface-muted" aria-label="تعديل"><Pencil className="h-3 w-3" /></button>
+                          <button onClick={() => { if (window.confirm('حذف قاعدة نهاية الخدمة؟')) run(() => PayrollSocialInsuranceService.deleteEndOfServiceRule(rule.id), 'تم حذف القاعدة.'); }} className="rounded border border-danger-border px-2 py-1 text-[10px] font-bold text-danger hover:bg-danger-soft" aria-label="حذف"><Trash2 className="h-3 w-3" /></button>
                         </div>
                       </div>
                       <div className="mt-3 grid grid-cols-2 gap-2 text-[10px] sm:grid-cols-4">
-                        <div className="rounded-lg bg-slate-50 px-2.5 py-2"><div className="text-slate-400">سنوات الاستحقاق الكامل</div><div className="font-bold">{rule.serviceYearsForFullBenefit} سنة</div></div>
-                        <div className="rounded-lg bg-slate-50 px-2.5 py-2"><div className="text-slate-400">الفترة الأولى</div><div className="font-bold">{rule.benefitMonthsPerYearFirstPeriod} شهر/سنة</div></div>
-                        <div className="rounded-lg bg-slate-50 px-2.5 py-2"><div className="text-slate-400">الفترة الثانية</div><div className="font-bold">{rule.benefitMonthsPerYearSecondPeriod} شهر/سنة</div></div>
-                        <div className="rounded-lg bg-slate-50 px-2.5 py-2"><div className="text-slate-400">حد الفترة الثانية</div><div className="font-bold">{rule.secondPeriodThresholdYears} سنة</div></div>
+                        <div className="rounded-lg bg-surface-muted px-2.5 py-2"><div className="text-muted">سنوات الاستحقاق الكامل</div><div className="font-bold">{rule.serviceYearsForFullBenefit} سنة</div></div>
+                        <div className="rounded-lg bg-surface-muted px-2.5 py-2"><div className="text-muted">الفترة الأولى</div><div className="font-bold">{rule.benefitMonthsPerYearFirstPeriod} شهر/سنة</div></div>
+                        <div className="rounded-lg bg-surface-muted px-2.5 py-2"><div className="text-muted">الفترة الثانية</div><div className="font-bold">{rule.benefitMonthsPerYearSecondPeriod} شهر/سنة</div></div>
+                        <div className="rounded-lg bg-surface-muted px-2.5 py-2"><div className="text-muted">حد الفترة الثانية</div><div className="font-bold">{rule.secondPeriodThresholdYears} سنة</div></div>
                       </div>
                     </div>
                   ))}
-                  {!eosRules.length && <div className="rounded-xl border border-dashed border-slate-300 bg-white px-4 py-12 text-center text-xs text-slate-400">لا توجد قواعد نهاية خدمة مسجلة.</div>}
+                  {!eosRules.length && <div className="rounded-xl border border-dashed border-line-strong bg-surface px-4 py-12 text-center text-xs text-muted">لا توجد قواعد نهاية خدمة مسجلة.</div>}
                 </div>
 
-                <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-4">
+                <div className="space-y-3 rounded-xl border border-line bg-surface p-4">
                   <div className="flex items-center justify-between">
                     <h2 className="text-sm font-black">{editingEosId ? 'تعديل قاعدة' : 'قاعدة نهاية خدمة جديدة'}</h2>
-                    {editingEosId && <button onClick={resetEosForm} className="text-[10px] font-bold text-slate-500 hover:text-slate-800">إلغاء</button>}
+                    {editingEosId && <button onClick={resetEosForm} className="text-[10px] font-bold text-muted hover:text-ink">إلغاء</button>}
                   </div>
-                  <label className="block text-[10px] font-bold text-slate-500">نظام العمل
-                    <select value={eosForm.systemType} onChange={(e) => setEosForm((prev) => ({ ...prev, systemType: e.target.value as SocialInsuranceSystemType }))} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm">
+                  <label className="block text-[10px] font-bold text-muted">نظام العمل
+                    <select value={eosForm.systemType} onChange={(e) => setEosForm((prev) => ({ ...prev, systemType: e.target.value as SocialInsuranceSystemType }))} className="mt-1 w-full rounded-lg border border-line px-3 py-2 text-sm">
                       {(Object.keys(systemTypeLabel) as SocialInsuranceSystemType[]).map((type) => <option key={type} value={type}>{systemTypeLabel[type]}</option>)}
                     </select>
                   </label>
-                  <label className="block text-[10px] font-bold text-slate-500">اسم القاعدة
-                    <input value={eosForm.name} onChange={(e) => setEosForm((prev) => ({ ...prev, name: e.target.value }))} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+                  <label className="block text-[10px] font-bold text-muted">اسم القاعدة
+                    <input value={eosForm.name} onChange={(e) => setEosForm((prev) => ({ ...prev, name: e.target.value }))} className="mt-1 w-full rounded-lg border border-line px-3 py-2 text-sm" />
                   </label>
                   <div className="grid grid-cols-2 gap-2">
-                    <label className="block text-[10px] font-bold text-slate-500">بداية السريان
-                      <input type="date" value={eosForm.effectiveFrom} onChange={(e) => setEosForm((prev) => ({ ...prev, effectiveFrom: e.target.value }))} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+                    <label className="block text-[10px] font-bold text-muted">بداية السريان
+                      <input type="date" value={eosForm.effectiveFrom} onChange={(e) => setEosForm((prev) => ({ ...prev, effectiveFrom: e.target.value }))} className="mt-1 w-full rounded-lg border border-line px-3 py-2 text-sm" />
                     </label>
-                    <label className="block text-[10px] font-bold text-slate-500">نهاية السريان
-                      <input type="date" value={eosForm.effectiveTo} onChange={(e) => setEosForm((prev) => ({ ...prev, effectiveTo: e.target.value }))} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+                    <label className="block text-[10px] font-bold text-muted">نهاية السريان
+                      <input type="date" value={eosForm.effectiveTo} onChange={(e) => setEosForm((prev) => ({ ...prev, effectiveTo: e.target.value }))} className="mt-1 w-full rounded-lg border border-line px-3 py-2 text-sm" />
                     </label>
-                    <label className="block text-[10px] font-bold text-slate-500">سنوات الاستحقاق
-                      <input type="number" min="0" value={eosForm.serviceYearsForFullBenefit} onChange={(e) => setEosForm((prev) => ({ ...prev, serviceYearsForFullBenefit: e.target.value }))} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+                    <label className="block text-[10px] font-bold text-muted">سنوات الاستحقاق
+                      <input type="number" min="0" value={eosForm.serviceYearsForFullBenefit} onChange={(e) => setEosForm((prev) => ({ ...prev, serviceYearsForFullBenefit: e.target.value }))} className="mt-1 w-full rounded-lg border border-line px-3 py-2 text-sm" />
                     </label>
-                    <label className="block text-[10px] font-bold text-slate-500">حد الفترة الثانية
-                      <input type="number" min="0" value={eosForm.secondPeriodThresholdYears} onChange={(e) => setEosForm((prev) => ({ ...prev, secondPeriodThresholdYears: e.target.value }))} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+                    <label className="block text-[10px] font-bold text-muted">حد الفترة الثانية
+                      <input type="number" min="0" value={eosForm.secondPeriodThresholdYears} onChange={(e) => setEosForm((prev) => ({ ...prev, secondPeriodThresholdYears: e.target.value }))} className="mt-1 w-full rounded-lg border border-line px-3 py-2 text-sm" />
                     </label>
-                    <label className="block text-[10px] font-bold text-slate-500">شهور/سنة (أولى)
-                      <input type="number" min="0" step="0.25" value={eosForm.benefitMonthsPerYearFirstPeriod} onChange={(e) => setEosForm((prev) => ({ ...prev, benefitMonthsPerYearFirstPeriod: e.target.value }))} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+                    <label className="block text-[10px] font-bold text-muted">شهور/سنة (أولى)
+                      <input type="number" min="0" step="0.25" value={eosForm.benefitMonthsPerYearFirstPeriod} onChange={(e) => setEosForm((prev) => ({ ...prev, benefitMonthsPerYearFirstPeriod: e.target.value }))} className="mt-1 w-full rounded-lg border border-line px-3 py-2 text-sm" />
                     </label>
-                    <label className="block text-[10px] font-bold text-slate-500">شهور/سنة (ثانية)
-                      <input type="number" min="0" step="0.25" value={eosForm.benefitMonthsPerYearSecondPeriod} onChange={(e) => setEosForm((prev) => ({ ...prev, benefitMonthsPerYearSecondPeriod: e.target.value }))} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+                    <label className="block text-[10px] font-bold text-muted">شهور/سنة (ثانية)
+                      <input type="number" min="0" step="0.25" value={eosForm.benefitMonthsPerYearSecondPeriod} onChange={(e) => setEosForm((prev) => ({ ...prev, benefitMonthsPerYearSecondPeriod: e.target.value }))} className="mt-1 w-full rounded-lg border border-line px-3 py-2 text-sm" />
                     </label>
                   </div>
-                  <label className="flex items-center gap-2 text-[11px] font-bold text-slate-600">
-                    <input type="checkbox" checked={eosForm.isActive} onChange={(e) => setEosForm((prev) => ({ ...prev, isActive: e.target.checked }))} className="h-4 w-4 rounded border-slate-300" />
+                  <label className="flex items-center gap-2 text-[11px] font-bold text-ink-secondary">
+                    <input type="checkbox" checked={eosForm.isActive} onChange={(e) => setEosForm((prev) => ({ ...prev, isActive: e.target.checked }))} className="h-4 w-4 rounded border-line-strong" />
                     قاعدة نشطة
                   </label>
-                  <button onClick={saveEos} className="w-full rounded-lg bg-indigo-600 px-4 py-2.5 text-xs font-bold text-white hover:bg-indigo-700">
+                  <button onClick={saveEos} className="w-full rounded-lg bg-primary px-4 py-2.5 text-xs font-bold text-white hover:bg-primary">
                     {editingEosId ? 'حفظ التعديلات' : 'إضافة القاعدة'}
                   </button>
                 </div>
@@ -443,53 +443,53 @@ export const PayrollSocialInsurancePage: React.FC = () => {
 
             {activeTab === 'calculator' && canTab('calculator') && (
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-4">
-                  <h2 className="flex items-center gap-1.5 text-sm font-black"><Calculator className="h-4 w-4 text-indigo-600" /> حاسبة التأمينات الاجتماعية</h2>
-                  <p className="text-[10px] text-slate-400">تُطبق القاعدة النشطة السارية في التاريخ المحدد.</p>
-                  <label className="block text-[10px] font-bold text-slate-500">تاريخ الاحتساب
-                    <input type="date" value={siCalcForm.date} onChange={(e) => setSiCalcForm((prev) => ({ ...prev, date: e.target.value }))} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+                <div className="space-y-3 rounded-xl border border-line bg-surface p-4">
+                  <h2 className="flex items-center gap-1.5 text-sm font-black"><Calculator className="h-4 w-4 text-primary" /> حاسبة التأمينات الاجتماعية</h2>
+                  <p className="text-[10px] text-muted">تُطبق القاعدة النشطة السارية في التاريخ المحدد.</p>
+                  <label className="block text-[10px] font-bold text-muted">تاريخ الاحتساب
+                    <input type="date" value={siCalcForm.date} onChange={(e) => setSiCalcForm((prev) => ({ ...prev, date: e.target.value }))} className="mt-1 w-full rounded-lg border border-line px-3 py-2 text-sm" />
                   </label>
-                  <label className="block text-[10px] font-bold text-slate-500">الراتب الإجمالي
-                    <input type="number" min="0" value={siCalcForm.gross} onChange={(e) => setSiCalcForm((prev) => ({ ...prev, gross: e.target.value }))} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+                  <label className="block text-[10px] font-bold text-muted">الراتب الإجمالي
+                    <input type="number" min="0" value={siCalcForm.gross} onChange={(e) => setSiCalcForm((prev) => ({ ...prev, gross: e.target.value }))} className="mt-1 w-full rounded-lg border border-line px-3 py-2 text-sm" />
                   </label>
-                  <button onClick={calculateSi} className="w-full rounded-lg bg-indigo-600 px-4 py-2.5 text-xs font-bold text-white hover:bg-indigo-700">احتساب</button>
+                  <button onClick={calculateSi} className="w-full rounded-lg bg-primary px-4 py-2.5 text-xs font-bold text-white hover:bg-primary">احتساب</button>
                   {siCalcResult && (
-                    <div className="space-y-2 rounded-lg border border-indigo-100 bg-indigo-50/50 p-3 text-[11px]">
-                      <div className="font-black text-indigo-800">{siCalcResult.ruleName}</div>
+                    <div className="space-y-2 rounded-lg border border-accent-border bg-accent-soft/50 p-3 text-[11px]">
+                      <div className="font-black text-primary">{siCalcResult.ruleName}</div>
                       <div className="flex justify-between"><span>الأساس الخاضع للاشتراك</span><span className="font-bold tabular-nums">{money(siCalcResult.contributionBase)}</span></div>
-                      <div className="flex justify-between"><span>حصة الموظف</span><span className="font-bold tabular-nums text-rose-600">{money(siCalcResult.employeeShareAmount)}</span></div>
-                      <div className="flex justify-between"><span>حصة صاحب العمل</span><span className="font-bold tabular-nums text-emerald-600">{money(siCalcResult.employerShareAmount)}</span></div>
-                      <div className="flex justify-between border-t border-indigo-200 pt-2 text-xs font-black"><span>الإجمالي</span><span className="tabular-nums">{money(siCalcResult.totalAmount)}</span></div>
-                      {siCalcResult.ceilingApplied && <div className="text-[10px] font-semibold text-amber-600">تم تطبيق الحد الأقصى للأساس.</div>}
+                      <div className="flex justify-between"><span>حصة الموظف</span><span className="font-bold tabular-nums text-danger">{money(siCalcResult.employeeShareAmount)}</span></div>
+                      <div className="flex justify-between"><span>حصة صاحب العمل</span><span className="font-bold tabular-nums text-success">{money(siCalcResult.employerShareAmount)}</span></div>
+                      <div className="flex justify-between border-t border-accent-border pt-2 text-xs font-black"><span>الإجمالي</span><span className="tabular-nums">{money(siCalcResult.totalAmount)}</span></div>
+                      {siCalcResult.ceilingApplied && <div className="text-[10px] font-semibold text-warning">تم تطبيق الحد الأقصى للأساس.</div>}
                     </div>
                   )}
                 </div>
 
-                <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-4">
-                  <h2 className="flex items-center gap-1.5 text-sm font-black"><ShieldCheck className="h-4 w-4 text-violet-600" /> حاسبة مكافأة نهاية الخدمة</h2>
-                  <label className="block text-[10px] font-bold text-slate-500">نظام العمل
-                    <select value={eosCalcForm.systemType} onChange={(e) => setEosCalcForm((prev) => ({ ...prev, systemType: e.target.value as SocialInsuranceSystemType }))} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm">
+                <div className="space-y-3 rounded-xl border border-line bg-surface p-4">
+                  <h2 className="flex items-center gap-1.5 text-sm font-black"><ShieldCheck className="h-4 w-4 text-primary" /> حاسبة مكافأة نهاية الخدمة</h2>
+                  <label className="block text-[10px] font-bold text-muted">نظام العمل
+                    <select value={eosCalcForm.systemType} onChange={(e) => setEosCalcForm((prev) => ({ ...prev, systemType: e.target.value as SocialInsuranceSystemType }))} className="mt-1 w-full rounded-lg border border-line px-3 py-2 text-sm">
                       {(Object.keys(systemTypeLabel) as SocialInsuranceSystemType[]).map((type) => <option key={type} value={type}>{systemTypeLabel[type]}</option>)}
                     </select>
                   </label>
                   <div className="grid grid-cols-2 gap-2">
-                    <label className="block text-[10px] font-bold text-slate-500">تاريخ الالتحاق
-                      <input type="date" value={eosCalcForm.joinDate} onChange={(e) => setEosCalcForm((prev) => ({ ...prev, joinDate: e.target.value }))} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+                    <label className="block text-[10px] font-bold text-muted">تاريخ الالتحاق
+                      <input type="date" value={eosCalcForm.joinDate} onChange={(e) => setEosCalcForm((prev) => ({ ...prev, joinDate: e.target.value }))} className="mt-1 w-full rounded-lg border border-line px-3 py-2 text-sm" />
                     </label>
-                    <label className="block text-[10px] font-bold text-slate-500">تاريخ الإنهاء
-                      <input type="date" value={eosCalcForm.terminationDate} onChange={(e) => setEosCalcForm((prev) => ({ ...prev, terminationDate: e.target.value }))} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+                    <label className="block text-[10px] font-bold text-muted">تاريخ الإنهاء
+                      <input type="date" value={eosCalcForm.terminationDate} onChange={(e) => setEosCalcForm((prev) => ({ ...prev, terminationDate: e.target.value }))} className="mt-1 w-full rounded-lg border border-line px-3 py-2 text-sm" />
                     </label>
                   </div>
-                  <label className="block text-[10px] font-bold text-slate-500">آخر راتب شهري
-                    <input type="number" min="0" value={eosCalcForm.lastMonthlySalary} onChange={(e) => setEosCalcForm((prev) => ({ ...prev, lastMonthlySalary: e.target.value }))} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+                  <label className="block text-[10px] font-bold text-muted">آخر راتب شهري
+                    <input type="number" min="0" value={eosCalcForm.lastMonthlySalary} onChange={(e) => setEosCalcForm((prev) => ({ ...prev, lastMonthlySalary: e.target.value }))} className="mt-1 w-full rounded-lg border border-line px-3 py-2 text-sm" />
                   </label>
-                  <button onClick={calculateEos} className="w-full rounded-lg bg-violet-600 px-4 py-2.5 text-xs font-bold text-white hover:bg-violet-700">احتساب المكافأة</button>
+                  <button onClick={calculateEos} className="w-full rounded-lg bg-primary px-4 py-2.5 text-xs font-bold text-white hover:bg-primary">احتساب المكافأة</button>
                   {eosCalcResult && (
-                    <div className="space-y-2 rounded-lg border border-violet-100 bg-violet-50/50 p-3 text-[11px]">
-                      <div className="font-black text-violet-800">{eosCalcResult.ruleName}</div>
+                    <div className="space-y-2 rounded-lg border border-accent-border bg-accent-soft/50 p-3 text-[11px]">
+                      <div className="font-black text-primary">{eosCalcResult.ruleName}</div>
                       <div className="flex justify-between"><span>مدة الخدمة</span><span className="font-bold">{eosCalcResult.serviceYears} سنة و {eosCalcResult.serviceMonths} شهر</span></div>
                       <div className="flex justify-between"><span>آخر راتب</span><span className="font-bold tabular-nums">{money(eosCalcResult.lastMonthlySalary)}</span></div>
-                      <div className="flex justify-between border-t border-violet-200 pt-2 text-xs font-black"><span>المكافأة التقديرية</span><span className="tabular-nums">{money(eosCalcResult.benefitAmount)}</span></div>
+                      <div className="flex justify-between border-t border-accent-border pt-2 text-xs font-black"><span>المكافأة التقديرية</span><span className="tabular-nums">{money(eosCalcResult.benefitAmount)}</span></div>
                     </div>
                   )}
                 </div>

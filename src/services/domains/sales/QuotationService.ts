@@ -5,6 +5,7 @@ import { PermissionService } from '../auth/PermissionService';
 import { BranchAccessService } from '../auth/BranchAccessService';
 import { SalesService } from './SalesService';
 import { OrderService, type Order } from './OrderService';
+import { OperationalFieldService } from '../products/OperationalFieldService';
 import { round2 } from '../finance/financials';
 import { unscaleMoneyRow } from '../../../utils/money';
 import type { PaymentType, SalesInvoice } from '../../../types';
@@ -574,6 +575,7 @@ export class QuotationService {
         discountAmount: item.discountAmount,
       })),
     });
+    new OperationalFieldService().copyRecordFieldValues('quotations', id, 'orders', order.id);
 
     this.db.run(
       `UPDATE quotations SET status = 'CONVERTED', converted_order_id = ?, warehouse_id = ?,
@@ -692,6 +694,7 @@ export class QuotationService {
         paymentType,
         notes: options.notes || `تحويل من عرض سعر ${quotation.quotationNumber}`,
       });
+      new OperationalFieldService().copyRecordFieldValues('quotations', id, 'sales_invoices', invoice.id);
 
       this.db.run(
         `UPDATE quotations SET status = 'CONVERTED', converted_invoice_id = ?, warehouse_id = ?,

@@ -85,7 +85,7 @@ export function ShortcutsHelpDialog({ open, onClose }: ShortcutsHelpDialogProps)
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[112] flex items-start justify-center bg-slate-950/30 p-4 pt-[10vh] backdrop-blur-sm">
+    <div className="fixed inset-0 z-[112] flex items-start justify-center bg-primary/30 p-4 pt-[10vh] backdrop-blur-sm">
       <button
         type="button"
         aria-label="إغلاق نافذة الاختصارات"
@@ -99,24 +99,24 @@ export function ShortcutsHelpDialog({ open, onClose }: ShortcutsHelpDialogProps)
         aria-modal="true"
         aria-labelledby="shortcuts-help-title"
         tabIndex={-1}
-        className="relative z-10 flex max-h-[80vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900"
+        className="relative z-10 flex max-h-[80vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-2xl "
       >
-        <header className="flex items-center gap-3 border-b border-slate-200 px-4 py-3 dark:border-slate-700">
-          <span className="rounded-lg bg-sky-50 p-2 text-sky-600 dark:bg-sky-950 dark:text-sky-300">
+        <header className="flex items-center gap-3 border-b border-line px-4 py-3 ">
+          <span className="rounded-lg bg-accent-soft p-2 text-primary ">
             <Keyboard className="h-5 w-5" />
           </span>
           <div className="min-w-0 flex-1">
-            <h2 id="shortcuts-help-title" className="text-sm font-extrabold text-slate-900 dark:text-slate-100">
+            <h2 id="shortcuts-help-title" className="text-sm font-extrabold text-ink ">
               اختصارات لوحة المفاتيح
             </h2>
-            <p className="text-xs text-slate-500 dark:text-slate-400">
+            <p className="text-xs text-muted ">
               اعمل أسرع بدون استخدام الفأرة. اضغط F1 في أي وقت لفتح هذه النافذة.
             </p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
+            className="rounded-lg p-2 text-muted hover:bg-surface-sunken dark:hover:bg-primary"
             aria-label="إغلاق"
           >
             <X className="h-4 w-4" />
@@ -126,18 +126,18 @@ export function ShortcutsHelpDialog({ open, onClose }: ShortcutsHelpDialogProps)
         <div className="min-h-0 flex-1 overflow-y-auto p-4">
           {groups.map((group) => (
             <section key={group.id} className="mb-4 last:mb-0" aria-label={group.title}>
-              <h3 className="mb-2 flex items-center gap-2 text-xs font-extrabold text-slate-700 dark:text-slate-200">
-                <group.icon className="h-4 w-4 text-sky-600 dark:text-sky-400" />
+              <h3 className="mb-2 flex items-center gap-2 text-xs font-extrabold text-ink ">
+                <group.icon className="h-4 w-4 text-primary " />
                 {group.title}
               </h3>
-              <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700">
+              <div className="overflow-hidden rounded-xl border border-line ">
                 {group.items.map(([keys, description]) => (
                   <div
                     key={keys}
-                    className="flex items-center justify-between gap-3 border-b border-slate-100 bg-white px-3 py-2 text-xs last:border-b-0 dark:border-slate-800 dark:bg-slate-900"
+                    className="flex items-center justify-between gap-3 border-b border-line bg-surface px-3 py-2 text-xs last:border-b-0 "
                   >
-                    <span className="text-slate-700 dark:text-slate-300">{description}</span>
-                    <kbd className="shrink-0 rounded border border-slate-200 bg-slate-50 px-2 py-0.5 font-mono text-[11px] text-sky-700 dark:border-slate-700 dark:bg-slate-800 dark:text-sky-300" dir="ltr">
+                    <span className="text-ink ">{description}</span>
+                    <kbd className="shrink-0 rounded border border-line bg-surface-muted px-2 py-0.5 font-mono text-[11px] text-primary " dir="ltr">
                       {keys}
                     </kbd>
                   </div>
@@ -147,7 +147,7 @@ export function ShortcutsHelpDialog({ open, onClose }: ShortcutsHelpDialogProps)
           ))}
 
           {!onPosScreen && (
-            <p className="rounded-xl bg-sky-50 px-3 py-2 text-xs leading-5 text-sky-900 dark:bg-sky-950 dark:text-sky-200">
+            <p className="rounded-xl bg-accent-soft px-3 py-2 text-xs leading-5 text-primary ">
               شاشة الكاشير لها اختصارات أسرع من F2 إلى F10 وتظهر تلقائياً عند فتحها.
             </p>
           )}

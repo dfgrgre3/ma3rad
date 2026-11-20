@@ -96,9 +96,9 @@ export const TenantListSection: React.FC<TenantListSectionProps> = ({
   saveFilterPreset,
 }) => (
   <>
-      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface p-3 shadow-sm">
         <div className="relative min-w-[220px] flex-1">
-          <Search className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+          <Search className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted" />
           <input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
@@ -118,7 +118,7 @@ export const TenantListSection: React.FC<TenantListSectionProps> = ({
             <option key={plan.id} value={plan.id}>{plan.name}</option>
           ))}
         </select>
-        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-600">{tenants.length} عميل</span>
+        <span className="rounded-full bg-surface-sunken px-2.5 py-1 text-[11px] font-bold text-ink-secondary">{tenants.length} عميل</span>
       </div>
 
       {tenants.length > 20 && (
@@ -129,16 +129,16 @@ export const TenantListSection: React.FC<TenantListSectionProps> = ({
          </div>
        )}
       {error && (
-        <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-2.5 text-xs font-semibold text-rose-700">{error}</div>
+        <div role="alert" className="rounded-lg border border-danger-border bg-danger-soft px-4 py-2.5 text-xs font-semibold text-danger">{error}</div>
       )}
 
       {/* Bulk Action Toolbar */}
       {selectedIds.size > 0 && canManageTenants && (
         <div className="fixed bottom-4 left-4 right-4 md:left-auto md:right-4 md:w-[420px] z-50 animate-slide-up">
-          <div className="rounded-xl border border-emerald-200 bg-emerald-50 shadow-xl p-3">
+          <div className="rounded-xl border border-success-border bg-success-soft shadow-xl p-3">
             <div className="flex items-center justify-between gap-2 mb-2">
-              <span className="text-sm font-bold text-emerald-800">{selectedIds.size} عميل محدد</span>
-              <button onClick={() => setSelectedIds(new Set())} className="text-emerald-600 hover:underline text-sm">إلغاء التحديد</button>
+              <span className="text-sm font-bold text-success">{selectedIds.size} عميل محدد</span>
+              <button onClick={() => setSelectedIds(new Set())} className="text-success hover:underline text-sm">إلغاء التحديد</button>
             </div>
             <div className="flex flex-wrap gap-2">
               <Button variant="secondary" size="sm" leadingIcon={<Ban className="h-3 w-3" />} onClick={() => { setBulkActionType('status'); setBulkActionOpen(true); }}>
@@ -159,12 +159,12 @@ export const TenantListSection: React.FC<TenantListSectionProps> = ({
       )}
 
       {/* Advanced Filters */}
-      <section className="rounded-xl border border-slate-200 bg-white shadow-sm">
-        <div className="flex items-center justify-between border-b border-slate-100 px-3 py-2.5">
+      <section className="rounded-xl border border-line bg-surface shadow-sm">
+        <div className="flex items-center justify-between border-b border-line px-3 py-2.5">
           <button
             type="button"
             onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-            className="flex items-center gap-1.5 text-sm font-semibold text-slate-700 hover:text-emerald-700"
+            className="flex items-center gap-1.5 text-sm font-semibold text-ink hover:text-success"
           >
             <Filter className="h-4 w-4" />
             فلاتر متقدمة
@@ -172,7 +172,7 @@ export const TenantListSection: React.FC<TenantListSectionProps> = ({
           </button>
           {Object.keys(filterPresets).length > 0 && (
             <div className="flex items-center gap-2">
-              <span className="text-[10.5px] text-slate-500">قوالب محفوظة:</span>
+              <span className="text-[10.5px] text-muted">قوالب محفوظة:</span>
               <select
                 className={`${inputClass} max-w-[150px]`}
                 onChange={(e) => loadFilterPreset(e.target.value)}
@@ -236,9 +236,9 @@ export const TenantListSection: React.FC<TenantListSectionProps> = ({
         )}
       </section>
 
-      <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+      <section className="overflow-hidden rounded-xl border border-line bg-surface shadow-sm">
         {loading ? (
-          <div className="py-16 text-center text-sm font-semibold text-slate-500">جارٍ تحميل العملاء...</div>
+          <div className="py-16 text-center text-sm font-semibold text-muted">جارٍ تحميل العملاء...</div>
         ) : tenants.length === 0 ? (
           <EmptyState
             icon={<Building2 className="h-5 w-5" />}
@@ -251,7 +251,7 @@ export const TenantListSection: React.FC<TenantListSectionProps> = ({
             rows={tenants.slice((page - 1) * 20, page * 20)}
             rowKey={(item) => item.id}
             minWidth={1080}
-            rowClassName={(item) => (selectedIds.has(item.id) ? 'bg-emerald-50/30' : '')}
+            rowClassName={(item) => (selectedIds.has(item.id) ? 'bg-success-soft/30' : '')}
             columns={[
               {
                 key: 'select', header: (
@@ -264,33 +264,33 @@ export const TenantListSection: React.FC<TenantListSectionProps> = ({
                 key: 'tenant', header: 'العميل / Tenant ID',
                 render: (item) => (
                   <>
-                    <p className="text-[12.5px] font-bold text-slate-800">{item.name}</p>
-                    <p className="text-[10px] text-slate-500">
+                    <p className="text-[12.5px] font-bold text-ink">{item.name}</p>
+                    <p className="text-[10px] text-muted">
                       <span dir="ltr" className="font-mono">{item.code}</span>
                       {' · '}
-                      <span dir="ltr" className="font-mono text-slate-400">{item.id}</span>
+                      <span dir="ltr" className="font-mono text-muted">{item.id}</span>
                     </p>
-                    <p className="text-[10px] text-slate-500">{item.phone || item.email || '—'}</p>
+                    <p className="text-[10px] text-muted">{item.phone || item.email || '—'}</p>
                   </>
                 ),
               },
-              { key: 'business', header: 'النشاط', render: (item) => <span className="text-[11px] text-slate-600">{item.businessType || '—'}</span> },
-              { key: 'plan', header: 'الباقة', render: (item) => <span className="text-[11.5px] font-semibold text-slate-600">{item.planName || '—'}</span> },
+              { key: 'business', header: 'النشاط', render: (item) => <span className="text-[11px] text-ink-secondary">{item.businessType || '—'}</span> },
+              { key: 'plan', header: 'الباقة', render: (item) => <span className="text-[11.5px] font-semibold text-ink-secondary">{item.planName || '—'}</span> },
               { key: 'status', header: 'الحالة', render: (item) => <StatusBadge value={item.status} label={PLATFORM_TENANT_STATUS_LABELS[item.status]} /> },
-              { key: 'expires', header: 'نهاية الاشتراك', render: (item) => <span className="text-[11px] text-slate-600">{formatDate(item.subscriptionExpiresAt)}</span> },
-              { key: 'devices', header: 'الأجهزة', render: (item) => <span className="text-[11px] font-semibold text-slate-700">{formatNumber(item.devicesUsed ?? 0)} / {formatNumber(item.devicesLimit)}</span> },
-              { key: 'branches', header: 'الفروع', render: (item) => <span className="text-[11px] font-semibold text-slate-700">{formatNumber(item.branchesLimit)}</span> },
+              { key: 'expires', header: 'نهاية الاشتراك', render: (item) => <span className="text-[11px] text-ink-secondary">{formatDate(item.subscriptionExpiresAt)}</span> },
+              { key: 'devices', header: 'الأجهزة', render: (item) => <span className="text-[11px] font-semibold text-ink">{formatNumber(item.devicesUsed ?? 0)} / {formatNumber(item.devicesLimit)}</span> },
+              { key: 'branches', header: 'الفروع', render: (item) => <span className="text-[11px] font-semibold text-ink">{formatNumber(item.branchesLimit)}</span> },
               {
                 key: 'outstanding', header: 'مستحقات',
-                render: (item) => <span className={`text-[11px] font-bold ${(item.outstanding ?? 0) > 0 ? 'text-rose-600' : 'text-slate-500'}`}>{formatMoney(item.outstanding ?? 0)}</span>,
+                render: (item) => <span className={`text-[11px] font-bold ${(item.outstanding ?? 0) > 0 ? 'text-danger' : 'text-muted'}`}>{formatMoney(item.outstanding ?? 0)}</span>,
               },
               {
                 key: 'actions', header: 'إجراءات',
                 render: (item) => (
                   <div className="flex items-center gap-1">
-                    <button type="button" onClick={() => openProfile(item)} className="rounded p-1.5 text-slate-500 hover:bg-sky-50 hover:text-sky-700" title="فتح الملف المركزي"><Eye className="h-3.5 w-3.5" /></button>
-                    {canManageTenants && (<button type="button" onClick={() => openEdit(item)} className="rounded p-1.5 text-slate-500 hover:bg-emerald-50 hover:text-emerald-700" title="تعديل البيانات"><Pencil className="h-3.5 w-3.5" /></button>)}
-                    <button type="button" onClick={() => openProfile(item)} className="rounded p-1.5 text-slate-500 hover:bg-amber-50 hover:text-amber-700" title="الحساب والترخيص"><KeyRound className="h-3.5 w-3.5" /></button>
+                    <button type="button" onClick={() => openProfile(item)} className="rounded p-1.5 text-muted hover:bg-accent-soft hover:text-primary" title="فتح الملف المركزي"><Eye className="h-3.5 w-3.5" /></button>
+                    {canManageTenants && (<button type="button" onClick={() => openEdit(item)} className="rounded p-1.5 text-muted hover:bg-success-soft hover:text-success" title="تعديل البيانات"><Pencil className="h-3.5 w-3.5" /></button>)}
+                    <button type="button" onClick={() => openProfile(item)} className="rounded p-1.5 text-muted hover:bg-warning-soft hover:text-warning" title="الحساب والترخيص"><KeyRound className="h-3.5 w-3.5" /></button>
                   </div>
                 ),
               },

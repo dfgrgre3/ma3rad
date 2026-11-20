@@ -8,7 +8,7 @@ import { CentralLimitGuard } from '../ui/CentralLimitGuard';
 import type { Company } from '../../types';
 
 const inputCls =
-  'w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-sky-500/30';
+  'w-full px-3 py-2 bg-surface-muted rounded-xl border border-line text-ink text-xs focus:outline-none focus:ring-2 focus:ring-primary/30';
 
 /**
  * Legal-entity management. Every operation is executed by CompanyService, so
@@ -99,11 +99,11 @@ export const CompaniesPanel: React.FC = () => {
   return (
     <div>
       <div className="mb-2 flex items-center justify-between">
-        <h4 className="flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-slate-300">
+        <h4 className="flex items-center gap-2 text-xs font-bold text-ink ">
           <Building2 className="h-4 w-4" /> الشركات والكيانات القانونية
         </h4>
         <div className="flex gap-2">
-          <button type="button" onClick={load} className="rounded-lg border border-slate-200 p-1.5 text-slate-500 dark:border-slate-700" title="تحديث">
+          <button type="button" onClick={load} className="rounded-lg border border-line p-1.5 text-muted " title="تحديث">
             <RefreshCw className="h-3.5 w-3.5" />
           </button>
           {can('companies.create') && (
@@ -111,7 +111,7 @@ export const CompaniesPanel: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setCreating((value) => !value)}
-                className="inline-flex items-center gap-1 rounded-lg bg-sky-600 px-2.5 py-1.5 text-xs font-bold text-white hover:bg-sky-700"
+                className="inline-flex items-center gap-1 rounded-lg bg-primary px-2.5 py-1.5 text-xs font-bold text-white hover:bg-primary"
               >
                 <Plus className="h-3.5 w-3.5" /> شركة جديدة
               </button>
@@ -120,19 +120,19 @@ export const CompaniesPanel: React.FC = () => {
         </div>
       </div>
 
-      {error && <p className="mb-2 text-xs text-rose-600">{error}</p>}
-      {loading && <p className="text-xs text-slate-500">جارٍ التحميل…</p>}
+      {error && <p className="mb-2 text-xs text-danger">{error}</p>}
+      {loading && <p className="text-xs text-muted">جارٍ التحميل…</p>}
 
       {creating && (
-        <div className="mb-3 grid grid-cols-1 gap-2 rounded-xl border border-slate-200 p-3 sm:grid-cols-4 dark:border-slate-700">
+        <div className="mb-3 grid grid-cols-1 gap-2 rounded-xl border border-line p-3 sm:grid-cols-4 ">
           <input className={inputCls} placeholder="الكود (مثال: BRANCH2)" value={draft.code} onChange={(e) => setDraft({ ...draft, code: e.target.value })} />
           <input className={inputCls} placeholder="اسم الشركة" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
           <input className={inputCls} placeholder="العملة (EGP)" value={draft.currency} onChange={(e) => setDraft({ ...draft, currency: e.target.value })} />
-          <button type="button" onClick={create} className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white hover:bg-emerald-700">حفظ</button>
+          <button type="button" onClick={create} className="rounded-lg bg-success px-3 py-2 text-xs font-bold text-white hover:bg-success">حفظ</button>
         </div>
       )}
 
-      <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
+      <div className="overflow-x-auto rounded-xl border border-line ">
         <DataTable
         ariaLabel="الشركات"
         rows={companies}
@@ -169,7 +169,7 @@ export const CompaniesPanel: React.FC = () => {
           {
             key: 'status', header: 'الحالة',
             render: (company: any) => (
-              <span className={company.isActive ? 'text-emerald-600' : 'text-slate-400'}>
+              <span className={company.isActive ? 'text-success' : 'text-muted'}>
                 {company.isActive ? 'نشطة' : 'معطلة'}
               </span>
             ),
@@ -181,18 +181,18 @@ export const CompaniesPanel: React.FC = () => {
               return (
                 <div className="flex justify-end gap-1">
                   {isEditing ? (
-                    <button type="button" onClick={() => saveEdit(company)} className="rounded-md bg-emerald-600 p-1.5 text-white" title="حفظ">
+                    <button type="button" onClick={() => saveEdit(company)} className="rounded-md bg-success p-1.5 text-white" title="حفظ">
                       <Save className="h-3.5 w-3.5" />
                     </button>
                   ) : (
                     can('companies.update') && (
-                      <button type="button" onClick={() => startEdit(company)} className="rounded-md border border-slate-200 px-2 py-1 text-slate-600 dark:border-slate-700 dark:text-slate-300">
+                      <button type="button" onClick={() => startEdit(company)} className="rounded-md border border-line px-2 py-1 text-ink-secondary ">
                         تعديل
                       </button>
                     )
                   )}
                   {company.isActive && can('companies.delete') && !isEditing && (
-                    <button type="button" onClick={() => deactivate(company)} className="rounded-md border border-rose-200 p-1.5 text-rose-600 dark:border-rose-500/30" title="تعطيل">
+                    <button type="button" onClick={() => deactivate(company)} className="rounded-md border border-danger-border p-1.5 text-danger dark:border-danger/30" title="تعطيل">
                       <Ban className="h-3.5 w-3.5" />
                     </button>
                   )}
@@ -204,7 +204,7 @@ export const CompaniesPanel: React.FC = () => {
         emptyTitle="لا توجد شركات ضمن نطاق صلاحيتك."
       />
       </div>
-      <p className="mt-2 text-[11px] text-slate-500">
+      <p className="mt-2 text-[11px] text-muted">
         تعطيل الشركة لا يحذف أي سجل تاريخي. يجب نقل أو تعطيل فروعها أولًا.
       </p>
     </div>

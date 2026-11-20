@@ -29,4 +29,27 @@ export const emptyForm: PlatformTenantInput = {
   notes: '',
 };
 
+export interface NewAccountForm {
+  enabled: boolean;
+  username: string;
+  fullName: string;
+  email: string;
+  password: string;
+}
+
+export const emptyAccountForm: NewAccountForm = {
+  enabled: true,
+  username: '',
+  fullName: '',
+  email: '',
+  password: '',
+};
+
+export interface CreatedAccountInfo {
+  username: string;
+  temporaryPassword?: string | null;
+  activationCode?: string | null;
+  loginUrl: string;
+}
+
 export type TabKey = 'overview' | 'subscription' | 'licenses' | 'billing' | 'logs' | 'users' | 'remote';

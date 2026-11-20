@@ -522,13 +522,13 @@ export const PlatformStaffPage: React.FC = () => {
       />
 
       {/* Tabs */}
-      <div className="flex flex-wrap items-center gap-1.5 rounded-xl border border-slate-800 bg-slate-900/60 p-1.5">
+      <div className="flex flex-wrap items-center gap-1.5 rounded-xl border border-line-strong bg-primary/60 p-1.5">
         {TABS.map((item) => (
           <button
             key={item.key}
             onClick={() => setTab(item.key)}
             className={`rounded-lg px-3.5 py-2 text-xs font-bold transition-colors ${
-              tab === item.key ? 'bg-sky-500/15 text-sky-300 ring-1 ring-sky-500/40' : 'text-slate-400 hover:text-slate-200'
+              tab === item.key ? 'bg-primary/15 text-primary ring-1 ring-primary/40' : 'text-muted hover:text-muted'
             }`}
           >
             {item.label}

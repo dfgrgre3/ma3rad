@@ -97,33 +97,33 @@ export const IncomingProductsPage: React.FC = () => {
     } catch (error: any) { toast.error(error?.message || 'تعذر تسجيل الاستلام.'); }
   };
 
-  return <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
-    <div className="bg-white border-b border-slate-200 px-6 pt-4">
+  return <div className="h-full flex flex-col bg-surface-muted text-ink overflow-hidden">
+    <div className="bg-surface border-b border-line px-6 pt-4">
       <PageHeader
         icon={<PackageCheck className="w-5 h-5" />}
         title="البضائع المنتظرة"
         description="طلبات الشراء المفتوحة والكميات التي لم تصل بعد"
-        meta={<div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-2 text-sm font-black text-amber-800">{filtered.length} طلب مفتوح</div>}
+        meta={<div className="rounded-xl bg-warning-soft border border-warning-border px-4 py-2 text-sm font-black text-warning">{filtered.length} طلب مفتوح</div>}
       />
     </div>
-    <div className="p-4 bg-white border-b border-slate-200 flex flex-wrap gap-3 items-center">
-      <div className="relative flex-1 min-w-56"><Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"/><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="ابحث بالمنتج أو المورد أو رقم الطلب" className="w-full pr-10 pl-3 py-2.5 rounded-xl border border-slate-200 text-sm" /></div>
+    <div className="p-4 bg-surface border-b border-line flex flex-wrap gap-3 items-center">
+      <div className="relative flex-1 min-w-56"><Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted"/><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="ابحث بالمنتج أو المورد أو رقم الطلب" className="w-full pr-10 pl-3 py-2.5 rounded-xl border border-line text-sm" /></div>
       <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={overdueOnly} onChange={(e) => setOverdueOnly(e.target.checked)} /> المتأخرة فقط</label>
       <select value={supplierFilter} onChange={(e)=>setSupplierFilter(e.target.value)} className="border rounded-xl px-3 py-2 text-sm"><option value="">كل الموردين</option>{Array.from(new Map(orders.map(o=>[o.supplierId,o.supplierName||'—'])).entries()).map(([id,name])=><option key={id} value={id}>{name}</option>)}</select>
       <select value={warehouseFilter} onChange={(e)=>setWarehouseFilter(e.target.value)} className="border rounded-xl px-3 py-2 text-sm"><option value="">كل المخازن</option>{Array.from(new Map(orders.map(o=>[o.warehouseId,o.warehouseName||'—'])).entries()).map(([id,name])=><option key={id} value={id}>{name}</option>)}</select>
       <select value={statusFilter} onChange={(e)=>setStatusFilter(e.target.value)} className="border rounded-xl px-3 py-2 text-sm"><option value="ALL">كل الحالات</option><option value="SENT">مرسل</option><option value="CONFIRMED">مؤكد</option><option value="PARTIAL">استلام جزئي</option></select>
       <input aria-label="من موعد الوصول المتوقع" type="date" value={dateFrom} onChange={(e)=>setDateFrom(e.target.value)} className="border rounded-xl px-2 py-2 text-sm"/><input aria-label="إلى موعد الوصول المتوقع" type="date" value={dateTo} onChange={(e)=>setDateTo(e.target.value)} className="border rounded-xl px-2 py-2 text-sm"/>
-      <button onClick={load} className="px-4 py-2 rounded-xl border border-slate-200 text-sm font-bold">تحديث</button>
-      <button onClick={()=>report('excel')} className="px-3 py-2 rounded-xl bg-emerald-700 text-white text-sm">جدول بيانات</button><button onClick={()=>report('pdf')} className="px-3 py-2 rounded-xl bg-slate-700 text-white text-sm">طباعة / مستند</button>
+      <button onClick={load} className="px-4 py-2 rounded-xl border border-line text-sm font-bold">تحديث</button>
+      <button onClick={()=>report('excel')} className="px-3 py-2 rounded-xl bg-success text-white text-sm">جدول بيانات</button><button onClick={()=>report('pdf')} className="px-3 py-2 rounded-xl bg-primary text-white text-sm">طباعة / مستند</button>
     </div>
     <main className="flex-1 overflow-auto p-4 space-y-3">
       {filtered.map((order) => {
         const overdue = Boolean(order.expectedDate && order.expectedDate < today);
         const expandedNow = expanded === order.id;
-        return <article key={order.id} className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+        return <article key={order.id} className="bg-surface border border-line rounded-2xl overflow-hidden">
           <div className="px-5 py-4 flex flex-wrap items-center justify-between gap-3">
-            <button className="text-right" onClick={() => setExpanded(expandedNow ? null : order.id)}><div className="font-black">أمر شراء {order.orderNumber} <ChevronDown className={`inline w-4 h-4 transition ${expandedNow ? 'rotate-180' : ''}`} /></div><div className="text-xs text-slate-500 mt-1">المورد: {order.supplierName || '—'} · {order.supplierPhone || 'لا يوجد هاتف'} · {order.supplierAddress || 'لا يوجد عنوان'} · تاريخ الطلب: {order.date}</div></button>
-            <div className="flex flex-wrap items-center gap-3 text-xs text-slate-600"><span className="inline-flex items-center gap-1"><Warehouse className="w-3.5 h-3.5"/>{order.warehouseName || '—'}</span><span className="inline-flex items-center gap-1"><CalendarDays className="w-3.5 h-3.5"/>متوقع: {order.expectedDate || 'غير محدد'}</span><span className={`inline-flex items-center gap-1 font-bold ${overdue ? 'text-rose-700' : 'text-amber-700'}`}>{overdue ? <Clock3 className="w-3.5 h-3.5"/> : <Truck className="w-3.5 h-3.5"/>}{overdue ? 'متأخر' : order.status === 'PARTIAL' ? 'وصل جزئيًا' : 'بانتظار الوصول'}</span><button onClick={() => openReceipt(order)} className="inline-flex items-center gap-1 px-3 py-2 rounded-lg bg-emerald-600 text-white font-bold"><Check className="w-4 h-4"/> تسجيل استلام</button></div>
+            <button className="text-right" onClick={() => setExpanded(expandedNow ? null : order.id)}><div className="font-black">أمر شراء {order.orderNumber} <ChevronDown className={`inline w-4 h-4 transition ${expandedNow ? 'rotate-180' : ''}`} /></div><div className="text-xs text-muted mt-1">المورد: {order.supplierName || '—'} · {order.supplierPhone || 'لا يوجد هاتف'} · {order.supplierAddress || 'لا يوجد عنوان'} · تاريخ الطلب: {order.date}</div></button>
+            <div className="flex flex-wrap items-center gap-3 text-xs text-ink-secondary"><span className="inline-flex items-center gap-1"><Warehouse className="w-3.5 h-3.5"/>{order.warehouseName || '—'}</span><span className="inline-flex items-center gap-1"><CalendarDays className="w-3.5 h-3.5"/>متوقع: {order.expectedDate || 'غير محدد'}</span><span className={`inline-flex items-center gap-1 font-bold ${overdue ? 'text-danger' : 'text-warning'}`}>{overdue ? <Clock3 className="w-3.5 h-3.5"/> : <Truck className="w-3.5 h-3.5"/>}{overdue ? 'متأخر' : order.status === 'PARTIAL' ? 'وصل جزئيًا' : 'بانتظار الوصول'}</span><button onClick={() => openReceipt(order)} className="inline-flex items-center gap-1 px-3 py-2 rounded-lg bg-success text-white font-bold"><Check className="w-4 h-4"/> تسجيل استلام</button></div>
           </div>
           <div className="overflow-x-auto"><DataTable
                 ariaLabel="أصناف الطلب الوارد"
@@ -137,23 +137,23 @@ export const IncomingProductsPage: React.FC = () => {
                     render: (item: any) => (
                       <span className="block font-semibold">
                         {item.productName}
-                        <small className="block font-normal text-slate-500">{[item.productCode, item.barcode, item.brandName, item.grade, item.size, item.categoryName].filter(Boolean).join(' · ')}</small>
+                        <small className="block font-normal text-muted">{[item.productCode, item.barcode, item.brandName, item.grade, item.size, item.categoryName].filter(Boolean).join(' · ')}</small>
                       </span>
                     ),
                   },
                   { key: 'req', header: 'المطلوب', render: (item: any) => <span>{formatProductQuantity(item.quantityM2, item)}</span> },
                   { key: 'recv', header: 'المستلم', render: (item: any) => <span>{formatProductQuantity(item.receivedM2, item)}</span> },
-                  { key: 'left', header: 'المتبقي', render: (item: any) => <span className="font-black text-amber-700">{formatProductQuantity(left(item), item)}</span> },
+                  { key: 'left', header: 'المتبقي', render: (item: any) => <span className="font-black text-warning">{formatProductQuantity(left(item), item)}</span> },
                   { key: 'price', header: 'سعر الوحدة', render: (item: any) => <span>{fmt(item.unitCost)} ج.م / {getProductUnitLabel(item)}</span> },
                   { key: 'val', header: 'القيمة المتبقية', render: (item: any) => <span>{fmt(left(item) * item.unitCost)} ج.م</span> },
                 ]}
               /></div>
           {canUpdate && <div className="px-4 pb-4 flex flex-wrap gap-3"><label className="text-xs">موعد الوصول المتوقع<input type="date" defaultValue={order.expectedDate || ''} onBlur={(e)=>updateFollowUp(order,e.target.value,order.notes || '')} className="mr-2 border rounded-lg p-1.5"/></label><label className="text-xs flex-1">ملاحظات المتابعة<input type="text" defaultValue={order.notes || ''} onBlur={(e)=>updateFollowUp(order,order.expectedDate || '',e.target.value)} className="mr-2 w-full border rounded-lg p-1.5"/></label></div>}
-          {expandedNow && <div className="p-4 bg-slate-50 border-t text-xs"><strong>سجل الاستلام:</strong>{service.getReceiptHistory(order.id).length ? service.getReceiptHistory(order.id).map((r) => <div key={`${r.id}-${r.productName}`} className="mt-2">{r.receivedAt} · فاتورة {r.invoiceNumber} · {r.productName}: {formatProductQuantity(r.quantity, r)} {r.notes ? `· ${r.notes}` : ''}</div>) : <span className="text-slate-500"> لا توجد استلامات سابقة.</span>}</div>}
+          {expandedNow && <div className="p-4 bg-surface-muted border-t text-xs"><strong>سجل الاستلام:</strong>{service.getReceiptHistory(order.id).length ? service.getReceiptHistory(order.id).map((r) => <div key={`${r.id}-${r.productName}`} className="mt-2">{r.receivedAt} · فاتورة {r.invoiceNumber} · {r.productName}: {formatProductQuantity(r.quantity, r)} {r.notes ? `· ${r.notes}` : ''}</div>) : <span className="text-muted"> لا توجد استلامات سابقة.</span>}</div>}
         </article>;
       })}
-      {!filtered.length && <div className="bg-white border border-dashed border-slate-300 rounded-2xl p-12 text-center text-slate-500">لا توجد بضائع منتظرة مطابقة للبحث</div>}
+      {!filtered.length && <div className="bg-surface border border-dashed border-line-strong rounded-2xl p-12 text-center text-muted">لا توجد بضائع منتظرة مطابقة للبحث</div>}
     </main>
-    {receipt && <div className="fixed inset-0 z-50 bg-slate-900/40 flex items-center justify-center p-4"><section className="bg-white rounded-2xl shadow-xl max-w-2xl w-full p-5 max-h-[90vh] overflow-auto"><h2 className="font-black text-lg">استلام من أمر {receipt.orderNumber}</h2><p className="text-xs text-slate-500 mt-1">سيضاف للمخزون فقط ما تسجله هنا.</p><div className="mt-4 space-y-3">{receipt.items.filter((i) => left(i) > 0).map((item) => <label key={item.id} className="grid grid-cols-[1fr_9rem] gap-3 items-center border rounded-xl p-3"><span className="text-sm font-bold">{item.productName}<small className="block text-slate-500 font-normal">متبقي {formatProductQuantity(left(item), item)}</small></span><input type="number" min="0" max={left(item)} step="0.01" value={quantities[item.id] || ''} onChange={(e) => setQuantities((prev) => ({ ...prev, [item.id]: e.target.value }))} className="border rounded-lg px-3 py-2" /></label>)}</div><textarea value={receiptNotes} onChange={(e) => setReceiptNotes(e.target.value)} placeholder="ملاحظات الاستلام" className="mt-3 w-full border rounded-xl p-3 text-sm"/><div className="mt-4 flex justify-end gap-2"><button onClick={() => setReceipt(null)} className="px-4 py-2 rounded-lg bg-slate-100">إلغاء</button><button onClick={submitReceipt} className="px-4 py-2 rounded-lg bg-emerald-600 text-white font-bold">تأكيد الاستلام</button></div></section></div>}
+    {receipt && <div className="fixed inset-0 z-50 bg-primary/40 flex items-center justify-center p-4"><section className="bg-surface rounded-2xl shadow-xl max-w-2xl w-full p-5 max-h-[90vh] overflow-auto"><h2 className="font-black text-lg">استلام من أمر {receipt.orderNumber}</h2><p className="text-xs text-muted mt-1">سيضاف للمخزون فقط ما تسجله هنا.</p><div className="mt-4 space-y-3">{receipt.items.filter((i) => left(i) > 0).map((item) => <label key={item.id} className="grid grid-cols-[1fr_9rem] gap-3 items-center border rounded-xl p-3"><span className="text-sm font-bold">{item.productName}<small className="block text-muted font-normal">متبقي {formatProductQuantity(left(item), item)}</small></span><input type="number" min="0" max={left(item)} step="0.01" value={quantities[item.id] || ''} onChange={(e) => setQuantities((prev) => ({ ...prev, [item.id]: e.target.value }))} className="border rounded-lg px-3 py-2" /></label>)}</div><textarea value={receiptNotes} onChange={(e) => setReceiptNotes(e.target.value)} placeholder="ملاحظات الاستلام" className="mt-3 w-full border rounded-xl p-3 text-sm"/><div className="mt-4 flex justify-end gap-2"><button onClick={() => setReceipt(null)} className="px-4 py-2 rounded-lg bg-surface-sunken">إلغاء</button><button onClick={submitReceipt} className="px-4 py-2 rounded-lg bg-success text-white font-bold">تأكيد الاستلام</button></div></section></div>}
   </div>;
 };

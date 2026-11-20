@@ -95,26 +95,26 @@ export const CartLine: React.FC<CartLineProps> = ({
         }
       }}
       aria-current={isActive || undefined}
-      className={`bg-white dark:bg-slate-900 p-2 rounded-xl border text-xs space-y-1.5 cursor-pointer transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-1 ${
-        overStock ? 'border-rose-500/50' : isActive ? 'border-sky-500 ring-2 ring-sky-500/25' : 'border-slate-200/80 dark:border-slate-800'
-      }`}
+      className={`bg-surface p-2 rounded-xl border text-xs space-y-1.5 cursor-pointer transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1 ${
+ overStock ? 'border-danger/50' : isActive ? 'border-primary ring-2 ring-primary/25' : 'border-line/80 dark:border-line-strong'
+ }`}
     >
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-start gap-2 min-w-0">
           {item.product.imagePath ? (
-            <img src={item.product.imagePath} alt={item.product.name} className="w-10 h-10 object-cover rounded-lg bg-slate-100 dark:bg-slate-800 shrink-0" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+            <img src={item.product.imagePath} alt={item.product.name} className="w-10 h-10 object-cover rounded-lg bg-surface-sunken shrink-0" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
           ) : (
-            <div aria-hidden="true" className="w-10 h-10 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-300 dark:text-slate-600 flex items-center justify-center shrink-0">
+            <div aria-hidden="true" className="w-10 h-10 rounded-lg bg-surface-sunken text-muted flex items-center justify-center shrink-0">
               <Package className="w-5 h-5" strokeWidth={1.5} />
             </div>
           )}
           <div className="min-w-0">
-            <div className="font-bold text-slate-900 dark:text-slate-100 line-clamp-1">{item.product.name}</div>
-          <div className="text-[10px] text-slate-500 dark:text-slate-400">
+            <div className="font-bold text-ink line-clamp-1">{item.product.name}</div>
+          <div className="text-[10px] text-muted ">
             {isGeneral ? `الوحدة الأساسية: ${getProductUnitLabel(item.product)}` : `${item.product.size} • ${gradeLabel(item.product.grade)}`} • متاح {formatProductQuantity(item.availableStockM2, item.product)}
           </div>
           {item.specialStockId && (
-            <div className="text-[10px] font-bold text-purple-700 dark:text-purple-300">
+            <div className="text-[10px] font-bold text-primary ">
               بيع مخفض • مصدر {item.specialNumber}
             </div>
           )}
@@ -124,14 +124,14 @@ export const CartLine: React.FC<CartLineProps> = ({
           onClick={() => onRemove(index)}
           aria-label={`حذف ${item.product.name} من السلة`}
           title="حذف من السلة (Delete)"
-          className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition shrink-0"
+          className="w-8 h-8 flex items-center justify-center text-muted hover:text-danger hover:bg-danger-soft dark:hover:bg-danger/40 rounded-lg transition shrink-0"
         >
           <Trash2 className="w-4 h-4" />
         </button>
       </div>
 
       {overStock && (
-        <div className="text-[10px] text-rose-600 flex items-center gap-1">
+        <div className="text-[10px] text-danger flex items-center gap-1">
           <AlertCircle className="w-3 h-3" /> الكمية تتجاوز الرصيد المتاح
         </div>
       )}
@@ -143,12 +143,12 @@ export const CartLine: React.FC<CartLineProps> = ({
               key={unit}
               type="button"
               onClick={() => onUpdateUnit(index, unit)}
-              className={`px-2 py-0.5 rounded text-[10px] font-bold border ${item.soldBy === unit ? 'bg-sky-600 text-white border-sky-500' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300'}`}
+              className={`px-2 py-0.5 rounded text-[10px] font-bold border ${item.soldBy === unit ? 'bg-primary text-white border-primary' : 'bg-surface dark:bg-primary border-line text-ink dark:text-muted'}`}
             >
               {getUomLabel(unit, item.product)}
             </button>
           ))}
-          <span className="text-[10px] text-slate-500 mr-auto">
+          <span className="text-[10px] text-muted mr-auto">
             {round2(item.quantityM2)} {getProductUnitLabel(item.product)}
             {item.product?.productType !== 'GENERAL' ? ` • ${item.boxesCount} كرتونة` : ''}
           </span>
@@ -157,11 +157,11 @@ export const CartLine: React.FC<CartLineProps> = ({
 
       <div className="flex items-center justify-between gap-2">
         {/* Quantity Controls */}
-        <div className="flex items-center gap-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-0.5">
+        <div className="flex items-center gap-1 bg-surface border border-line rounded-lg p-0.5">
           <button
             onClick={() => onStepQuantity(index, -1)}
             aria-label="إنقاص الكمية"
-            className="w-7 h-7 flex items-center justify-center text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 rounded"
+            className="w-7 h-7 flex items-center justify-center text-muted hover:bg-surface-sunken dark:hover:bg-primary rounded"
           >
             <Minus className="w-3 h-3" />
           </button>
@@ -171,12 +171,12 @@ export const CartLine: React.FC<CartLineProps> = ({
             value={item.soldQuantity}
             onChange={(e) => { if (e.target.value !== '') onUpdateQuantity(index, Number.parseFloat(e.target.value)); }}
             aria-label={`تغيير الكمية للمنتج ${item.product.name}`}
-            className="w-14 text-center font-bold bg-transparent focus:outline-none text-xs text-slate-900 dark:text-slate-100"
+            className="w-14 text-center font-bold bg-transparent focus:outline-none text-xs text-ink "
           />
           <button
             onClick={() => onStepQuantity(index, 1)}
             aria-label="زيادة الكمية"
-            className="w-7 h-7 flex items-center justify-center text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 rounded"
+            className="w-7 h-7 flex items-center justify-center text-muted hover:bg-surface-sunken dark:hover:bg-primary rounded"
           >
             <Plus className="w-3 h-3" />
           </button>
@@ -190,10 +190,10 @@ export const CartLine: React.FC<CartLineProps> = ({
             onChange={(e) => { if (e.target.value !== '') onUpdatePrice(index, Number.parseFloat(e.target.value)); }}
             aria-label={`تغيير السعر للمنتج ${item.product.name}`}
             readOnly={Boolean(item.specialStockId)}
-            className={`w-16 text-center font-bold bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-1 text-xs text-slate-900 dark:text-slate-100 ${item.specialStockId ? 'opacity-70 cursor-not-allowed' : ''}`}
+            className={`w-16 text-center font-bold bg-surface border border-line rounded-lg p-1 text-xs text-ink ${item.specialStockId ? 'opacity-70 cursor-not-allowed' : ''}`}
           />
-          <span className="text-[10px] text-slate-500">ج.م</span>
-          <span className="text-[10px] text-slate-500">/{getCartPriceUnitLabel(item)}</span>
+          <span className="text-[10px] text-muted">ج.م</span>
+          <span className="text-[10px] text-muted">/{getCartPriceUnitLabel(item)}</span>
 
           {/* زر تثبيت / اختيار السعر إذا كان مفعلاً أكثر من سعر */}
           {!item.specialStockId && sellingPriceTiersCount > 1 && (
@@ -202,7 +202,7 @@ export const CartLine: React.FC<CartLineProps> = ({
                 type="button"
                 onClick={() => setIsPriceMenuOpen(!isPriceMenuOpen)}
                 title="تثبيت / اختيار مستوى السعر"
-                className="p-1 rounded bg-slate-100 dark:bg-slate-800 hover:bg-sky-50 dark:hover:bg-sky-950/40 text-slate-600 dark:text-slate-300 hover:text-sky-600 border border-slate-200 dark:border-slate-700 transition"
+                className="p-1 rounded bg-surface-sunken hover:bg-accent-soft dark:hover:bg-primary/40 text-ink-secondary hover:text-primary border border-line transition"
               >
                 <Tag className="w-3 h-3 inline" />
                 <ChevronDown className="w-2.5 h-2.5 inline mr-0.5" />
@@ -210,10 +210,10 @@ export const CartLine: React.FC<CartLineProps> = ({
 
               {isPriceMenuOpen && (
                 <div
-                  className="absolute left-0 top-full mt-1 w-44 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 py-1 z-50 text-right"
+                  className="absolute left-0 top-full mt-1 w-44 bg-surface rounded-xl shadow-xl border border-line py-1 z-50 text-right"
                   onMouseLeave={() => setIsPriceMenuOpen(false)}
                 >
-                  <div className="px-2 py-1 text-[10px] font-bold text-slate-400 border-b border-slate-100 dark:border-slate-700">
+                  <div className="px-2 py-1 text-[10px] font-bold text-muted border-b border-line ">
                     تثبيت السعر للصنف
                   </div>
                   {priceTiers.map((tier) => (
@@ -224,10 +224,10 @@ export const CartLine: React.FC<CartLineProps> = ({
                         onUpdatePrice(index, tier.price);
                         setIsPriceMenuOpen(false);
                       }}
-                      className="w-full px-2.5 py-1.5 text-right flex items-center justify-between text-xs hover:bg-sky-50 dark:hover:bg-sky-950/40 transition text-slate-700 dark:text-slate-200"
+                      className="w-full px-2.5 py-1.5 text-right flex items-center justify-between text-xs hover:bg-accent-soft dark:hover:bg-primary/40 transition text-ink "
                     >
                       <span className="text-[11px] font-semibold">{tier.label}</span>
-                      <span className="font-mono font-bold text-sky-600">{tier.price}</span>
+                      <span className="font-mono font-bold text-primary">{tier.price}</span>
                     </button>
                   ))}
                 </div>
@@ -236,18 +236,18 @@ export const CartLine: React.FC<CartLineProps> = ({
           )}
         </div>
 
-        <div className="font-black text-sky-600 w-20 text-left">{CeramicMath.formatCurrency(lineTotal)}</div>
+        <div className="font-black text-primary w-20 text-left">{CeramicMath.formatCurrency(lineTotal)}</div>
       </div>
 
       <div className="flex items-center gap-2">
-        <span className="text-[10px] text-slate-500">خصم الصنف</span>
+        <span className="text-[10px] text-muted">خصم الصنف</span>
         <input
           type="number"
           value={item.discountAmount || ''}
           placeholder="0"
           onChange={(e) => onUpdateLineDiscount(index, e.target.value === '' ? 0 : Number.parseFloat(e.target.value))}
           aria-label={`خصم الصنف ${item.product.name}`}
-          className="w-20 px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-[11px] font-bold text-slate-900 dark:text-slate-100"
+          className="w-20 px-2 py-1 bg-surface border border-line rounded-lg text-[11px] font-bold text-ink "
         />
       </div>
     </div>

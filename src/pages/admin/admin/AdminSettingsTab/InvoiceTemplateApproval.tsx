@@ -28,15 +28,15 @@ export const InvoiceTemplateApproval: React.FC<InvoiceTemplateApprovalProps> = (
   setPreviewSize,
   setPreviewModalOpen,
 }) => (
-  <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 space-y-4">
-    <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+  <div className="rounded-2xl border border-line bg-surface p-4 space-y-4">
+    <div className="flex items-center justify-between border-b border-line pb-3">
       <div className="flex items-center gap-2">
-        <LayoutTemplate className="w-4 h-4 text-sky-600" />
-        <h4 className="text-xs font-black text-slate-800 dark:text-slate-200">
+        <LayoutTemplate className="w-4 h-4 text-primary" />
+        <h4 className="text-xs font-black text-ink ">
           اعتماد الفورما والمفضلة (Invoice Form Approval)
         </h4>
       </div>
-      <span className="text-[11px] text-slate-500">
+      <span className="text-[11px] text-muted">
         الفورما والمقاس المعتمدان سيتم تطبيقهما تلقائياً على كافة مبيعات ونقاط بيع النظام
       </span>
     </div>
@@ -107,29 +107,29 @@ export const InvoiceTemplateApproval: React.FC<InvoiceTemplateApprovalProps> = (
             key={tpl.key}
             className={`relative flex flex-col justify-between rounded-xl border p-3.5 transition-all ${
               isApproved
-                ? 'border-sky-500 bg-sky-50/40 dark:border-sky-500/60 dark:bg-sky-950/20 shadow-sm'
-                : 'border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 hover:border-slate-300'
+                ? 'border-primary bg-accent-soft/40 dark:border-primary/60 dark:bg-primary/20 shadow-sm'
+                : 'border-line bg-surface-muted/50 dark:bg-primary/40 hover:border-line-strong'
             }`}
           >
             <div>
               <div className="flex items-center justify-between gap-1 mb-2">
-                <span className="flex items-center gap-1.5 text-xs font-black text-slate-800 dark:text-slate-200">
-                  <Icon className={`w-3.5 h-3.5 ${isApproved ? 'text-sky-600' : 'text-slate-500'}`} />
+                <span className="flex items-center gap-1.5 text-xs font-black text-ink ">
+                  <Icon className={`w-3.5 h-3.5 ${isApproved ? 'text-primary' : 'text-muted'}`} />
                   {tpl.title}
                 </span>
                 {isApproved && (
-                  <span className="shrink-0 flex items-center gap-1 px-2 py-0.5 rounded-full bg-sky-600 text-white text-[10px] font-black">
+                  <span className="shrink-0 flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary text-white text-[10px] font-black">
                     <Star className="w-2.5 h-2.5 fill-current" />
                     معتمدة
                   </span>
                 )}
               </div>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed mb-3">
+              <p className="text-[11px] text-muted leading-relaxed mb-3">
                 {tpl.desc}
               </p>
             </div>
 
-            <div className="flex items-center gap-1.5 pt-2 border-t border-slate-200/60 dark:border-slate-700/60">
+            <div className="flex items-center gap-1.5 pt-2 border-t border-line/60 dark:border-line-strong/60">
               <button
                 type="button"
                 onClick={() => {
@@ -140,8 +140,8 @@ export const InvoiceTemplateApproval: React.FC<InvoiceTemplateApprovalProps> = (
                 disabled={readOnly || isApproved}
                 className={`flex-1 py-1.5 px-2 rounded-lg text-[11px] font-bold text-center transition ${
                   isApproved
-                    ? 'bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300 cursor-default'
-                    : 'bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-sky-50 hover:text-sky-700 border border-slate-200 dark:border-slate-600'
+                    ? 'bg-accent-soft dark:bg-primary/40 text-primary cursor-default'
+                    : 'bg-surface text-ink hover:bg-accent-soft hover:text-primary border border-line '
                 }`}
               >
                 {isApproved ? '✓ معتمدة حالياً' : 'اعتماد كمعتمدة'}
@@ -153,7 +153,7 @@ export const InvoiceTemplateApproval: React.FC<InvoiceTemplateApprovalProps> = (
                   if (tpl.size) setPreviewSize(tpl.size);
                   setPreviewModalOpen(true);
                 }}
-                className="px-2 py-1.5 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 hover:bg-slate-100 text-slate-600 dark:text-slate-300 text-[11px] font-bold"
+                className="px-2 py-1.5 rounded-lg border border-line bg-surface hover:bg-surface-sunken text-ink-secondary text-[11px] font-bold"
                 title="معاينة هذه الفورما"
               >
                 <Eye className="w-3.5 h-3.5" />
@@ -165,17 +165,17 @@ export const InvoiceTemplateApproval: React.FC<InvoiceTemplateApprovalProps> = (
     </div>
 
     {/* Favorite Size Selector */}
-    <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/40 p-3.5">
+    <div className="rounded-xl border border-line bg-surface-muted/70 dark:bg-primary/40 p-3.5">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
         <div>
-          <span className="text-xs font-bold text-slate-800 dark:text-slate-200 block">
+          <span className="text-xs font-bold text-ink block">
             المقاس المفضل (الافتراضي للطباعة)
           </span>
-          <span className="text-[11px] text-slate-500">
+          <span className="text-[11px] text-muted">
             المقاس المحدد سيتم اختياره تلقائياً عند طلب طباعة أو تصدير الفواتير
           </span>
         </div>
-        <span className="text-[11px] font-bold text-sky-700 dark:text-sky-400 bg-sky-50 dark:bg-sky-950/40 px-2.5 py-1 rounded-lg border border-sky-200 dark:border-sky-800 shrink-0">
+        <span className="text-[11px] font-bold text-primary bg-accent-soft dark:bg-primary/40 px-2.5 py-1 rounded-lg border border-accent-border shrink-0">
           المقاس المعتمد حالياً: {(settings.defaultInvoiceSize || 'a4').toUpperCase()}
         </span>
       </div>
@@ -197,20 +197,20 @@ export const InvoiceTemplateApproval: React.FC<InvoiceTemplateApprovalProps> = (
               }}
               className={`flex flex-col text-right p-3 rounded-xl border transition ${
                 isSelected
-                  ? 'border-sky-500 bg-white dark:bg-slate-900 shadow-sm ring-2 ring-sky-500/20'
-                  : 'border-slate-200 dark:border-slate-700 bg-white/60 dark:bg-slate-800/60 hover:bg-white dark:hover:bg-slate-800'
+                  ? 'border-primary bg-surface shadow-sm ring-2 ring-primary/20'
+                  : 'border-line bg-surface/60 dark:bg-primary/60 hover:bg-surface dark:hover:bg-primary'
               }`}
             >
               <div className="flex items-center justify-between w-full mb-1">
-                <span className="text-xs font-black text-slate-800 dark:text-slate-100 flex items-center gap-1.5">
-                  {isSelected ? <CheckCircle2 className="w-3.5 h-3.5 text-sky-600" /> : <span className="w-3.5 h-3.5 rounded-full border border-slate-300 inline-block" />}
+                <span className="text-xs font-black text-ink flex items-center gap-1.5">
+                  {isSelected ? <CheckCircle2 className="w-3.5 h-3.5 text-primary" /> : <span className="w-3.5 h-3.5 rounded-full border border-line-strong inline-block" />}
                   {sz.label}
                 </span>
-                <span className="text-[10px] font-mono text-slate-400 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">
+                <span className="text-[10px] font-mono text-muted bg-surface-sunken px-1.5 py-0.5 rounded">
                   {sz.dim}
                 </span>
               </div>
-              <span className="text-[11px] text-slate-500 dark:text-slate-400">{sz.desc}</span>
+              <span className="text-[11px] text-muted ">{sz.desc}</span>
             </button>
           );
         })}

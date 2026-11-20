@@ -44,9 +44,9 @@ export const ReceivablesHubPage: React.FC<{ initialTab?: TabId }> = ({ initialTa
     if (tab && params.get('tab') !== tab) setParams({ tab }, { replace: true });
   }, [params, setParams, tab]);
 
-  if (!tab) return <div className="flex h-full items-center justify-center p-6 text-sm font-bold text-slate-500">لا تملك صلاحية لأي قسم من مركز الذمم.</div>;
+  if (!tab) return <div className="flex h-full items-center justify-center p-6 text-sm font-bold text-muted">لا تملك صلاحية لأي قسم من مركز الذمم.</div>;
 
-  return <div className="h-full overflow-y-auto bg-slate-100 p-3 lg:p-4">
+  return <div className="h-full overflow-y-auto bg-surface-sunken p-3 lg:p-4">
     <div className="w-full space-y-4">
       <PageHeader
         icon={<Banknote className="h-5 w-5" />}
@@ -54,14 +54,14 @@ export const ReceivablesHubPage: React.FC<{ initialTab?: TabId }> = ({ initialTa
         description={pageCopy?.description || 'مساحة موحدة للوصول إلى الذمم والمطالبات وخطط السداد، مع بقاء بيانات كل عملية مستقلة.'}
       />
       <nav className="flex flex-wrap gap-2" aria-label="أقسام مركز الذمم">
-        {allowedTabs.map(({ id, label, icon: Icon }) => <button key={id} onClick={() => select(id)} className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold ${tab === id ? 'bg-violet-700 text-white' : 'border bg-white text-slate-700 hover:bg-slate-50'}`}><Icon className="h-4 w-4" />{label}</button>)}
+        {allowedTabs.map(({ id, label, icon: Icon }) => <button key={id} onClick={() => select(id)} className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold ${tab === id ? 'bg-primary text-white' : 'border bg-surface text-ink hover:bg-surface-muted'}`}><Icon className="h-4 w-4" />{label}</button>)}
       </nav>
-      {tab === 'follow-up' ? <section className="grid gap-3 rounded-2xl border bg-white p-5 md:grid-cols-2">
-        <p className="md:col-span-2 text-sm text-slate-600">تُدار إجراءات المتابعة داخل سجلها الأصلي لتجنب نسخ بيانات العملاء أو الأقساط إلى قائمة ثانية. اختر المصدر لمراجعة المتأخرات وتسجيل الإجراء التالي.</p>
-        {allowedTabs.some(item => item.id === 'debts') && <button onClick={() => select('debts')} className="flex items-center justify-between rounded-xl border p-4 text-right hover:border-violet-400"><span><b className="block">متابعة تحصيل العملاء والموردين</b><small className="text-slate-500">الفواتير المتأخرة ووعود السداد وسندات التحصيل</small></span><ExternalLink className="h-4 w-4" /></button>}
-        {allowedTabs.some(item => item.id === 'installments') && <button onClick={() => select('installments')} className="flex items-center justify-between rounded-xl border p-4 text-right hover:border-violet-400"><span><b className="block">متابعة الأقساط</b><small className="text-slate-500">الأقساط المستحقة والمتأخرة والمدفوعات</small></span><ExternalLink className="h-4 w-4" /></button>}
-      </section> : <div className="min-h-[60vh] rounded-2xl border bg-white p-2">
-        <Suspense fallback={<div className="p-10 text-center text-sm text-slate-500">جارٍ تحميل القسم…</div>}>
+      {tab === 'follow-up' ? <section className="grid gap-3 rounded-2xl border bg-surface p-5 md:grid-cols-2">
+        <p className="md:col-span-2 text-sm text-ink-secondary">تُدار إجراءات المتابعة داخل سجلها الأصلي لتجنب نسخ بيانات العملاء أو الأقساط إلى قائمة ثانية. اختر المصدر لمراجعة المتأخرات وتسجيل الإجراء التالي.</p>
+        {allowedTabs.some(item => item.id === 'debts') && <button onClick={() => select('debts')} className="flex items-center justify-between rounded-xl border p-4 text-right hover:border-primary"><span><b className="block">متابعة تحصيل العملاء والموردين</b><small className="text-muted">الفواتير المتأخرة ووعود السداد وسندات التحصيل</small></span><ExternalLink className="h-4 w-4" /></button>}
+        {allowedTabs.some(item => item.id === 'installments') && <button onClick={() => select('installments')} className="flex items-center justify-between rounded-xl border p-4 text-right hover:border-primary"><span><b className="block">متابعة الأقساط</b><small className="text-muted">الأقساط المستحقة والمتأخرة والمدفوعات</small></span><ExternalLink className="h-4 w-4" /></button>}
+      </section> : <div className="min-h-[60vh] rounded-2xl border bg-surface p-2">
+        <Suspense fallback={<div className="p-10 text-center text-sm text-muted">جارٍ تحميل القسم…</div>}>
           {tab === 'debts' && <DebtsDashboardPage />}
           {tab === 'other' && <OtherReceivablesPage />}
           {tab === 'installments' && <InstallmentsPage />}

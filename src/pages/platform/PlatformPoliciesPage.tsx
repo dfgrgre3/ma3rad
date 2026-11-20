@@ -108,19 +108,19 @@ export const PlatformPoliciesPage: React.FC = () => {
       />
 
       {error && (
-        <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-lg text-xs font-bold text-rose-300">
+        <div className="p-3 bg-danger/10 border border-danger/20 rounded-lg text-xs font-bold text-danger">
           {error}
         </div>
       )}
 
       {/* Tabs */}
-      <div className="flex border-b border-slate-800 text-xs font-bold text-slate-400 gap-1">
+      <div className="flex border-b border-line-strong text-xs font-bold text-muted gap-1">
         <button
           onClick={() => setTab('TERMS')}
           className={`flex items-center gap-2 px-4 py-2.5 border-b-2 transition-colors ${
             tab === 'TERMS'
-              ? 'border-sky-500 text-sky-400 bg-sky-500/10'
-              : 'border-transparent hover:text-slate-200'
+              ? 'border-primary text-primary bg-primary/10'
+              : 'border-transparent hover:text-muted'
           }`}
         >
           <FileText className="h-4 w-4" />
@@ -131,8 +131,8 @@ export const PlatformPoliciesPage: React.FC = () => {
           onClick={() => setTab('PRIVACY')}
           className={`flex items-center gap-2 px-4 py-2.5 border-b-2 transition-colors ${
             tab === 'PRIVACY'
-              ? 'border-emerald-500 text-emerald-400 bg-emerald-500/10'
-              : 'border-transparent hover:text-slate-200'
+              ? 'border-success text-success bg-success/10'
+              : 'border-transparent hover:text-muted'
           }`}
         >
           <Shield className="h-4 w-4" />
@@ -143,8 +143,8 @@ export const PlatformPoliciesPage: React.FC = () => {
           onClick={() => setTab('RETENTION')}
           className={`flex items-center gap-2 px-4 py-2.5 border-b-2 transition-colors ${
             tab === 'RETENTION'
-              ? 'border-purple-500 text-purple-400 bg-purple-500/10'
-              : 'border-transparent hover:text-slate-200'
+              ? 'border-primary text-primary bg-primary/10'
+              : 'border-transparent hover:text-muted'
           }`}
         >
           <Lock className="h-4 w-4" />
@@ -152,10 +152,10 @@ export const PlatformPoliciesPage: React.FC = () => {
         </button>
       </div>
 
-      <div className="p-4 bg-slate-900/70 border border-slate-800 rounded-xl space-y-4 max-w-4xl">
+      <div className="p-4 bg-primary/70 border border-line-strong rounded-xl space-y-4 max-w-4xl">
         {tab === 'TERMS' && (
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">
+            <label className="block text-xs font-semibold text-muted mb-1">
               نص اتفاقية وشروط الاستخدام المعتمدة:
             </label>
             <textarea
@@ -169,7 +169,7 @@ export const PlatformPoliciesPage: React.FC = () => {
 
         {tab === 'PRIVACY' && (
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">
+            <label className="block text-xs font-semibold text-muted mb-1">
               نص سياسة الخصوصية وحماية بيانات المستأجرين:
             </label>
             <textarea
@@ -183,12 +183,12 @@ export const PlatformPoliciesPage: React.FC = () => {
 
         {tab === 'RETENTION' && (
           <div className="space-y-4">
-            <h4 className="text-xs font-bold text-slate-200">
+            <h4 className="text-xs font-bold text-muted">
               فترات الاحتفاظ بالبيانات والأرشفة التلقائية:
             </h4>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                <label className="block text-xs font-semibold text-muted mb-1">
                   الاحتفاظ بسجلات العمليات والتدقيق (Audit Logs)
                 </label>
                 <div className="flex items-center gap-2">
@@ -198,12 +198,12 @@ export const PlatformPoliciesPage: React.FC = () => {
                     onChange={(e) => setRetention({ ...retention, auditRetentionDays: Number(e.target.value) })}
                     className={inputClass}
                   />
-                  <span className="text-xs text-slate-400">يوماً</span>
+                  <span className="text-xs text-muted">يوماً</span>
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                <label className="block text-xs font-semibold text-muted mb-1">
                   الاحتفاظ بالنسخ الاحتياطية السحابية (Backups)
                 </label>
                 <div className="flex items-center gap-2">
@@ -213,12 +213,12 @@ export const PlatformPoliciesPage: React.FC = () => {
                     onChange={(e) => setRetention({ ...retention, backupRetentionDays: Number(e.target.value) })}
                     className={inputClass}
                   />
-                  <span className="text-xs text-slate-400">يوماً</span>
+                  <span className="text-xs text-muted">يوماً</span>
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                <label className="block text-xs font-semibold text-muted mb-1">
                   الاحتفاظ بسجلات المزامنة التشغيلية (Sync Logs)
                 </label>
                 <div className="flex items-center gap-2">
@@ -228,12 +228,12 @@ export const PlatformPoliciesPage: React.FC = () => {
                     onChange={(e) => setRetention({ ...retention, syncLogRetentionDays: Number(e.target.value) })}
                     className={inputClass}
                   />
-                  <span className="text-xs text-slate-400">يوماً</span>
+                  <span className="text-xs text-muted">يوماً</span>
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                <label className="block text-xs font-semibold text-muted mb-1">
                   مهلة الحذف المبدئي قبل الإتلاف النهائي (Soft Delete)
                 </label>
                 <div className="flex items-center gap-2">
@@ -243,14 +243,14 @@ export const PlatformPoliciesPage: React.FC = () => {
                     onChange={(e) => setRetention({ ...retention, softDeleteGraceDays: Number(e.target.value) })}
                     className={inputClass}
                   />
-                  <span className="text-xs text-slate-400">يوماً</span>
+                  <span className="text-xs text-muted">يوماً</span>
                 </div>
               </div>
             </div>
           </div>
         )}
 
-        <div className="flex justify-between items-center pt-3 border-t border-slate-800 text-[11px] text-slate-400">
+        <div className="flex justify-between items-center pt-3 border-t border-line-strong text-[11px] text-muted">
           <span>آخر تحديث واعتماد: {lastSaved ? formatDateTime(lastSaved) : 'لم تُحفظ السياسات بعد'}</span>
           {canManagePolicies && (
             <Button size="sm" onClick={handleSave} disabled={saving} leadingIcon={<Save className="h-3.5 w-3.5" />}>
