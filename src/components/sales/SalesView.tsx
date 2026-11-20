@@ -411,7 +411,7 @@ export const SalesView: React.FC = () => {
           <>
             {canExport && <Button variant="secondary" size="sm" leadingIcon={<FileSpreadsheet className="h-4 w-4" />} onClick={() => doExport('excel')}>جدول بيانات</Button>}
             {canExport && <Button variant="secondary" size="sm" leadingIcon={<FileDown className="h-4 w-4" />} onClick={() => doExport('pdf')}>مستند</Button>}
-            {canCreate && <Button variant="primary" leadingIcon={<Plus className="h-4 w-4" />} onClick={() => navigate('/pos')}>{newInvoiceLabel} (POS)</Button>}
+            {canCreate && <Button variant="primary" leadingIcon={<Plus className="h-4 w-4" />} onClick={() => navigate('/pos')}>{newInvoiceLabel}</Button>}
           </>
         }
       />
