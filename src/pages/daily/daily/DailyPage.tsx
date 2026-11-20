@@ -23,6 +23,8 @@ import { TodayPurchasesPage as PurchasesPage } from '../today-purchases/TodayPur
 import { DataTable as UiDataTable } from '../../../components/ui/DataTable';
 import { PageHeader } from '../../../components/ui/PageHeader';
 import { StatCard as UiStatCard } from '../../../components/ui/Card';
+import { ActivityGate } from '../../../components/ui/ActivityGate';
+import { useActivityElementLabel } from '../../../hooks/domains/config/useActivityUi';
 import { getActivityNavLabel } from '../../../config/activityNavLabels';
 
 
@@ -303,6 +305,8 @@ const DailyPage: React.FC<{ kind: DailyKind }> = ({ kind }) => {
       : undefined;
   const meta = { ...META[kind], title: activityTitle || META[kind].title };
   const Icon = meta.icon;
+  const dailyPath = `/daily/${kind}` as const;
+  const quickSaleLabel = useActivityElementLabel('quick-sale', dailyPath);
   const toast = useToast();
   const navigate = useNavigate();
   const service = useMemo(() => new DailyOperationsService(), []);
@@ -441,13 +445,15 @@ const DailyPage: React.FC<{ kind: DailyKind }> = ({ kind }) => {
               actions={<>
                 <CentralLimitGuard metric="maxInvoices">
                   {canCreateSale && (
+                    <ActivityGate element="quick-sale" atPath={dailyPath}>
                     <button
                       type="button"
                       onClick={() => setQuickSaleOpen(true)}
                       className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-success px-4 text-xs font-bold text-white shadow-sm transition hover:bg-success focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-success focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900"
                     >
-                      <Plus className="h-4 w-4" /> بيع سريع
+                      <Plus className="h-4 w-4" /> {quickSaleLabel || 'بيع سريع'}
                     </button>
+                    </ActivityGate>
                   )}
                 </CentralLimitGuard>
                 <div className="flex items-center gap-1 rounded-lg border border-line bg-surface-muted p-1 ">
@@ -468,9 +474,11 @@ const DailyPage: React.FC<{ kind: DailyKind }> = ({ kind }) => {
                 <button type="button" onClick={load} aria-label="تحديث بيانات المبيعات" title="تحديث" className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-line bg-surface text-ink-secondary transition hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-success dark:hover:bg-primary">
                   <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
                 </button>
+                <ActivityGate element="export" atPath={dailyPath}>
                 <button type="button" onClick={handleExport} disabled={!data} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-line bg-surface px-3 text-xs font-bold text-ink transition hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-primary">
                   <Download className="h-4 w-4" /> تصدير جدول بيانات
                 </button>
+                </ActivityGate>
               </>}
             />
           </div>
@@ -483,14 +491,18 @@ const DailyPage: React.FC<{ kind: DailyKind }> = ({ kind }) => {
           description={meta.subtitle}
           actions={<>
             {kind === 'purchases' && canCreatePurchase && (
+              <ActivityGate element="quick-purchase" atPath={dailyPath}>
               <button onClick={() => setQuickPurchaseOpen(true)} className="flex items-center gap-1.5 px-3.5 py-2.5 bg-warning text-white rounded-xl text-xs font-bold hover:bg-warning">
                 <Plus className="w-4 h-4" /> فاتورة توريد
               </button>
+              </ActivityGate>
             )}
             {kind === 'expenses' && canExpense && (
+              <ActivityGate element="new-expense" atPath={dailyPath}>
               <button onClick={() => setExpenseModal({})} className="flex items-center gap-1.5 px-3.5 py-2.5 bg-danger text-white rounded-xl text-xs font-bold hover:bg-danger">
                 <Plus className="w-4 h-4" /> إضافة مصروف
               </button>
+              </ActivityGate>
             )}
             <div className="flex items-center gap-2 bg-surface-sunken border border-line rounded-xl px-3 py-2">
               <CalendarDays className="w-4 h-4 text-muted" />
@@ -504,6 +516,7 @@ const DailyPage: React.FC<{ kind: DailyKind }> = ({ kind }) => {
             <button onClick={load} className="p-2.5 rounded-xl bg-surface-sunken text-ink-secondary hover:bg-surface-sunken" title="تحديث">
               <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             </button>
+            <ActivityGate element="export" atPath={dailyPath}>
             <button
               onClick={handleExport}
               disabled={!data}
@@ -511,6 +524,7 @@ const DailyPage: React.FC<{ kind: DailyKind }> = ({ kind }) => {
             >
               <Download className="w-4 h-4" /> تصدير
             </button>
+            </ActivityGate>
           </>}
         />
       </div>

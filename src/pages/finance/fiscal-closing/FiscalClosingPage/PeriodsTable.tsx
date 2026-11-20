@@ -3,6 +3,7 @@ import { Circle, Lock } from 'lucide-react';
 import { DataTable } from '../../../../components/ui/DataTable';
 import type { FiscalPeriod } from '../../../../types/finance';
 import { formatDate, periodStatus } from './utils';
+import { ActivityGate } from '../../../../components/ui/ActivityGate';
 
 interface PeriodsTableProps {
   periods: FiscalPeriod[];
@@ -87,22 +88,26 @@ export const PeriodsTable: FC<PeriodsTableProps> = ({
                 return (
                   <div className="flex flex-wrap gap-1.5">
                     {(state === 'OPEN' || state === 'IN_REVIEW') && canClose && (
-                      <button
-                        type="button"
-                        onClick={(event) => { event.stopPropagation(); onOpenCloseChecklist(period); }}
-                        className="rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-white hover:bg-primary"
-                      >
-                        فحص وإقفال
-                      </button>
+                      <ActivityGate element="run">
+                        <button
+                          type="button"
+                          onClick={(event) => { event.stopPropagation(); onOpenCloseChecklist(period); }}
+                          className="rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-white hover:bg-primary"
+                        >
+                          فحص وإقفال
+                        </button>
+                      </ActivityGate>
                     )}
                     {state === 'CLOSED' && canReopen && (
-                      <button
-                        type="button"
-                        onClick={(event) => { event.stopPropagation(); onRequestReopen(period); }}
-                        className="rounded-lg bg-warning-soft px-3 py-1.5 text-xs font-bold text-warning hover:bg-warning-soft"
-                      >
-                        إعادة فتح
-                      </button>
+                      <ActivityGate element="reopen">
+                        <button
+                          type="button"
+                          onClick={(event) => { event.stopPropagation(); onRequestReopen(period); }}
+                          className="rounded-lg bg-warning-soft px-3 py-1.5 text-xs font-bold text-warning hover:bg-warning-soft"
+                        >
+                          إعادة فتح
+                        </button>
+                      </ActivityGate>
                     )}
                     {state === 'CLOSED' && canClose && (
                       <button

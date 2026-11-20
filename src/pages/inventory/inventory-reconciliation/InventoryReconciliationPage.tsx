@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { DataTable } from '../../../components/ui/DataTable';
+import { ActivityGate } from '../../../components/ui/ActivityGate';
 import { PageHeader } from '../../../components/ui/PageHeader';
 import { 
   Scale, CheckCircle2, AlertTriangle, RefreshCw, BookmarkCheck, Building2,
@@ -93,13 +94,13 @@ export const InventoryReconciliationPage: React.FC = () => {
             </select>
 
             {canManage && (
-              <button
+              <ActivityGate element="run"><button
                 onClick={() => setShowSaveModal(true)}
                 className="flex items-center gap-2 px-4 py-2 rounded-xl bg-success hover:bg-success text-white text-xs font-black shadow-md shadow-success/20 transition active:scale-95"
               >
                 <BookmarkCheck className="w-4 h-4" />
                 توثيق محضر مطابقة دوري
-              </button>
+              </button></ActivityGate>
             )}
 
             <button

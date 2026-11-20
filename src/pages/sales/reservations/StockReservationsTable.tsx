@@ -3,6 +3,7 @@ import { DataTable } from '../../../components/ui/DataTable';
 import type { StockReservation } from '../../../services/domains/sales/ReservationService';
 import { formatProductQuantity } from '../../../utils/products/productUnits';
 import { reservationStatusLabels, reservationStatusStyles } from './constants';
+import { ActivityGate } from '../../../components/ui/ActivityGate';
 
 interface StockReservationsTableProps {
   reservations: StockReservation[];
@@ -75,7 +76,9 @@ export const StockReservationsTable: React.FC<StockReservationsTableProps> = ({
                 {canAdjust && r.status === 'ACTIVE' && (
                   <>
                     <button onClick={() => onConsume(r.id)} className="rounded-lg bg-success-soft px-2.5 py-1.5 text-xs font-bold text-success transition hover:bg-success-soft" title="صرف وتنفيذ الحجز">صرف</button>
-                    <button onClick={() => onRelease(r.id)} className="rounded-lg bg-danger-soft px-2.5 py-1.5 text-xs font-bold text-danger transition hover:bg-danger-soft" title="فك الحجز">إلغاء الحجز</button>
+                    <ActivityGate element="release">
+                      <button onClick={() => onRelease(r.id)} className="rounded-lg bg-danger-soft px-2.5 py-1.5 text-xs font-bold text-danger transition hover:bg-danger-soft" title="فك الحجز">إلغاء الحجز</button>
+                    </ActivityGate>
                   </>
                 )}
               </div>

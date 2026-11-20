@@ -3,7 +3,7 @@
  * Source: central-server/routeManifest.js
  * Regenerate with: node central-server/scripts/generate-routes.mjs
  *
- * 176 allowlisted endpoint pattern(s).
+ * 179 allowlisted endpoint pattern(s).
  */
 
 const ROUTE_DEFINITIONS = [
@@ -327,6 +327,12 @@ const ROUTE_DEFINITIONS = [
     "pattern": "/api/v1/admin/devices/:id/revoke",
     "methods": [
       "POST"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/devices/:id/credential",
+    "methods": [
+      "PUT"
     ]
   },
   {
@@ -1078,6 +1084,18 @@ const ROUTE_DEFINITIONS = [
   },
   {
     "pattern": "/api/v1/releases",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "pattern": "/api/v1/modules/catalog",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "pattern": "/api/v1/modules/:moduleId/:version/files/:name",
     "methods": [
       "GET"
     ]

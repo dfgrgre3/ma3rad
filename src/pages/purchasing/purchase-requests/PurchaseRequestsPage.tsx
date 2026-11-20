@@ -3,6 +3,7 @@ import {
   ClipboardList, Plus, Search, FileText, Loader2, X, Trash2,
   XCircle, Truck, FileSpreadsheet, Sparkles, CheckCircle2
 } from 'lucide-react';
+import { ActivityGate } from '../../../components/ui/ActivityGate';
 import { PageHeader } from '../../../components/ui/PageHeader';
 import { useBusinessTerm } from '../../../hooks/domains/config/useBusinessTerm';
 import { PurchaseRequestService, PurchaseRequest, PurchaseRequestStatus, RequestPriority } from '../../../services/domains/purchases/PurchaseRequestService';
@@ -230,12 +231,12 @@ export const PurchaseRequestsPage: React.FC = () => {
               </button>
             )}
             {canCreate && (
-              <button
+              <ActivityGate element="new-request"><button
                 onClick={openModal}
                 className="flex items-center gap-2 px-4 py-2 bg-warning hover:bg-warning text-white rounded-xl text-sm font-semibold transition shrink-0"
               >
                 <Plus className="w-4 h-4" /> {newRequestLabel}
-              </button>
+              </button></ActivityGate>
             )}
           </>}
         />

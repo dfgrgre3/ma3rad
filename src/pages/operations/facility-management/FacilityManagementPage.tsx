@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { DataTable } from '../../../components/ui/DataTable';
 import { PageHeader } from '../../../components/ui/PageHeader';
+import { ActivityGate } from '../../../components/ui/ActivityGate';
 import {
   AlertTriangle, Building2, CalendarClock, Check, ClipboardCheck, FileText, MapPin,
   Plus, RefreshCw, Search, ShieldCheck, Wrench, X, Edit3, Trash2, Archive,
@@ -529,7 +530,7 @@ export const FacilityManagementPage: React.FC = () => {
         description="المواقع، الأصول، أوامر العمل، العقود، وسجلات السلامة مع دورة حياة كاملة وسجل تغييرات."
         actions={<>
           <button onClick={load} title="تحديث" className="inline-flex h-10 w-10 items-center justify-center rounded border border-line-strong bg-surface text-ink-secondary hover:bg-surface-muted"><RefreshCw size={17} /></button>
-          {canManage && <button onClick={() => openForm(activeTab)} className="inline-flex h-10 items-center gap-2 rounded bg-success px-4 text-sm font-bold text-white hover:bg-success"><Plus size={17} /> إضافة {activeTab === 'locations' ? 'موقع' : activeTab === 'assets' ? 'أصل' : activeTab === 'maintenance' ? 'طلب صيانة' : activeTab === 'contracts' ? 'عقد' : 'سجل سلامة'}</button>}
+          {canManage && <ActivityGate element="new-site"><button onClick={() => openForm(activeTab)} className="inline-flex h-10 items-center gap-2 rounded bg-success px-4 text-sm font-bold text-white hover:bg-success"><Plus size={17} /> إضافة {activeTab === 'locations' ? 'موقع' : activeTab === 'assets' ? 'أصل' : activeTab === 'maintenance' ? 'طلب صيانة' : activeTab === 'contracts' ? 'عقد' : 'سجل سلامة'}</button></ActivityGate>}
         </>}
       />
 

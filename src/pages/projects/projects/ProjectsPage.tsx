@@ -14,7 +14,8 @@ import { OperationalFieldsRecordEditor } from '../../../components/products/Oper
 
 import { useToast } from '../../../components/ui/Toast';
 import { PageHeader } from '../../../components/ui/PageHeader';
-import { useActivityPageCopy } from '../../../hooks/domains/config/useBusinessTerm';
+import { ActivityGate } from '../../../components/ui/ActivityGate';
+import { useActivityPageCopy, useBusinessTerm } from '../../../hooks/domains/config/useBusinessTerm';
 const STATUS: Record<ProjectStatus, { label: string; color: string; bg: string }> = {
   PLANNED:   { label: 'قيد التخطيط', color: 'text-warning',   bg: 'bg-warning-soft border-warning-border' },
   ACTIVE:    { label: 'جاري التنفيذ', color: 'text-primary',    bg: 'bg-accent-soft border-accent-border' },
@@ -27,6 +28,7 @@ const fmt = (n: number) => new Intl.NumberFormat('ar-EG').format(Math.round(n)) 
 
 export const ProjectsPage: React.FC = () => {
   const pageCopy = useActivityPageCopy('projects');
+  const newProjectLabel = useBusinessTerm('actions.newProject');
   const toast = useToast();
   const service = new ProjectService();
   const fieldService = new OperationalFieldService();
@@ -120,9 +122,9 @@ export const ProjectsPage: React.FC = () => {
             </span>
           }
           actions={canCreate && (
-            <button onClick={() => setModalOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary text-white rounded-xl text-sm font-semibold transition self-start sm:self-auto">
-              <Plus className="w-4 h-4" /> مشروع جديد
-            </button>
+            <ActivityGate element="new-project"><button onClick={() => setModalOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary text-white rounded-xl text-sm font-semibold transition self-start sm:self-auto">
+              <Plus className="w-4 h-4" /> {newProjectLabel}
+            </button></ActivityGate>
           )}
         />
       </div>
@@ -220,7 +222,7 @@ export const ProjectsPage: React.FC = () => {
         <div className="fixed inset-0 bg-primary/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-surface rounded-2xl border border-line shadow-2xl max-w-lg w-full p-6 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-base font-extrabold text-ink">مشروع جديد</h3>
+              <h3 className="text-base font-extrabold text-ink">{newProjectLabel}</h3>
               <button onClick={() => setModalOpen(false)} className="p-1.5 rounded-lg text-muted hover:bg-surface-sunken"><X className="w-4 h-4" /></button>
             </div>
             <form onSubmit={handleCreate} className="space-y-3 text-xs">

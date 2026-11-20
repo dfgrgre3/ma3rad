@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { DataTable } from '../../../components/ui/DataTable';
+import { ActivityGate } from '../../../components/ui/ActivityGate';
 import { PageHeader } from '../../../components/ui/PageHeader';
 import { Scale, Download, TrendingUp, DollarSign, Layers, PieChart } from 'lucide-react';
 import { InventoryValuationService, type WarehouseValuation } from '../../../services/domains/inventory/InventoryValuationService';
@@ -65,10 +66,10 @@ export const InventoryValuationPage: React.FC = () => {
           icon={<Scale className="w-5 h-5" />}
           title="تقييم المخزون (Inventory Valuation)"
           description="حساب القيمة المالية الحالية للبضائع المتاحة بسعر التكلفة وسعر البيع"
-          actions={canExport && <button onClick={exportReport} className="flex items-center gap-2 px-4 py-2 bg-success hover:bg-success text-white rounded-xl text-sm font-semibold transition shrink-0">
+          actions={canExport && <ActivityGate element="export"><button onClick={exportReport} className="flex items-center gap-2 px-4 py-2 bg-success hover:bg-success text-white rounded-xl text-sm font-semibold transition shrink-0">
             <Download className="w-4 h-4" />
             تصدير التقرير المالي في جدول بيانات
-          </button>}
+          </button></ActivityGate>}
         />
       </div>
 

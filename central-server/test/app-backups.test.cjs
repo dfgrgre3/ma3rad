@@ -84,15 +84,16 @@ before(async () => {
   }
   deviceA = { id: 'dev_a', hardware_id: 'hw-a' };
   deviceB = { id: 'dev_b', hardware_id: 'hw-b' };
+  const credentialHash = crypto.createHash('sha256').update('test-device-credential').digest('hex');
   await db.run(
-    `INSERT INTO platform_devices (id, tenant_id, hardware_id, name, status, created_at, updated_at)
-     VALUES (?, ?, ?, 'Device A', 'ACTIVE', ?, ?)`,
-    [deviceA.id, tenantA, deviceA.hardware_id, now, now]
+    `INSERT INTO platform_devices (id, tenant_id, hardware_id, name, status, credential_hash, created_at, updated_at)
+     VALUES (?, ?, ?, 'Device A', 'ACTIVE', ?, ?, ?)`,
+    [deviceA.id, tenantA, deviceA.hardware_id, credentialHash, now, now]
   );
   await db.run(
-    `INSERT INTO platform_devices (id, tenant_id, hardware_id, name, status, created_at, updated_at)
-     VALUES (?, ?, ?, 'Device B', 'ACTIVE', ?, ?)`,
-    [deviceB.id, tenantB, deviceB.hardware_id, now, now]
+    `INSERT INTO platform_devices (id, tenant_id, hardware_id, name, status, credential_hash, created_at, updated_at)
+     VALUES (?, ?, ?, 'Device B', 'ACTIVE', ?, ?, ?)`,
+    [deviceB.id, tenantB, deviceB.hardware_id, credentialHash, now, now]
   );
 });
 
@@ -121,6 +122,45 @@ test('device upload requires device authentication and a valid checksum', async 
     body: ARTIFACT,
   });
   assert.equal(wrongSize.status, 400);
+});
+
+test('device credential is verified and can be rotated by an admin', async () => {
+  // A wrong credential is rejected even though the device id is valid.
+  const wrongCred = await api(server.base, '/api/v1/device/backups', {
+    headers: { 'X-Device-Id': deviceA.hardware_id, 'X-Device-Credential': 'not-the-credential' },
+  });
+  assert.equal(wrongCred.status, 401);
+
+  // Admin rotates the enrolled credential; the old one stops working.
+  const rotate = await api(server.base, `/api/v1/admin/devices/${deviceA.id}/credential`, {
+    method: 'PUT',
+    token,
+    body: { credential: 'rotated-device-credential-123' },
+  });
+  assert.equal(rotate.status, 200);
+  assert.equal(rotate.body.data.credentialEnrolled, true);
+
+  const oldCred = await api(server.base, '/api/v1/device/backups', { headers: deviceHeaders(deviceA) });
+  assert.equal(oldCred.status, 401);
+  const newCred = await api(server.base, '/api/v1/device/backups', {
+    headers: { 'X-Device-Id': deviceA.hardware_id, 'X-Device-Credential': 'rotated-device-credential-123' },
+  });
+  assert.equal(newCred.status, 200);
+
+  // Restore the shared fixture credential for the remaining tests.
+  await api(server.base, `/api/v1/admin/devices/${deviceA.id}/credential`, {
+    method: 'PUT',
+    token,
+    body: { credential: 'test-device-credential' },
+  });
+
+  // The stored hash — not the raw credential — is what the admin API returns.
+  const adminDevices = await api(server.base, '/api/v1/admin/devices', { token });
+  assert.equal(adminDevices.status, 200);
+  const row = (adminDevices.body.data || []).find((d) => d.id === deviceA.id);
+  assert.ok(row);
+  assert.equal('credential_hash' in row, false);
+  assert.equal('credentialHash' in row, false);
 });
 
 test('upload stores the artifact under the device tenant only', async () => {

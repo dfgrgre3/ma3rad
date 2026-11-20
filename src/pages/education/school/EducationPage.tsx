@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { CalendarDays, ClipboardCheck, GraduationCap, RefreshCw, UserPlus, Users } from 'lucide-react';
 import { PageHeader } from '../../../components/ui/PageHeader';
+import { resolveActivitySubTabs } from '../../../config/activityElementSpec';
 import { Card, CardHeader, StatCard } from '../../../components/ui/Card';
 import { Button } from '../../../components/ui/Button';
 import { Modal } from '../../../components/ui/Modal';
@@ -130,7 +131,7 @@ export const EducationPage: React.FC = () => {
       </div>
 
       <div className="flex gap-1 border-b border-[var(--cerami-border)] flex-wrap">
-        {tabs.map((t) => (
+        {resolveActivitySubTabs(tabs, '/education').map((t) => (
           <button key={t.id} onClick={() => setTab(t.id)}
             className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px flex items-center gap-2 ${tab === t.id ? 'border-[var(--cerami-primary)] text-[var(--cerami-primary)]' : 'border-transparent text-[var(--cerami-muted)] hover:text-[var(--cerami-text)]'}`}>
             <t.icon className="w-4 h-4" />{t.label}

@@ -168,7 +168,7 @@ export const MODULE_REGISTRY: ModuleDefinition[] = [
     description: 'مشروعات العملاء والوحدات والمنتجات والتقدم.',
     dependencies: ['customers'],
     permissions: ['projects.view'],
-    paths: ['/projects', '/time-billing'],
+    paths: ['/projects', '/projects/execution', '/projects/sites', '/projects/boq', '/time-billing'],
     businessEvents: ['project.created', 'project.updated', 'project.completed'],
     settings: [],
     activation: {},

@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { DataTable } from '../../../components/ui/DataTable';
+import { resolveActivitySubTabs } from '../../../config/activityElementSpec';
 import { PageHeader } from '../../../components/ui/PageHeader';
 import {
   CheckCircle2, Cpu, Download, Fingerprint, Plus, RefreshCw, Smartphone,
@@ -93,7 +94,7 @@ export const AttendanceDevicesPage: React.FC = () => {
     { id: 'import', label: 'استيراد السجلات', icon: <Upload className="h-4 w-4" /> },
     { id: 'mobile', label: 'حضور الجوال', icon: <Smartphone className="h-4 w-4" /> },
   ];
-  const visibleTabs = tabs.filter((t) => canTab(t.id));
+  const visibleTabs = resolveActivitySubTabs(tabs.filter((t) => canTab(t.id)), '/hr/attendance-devices');
   const activeTab: Tab = canTab(tab) ? tab : (visibleTabs[0]?.id ?? tab);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

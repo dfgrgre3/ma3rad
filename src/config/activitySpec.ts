@@ -4,6 +4,13 @@ import { getActivityHiddenPaths, isActivityPathHidden } from './activityPageVisi
 import { getActivityNavLabel } from './activityNavLabels';
 import { getActivityPathCopy } from './activityPathCopy';
 import type { ActivityPageCopy } from './activityPageCopy';
+import {
+  resolveActivityElement,
+  resolveActivityElements,
+  resolveActivityTabs,
+  type ActivityElementState,
+  type ActivityTabLike,
+} from './activityElementSpec';
 
 /**
  * Unified read layer over the per-activity configuration.
@@ -26,6 +33,12 @@ export interface ActivitySpec {
   navLabel(pathname: string): string | undefined;
   /** Page title/description copy for a path, or undefined to keep the default. */
   pathCopy(pathname: string): ActivityPageCopy | undefined;
+  /** Visibility + label for an in-page element (button, tab, panel). */
+  element(pathname: string, elementId: string): ActivityElementState;
+  /** All element states declared for a path. */
+  elements(pathname: string): Record<string, ActivityElementState>;
+  /** Activity-aware tab filter/labeler for tab strips on this activity. */
+  tabs<T extends ActivityTabLike>(tabs: T[]): T[];
 }
 
 function toSpec(row: ActivityDefinition): ActivitySpec {
@@ -38,6 +51,9 @@ function toSpec(row: ActivityDefinition): ActivitySpec {
     isPathHidden: (pathname) => isActivityPathHidden(pathname, id),
     navLabel: (pathname) => getActivityNavLabel(pathname, id),
     pathCopy: (pathname) => getActivityPathCopy(pathname, id),
+    element: (pathname, elementId) => resolveActivityElement(pathname, elementId, id),
+    elements: (pathname) => resolveActivityElements(pathname, id),
+    tabs: (tabs) => resolveActivityTabs(tabs, id),
   };
 }
 

@@ -58,6 +58,8 @@ test('permission-guarded routes declare at least one permission code', () => {
     '/api/v1/device/backups/upload',
     '/api/v1/device/backups/:id/download',
     '/api/v1/device/backups/:id/restore-result',
+    '/api/v1/modules/catalog',
+    '/api/v1/modules/:moduleId/:version/files/:name',
   ]);
 
   for (const entry of ROUTE_MANIFEST) {

@@ -7,6 +7,7 @@ const { nowIso } = require('../lib/time');
 const { recordAuditEvent } = require('../lib/audit');
 const { authenticatePlatformUser, requirePlatformPermission, getScopedTenantIds, assertTenantAccess, tenantScopePredicate } = require('../middleware/auth');
 const { runCloneDetection } = require('../lib/cloneDetection');
+const { hashDeviceCredential } = require('../lib/deviceAuth');
 
 const router = express.Router();
 
@@ -56,6 +57,8 @@ router.get(
 
       sql += ' ORDER BY last_seen_at DESC, created_at DESC';
       const devices = await db.all(sql, params);
+      // The credential hash is server-side secret material; never serialize it.
+      res.json(devices.map(({ credential_hash, ...device }) => device));
       res.json(devices);
     } catch (err) {
       next(err);
@@ -203,6 +206,38 @@ router.post(
 
       await auditDeviceChange(req, 'DEVICE_REVOKED', id, { reason: reason || null, previousStatus: device.status });
       res.json({ deviceId: id, status: 'REVOKED', previousStatus: device.status });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+router.put(
+  '/:id/credential',
+  authenticatePlatformUser,
+  requirePlatformPermission(['platform.devices.update']),
+  async (req, res, next) => {
+    try {
+      const db = getDb();
+      const { id } = req.params;
+      const { credential } = req.body || {};
+
+      if (typeof credential !== 'string' || credential.trim().length < 16 || credential.length > 4096) {
+        return res.status(400).json({ error: 'credential must be the device secret string (16-4096 chars)' });
+      }
+
+      const device = await db.get('SELECT * FROM platform_devices WHERE id = ?', [id]);
+      if (!device) return res.status(404).json({ error: 'Device not found' });
+      if (!(await assertTenantAccess(req, res, device.tenant_id))) return;
+
+      // Only the SHA-256 is stored; the raw credential is never persisted or logged.
+      await db.run(
+        `UPDATE platform_devices SET credential_hash = ?, updated_at = ? WHERE id = ?`,
+        [hashDeviceCredential(credential.trim()), nowIso(), id]
+      );
+
+      await auditDeviceChange(req, 'DEVICE_CREDENTIAL_ENROLLED', id, { rotated: Boolean(device.credential_hash) });
+      res.json({ deviceId: id, credentialEnrolled: true });
     } catch (err) {
       next(err);
     }

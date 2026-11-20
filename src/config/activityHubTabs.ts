@@ -10,7 +10,7 @@ import { isActivityPathHidden } from './activityPageVisibility';
  * so e.g. a restaurant never sees a "showroom stock" tab.
  */
 
-export type ActivityHubId = 'sales' | 'inventory' | 'purchasing' | 'crm' | 'receivables';
+export type ActivityHubId = 'sales' | 'inventory' | 'purchasing' | 'crm' | 'receivables' | 'products';
 
 export interface HubTabLike {
   id: string;
@@ -404,6 +404,63 @@ const ACTIVITY_TAB_LABELS: Record<ActivityHubId, Record<string, Record<string, s
       general: 'التحصيل والمتابعة', custom: 'التحصيل والمتابعة',
     },
   },
+  products: {
+    products: {
+      ceramics: 'منتجات السيراميك', sanitary: 'الأدوات الصحية', furniture: 'قطع الأثاث',
+      home_appliances: 'الأجهزة الكهربائية', electronics: 'الأجهزة والإكسسوارات', clothing: 'الملابس',
+      food: 'الأصناف الغذائية', cosmetics: 'منتجات التجميل', automotive: 'قطع غيار السيارات',
+      building_materials: 'مواد البناء', lighting: 'منتجات الإضاءة', ecommerce: 'منتجات المتجر',
+      general: 'المنتجات', restaurant: 'أصناف المطبخ', hospitality: 'غرف وخدمات الفندق',
+      education: 'الدورات والخدمات', workshop: 'قطع الغيار', manufacturing: 'المنتجات المصنعة',
+      construction: 'بنود التنفيذ', import_export: 'البضائع', logistics: 'خدمات الشحن',
+      healthcare_admin: 'الخدمات الطبية', services: 'الخدمات', professional_services: 'الخدمات المهنية',
+      custom: 'المنتجات',
+    },
+    categories: {
+      ceramics: 'أقسام السيراميك', sanitary: 'أقسام الأدوات', furniture: 'أقسام الأثاث',
+      home_appliances: 'أقسام الأجهزة', electronics: 'أقسام الأجهزة', clothing: 'أقسام الملابس',
+      food: 'أقسام الأصناف', cosmetics: 'أقسام التجميل', automotive: 'أقسام قطع الغيار',
+      building_materials: 'أصناف البناء', lighting: 'أقسام الإضاءة', ecommerce: 'أقسام المتجر',
+      general: 'التصنيفات', restaurant: 'أقسام المطبخ', hospitality: 'أقسام الفندق',
+      education: 'أقسام الدورات', workshop: 'أصناف قطع الغيار', manufacturing: 'مجموعات المنتجات',
+      construction: 'بنود التنفيذ', import_export: 'أصناف البضائع', logistics: 'أنواع الشحن',
+      healthcare_admin: 'تخصصات العيادة', services: 'أنواع الخدمات', professional_services: 'أنواع الملفات',
+      custom: 'التصنيفات',
+    },
+    brands: {
+      ceramics: 'المصانع والماركات', sanitary: 'المصانع', furniture: 'مصانع الأثاث',
+      home_appliances: 'ماركات الأجهزة', electronics: 'الماركات', clothing: 'الماركات',
+      food: 'الماركات الغذائية', cosmetics: 'ماركات التجميل', automotive: 'مصانع قطع الغيار',
+      building_materials: 'مصانع المواد', lighting: 'ماركات الإضاءة', ecommerce: 'الماركات',
+      general: 'الماركات', restaurant: 'الموردون', hospitality: 'موردو الفندق',
+      education: 'الجهات التعليمية', workshop: 'مصانع القطع', manufacturing: 'مصانع المواد',
+      construction: 'موردو المواد', import_export: 'المصانع المصدرة', logistics: 'شركات الشحن',
+      healthcare_admin: 'المختبرات', services: 'الشركاء', professional_services: 'الشركاء',
+      custom: 'الماركات',
+    },
+    attributes: {
+      ceramics: 'مقاسات السيراميك', sanitary: 'مواصفات الأدوات', furniture: 'مقاسات الأثاث',
+      home_appliances: 'مواصفات الأجهزة', electronics: 'مواصفات الأجهزة', clothing: 'مقاسات الملابس',
+      food: 'مكونات الأصناف', cosmetics: 'مكونات التجميل', automotive: 'توافق القطع',
+      building_materials: 'مواصفات المواد', lighting: 'مواصفات الإضاءة', ecommerce: 'خصائص المتجر',
+      general: 'الخصائص الديناميكية', restaurant: 'وصفات ومكونات', hospitality: 'مواصفات الغرف',
+      education: 'متطلبات الدورات', workshop: 'توافق القطع', manufacturing: 'مواصفات الإنتاج',
+      construction: 'مواصفات البنود', import_export: 'مواصفات البضائع', logistics: 'خصائص الشحن',
+      healthcare_admin: 'تخصصات الخدمات', services: 'خصائص الخدمات', professional_services: 'خصائص الملفات',
+      custom: 'الخصائص الديناميكية',
+    },
+    barcodes: {
+      ceramics: 'باركود السيراميك', sanitary: 'باركود الأدوات', furniture: 'باركود الأثاث',
+      home_appliances: 'باركود الأجهزة', electronics: 'باركود الأجهزة', clothing: 'باركود الملابس',
+      food: 'باركود الأصناف', cosmetics: 'باركود التجميل', automotive: 'باركود القطع',
+      building_materials: 'باركود المواد', lighting: 'باركود الإضاءة', ecommerce: 'باركود المتجر',
+      general: 'الباركود', restaurant: 'رموز الأصناف', hospitality: 'رموز الغرف',
+      education: 'رموز الدورات', workshop: 'باركود القطع', manufacturing: 'باركود الإنتاج',
+      construction: 'باركود المواد', import_export: 'باركود البضائع', logistics: 'باركود الشحنات',
+      healthcare_admin: 'رموز الخدمات', services: 'رموز الخدمات', professional_services: 'رموز الملفات',
+      custom: 'الباركود',
+    },
+  },
 };
 
 /** Family-level fallbacks for retail subtypes sharing showroom wording. */
@@ -460,6 +517,13 @@ const FAMILY_TAB_LABELS: Record<ActivityHubId, Record<string, Record<string, str
     other: { retail: 'المطالبات الأخرى', distribution: 'المطالبات الأخرى', manufacturing: 'المطالبات الأخرى', construction: 'مطالبات المشاريع', transport: 'المطالبات الأخرى', hospitality: 'مطالبات النزلاء', healthcare: 'مطالبات التأمين', education: 'مطالبات الرسوم', professional_services: 'مطالبات الأتعاب' },
     installments: { retail: 'الأقساط', distribution: 'الأقساط', manufacturing: 'الأقساط', construction: 'دفعات المشاريع', transport: 'الأقساط', hospitality: 'أقساط النزلاء', healthcare: 'تقسيط الرسوم', education: 'أقساط الطلاب', professional_services: 'أتعاب بالتقسيط' },
     'follow-up': { retail: 'التحصيل والمتابعة', distribution: 'التحصيل والمتابعة', manufacturing: 'التحصيل والمتابعة', construction: 'تحصيل المستخلصات', transport: 'التحصيل والمتابعة', hospitality: 'تحصيل النزلاء', healthcare: 'تحصيل المرضى', education: 'تحصيل الرسوم', professional_services: 'تحصيل الأتعاب' },
+  },
+  products: {
+    products: { retail: 'المنتجات', distribution: 'البضائع', manufacturing: 'المنتجات المصنعة', construction: 'بنود التنفيذ', transport: 'قطع الغيار', hospitality: 'الغرف والخدمات', healthcare: 'الخدمات الطبية', education: 'الدورات والخدمات', professional_services: 'الخدمات المهنية' },
+    categories: { retail: 'التصنيفات', distribution: 'أصناف البضائع', manufacturing: 'مجموعات المنتجات', construction: 'بنود التنفيذ', transport: 'أصناف قطع الغيار', hospitality: 'أقسام الفندق', healthcare: 'تخصصات العيادة', education: 'أقسام الدورات', professional_services: 'أنواع الملفات' },
+    brands: { retail: 'الماركات', distribution: 'المصانع', manufacturing: 'مصانع المواد', construction: 'موردو المواد', transport: 'مصانع القطع', hospitality: 'موردو الفندق', healthcare: 'المختبرات', education: 'الجهات التعليمية', professional_services: 'الشركاء' },
+    attributes: { retail: 'الخصائص الديناميكية', distribution: 'مواصفات البضائع', manufacturing: 'مواصفات الإنتاج', construction: 'مواصفات البنود', transport: 'توافق القطع', hospitality: 'مواصفات الغرف', healthcare: 'تخصصات الخدمات', education: 'متطلبات الدورات', professional_services: 'خصائص الملفات' },
+    barcodes: { retail: 'الباركود', distribution: 'باركود البضائع', manufacturing: 'باركود الإنتاج', construction: 'باركود المواد', transport: 'باركود القطع', hospitality: 'رموز الغرف', healthcare: 'رموز الخدمات', education: 'رموز الدورات', professional_services: 'رموز الملفات' },
   },
 };
 

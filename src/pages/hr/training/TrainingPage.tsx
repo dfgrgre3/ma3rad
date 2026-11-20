@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { GraduationCap, Users, BookOpen, Award, Target, AlertTriangle } from 'lucide-react';
 import { TrainingService, TrainingTrainer, TrainingCourse, TrainingEnrollment, Skill, JobSkill, TrainingGap } from '../../../services/domains/hr/TrainingService';
+import { resolveActivitySubTabs } from '../../../config/activityElementSpec';
 import { PageHeader } from '../../../components/ui/PageHeader';
 import { EmployeeService } from '../../../services/domains/hr/EmployeeService';
 import { useTabPermissions } from '../../../hooks/domains/auth/useTabPermissions';
@@ -84,7 +85,7 @@ export const TrainingPage: React.FC = () => {
     { id: 'certificates', label: 'الشهادات', icon: <Award className="h-4 w-4" /> },
     { id: 'expenses', label: 'المصروفات', icon: <Award className="h-4 w-4" /> },
   ];
-  const visibleTabs = tabs.filter((t) => canTab(t.id));
+  const visibleTabs = resolveActivitySubTabs(tabs.filter((t) => canTab(t.id)), '/hr/training');
   const activeTab: Tab = canTab(tab) ? tab : (visibleTabs[0]?.id ?? tab);
 
   return (

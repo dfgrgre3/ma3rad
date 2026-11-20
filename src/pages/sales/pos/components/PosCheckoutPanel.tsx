@@ -9,6 +9,7 @@ import type { AppliedPromotion } from '../../../../services/domains/sales/Pricin
 import { CentralLimitGuard } from '../../../../components/ui/CentralLimitGuard';
 import { round2 } from '../../../../types/pos';
 import { usePosActivityCopy } from '../../../../hooks/pages/sales/pos/usePosActivityCopy';
+import { ActivityGate } from '../../../../components/ui/ActivityGate';
 
 const paymentLabel = (type: PaymentType) => ({ CASH: 'نقدي', CARD: 'بطاقة', BANK_TRANSFER: 'تحويل بنكي', CHEQUE: 'شيك', CREDIT: 'آجل', MIXED: 'دفع مختلط' }[type]);
 
@@ -152,6 +153,7 @@ export const PosCheckoutPanel: React.FC<PosCheckoutPanelProps> = ({
     <section aria-label={copy.adjustmentsTitle} className="space-y-1.5 [container-type:inline-size]">
     <div className="text-xs font-black text-ink ">{copy.adjustmentsTitle}</div>
     <div className="grid grid-cols-2 gap-2 text-xs [@container(min-width:40rem)]:grid-cols-4">
+      <ActivityGate element="discount">
       <div className="min-w-0">
         <label htmlFor="pos-invoice-discount" className="flex items-center gap-1 text-xs font-bold text-ink-secondary "><Percent className="w-3 h-3 shrink-0" /> {copy.invoiceDiscountLabel}</label>
         <div role="group" aria-label="نوع الخصم" className="mt-1 flex w-full items-center overflow-hidden rounded-lg border border-line ">
@@ -214,6 +216,7 @@ export const PosCheckoutPanel: React.FC<PosCheckoutPanelProps> = ({
           </div>
         )}
       </div>
+      </ActivityGate>
       <div>
         <label htmlFor="pos-tax-percentage" className="flex items-center gap-1 text-xs font-bold text-ink-secondary "><Percent className="w-3 h-3" /> ضريبة %</label>
         <input
@@ -337,19 +340,23 @@ export const PosCheckoutPanel: React.FC<PosCheckoutPanelProps> = ({
 
     {/* Coupon code */}
     {showCouponCode && (
+      <ActivityGate element="promotions">
       <div className="flex items-center gap-2 border-b border-line pb-1.5 ">
         <input value={couponCode} onChange={(e) => setCouponCode(e.target.value)} placeholder="رمز القسيمة" aria-label="رمز القسيمة" className="min-h-10 min-w-0 flex-1 rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 " />
         {appliedPromotion && <span className="text-xs font-bold text-success ">✓ {appliedPromotion.name} (-{appliedPromotion.discountAmount})</span>}
       </div>
+      </ActivityGate>
     )}
 
     {/* Loyalty redeem */}
     {showLoyaltyPoints && selectedCustomer && canRedeemPoints && (
+      <ActivityGate element="loyalty">
       <div className="flex items-center gap-2 border-b border-line pb-1.5 ">
         <input type="number" min={0} step={1} value={redeemPoints || ''} onChange={(e) => setRedeemPoints(Number.parseFloat(e.target.value) || 0)} placeholder="عدد نقاط الولاء" aria-label="عدد نقاط الولاء" className="min-h-10 w-32 rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 " />
         <button type="button" onClick={onRedeemPoints} className="min-h-10 rounded-lg border border-warning-border bg-warning-soft px-3 py-2 text-xs font-bold text-warning hover:bg-warning-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-warning">تطبيق النقاط</button>
         {redeemPoints > 0 && <span className="text-xs text-ink-secondary ">تُخصم عند حفظ الفاتورة</span>}
       </div>
+      </ActivityGate>
     )}
 
     {/* Paid amount */}
@@ -464,6 +471,7 @@ export const PosCheckoutPanel: React.FC<PosCheckoutPanelProps> = ({
 
     {/* Sales rep */}
     {salesReps && salesReps.length > 0 && onSalesRepChange && (
+      <ActivityGate element="sales-rep">
       <label className="block">
         <span className="mb-1 block text-[11px] font-bold text-muted">المندوب</span>
         <select
@@ -479,6 +487,7 @@ export const PosCheckoutPanel: React.FC<PosCheckoutPanelProps> = ({
           ))}
         </select>
       </label>
+      </ActivityGate>
     )}
 
     {/* Notes */}
@@ -495,6 +504,7 @@ export const PosCheckoutPanel: React.FC<PosCheckoutPanelProps> = ({
 
     {/* Actions */}
     <div className="grid grid-cols-2 gap-1.5">
+      <ActivityGate element="hold">
       <button
         onClick={onHoldOrder}
         disabled={cartLength === 0}
@@ -502,6 +512,7 @@ export const PosCheckoutPanel: React.FC<PosCheckoutPanelProps> = ({
       >
         <PauseCircle className="h-3.5 w-3.5" /> {copy.holdLabel}
       </button>
+      </ActivityGate>
       <button
         onClick={onClearOrder}
         disabled={cartLength === 0}

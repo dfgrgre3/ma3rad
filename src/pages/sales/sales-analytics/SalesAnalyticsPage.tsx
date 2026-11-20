@@ -3,6 +3,7 @@ import { useDashboardRefresh } from '../../../contexts/DashboardRefreshContext';
 import { Link } from 'react-router-dom';
 import { Activity, ArrowDownRight, ArrowUpRight, Banknote, CalendarDays, FileText, Package, ShoppingCart, Users } from 'lucide-react';
 import { PageHeader } from '../../../components/ui/PageHeader';
+import { ActivityGate } from '../../../components/ui/ActivityGate';
 import { DatabaseManager } from '../../../database/repositories/databaseManager';
 import { AnalyticsService } from '../../../services/domains/reports/AnalyticsService';
 import { BranchAccessService } from '../../../services/domains/auth/BranchAccessService';
@@ -125,7 +126,7 @@ export const SalesAnalyticsPage: React.FC = () => {
         title="كل حركة البيع في مكان واحد"
         description="تابع الإيرادات والتحصيل والربحية والعملاء والأصناف الأعلى أداءً."
         actions={<>
-          {canOpenPos && <Link to="/pos" className="rounded-xl bg-success px-4 py-2.5 text-sm font-extrabold text-white hover:bg-success">{newInvoiceLabel}</Link>}
+          {canOpenPos && <ActivityGate element="pos-checkout"><Link to="/pos" className="rounded-xl bg-success px-4 py-2.5 text-sm font-extrabold text-white hover:bg-success">{newInvoiceLabel}</Link></ActivityGate>}
           <Link to="/sales" className="rounded-xl border border-line bg-surface px-4 py-2.5 text-sm font-bold text-ink hover:bg-surface-muted">الفواتير</Link>
         </>}
       />

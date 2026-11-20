@@ -19,6 +19,7 @@ import { useBusinessProfileMeta, useBusinessTerm, useActivityPageCopy } from '..
 import { useIdempotencyKey } from '../../hooks/shared/useIdempotencyKey';
 import { usePermission } from '../../hooks/domains/auth/usePermission';
 import { ConfiguredActionButton } from '../config/ConfiguredActionButton';
+import { ActivityGate } from '../ui/ActivityGate';
 import { OperationalFieldService, type OperationalFieldDefinition } from '../../services/domains/products/OperationalFieldService';
 import { logger } from '../../utils/logger';
 import { OperationalFieldsForm } from '../products/OperationalFieldsForm';
@@ -210,6 +211,7 @@ export const CustomersView: React.FC = () => {
         description={pageCopy?.description || `متابعة مديونيات العملاء، تحصيل الدفعات، وكشوف الحساب التفصيلية · ${businessProfileLabel}`}
         icon={<Users className="h-5 w-5" />}
         actions={
+          <ActivityGate element="new-customer">
           <ConfiguredActionButton
             actionId="customers.create"
             fallbackLabel={`إضافة ${customerSingularLabel} جديد`}
@@ -233,6 +235,7 @@ export const CustomersView: React.FC = () => {
               setIsAddModalOpen(true);
             }}
           />
+          </ActivityGate>
         }
       />
 
@@ -315,6 +318,7 @@ export const CustomersView: React.FC = () => {
               ...(canViewStatement ? [{
                 key: 'statement', header: 'كشف الحساب', align: 'center' as const,
                 render: (c: any) => (
+                  <ActivityGate element="statement">
                   <Button
                     variant="secondary"
                     size="sm"
@@ -327,6 +331,7 @@ export const CustomersView: React.FC = () => {
                   >
                     <FileText className="h-4 w-4" />
                   </Button>
+                  </ActivityGate>
                 ),
               }] : []),
             ]}
@@ -343,14 +348,14 @@ export const CustomersView: React.FC = () => {
                   <p className="text-[11px] font-mono text-[var(--cerami-muted)]">{selectedCustomer.phone}</p>
                 </div>
                 <div className="flex flex-wrap items-center gap-1.5">
-                  {canCollect && <Button
+                  {canCollect && <ActivityGate element="collect-payment"><Button
                     variant="success"
                     size="sm"
                     leadingIcon={<DollarSign className="h-4 w-4" />}
                     onClick={() => setIsPaymentModalOpen(true)}
                   >
                     سند قبض / تحصيل
-                  </Button>}
+                  </Button></ActivityGate>}
                   {canUpdate && selectedCustomer && <Button
                     variant="secondary"
                     size="sm"

@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { DataTable } from '../../../components/ui/DataTable';
 import { PageHeader } from '../../../components/ui/PageHeader';
+import { ActivityGate } from '../../../components/ui/ActivityGate';
 import {
   CreditCard,
   Plus,
@@ -170,20 +171,20 @@ export const EPaymentSettlementPage: React.FC = () => {
             </button>
             {canManage && (
               <>
-                <button
+                <ActivityGate element="new-gateway"><button
                   onClick={() => setShowGatewayModal(true)}
                   className="flex items-center gap-1.5 px-4 py-2.5 bg-primary hover:bg-primary text-white rounded-xl text-xs font-semibold shadow-sm transition"
                 >
                   <Plus className="w-4 h-4" />
                   <span>{newGatewayLabel}</span>
-                </button>
-                <button
+                </button></ActivityGate>
+                <ActivityGate element="settle"><button
                   onClick={() => setShowSettlementModal(true)}
                   className="flex items-center gap-1.5 px-4 py-2.5 bg-primary hover:bg-primary text-white rounded-xl text-xs font-semibold shadow-sm transition"
                 >
                   <ArrowRightLeft className="w-4 h-4" />
                   <span>تسوية وإيداع بنكي</span>
-                </button>
+                </button></ActivityGate>
               </>
             )}
           </>}

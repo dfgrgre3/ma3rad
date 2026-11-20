@@ -3,6 +3,8 @@ import { useSearchParams } from 'react-router-dom';
 import { Banknote, CalendarDays, ClipboardList, Clock3, ExternalLink } from 'lucide-react';
 import { useRouteAccess } from '../../../hooks/domains/auth/useRouteAccess';
 import { getHubTabOrder, resolveHubTabLabel } from '../../../config/activityHubTabs';
+import { isActivityPathHidden } from '../../../config/activityPageVisibility';
+import { getEffectiveBusinessType } from '../../../services/domains/config/BusinessTypeService';
 import { useActivityPageCopy } from '../../../hooks/domains/config/useBusinessTerm';
 import { PageHeader } from '../../../components/ui/PageHeader';
 
@@ -28,7 +30,8 @@ export const ReceivablesHubPage: React.FC<{ initialTab?: TabId }> = ({ initialTa
   const canAccess = useRouteAccess();
   const pageCopy = useActivityPageCopy('finance');
   const allowedTabs = useMemo(() => {
-    const permitted = tabs.filter((item) => item.path !== null && canAccess(item.path));
+    const businessType = getEffectiveBusinessType();
+    const permitted = tabs.filter((item) => item.path !== null && canAccess(item.path) && !isActivityPathHidden(item.path, businessType));
     const followUpAllowed = permitted.some((item) => item.id === 'debts' || item.id === 'installments');
     const allowed = tabs
       .filter((item) =>

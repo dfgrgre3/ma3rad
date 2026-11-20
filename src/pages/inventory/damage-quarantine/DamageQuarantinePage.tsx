@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { DataTable } from '../../../components/ui/DataTable';
+import { ActivityGate } from '../../../components/ui/ActivityGate';
 import { PageHeader } from '../../../components/ui/PageHeader';
 import { 
   ShieldAlert, AlertTriangle, Eye, 
@@ -215,13 +216,13 @@ export const DamageQuarantinePage: React.FC = () => {
           description="عزل البضائع غير الصالحة، الفحص الفني، والإعدام المخزني المحاسبي أو التخفيض"
           actions={<>
             {canManage && (
-              <button
+              <ActivityGate element="quarantine"><button
                 onClick={handleOpenCreate}
                 className="flex items-center gap-2 px-4 py-2 rounded-xl bg-danger hover:bg-danger text-white text-xs font-black shadow-md shadow-danger/20 transition active:scale-95"
               >
                 <Plus className="w-4 h-4" />
                 تسجيل كسر / تالف / حجر
-              </button>
+              </button></ActivityGate>
             )}
 
             <button

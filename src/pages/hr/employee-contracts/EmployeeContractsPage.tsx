@@ -1,12 +1,14 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { DataTable } from '../../../components/ui/DataTable';
 import { PageHeader } from '../../../components/ui/PageHeader';
+import { ActivityGate } from '../../../components/ui/ActivityGate';
 import { useSearchParams } from 'react-router-dom';
 import { CheckCircle2, Clock3, FileSignature, Loader2, Plus, RefreshCw, Trash2, XCircle } from 'lucide-react';
 import { ContractService } from '../../../services/domains/hr/ContractService';
 import { EmployeeService } from '../../../services/domains/hr/EmployeeService';
 import { usePermission } from '../../../hooks/domains/auth/usePermission';
 import { useToast } from '../../../components/ui/Toast';
+import { useBusinessTerm } from '../../../hooks/domains/config/useBusinessTerm';
 import { localDateString } from '../../../utils/shared/date';
 import type {
   ContractEffectiveStatus,
@@ -64,6 +66,7 @@ const emptyForm = {
 };
 
 export const EmployeeContractsPage: React.FC = () => {
+  const newContractLabel = useBusinessTerm('actions.newContract');
   const [searchParams] = useSearchParams();
   const service = useMemo(() => new ContractService(), []);
   const toast = useToast();
@@ -250,12 +253,12 @@ export const EmployeeContractsPage: React.FC = () => {
             <RefreshCw className="h-4 w-4" />
           </button>
           {canManage && (
-            <button
+            <ActivityGate element="new-contract"><button
               className="flex items-center gap-1 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-white"
               onClick={() => setShowForm((value) => !value)}
             >
-              <Plus className="h-4 w-4" /> عقد جديد
-            </button>
+              <Plus className="h-4 w-4" /> {newContractLabel}
+            </button></ActivityGate>
           )}
         </>}
       />

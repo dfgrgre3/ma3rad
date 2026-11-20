@@ -207,6 +207,50 @@ export const BUSINESS_TERMINOLOGY = {
     label: 'حساب جديد',
     description: 'نص زر إضافة حساب في شجرة الحسابات.',
   },
+  'actions.newProject': {
+    label: 'مشروع جديد',
+    description: 'نص زر إنشاء مشروع أو ملف عمل جديد.',
+  },
+  'actions.newDelivery': {
+    label: 'أمر تسليم جديد',
+    description: 'نص زر إنشاء أمر توصيل أو تسليم جديد.',
+  },
+  'actions.newDriver': {
+    label: 'سائق جديد',
+    description: 'نص زر إضافة سائق أو مندوب جديد.',
+  },
+  'actions.newVehicle': {
+    label: 'مركبة جديدة',
+    description: 'نص زر إضافة مركبة أو معدة جديدة.',
+  },
+  'actions.newWarehouse': {
+    label: 'مخزن جديد',
+    description: 'نص زر إضافة مخزن أو موقع تخزين جديد.',
+  },
+  'actions.newDocument': {
+    label: 'مستند جديد',
+    description: 'نص زر رفع أو إنشاء مستند جديد.',
+  },
+  'actions.newContract': {
+    label: 'عقد جديد',
+    description: 'نص زر إنشاء عقد أو اتفاقية جديدة.',
+  },
+  'actions.newPromotion': {
+    label: 'عرض ترويجي جديد',
+    description: 'نص زر إنشاء عرض أو خصم ترويجي جديد.',
+  },
+  'actions.newLeaveRequest': {
+    label: 'طلب إجازة',
+    description: 'نص زر تقديم طلب إجازة موظف.',
+  },
+  'actions.newJobPosting': {
+    label: 'وظيفة جديدة',
+    description: 'نص زر نشر وظيفة شاغرة جديدة في التوظيف.',
+  },
+  'actions.newCandidate': {
+    label: 'تسجيل مرشح',
+    description: 'نص زر تسجيل مرشح توظيف جديد.',
+  },
 } as const;
 
 export type BusinessTermKey = keyof typeof BUSINESS_TERMINOLOGY;

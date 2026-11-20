@@ -3,6 +3,7 @@ import { DataTable } from '../../../components/ui/DataTable';
 import { Truck } from 'lucide-react';
 import { timeOf } from './helpers';
 import { ShareBar } from './primitives';
+import { useActivityPathHidden } from '../../../hooks/domains/config/useActivityUi';
 import type { NumberFormatter, SupplierStat } from '../../../types/dashboard/todayPurchases';
 
 export interface SuppliersPanelProps {
@@ -12,7 +13,9 @@ export interface SuppliersPanelProps {
   plain: NumberFormatter;
 }
 
-export const SuppliersPanel: React.FC<SuppliersPanelProps> = ({ supplierStats, onNavigate, fmt, plain }) => (
+export const SuppliersPanel: React.FC<SuppliersPanelProps> = ({ supplierStats, onNavigate, fmt, plain }) => {
+  const suppliersHidden = useActivityPathHidden('/suppliers');
+  return (
   <div role="tabpanel" aria-label="موردون اليوم">
     {supplierStats.length === 0 ? (
       <div className="flex flex-col items-center px-4 py-14 text-center">
@@ -49,7 +52,11 @@ export const SuppliersPanel: React.FC<SuppliersPanelProps> = ({ supplierStats, o
               key: 'supplier', header: 'المورد',
               render: (supplier: any) => (
                 <span>
-                  <button type="button" onClick={() => onNavigate(supplier.id ? `/suppliers/${supplier.id}` : '/suppliers')} className="font-bold text-ink hover:text-warning dark:hover:text-warning">{supplier.name}</button>
+                  {suppliersHidden ? (
+                    <span className="font-bold text-ink ">{supplier.name}</span>
+                  ) : (
+                    <button type="button" onClick={() => onNavigate(supplier.id ? `/suppliers/${supplier.id}` : '/suppliers')} className="font-bold text-ink hover:text-warning dark:hover:text-warning">{supplier.name}</button>
+                  )}
                   {supplier.unpaid > 0 && <span className="mt-0.5 block text-[10px] text-danger ">{plain(supplier.unpaid)} فاتورة غير مسددة</span>}
                 </span>
               ),
@@ -78,4 +85,5 @@ export const SuppliersPanel: React.FC<SuppliersPanelProps> = ({ supplierStats, o
       </>
     )}
   </div>
-);
+  );
+};

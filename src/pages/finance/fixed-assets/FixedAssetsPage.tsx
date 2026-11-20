@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { DataTable } from '../../../components/ui/DataTable';
 import { PageHeader } from '../../../components/ui/PageHeader';
+import { ActivityGate } from '../../../components/ui/ActivityGate';
 import {
   ArrowDownUp, Building2, CalendarDays, Check, ClipboardList, Download, Loader2,
   MapPin, Pencil, Plus, Search, SlidersHorizontal, Trash2, TrendingDown, Wallet,
@@ -269,18 +270,18 @@ export const FixedAssetsPage: React.FC = () => {
                 </button>
               </>
             )}
-            <button type="button" onClick={() => setWorkflowsOpen(true)}
+            <ActivityGate element="depreciate"><button type="button" onClick={() => setWorkflowsOpen(true)}
               className="inline-flex items-center gap-2 rounded-lg border border-accent-border bg-accent-soft px-3 py-2.5 text-xs font-bold text-primary hover:bg-accent-soft dark:bg-primary/40 ">
               <ClipboardList aria-hidden="true" className="h-4 w-4" /> عمليات الأصول
-            </button>
+            </button></ActivityGate>
             {canManage && (
-              <button
+              <ActivityGate element="new-asset"><button
                 type="button"
                 onClick={openNew}
                 className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-primary focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
               >
                 <Plus aria-hidden="true" className="h-4 w-4" /> {newAssetLabel}
-              </button>
+              </button></ActivityGate>
             )}
             {workflowsOpen && (
               <FixedAssetWorkflows

@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { ShieldAlert, FileText, AlertTriangle, MessageSquare, Scale, Paperclip } from 'lucide-react';
+import { resolveActivitySubTabs } from '../../../config/activityElementSpec';
 import { PageHeader } from '../../../components/ui/PageHeader';
 import { HrDisciplineService, HrViolation, HrWarning, HrPenalty, HrComplaint, HrAppeal, HrAttachment } from '../../../services/domains/hr/HrDisciplineService';
 import { useTabPermissions } from '../../../hooks/domains/auth/useTabPermissions';
@@ -69,7 +70,7 @@ export const HrDisciplinePage: React.FC = () => {
     { id: 'appeals', label: 'التظلمات', icon: <FileText className="h-4 w-4" /> },
     { id: 'attachments', label: 'المرفقات', icon: <Paperclip className="h-4 w-4" /> },
   ];
-  const visibleTabs = tabs.filter((t) => canTab(t.id));
+  const visibleTabs = resolveActivitySubTabs(tabs.filter((t) => canTab(t.id)), '/hr/discipline');
   const activeTab: Tab = canTab(tab) ? tab : (visibleTabs[0]?.id ?? tab);
 
   return (

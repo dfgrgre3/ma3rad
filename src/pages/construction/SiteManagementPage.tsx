@@ -4,6 +4,7 @@ import {
   ArrowRight, ChevronDown, ChevronUp, ClipboardList, FileCheck2, HardHat, Loader2, Plus, Printer, UserCheck, Users,
 } from 'lucide-react';
 import { buildExportHtml, printHtml } from '../../utils/export/export';
+import { ActivityGate } from '../../components/ui/ActivityGate';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { useToast } from '../../components/ui/Toast';
 import { AuthService } from '../../services/domains/auth/AuthService';
@@ -412,7 +413,7 @@ export const SiteManagementPage: React.FC = () => {
               {canUpdate && (
                 <div className="mb-4">
                   {!showReportForm ? (
-                    <button type="button" onClick={() => setShowReportForm(true)} className="inline-flex items-center gap-1 rounded-lg bg-primary px-3 py-2 text-xs font-bold text-white"><Plus size={14} /> تقرير يومي جديد</button>
+                    <ActivityGate element="daily-report"><button type="button" onClick={() => setShowReportForm(true)} className="inline-flex items-center gap-1 rounded-lg bg-primary px-3 py-2 text-xs font-bold text-white"><Plus size={14} /> تقرير يومي جديد</button></ActivityGate>
                   ) : (
                     <div className="space-y-3 rounded-xl border border-accent-border bg-accent-soft/60 p-4">
                       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">

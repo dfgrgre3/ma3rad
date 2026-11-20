@@ -14,6 +14,7 @@ import type { OperationalFieldDefinition } from '../../services/domains/products
 import { OperationalFieldsSummary } from '../products/OperationalFieldsSummary';
 import { OperationalFieldsRecordEditor } from '../products/OperationalFieldsRecordEditor';
 import type { BankAccount } from '../../types/finance';
+import { useDocElements } from '../../hooks/domains/config/useActivityUi';
 
 const fmt = (n: number) => CeramicMath.formatCurrency(Number(n) || 0);
 
@@ -122,7 +123,10 @@ export const SalesModals: React.FC<SalesModalsProps> = ({
   operationalFieldValues,
   canUpdateOperationalFields,
   onSaveOperationalFields,
-}) => (
+}) => {
+  const doc = useDocElements('/doc/sales_invoice');
+  const docVisible = (id: string) => doc[id]?.visible !== false;
+  return (
   <>
       {/* ── Invoice Details ─────────────────────────────────────────────────── */}
       {selected && (
@@ -220,29 +224,29 @@ export const SalesModals: React.FC<SalesModalsProps> = ({
           </div>
 
           <div className="flex flex-wrap items-center justify-end gap-2 pt-4 mt-4 border-t border-line">
-            <button onClick={() => openInvoicePreview(selected)} className="px-3 py-2 bg-accent-soft hover:bg-accent-soft text-primary border border-accent-border rounded-xl text-xs font-bold flex items-center gap-1.5">
+            {docVisible('preview') && <button onClick={() => openInvoicePreview(selected)} className="px-3 py-2 bg-accent-soft hover:bg-accent-soft text-primary border border-accent-border rounded-xl text-xs font-bold flex items-center gap-1.5">
               <Eye className="w-3.5 h-3.5" /> معاينة الفاتورة
-            </button>
-            <button onClick={() => printInvoice(selected)} className="px-3 py-2 bg-surface-sunken hover:bg-surface-sunken text-ink rounded-xl text-xs font-bold flex items-center gap-1.5">
+            </button>}
+            {docVisible('print-a4') && <button onClick={() => printInvoice(selected)} className="px-3 py-2 bg-surface-sunken hover:bg-surface-sunken text-ink rounded-xl text-xs font-bold flex items-center gap-1.5">
               <Printer className="w-3.5 h-3.5" /> طباعة A4
-            </button>
-            <button onClick={() => printThermalReceipt(selected)} className="px-3 py-2 bg-surface-sunken hover:bg-surface-sunken text-ink rounded-xl text-xs font-bold flex items-center gap-1.5">
+            </button>}
+            {docVisible('receipt-thermal') && <button onClick={() => printThermalReceipt(selected)} className="px-3 py-2 bg-surface-sunken hover:bg-surface-sunken text-ink rounded-xl text-xs font-bold flex items-center gap-1.5">
               <Receipt className="w-3.5 h-3.5" /> إيصال حراري
-            </button>
-            {canViewCustomerStatement && <button onClick={() => openStatement(selected.customerId)} className="px-3 py-2 bg-surface-sunken hover:bg-surface-sunken text-ink rounded-xl text-xs font-bold flex items-center gap-1.5">
+            </button>}
+            {canViewCustomerStatement && docVisible('statement') && <button onClick={() => openStatement(selected.customerId)} className="px-3 py-2 bg-surface-sunken hover:bg-surface-sunken text-ink rounded-xl text-xs font-bold flex items-center gap-1.5">
               <FileBarChart className="w-3.5 h-3.5" /> كشف حساب العميل
             </button>}
-            {selected.invoiceStatus !== 'VOID' && canRefund && (
+            {selected.invoiceStatus !== 'VOID' && canRefund && docVisible('return') && (
               <button onClick={() => goToReturn(selected.id)} className="px-3 py-2 bg-danger-soft hover:bg-danger-soft text-danger border border-danger-border rounded-xl text-xs font-bold flex items-center gap-1.5">
                 <RotateCcw className="w-3.5 h-3.5" /> مرتجع مبيعات
               </button>
             )}
-            {selected.invoiceStatus !== 'VOID' && selected.remainingAmount > 0 && canCollect && (
+            {selected.invoiceStatus !== 'VOID' && selected.remainingAmount > 0 && canCollect && docVisible('collect-payment') && (
               <button onClick={() => openPayment(selected)} className="px-3 py-2 bg-primary hover:bg-primary text-white rounded-xl text-xs font-bold flex items-center gap-1.5">
                 <Wallet className="w-3.5 h-3.5" /> تحصيل دفعة
               </button>
             )}
-            {selected.invoiceStatus !== 'VOID' && canVoid && (
+            {selected.invoiceStatus !== 'VOID' && canVoid && docVisible('void') && (
               <button onClick={() => openVoid(selected)} className="px-3 py-2 bg-danger hover:bg-danger text-white rounded-xl text-xs font-bold flex items-center gap-1.5">
                 <Ban className="w-3.5 h-3.5" /> إلغاء الفاتورة
               </button>
@@ -402,4 +406,5 @@ export const SalesModals: React.FC<SalesModalsProps> = ({
         </Modal>
       )}
   </>
-);
+  );
+};

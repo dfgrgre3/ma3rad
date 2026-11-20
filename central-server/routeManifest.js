@@ -181,6 +181,9 @@ const ROUTE_MANIFEST = [
   route('/api/v1/admin/devices/:id/revoke', ['POST'], {
     POST: ['platform.devices.update'],
   }),
+  route('/api/v1/admin/devices/:id/credential', ['PUT'], {
+    PUT: ['platform.devices.update'],
+  }),
   route('/api/v1/admin/devices/detect-clones', ['POST'], {
     POST: ['platform.devices.view', 'platform.devices.update'],
   }),
@@ -605,6 +608,9 @@ const ROUTE_MANIFEST = [
   route('/api/v1/configuration/current', ['GET'], null),
   route('/api/v1/telemetry/errors', ['POST'], null),
   route('/api/v1/releases', ['GET'], null),
+  // Device-authenticated signed feature-module packages (entitlement-checked).
+  route('/api/v1/modules/catalog', ['GET'], null),
+  route('/api/v1/modules/:moduleId/:version/files/:name', ['GET'], null),
   // Device-authenticated application backup channel (X-Device-Id +
   // X-Device-Credential; tenant resolved from the registered device).
   route('/api/v1/device/backups', ['GET'], null),

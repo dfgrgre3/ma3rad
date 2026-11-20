@@ -11,6 +11,7 @@ import { DatabaseManager } from '../../../database/repositories/databaseManager'
 import { AuthService } from '../../../services/domains/auth/AuthService';
 import { PermissionService } from '../../../services/domains/auth/PermissionService';
 import { PageHeader } from '../../../components/ui/PageHeader';
+import { ActivityGate } from '../../../components/ui/ActivityGate';
 import { useActivityPageCopy } from '../../../hooks/domains/config/useBusinessTerm';
 import { StatCard as UiStatCard } from '../../../components/ui/Card';
 
@@ -360,12 +361,12 @@ export const CrmDashboardPage: React.FC = () => {
           title={pageCopy?.title || 'لوحة تحكم CRM'}
           description={pageCopy?.description || 'مسار المبيعات وإدارة علاقات العملاء'}
           actions={<>
-            <button onClick={() => navigate('/crm/leads')} className="text-xs font-bold text-white bg-primary hover:bg-primary transition px-3 py-2 rounded-lg flex items-center gap-1.5">
+            <ActivityGate element="lead"><button onClick={() => navigate('/crm/leads')} className="text-xs font-bold text-white bg-primary hover:bg-primary transition px-3 py-2 rounded-lg flex items-center gap-1.5">
               <Users className="w-3.5 h-3.5" /> العملاء المحتملون
-            </button>
-            <button onClick={() => navigate('/crm/pipeline')} className="text-xs font-bold text-primary bg-accent-soft hover:bg-accent-soft transition px-3 py-2 rounded-lg flex items-center gap-1.5 border border-accent-border">
+            </button></ActivityGate>
+            <ActivityGate element="pipeline"><button onClick={() => navigate('/crm/pipeline')} className="text-xs font-bold text-primary bg-accent-soft hover:bg-accent-soft transition px-3 py-2 rounded-lg flex items-center gap-1.5 border border-accent-border">
               <Target className="w-3.5 h-3.5" /> Pipeline
-            </button>
+            </button></ActivityGate>
             <button onClick={load} className="p-2 hover:bg-surface-sunken rounded-lg transition" title="تحديث">
               <RefreshCw className={`w-4 h-4 text-muted ${loading ? 'animate-spin' : ''}`} />
             </button>

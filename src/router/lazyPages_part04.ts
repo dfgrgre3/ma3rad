@@ -1,17 +1,18 @@
 import { lazy } from 'react';
+import { moduleLazy } from '../modules/moduleLazy';
 
-export const FinancialStatementsPage = lazy(() => import('../pages/reports/financial-statements/FinancialStatementsPage').then(m => ({ default: m.FinancialStatementsPage })));
+export const FinancialStatementsPage = moduleLazy('reports', () => import('../pages/reports/financial-statements/FinancialStatementsPage').then(m => ({ default: m.FinancialStatementsPage })));
 
-export const SalesReportsPage = lazy(() => import('../pages/reports/sales-reports/SalesReportsPage').then(m => ({ default: m.SalesReportsPage })));
+export const SalesReportsPage = moduleLazy('reports', () => import('../pages/reports/sales-reports/SalesReportsPage').then(m => ({ default: m.SalesReportsPage })));
 
-export const PosReportsPage = lazy(() => import('../pages/reports/pos-reports/PosReportsPage').then(m => ({ default: m.PosReportsPage })));
+export const PosReportsPage = moduleLazy('reports', () => import('../pages/reports/pos-reports/PosReportsPage').then(m => ({ default: m.PosReportsPage })));
 
-export const PurchaseInventoryReportPage = lazy(() => import('../pages/reports/purchase-inventory/PurchaseInventoryReportPage').then(m => ({ default: m.PurchaseInventoryReportPage })));
+export const PurchaseInventoryReportPage = moduleLazy('reports', () => import('../pages/reports/purchase-inventory/PurchaseInventoryReportPage').then(m => ({ default: m.PurchaseInventoryReportPage })));
 
 // Approvals, Documents & Security
-export const ApprovalsPage = lazy(() => import('../pages/approvals/approvals/ApprovalsPage').then(m => ({ default: m.ApprovalsPage })));
+export const ApprovalsPage = moduleLazy('approvals', () => import('../pages/approvals/approvals/ApprovalsPage').then(m => ({ default: m.ApprovalsPage })));
 
-export const DocumentsPage = lazy(() => import('../pages/documents/documents/DocumentsPage').then(m => ({ default: m.DocumentsPage })));
+export const DocumentsPage = moduleLazy('documents', () => import('../pages/documents/documents/DocumentsPage').then(m => ({ default: m.DocumentsPage })));
 
 export const NotificationsView = lazy(() => import('../components/notifications/NotificationsView').then(m => ({ default: m.NotificationsView })));
 
@@ -52,9 +53,9 @@ export const SystemHealthPage = lazy(() => import('../pages/settings/system-heal
 
 export const NotFoundPage = lazy(() => import('../pages/common/not-found/NotFoundPage').then(m => ({ default: m.NotFoundPage })));
 
-export const ApartmentEstimatePage = lazy(() => import('../pages/construction/ApartmentEstimatePage').then(m => ({ default: m.ApartmentEstimatePage })));
+export const ApartmentEstimatePage = moduleLazy('sales', () => import('../pages/construction/ApartmentEstimatePage').then(m => ({ default: m.ApartmentEstimatePage })));
 
-export const OperationsShiftsPage = lazy(() => import('../pages/operations/shifts/OperationsShiftsPage').then(m => ({ default: m.OperationsShiftsPage })));
+export const OperationsShiftsPage = moduleLazy('operations', () => import('../pages/operations/shifts/OperationsShiftsPage').then(m => ({ default: m.OperationsShiftsPage })));
 
 export const PlatformSuperAdminDashboard = lazy(() => import('../pages/platform/PlatformSuperAdminDashboard').then(m => ({ default: m.PlatformSuperAdminDashboard })));
 export const PlatformUserPlatformPermissionsPage = lazy(() => import('../pages/platform/PlatformUserPlatformPermissionsPage').then(m => ({ default: m.PlatformUserPlatformPermissionsPage })));

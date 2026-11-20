@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { DataTable } from '../../../components/ui/DataTable';
+import { ActivityGate } from '../../../components/ui/ActivityGate';
 import { PageHeader } from '../../../components/ui/PageHeader';
 import { useBusinessTerm } from '../../../hooks/domains/config/useBusinessTerm';
 import {
@@ -284,12 +285,12 @@ export const GoodsReceiptsPage: React.FC = () => {
           title="إذن استلام مخزني وفحص الجودة والدفعة (GRN)"
           description="استلام مستقل عن فاتورة المورد، فحص الشيد والكاليبر، حصر التالف والعجز وزيادة رصيد المخزن"
           actions={canCreate && (
-            <button
+            <ActivityGate element="new-receipt"><button
               onClick={openNewReceiptModal}
               className="flex items-center gap-2 px-4 py-2.5 bg-warning hover:bg-warning text-white rounded-xl text-sm font-bold shadow-md shadow-warning/20 transition shrink-0"
             >
               <Plus className="w-4 h-4" /> {newReceiptLabel}
-            </button>
+            </button></ActivityGate>
           )}
         />
       </div>

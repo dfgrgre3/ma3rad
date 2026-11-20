@@ -6,6 +6,7 @@ import { v4 as uuidv4 } from 'uuid';
 
 import { useToast } from '../../../components/ui/Toast';
 import { PageHeader } from '../../../components/ui/PageHeader';
+import { ActivityGate } from '../../../components/ui/ActivityGate';
 import { useBusinessTerm } from '../../../hooks/domains/config/useBusinessTerm';
 type CampaignStatus = 'PLANNED' | 'RUNNING' | 'PAUSED' | 'COMPLETED' | 'CANCELLED';
 type Channel = 'WHATSAPP' | 'SMS' | 'EMAIL' | 'PHONE' | 'SOCIAL' | 'WALK_IN' | 'REFERRAL' | 'OTHER';
@@ -135,9 +136,9 @@ export const CampaignsPage: React.FC = () => {
           title="الحملات التسويقية"
           description="تخطيط الحملات ومتابعة الميزانية والعملاء المحتملين الناتجين عنها"
           actions={
-            <button onClick={openNew} className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary text-white rounded-xl text-sm font-bold transition shrink-0">
+            <ActivityGate element="new-campaign"><button onClick={openNew} className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary text-white rounded-xl text-sm font-bold transition shrink-0">
               <Plus className="w-4 h-4" /> {newCampaignLabel}
-            </button>
+            </button></ActivityGate>
           }
         />
       </div>

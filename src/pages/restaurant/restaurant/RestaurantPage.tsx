@@ -7,6 +7,7 @@ import { ManufacturingService, type BillOfMaterials } from '../../../services/do
 import { ProductService } from '../../../services/domains/products/ProductService';
 import { ProductPicker } from '../../../components/products/ProductPicker';
 import { PageHeader } from '../../../components/ui/PageHeader';
+import { ActivityGate } from '../../../components/ui/ActivityGate';
 import { isServiceProduct } from '../../../utils/products/productUnits';
 import {
   RestaurantService,
@@ -307,9 +308,9 @@ export const RestaurantPage: React.FC = () => {
       )}
 
       <nav className="flex flex-wrap gap-2 border-b border-line pb-2">
-        <button onClick={() => setTab('floor')} className={`rounded px-3 py-2 text-sm ${tab === 'floor' ? 'bg-success text-white' : 'bg-surface-sunken text-ink'}`}>الصالة والطلبات</button>
-        <button onClick={() => setTab('kitchen')} className={`rounded px-3 py-2 text-sm ${tab === 'kitchen' ? 'bg-success text-white' : 'bg-surface-sunken text-ink'}`}>شاشة المطبخ ({orders.length})</button>
-        {canViewRecipes && <button onClick={() => setTab('recipes')} className={`rounded px-3 py-2 text-sm ${tab === 'recipes' ? 'bg-success text-white' : 'bg-surface-sunken text-ink'}`}>الوصفات</button>}
+        <ActivityGate element="tables"><button onClick={() => setTab('floor')} className={`rounded px-3 py-2 text-sm ${tab === 'floor' ? 'bg-success text-white' : 'bg-surface-sunken text-ink'}`}>الصالة والطلبات</button></ActivityGate>
+        <ActivityGate element="kitchen-display"><button onClick={() => setTab('kitchen')} className={`rounded px-3 py-2 text-sm ${tab === 'kitchen' ? 'bg-success text-white' : 'bg-surface-sunken text-ink'}`}>شاشة المطبخ ({orders.length})</button></ActivityGate>
+        {canViewRecipes && <ActivityGate element="menu"><button onClick={() => setTab('recipes')} className={`rounded px-3 py-2 text-sm ${tab === 'recipes' ? 'bg-success text-white' : 'bg-surface-sunken text-ink'}`}>الوصفات</button></ActivityGate>}
       </nav>
 
       {loading ? (

@@ -7,6 +7,7 @@ import { OperationalFieldService, type OperationalFieldDefinition } from '../../
 import { OperationalFieldsForm } from '../../../components/products/OperationalFieldsForm';
 import { OperationalFieldsFilter, matchesOperationalFieldFilters, type OperationalFieldFilters } from '../../../components/products/OperationalFieldsFilter';
 import { PageHeader } from '../../../components/ui/PageHeader';
+import { ActivityGate } from '../../../components/ui/ActivityGate';
 import { OperationalFieldsSummary } from '../../../components/products/OperationalFieldsSummary';
 import { OperationalFieldsRecordEditor } from '../../../components/products/OperationalFieldsRecordEditor';
 
@@ -158,12 +159,12 @@ export const LeadsPage: React.FC = () => {
           title="العملاء المحتملون (Leads)"
           description="متابعة الفرص التسويقية والمهتمين بالمعرض"
           actions={canCreate && (
-            <button
+            <ActivityGate element="new-lead"><button
               onClick={() => setModalOpen(true)}
               className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary text-white rounded-xl text-sm font-semibold transition shrink-0 self-start sm:self-auto"
             >
               <Plus className="w-4 h-4" /> إضافة {newLeadLabel}
-            </button>
+            </button></ActivityGate>
           )}
         />
       </div>

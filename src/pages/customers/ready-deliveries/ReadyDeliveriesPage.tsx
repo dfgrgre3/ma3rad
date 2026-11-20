@@ -6,6 +6,7 @@ import { CustomerSupplyService, CustomerSupplyRequest } from '../../../services/
 import { formatProductQuantity, getProductUnitLabel } from '../../../utils/products/productUnits';
 import { normalizeWhatsAppPhone, openWhatsAppChat } from '../../../utils/shared/externalLinks';
 import { usePermission } from '../../../hooks/domains/auth/usePermission';
+import { ActivityGate } from '../../../components/ui/ActivityGate';
 
 const fmt = (n: number) => new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 2 }).format(Number(n) || 0);
 
@@ -90,7 +91,7 @@ export const ReadyDeliveriesPage: React.FC = () => {
             { key: 'price', header: 'السعر / الوحدة', render: (item: any) => `${fmt(item.unitPrice)} ج / ${getProductUnitLabel(item)}` },
           ]}
         /></div>
-        <div className="px-5 py-3 bg-surface-muted/70 flex flex-wrap justify-between items-center gap-3"><div className="text-xs text-ink-secondary">المخزن: <b>{request.warehouseName || '—'}</b></div><button onClick={() => shareReadyDelivery(request)} disabled={!normalizeWhatsAppPhone(request.phone || '')} title={!normalizeWhatsAppPhone(request.phone || '') ? 'لا يوجد رقم هاتف صحيح للعميل' : 'فتح محادثة العميل على واتساب'} className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-success hover:bg-success disabled:bg-surface-sunken text-white text-xs font-bold"><MessageCircle className="w-4 h-4"/>إرسال واتساب</button></div>
+        <div className="px-5 py-3 bg-surface-muted/70 flex flex-wrap justify-between items-center gap-3"><div className="text-xs text-ink-secondary">المخزن: <b>{request.warehouseName || '—'}</b></div><ActivityGate element="deliver"><button onClick={() => shareReadyDelivery(request)} disabled={!normalizeWhatsAppPhone(request.phone || '')} title={!normalizeWhatsAppPhone(request.phone || '') ? 'لا يوجد رقم هاتف صحيح للعميل' : 'فتح محادثة العميل على واتساب'} className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-success hover:bg-success disabled:bg-surface-sunken text-white text-xs font-bold"><MessageCircle className="w-4 h-4"/>إرسال واتساب</button></ActivityGate></div>
       </article>)}
       {!loading && rows.length === 0 && <div className="bg-surface border border-dashed border-line-strong rounded-2xl p-12 text-center text-muted">لا توجد طلبات جاهزة للتسليم حاليًا</div>}
     </main>

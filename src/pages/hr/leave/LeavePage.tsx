@@ -1,11 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { DataTable } from '../../../components/ui/DataTable';
 import { PageHeader } from '../../../components/ui/PageHeader';
+import { ActivityGate } from '../../../components/ui/ActivityGate';
 import { CalendarDays, Check, Loader2, Plus, RefreshCw, X } from 'lucide-react';
 import { LeaveService } from '../../../services/domains/hr/LeaveService';
 import { EmployeeService } from '../../../services/domains/hr/EmployeeService';
 import { usePermission } from '../../../hooks/domains/auth/usePermission';
 import { useToast } from '../../../components/ui/Toast';
+import { useBusinessTerm } from '../../../hooks/domains/config/useBusinessTerm';
 import type { EmployeeLeaveRequest, LeaveStatus, LeaveType } from '../../../types/hr/leave';
 import type {
   AnnualLeaveAccrualPolicyState,
@@ -51,6 +53,7 @@ const nextMonth = new Date(today.getFullYear(), today.getMonth() + 1, 1);
 const nextMonthPeriod = `${nextMonth.getFullYear()}-${String(nextMonth.getMonth() + 1).padStart(2, '0')}`;
 
 export const LeavePage: React.FC = () => {
+  const newLeaveLabel = useBusinessTerm('actions.newLeaveRequest');
   const service = useMemo(() => new LeaveService(), []);
   const toast = useToast();
   const can = usePermission();
@@ -300,12 +303,12 @@ export const LeavePage: React.FC = () => {
             <RefreshCw className="h-4 w-4" />
           </button>
           {canRequest && (
-            <button
+            <ActivityGate element="new-request"><button
               className="flex items-center gap-1 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-white"
               onClick={() => setShowForm((value) => !value)}
             >
-              <Plus className="h-4 w-4" /> طلب إجازة
-            </button>
+              <Plus className="h-4 w-4" /> {newLeaveLabel}
+            </button></ActivityGate>
           )}
         </>}
       />

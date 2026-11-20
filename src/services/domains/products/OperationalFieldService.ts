@@ -1,4 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
+import { isFieldRequiredByActivity } from '../../../config/activityDocumentSpec';
+import { getEffectiveBusinessType } from '../config/BusinessTypeService';
 import { DatabaseManager } from '../../../database/repositories/databaseManager';
 import { AuthService } from '../auth/AuthService';
 import { PermissionService } from '../auth/PermissionService';
@@ -26,6 +28,8 @@ export interface OperationalFieldDefinition extends DynamicAttributeDefinition {
   entityType: string;
   code: string;
   sortOrder: number;
+  /** Mandatory for the current activity when creating a record (display hint). */
+  requiredByActivity?: boolean;
   values: OperationalFieldOption[];
 }
 
@@ -110,6 +114,7 @@ export class OperationalFieldService {
       ...definition,
       isRequired: Boolean(definition.isRequired),
       isFilterable: Boolean(definition.isFilterable),
+      requiredByActivity: isFieldRequiredByActivity(entityType, definition.code, getEffectiveBusinessType()),
       values: options.filter((option) => option.fieldId === definition.id)
         .map(({ id, value, label }: OperationalFieldOption) => ({ id, value, label })),
     }));
@@ -402,6 +407,13 @@ export class OperationalFieldService {
     });
   }
 
+  /** Definition-level flag, plus activity rules (enforced on create only). */
+  private isRequiredOn(definition: OperationalFieldDefinition, operation: 'create' | 'update'): boolean {
+    if (definition.isRequired) return true;
+    return operation === 'create'
+      && isFieldRequiredByActivity(definition.entityType, definition.code, getEffectiveBusinessType());
+  }
+
   public setRecordValues(
     entityType: string,
     recordId: string,
@@ -442,7 +454,7 @@ export class OperationalFieldService {
       }
     }
     for (const definition of definitions) {
-      if (definition.isRequired && !effectiveValues[definition.id]) {
+      if (this.isRequiredOn(definition, operation) && !effectiveValues[definition.id]) {
         throw new Error(`الحقل «${definition.name}» مطلوب.`);
       }
     }
@@ -500,7 +512,7 @@ export class OperationalFieldService {
       else effectiveValues[fieldId] = normalized;
     }
     for (const definition of definitions) {
-      if (definition.isRequired && !effectiveValues[definition.id]) {
+      if (this.isRequiredOn(definition, operation) && !effectiveValues[definition.id]) {
         throw new Error(`الحقل «${definition.name}» مطلوب.`);
       }
     }

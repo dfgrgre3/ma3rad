@@ -6,6 +6,7 @@ import { CeramicMath } from '../../utils/products/ceramicMath';
 import { getProductUnitLabel } from '../../utils/products/productUnits';
 import { round, gradeLabel } from './productFormModel';
 import type { OperationalFieldDefinition } from '../../services/domains/products/OperationalFieldService';
+import { useActivityPathHidden } from '../../hooks/domains/config/useActivityUi';
 
 export interface ProductsTableProps {
   products: Product[];
@@ -58,6 +59,7 @@ export const ProductsTable: React.FC<ProductsTableProps> = ({
   onToggleActive,
   onDelete,
 }) => {
+  const barcodesHidden = useActivityPathHidden('/products/barcodes');
   const columns: DataTableColumn<Product>[] = [];
 
   if (canExportProducts || canDeleteProduct) {
@@ -231,7 +233,7 @@ export const ProductsTable: React.FC<ProductsTableProps> = ({
           {canAdjustInventory && <button type="button" onClick={() => onOpenStock(product)} className="rounded-lg p-1.5 text-muted transition hover:bg-success-soft hover:text-success" title="إضافة كمية للمخزون" aria-label={`إضافة كمية للمخزون: ${product.name}`}><PackagePlus className="h-4 w-4" /></button>}
           {canUpdateProduct && <button type="button" onClick={() => onOpenEdit(product)} className="rounded-lg p-1.5 text-muted transition hover:bg-surface-sunken" title="تعديل" aria-label={`تعديل ${product.name}`}><Edit className="h-4 w-4" /></button>}
           {canCreateProduct && <button type="button" onClick={() => onDuplicate(product)} className="rounded-lg p-1.5 text-muted transition hover:bg-accent-soft hover:text-primary" title="نسخ الصنف" aria-label={`نسخ ${product.name}`}><Copy className="h-4 w-4" /></button>}
-          {canExportProducts && <button type="button" onClick={onOpenBarcodes} className="rounded-lg p-1.5 text-muted transition hover:bg-accent-soft hover:text-primary" title="طباعة باركود" aria-label={`طباعة باركود ${product.name}`}><Barcode className="h-4 w-4" /></button>}
+          {canExportProducts && !barcodesHidden && <button type="button" onClick={onOpenBarcodes} className="rounded-lg p-1.5 text-muted transition hover:bg-accent-soft hover:text-primary" title="طباعة باركود" aria-label={`طباعة باركود ${product.name}`}><Barcode className="h-4 w-4" /></button>}
           {canDeleteProduct && <button type="button" onClick={() => onToggleActive(product)} className={`rounded-lg p-1.5 transition ${product.isActive ? 'text-muted hover:bg-warning-soft hover:text-warning' : 'text-success hover:bg-success-soft'}`} title={product.isActive ? 'إيقاف الصنف' : 'تفعيل الصنف'} aria-label={`${product.isActive ? 'إيقاف' : 'تفعيل'} ${product.name}`}><Power className="h-4 w-4" /></button>}
           {canDeleteProduct && <button type="button" onClick={() => onDelete(product.id)} className="rounded-lg p-1.5 text-muted transition hover:bg-danger-soft hover:text-danger" title="حذف" aria-label={`حذف ${product.name}`}><Trash2 className="h-4 w-4" /></button>}
         </div>

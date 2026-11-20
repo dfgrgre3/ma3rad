@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { CheckCircle2, ClipboardCheck, FileSignature, Plus, RefreshCw, Wrench } from 'lucide-react';
 import { PageHeader } from '../../../components/ui/PageHeader';
+import { ActivityGate } from '../../../components/ui/ActivityGate';
 import { Card, StatCard } from '../../../components/ui/Card';
 import { Button } from '../../../components/ui/Button';
 import { Modal } from '../../../components/ui/Modal';
@@ -111,7 +112,7 @@ export const WorkshopPage: React.FC = () => {
         icon={<Wrench className="w-6 h-6" />}
         actions={<div className="flex gap-2">
           <Button variant="secondary" size="sm" onClick={loadOrders} leadingIcon={<RefreshCw className="w-4 h-4" />}>تحديث</Button>
-          {canManage && <Button size="sm" onClick={() => { setOrderForm({ customerId: '', vehiclePlate: '', vehicleMake: '', vehicleModel: '', vehicleYear: '', vin: '', odometerKm: '', complaint: '', promisedDate: '' }); setOrderModal(true); }} leadingIcon={<Plus className="w-4 h-4" />}>أمر عمل جديد</Button>}
+          {canManage && <ActivityGate element="new-work-order"><Button size="sm" onClick={() => { setOrderForm({ customerId: '', vehiclePlate: '', vehicleMake: '', vehicleModel: '', vehicleYear: '', vin: '', odometerKm: '', complaint: '', promisedDate: '' }); setOrderModal(true); }} leadingIcon={<Plus className="w-4 h-4" />}>أمر عمل جديد</Button></ActivityGate>}
         </div>}
       />
 

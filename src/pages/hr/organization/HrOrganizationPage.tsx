@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Building2, GitBranch, Briefcase, Wallet, MoveRight, Activity, RefreshCw } from 'lucide-react';
 import { EmployeeOrganizationService, EmployeeDepartment, EmployeeJobTitle, EmployeeJobGrade, EmployeeCostCenter, EmployeeTransfer, EmployeeLifecycleEvent, DepartmentNode } from '../../../services/domains/hr/EmployeeOrganizationService';
+import { resolveActivitySubTabs } from '../../../config/activityElementSpec';
 import { PageHeader } from '../../../components/ui/PageHeader';
 import { fmt } from '../../operations/payroll/payrollDisplay';
 import { useTabPermissions } from '../../../hooks/domains/auth/useTabPermissions';
@@ -240,7 +241,7 @@ export const HrOrganizationPage: React.FC = () => {
     { id: 'custody', label: 'العهد', icon: <Wallet className="h-4 w-4" /> },
     { id: 'probation', label: 'تقييم الاختبار', icon: <Activity className="h-4 w-4" /> },
   ];
-  const visibleTabs = tabs.filter((t) => canTab(t.id));
+  const visibleTabs = resolveActivitySubTabs(tabs.filter((t) => canTab(t.id)), '/hr/organization');
   const activeTab: Tab = canTab(tab) ? tab : (visibleTabs[0]?.id ?? tab);
 
   return (

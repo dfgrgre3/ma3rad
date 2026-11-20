@@ -2,6 +2,7 @@ import React from 'react';
 import { ArrowLeftRight, Plus, RefreshCw } from 'lucide-react';
 import type { StockTransfersHeaderProps } from '../../../../types/inventory/stockTransfers';
 import { PageHeader } from '../../../../components/ui/PageHeader';
+import { ActivityGate } from '../../../../components/ui/ActivityGate';
 
 export const StockTransfersHeader: React.FC<StockTransfersHeaderProps> = ({
   loading,
@@ -16,13 +17,13 @@ export const StockTransfersHeader: React.FC<StockTransfersHeaderProps> = ({
       description="طلب، اعتماد، تجهيز، إرسال، واستلام جزئي/كامل مع توثيق الفقد أو الرفض"
       actions={<>
         {canCreateTransfer && (
-          <button
+          <ActivityGate element="new-transfer"><button
             onClick={onCreateTransfer}
             className="flex items-center gap-2 px-4 py-2 rounded-xl bg-primary hover:bg-primary text-white text-xs font-black shadow-md shadow-primary/20 transition active:scale-95"
           >
             <Plus className="w-4 h-4" />
             طلب تحويل مخزني جديد
-          </button>
+          </button></ActivityGate>
         )}
 
         <button

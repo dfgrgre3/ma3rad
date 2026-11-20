@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { DataTable } from '../../../components/ui/DataTable';
 import { PageHeader } from '../../../components/ui/PageHeader';
+import { ActivityGate } from '../../../components/ui/ActivityGate';
 import { CalendarCheck, Clock3, Coffee, Download, FileUp, Loader2, Search, Settings2, ShieldCheck, Users } from 'lucide-react';
 import type { AttendanceStatus } from '../../../services/domains/hr/EmployeeService';
 import {
@@ -312,12 +313,12 @@ export const AttendancePage: React.FC = () => {
           title="الحضور والانصراف"
           description="سجل زمني، ورديات، استراحات وتصحيحات معتمدة"
           actions={tab === 'daily' && canManage && (
-            <button onClick={() => filtered.filter((employee) => !recordsByEmployee.has(employee.id)).forEach((employee) => {
+            <ActivityGate element="check-in"><button onClick={() => filtered.filter((employee) => !recordsByEmployee.has(employee.id)).forEach((employee) => {
               try { AttendanceService.saveManualRecord({ employeeId: employee.id, date, status: 'PRESENT' }); }
               catch (reason) { setError(reason instanceof Error ? reason.message : 'تعذر تسجيل الموظفين.'); }
             })} className="px-4 py-2 bg-success hover:bg-success text-white rounded-xl text-sm font-bold">
               تسجيل غير المسجلين حاضرين
-            </button>
+            </button></ActivityGate>
           )}
         />
       </div>

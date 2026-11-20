@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { DataTable } from '../../../components/ui/DataTable';
 import { PageHeader } from '../../../components/ui/PageHeader';
+import { ActivityGate } from '../../../components/ui/ActivityGate';
 import { Calendar, Printer, FileDown, Loader2, AlertTriangle, Wallet, Clock } from 'lucide-react';
 import { EmployeeService, PayrollRun, PayrollRunItem } from '../../../services/domains/hr/EmployeeService';
 import { AuthService } from '../../../services/domains/auth/AuthService';
@@ -202,9 +203,9 @@ export const PayslipsPage: React.FC = () => {
           icon={<Wallet className="h-5 w-5" />}
           title="كشوف المرتبات الشهرية"
           description="عرض وطباعة وتصدير كشوف رواتب الموظفين لكل فترة"
-          actions={run && <button onClick={exportPeriodCsv} className="flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-2 text-xs font-bold text-ink">
+          actions={run && <ActivityGate element="export"><button onClick={exportPeriodCsv} className="flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-2 text-xs font-bold text-ink">
             <FileDown className="w-3.5 h-3.5" /> تصدير الفترة CSV
-          </button>}
+          </button></ActivityGate>}
         />
       </div>
 

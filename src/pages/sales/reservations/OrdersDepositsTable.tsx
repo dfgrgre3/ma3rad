@@ -4,6 +4,7 @@ import { Receipt, DollarSign, ArrowUpRight, RotateCcw } from 'lucide-react';
 import type { Order, OrderDeposit } from '../../../services/domains/sales/OrderService';
 import { fmtCurrency } from './helpers';
 import { orderStatusBadges, orderStatusLabels } from './constants';
+import { ActivityGate } from '../../../components/ui/ActivityGate';
 
 interface OrdersDepositsTableProps {
   orders: Order[];
@@ -62,9 +63,11 @@ export const OrdersDepositsTable: React.FC<OrdersDepositsTableProps> = ({
                       ) : deposit.invoiceId ? (
                         <span>مسوّى بفاتورة</span>
                       ) : canRefund ? (
-                        <button type="button" onClick={() => onRefundDeposit(deposit)} className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-danger hover:bg-danger-soft dark:hover:bg-danger/40" title="رد العربون">
-                          <RotateCcw className="h-3 w-3" /> رد العربون
-                        </button>
+                        <ActivityGate element="deposit">
+                          <button type="button" onClick={() => onRefundDeposit(deposit)} className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-danger hover:bg-danger-soft dark:hover:bg-danger/40" title="رد العربون">
+                            <RotateCcw className="h-3 w-3" /> رد العربون
+                          </button>
+                        </ActivityGate>
                       ) : null}
                     </div>
                   ))}
@@ -103,10 +106,12 @@ export const OrdersDepositsTable: React.FC<OrdersDepositsTableProps> = ({
             render: (o: any) => (
               <div className="flex items-center justify-center gap-1.5">
                 {canCreate && o.status !== 'COMPLETED' && o.status !== 'CANCELLED' && (
-                  <button onClick={() => onRecordDeposit(o)} className="flex items-center gap-1 rounded-lg bg-success-soft px-2.5 py-1.5 text-xs font-bold text-success transition hover:bg-success-soft dark:bg-success/40 " title="تسجيل دفعة أو عربون">
-                    <DollarSign className="h-3.5 w-3.5" />
-                    عربون
-                  </button>
+                  <ActivityGate element="deposit">
+                    <button onClick={() => onRecordDeposit(o)} className="flex items-center gap-1 rounded-lg bg-success-soft px-2.5 py-1.5 text-xs font-bold text-success transition hover:bg-success-soft dark:bg-success/40 " title="تسجيل دفعة أو عربون">
+                      <DollarSign className="h-3.5 w-3.5" />
+                      عربون
+                    </button>
+                  </ActivityGate>
                 )}
                 {canInvoice && o.status !== 'COMPLETED' && o.status !== 'CANCELLED' && (
                   <button onClick={() => onConvertToInvoice(o)} className="flex items-center gap-1 rounded-lg bg-accent-soft px-2.5 py-1.5 text-xs font-bold text-primary transition hover:bg-accent-soft dark:bg-primary/40 " title="إصدار فاتورة مبيعات وخصم العربون">

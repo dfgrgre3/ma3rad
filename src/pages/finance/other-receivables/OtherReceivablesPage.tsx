@@ -7,6 +7,7 @@ import { BranchAccessService } from "../../../services/domains/auth/BranchAccess
 import { useToast } from "../../../components/ui/Toast";
 import { useBusinessTerm } from "../../../hooks/domains/config/useBusinessTerm";
 import { PageHeader } from "../../../components/ui/PageHeader";
+import { ActivityGate } from "../../../components/ui/ActivityGate";
 import { v4 as uuidv4 } from "uuid";
 import { exportToExcel, exportToPdf } from "../../../utils/export/export";
 import { unscaleMoneyRow } from "../../../utils/money";
@@ -386,22 +387,22 @@ export const OtherReceivablesPage: React.FC = () => {
           actions={<div className="flex gap-2">
             {canExport && (
               <>
-                <button
+                <ActivityGate element="export"><button
                   onClick={() => exportReport("excel")}
                   className="px-3 py-2 bg-success text-white rounded-xl text-sm"
                 >
                   جدول بيانات
-                </button>
-                <button
+                </button></ActivityGate>
+                <ActivityGate element="print"><button
                   onClick={() => exportReport("pdf")}
                   className="px-3 py-2 bg-primary text-white rounded-xl text-sm"
                 >
                   طباعة / مستند
-                </button>
+                </button></ActivityGate>
               </>
             )}
             {canCreate && (
-              <button
+              <ActivityGate element="new-receivable"><button
                 onClick={() => {
                   setSelectedId(null);
                   setNewFiles([]);
@@ -411,7 +412,7 @@ export const OtherReceivablesPage: React.FC = () => {
                 className="px-4 py-2 bg-primary text-white rounded-xl text-sm font-bold inline-flex gap-2"
               >
                 <Plus className="w-4 h-4" /> {newReceivableLabel}
-              </button>
+              </button></ActivityGate>
             )}
           </div>}
         />

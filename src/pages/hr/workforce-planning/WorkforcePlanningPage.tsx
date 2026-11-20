@@ -9,6 +9,7 @@ import {
   HiringRequisition, HiringRequisitionStatus,
 } from '../../../services/domains/hr/WorkforcePlanningService';
 import { EmployeeOrganizationService, EmployeeDepartment } from '../../../services/domains/hr/EmployeeOrganizationService';
+import { resolveActivitySubTabs } from '../../../config/activityElementSpec';
 import { PageHeader } from '../../../components/ui/PageHeader';
 import { BranchAccessService } from '../../../services/domains/auth/BranchAccessService';
 import { useTabPermissions } from '../../../hooks/domains/auth/useTabPermissions';
@@ -269,7 +270,7 @@ export const WorkforcePlanningPage: React.FC = () => {
     { id: 'requisitions', label: 'طلبات التوظيف', icon: <ClipboardList className="h-4 w-4" /> },
     { id: 'comparison', label: 'المخطط مقابل الفعلي', icon: <Scale className="h-4 w-4" /> },
   ];
-  const visibleTabs = tabs.filter((t) => canTab(t.id));
+  const visibleTabs = resolveActivitySubTabs(tabs.filter((t) => canTab(t.id)), '/hr/workforce-planning');
   const activeTab: Tab = canTab(tab) ? tab : (visibleTabs[0]?.id ?? tab);
 
   return (

@@ -2,6 +2,7 @@ import React from 'react';
 import type { Employee, EmployeeFormState } from '../../../types/hr/employeesPage';
 import type { OperationalFieldDefinition } from '../../../services/domains/products/OperationalFieldService';
 import { OperationalFieldsForm } from '../../../components/products/OperationalFieldsForm';
+import { useBusinessTerm } from '../../../hooks/domains/config/useBusinessTerm';
 
 interface EmployeeBranchOption {
   id: string;
@@ -73,6 +74,7 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
   onUpdateJobTitle,
   onDeactivateJobTitle,
 }) => {
+  const employeeSingular = useBusinessTerm('entities.employees.singular');
   if (!open) return null;
 
   return (
@@ -86,7 +88,7 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
         <header className="flex items-center justify-between border-b border-line bg-surface-muted px-5 py-4 sm:px-6">
           <div>
             <h2 id="employee-form-title" className="text-base font-black text-ink">
-              {editingEmployee ? 'تعديل بيانات العامل / الموظف' : 'إضافة عامل / موظف جديد'}
+              {editingEmployee ? `تعديل بيانات ${employeeSingular}` : `إضافة ${employeeSingular} جديد`}
             </h2>
             <p className="mt-1 text-xs text-muted">تُستخدم البيانات في سجل الموظفين والدوام والرواتب.</p>
           </div>
@@ -525,7 +527,7 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
               disabled={isSaving || !branches.length}
               className="rounded-lg bg-warning px-5 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-warning disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {isSaving ? 'جارٍ الحفظ...' : editingEmployee ? 'حفظ التغييرات' : 'إضافة الموظف'}
+              {isSaving ? 'جارٍ الحفظ...' : editingEmployee ? 'حفظ التغييرات' : `إضافة ${employeeSingular}`}
             </button>
           </footer>
         </form>

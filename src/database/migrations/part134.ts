@@ -1,5 +1,6 @@
 import type { Migration } from './support';
 import { tableExists, columnExists } from './support';
+import { withTableTriggersSuspended } from './triggerSuspend';
 
 interface MoneyColumnSpec { table: string; columns: string[]; }
 
@@ -31,6 +32,10 @@ const MONEY_TABLES: MoneyColumnSpec[] = [
 ];
 
 function convertTableColumns(db: any, table: string, columns: string[]): void {
+  withTableTriggersSuspended(db, table, () => convertTableColumnsInner(db, table, columns));
+}
+
+function convertTableColumnsInner(db: any, table: string, columns: string[]): void {
   if (!tableExists(db, table)) return;
 
   const createResult = db.exec(
@@ -106,11 +111,6 @@ function convertTableColumns(db: any, table: string, columns: string[]): void {
     [table]
   )[0]?.values || [];
 
-  const triggers = db.exec(
-    `SELECT name, sql FROM sqlite_master WHERE type = 'trigger' AND sql IS NOT NULL AND sql LIKE ?`,
-    [`%${table}%`]
-  )[0]?.values || [];
-
   db.exec(`DROP TABLE IF EXISTS "${tmp}"`);
   try {
     db.exec(newSql);
@@ -119,17 +119,10 @@ function convertTableColumns(db: any, table: string, columns: string[]): void {
   }
   db.exec(`INSERT INTO "${tmp}" SELECT * FROM "${table}"`);
 
-  for (const [triggerName] of triggers) {
-    db.exec(`DROP TRIGGER IF EXISTS "${String(triggerName)}"`);
-  }
-
   db.exec(`DROP TABLE "${table}"`);
   db.exec(`ALTER TABLE "${tmp}" RENAME TO "${table}"`);
 
   for (const [sql] of indexes) {
-    db.exec(String(sql));
-  }
-  for (const [, sql] of triggers) {
     db.exec(String(sql));
   }
 }

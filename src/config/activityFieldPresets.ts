@@ -97,6 +97,9 @@ export const ACTIVITY_FIELD_PRESETS: Record<string, ActivityFieldPreset[]> = {
     f('products', 'EXPIRY_DATE', 'تاريخ الصلاحية', 'DATE', { isFilterable: true }),
     f('products', 'BATCH_NUMBER', 'رقم التشغيلة', 'TEXT', { isFilterable: true }),
     f('products', 'STORAGE_ZONE', 'منطقة التخزين', 'TEXT'),
+    f('purchase_invoices', 'BATCH_NUMBER', 'رقم التشغيلة', 'TEXT', { isFilterable: true }),
+    f('purchase_invoices', 'EXPIRY_DATE', 'أقرب تاريخ صلاحية', 'DATE'),
+    f('purchase_orders', 'REQUIRED_DATE', 'تاريخ الاحتياج', 'DATE'),
   ],
   cosmetics: [
     f('customers', 'SKIN_TYPE', 'نوع البشرة', 'SELECT', { options: ['جافة', 'دهنية', 'مختلطة', 'حساسة'] }),
@@ -142,6 +145,11 @@ export const ACTIVITY_FIELD_PRESETS: Record<string, ActivityFieldPreset[]> = {
     f('purchase_invoices', 'INCOTERM', 'شرط التسليم الدولي', 'SELECT', { options: ['EXW', 'FOB', 'CIF', 'CFR', 'DDP', 'DAP'] }),
     f('purchase_invoices', 'COUNTRY_OF_ORIGIN', 'بلد المنشأ', 'TEXT'),
     f('purchase_invoices', 'SHIPPING_DOCUMENTS', 'مستندات الشحن', 'BOOLEAN'),
+    f('purchase_invoices', 'LETTER_OF_CREDIT', 'خطاب اعتماد', 'TEXT'),
+    f('purchase_orders', 'INCOTERM', 'شرط التسليم الدولي', 'SELECT', { options: ['EXW', 'FOB', 'CIF', 'CFR', 'DDP', 'DAP'] }),
+    f('purchase_orders', 'EXPECTED_SHIP_DATE', 'تاريخ الشحن المتوقع', 'DATE'),
+    f('purchase_orders', 'PORT_OF_LOADING', 'ميناء الشحن', 'TEXT'),
+    f('purchase_orders', 'CUSTOMS_BROKER', 'المخلص الجمركي', 'TEXT'),
   ],
   logistics: [
     f('customers', 'DELIVERY_ADDRESS', 'عنوان التسليم', 'TEXT'),
@@ -150,6 +158,11 @@ export const ACTIVITY_FIELD_PRESETS: Record<string, ActivityFieldPreset[]> = {
     f('orders', 'DELIVERY_WINDOW', 'نافذة التسليم', 'TEXT'),
     f('sales_invoices', 'PALLETS_COUNT', 'عدد البلاطات', 'NUMBER'),
     f('sales_invoices', 'DELIVERY_ADDRESS', 'عنوان التسليم', 'TEXT'),
+    f('purchase_invoices', 'FREIGHT_COST', 'تكلفة الشحن', 'NUMBER'),
+    f('purchase_invoices', 'SUPPLIER_DOC_NO', 'رقم مستند المورد', 'TEXT'),
+    f('purchase_orders', 'VEHICLE_PLATE', 'لوحة السيارة', 'TEXT'),
+    f('purchase_orders', 'DRIVER_NAME', 'اسم السائق', 'TEXT'),
+    f('purchase_orders', 'DELIVERY_WINDOW', 'نافذة التسليم', 'TEXT'),
   ],
 
   // ── Manufacturing ───────────────────────────────────────────────────
@@ -158,6 +171,13 @@ export const ACTIVITY_FIELD_PRESETS: Record<string, ActivityFieldPreset[]> = {
     f('products', 'PRODUCTION_UNIT', 'وحدة الإنتاج', 'TEXT'),
     f('orders', 'PRODUCTION_BATCH', 'تشغيلة الإنتاج', 'TEXT'),
     f('sales_invoices', 'QUALITY_CERTIFICATE', 'شهادة الجودة مرفقة', 'BOOLEAN'),
+    f('purchase_invoices', 'QC_STATUS', 'نتيجة فحص الجودة', 'SELECT', { options: ['مقبول', 'مرفوض', 'معلّق'] }),
+    f('purchase_invoices', 'WORK_ORDER_REF', 'مرجع أمر الشغل', 'TEXT'),
+    f('purchase_orders', 'PRODUCTION_ORDER', 'أمر الإنتاج', 'TEXT'),
+    f('purchase_orders', 'REQUIRED_DATE', 'تاريخ الاحتياج', 'DATE'),
+    f('projects', 'WORK_ORDER', 'أمر الشغل', 'TEXT'),
+    f('projects', 'PRODUCTION_BATCH', 'تشغيلة الإنتاج', 'TEXT'),
+    f('projects', 'QC_STATUS', 'حالة الجودة', 'SELECT', { options: ['قيد الفحص', 'مطابق', 'غير مطابق'] }),
   ],
 
   // ── Construction & real estate ──────────────────────────────────────
@@ -170,7 +190,14 @@ export const ACTIVITY_FIELD_PRESETS: Record<string, ActivityFieldPreset[]> = {
     f('projects', 'SITE_ADDRESS', 'موقع الموقع', 'TEXT'),
     f('projects', 'CONSULTANT_ENGINEER', 'استشاري المشروع', 'TEXT'),
     f('projects', 'CONTRACT_TYPE', 'نوع العقد', 'SELECT', { options: ['مقاولة عامة', 'مقاولة باطن', 'إشراف هندسي', 'توريد وتركيب'] }),
+    f('projects', 'PAYMENT_MILESTONE', 'مستحق الدفعة الحالية', 'TEXT'),
+    f('projects', 'PROGRESS_PERCENT', 'نسبة الإنجاز (%)', 'NUMBER'),
+    f('projects', 'SUPERVISOR', 'مشرف الموقع', 'TEXT'),
     f('purchase_orders', 'SUBCONTRACTOR', 'مقاول الباطن', 'TEXT'),
+    f('purchase_orders', 'PROJECT_PHASE', 'مرحلة المشروع', 'TEXT'),
+    f('purchase_orders', 'REQUIRED_DATE', 'تاريخ الاحتياج في الموقع', 'DATE'),
+    f('purchase_invoices', 'RETENTION_PERCENT', 'نسبة محتجزات', 'NUMBER'),
+    f('purchase_invoices', 'MEASUREMENT_NO', 'رقم مستخلص', 'TEXT'),
   ],
 
   // ── Automotive & transport ──────────────────────────────────────────
@@ -240,6 +267,89 @@ export const ACTIVITY_FIELD_PRESETS: Record<string, ActivityFieldPreset[]> = {
   ],
 };
 
+/**
+ * Presets for master-data entities beyond documents (leads, employees,
+ * vehicles, warehouses). Kept apart from the document presets above so each
+ * block stays readable; merged by `getActivityFieldPresets`.
+ */
+export const ACTIVITY_MASTER_FIELD_PRESETS: Record<string, ActivityFieldPreset[]> = {
+  ceramics: [
+    f('branches', 'SHOWROOM_AREA_M2', 'مساحة المعرض (م²)', 'NUMBER'),
+    f('leads', 'PROJECT_TYPE', 'نوع المشروع', 'SELECT', { options: ['سكني', 'تجاري', 'فيلا', 'تشطيب شقة'], isFilterable: true }),
+    f('leads', 'ESTIMATED_AREA_M2', 'المساحة التقديرية (م²)', 'NUMBER'),
+  ],
+  building_materials: [
+    f('leads', 'PROJECT_TYPE', 'نوع المشروع', 'TEXT', { isFilterable: true }),
+    f('vehicles', 'LOAD_CAPACITY_KG', 'حمولة المركبة (كجم)', 'NUMBER'),
+  ],
+  import_export: [
+    f('leads', 'TARGET_MARKET', 'السوق المستهدف', 'TEXT', { isFilterable: true }),
+    f('leads', 'EXPECTED_VOLUME', 'الحجم المتوقع', 'NUMBER'),
+    f('warehouses', 'BONDED', 'مخزن جمركي', 'BOOLEAN'),
+  ],
+  logistics: [
+    f('vehicles', 'LOAD_CAPACITY_KG', 'حمولة المركبة (كجم)', 'NUMBER'),
+    f('vehicles', 'LICENSE_EXPIRY', 'انتهاء رخصة المركبة', 'DATE'),
+    f('vehicles', 'INSURANCE_EXPIRY', 'انتهاء التأمين', 'DATE'),
+    f('employees', 'DRIVING_LICENSE_NO', 'رقم رخصة القيادة', 'TEXT'),
+    f('employees', 'DRIVING_LICENSE_EXPIRY', 'انتهاء رخصة القيادة', 'DATE'),
+    f('warehouses', 'BONDED', 'مخزن جمركي', 'BOOLEAN'),
+  ],
+  manufacturing: [
+    f('branches', 'FACTORY_LICENSE_NO', 'رقم ترخيص المصنع', 'TEXT'),
+    f('employees', 'PRODUCTION_LINE', 'خط الإنتاج', 'TEXT', { isFilterable: true }),
+    f('employees', 'SHIFT_PATTERN', 'نظام الوردية', 'SELECT', { options: ['صباحية', 'مسائية', 'ليلية', 'متناوبة'] }),
+    f('warehouses', 'STORES_RAW_MATERIAL', 'يخزّن خامات', 'BOOLEAN'),
+  ],
+  construction: [
+    f('employees', 'TRADE', 'الحرفة / التخصص', 'TEXT', { isFilterable: true }),
+    f('employees', 'ASSIGNED_SITE', 'موقع العمل الحالي', 'TEXT'),
+    f('vehicles', 'ASSIGNED_SITE', 'موقع العمل الحالي', 'TEXT'),
+    f('warehouses', 'SITE_STORE', 'مخزن موقع', 'BOOLEAN'),
+  ],
+  workshop: [
+    f('employees', 'TECH_SPECIALTY', 'تخصص الفني', 'TEXT', { isFilterable: true }),
+    f('vehicles', 'PLATE_NUMBER', 'رقم اللوحة', 'TEXT', { isFilterable: true }),
+    f('vehicles', 'LICENSE_EXPIRY', 'انتهاء رخصة المركبة', 'DATE'),
+  ],
+  food: [
+    f('warehouses', 'COLD_STORAGE', 'تخزين مبرّد', 'BOOLEAN'),
+    f('vehicles', 'REFRIGERATED', 'مركبة مبرّدة', 'BOOLEAN'),
+  ],
+  restaurant: [
+    f('branches', 'SEATING_CAPACITY', 'سعة الجلوس', 'NUMBER'),
+    f('employees', 'HEALTH_CARD_EXPIRY', 'انتهاء الكارنيه الصحي', 'DATE'),
+    f('warehouses', 'COLD_STORAGE', 'تخزين مبرّد', 'BOOLEAN'),
+  ],
+  hospitality: [
+    f('branches', 'ROOM_COUNT', 'عدد الغرف', 'NUMBER'),
+    f('employees', 'HEALTH_CARD_EXPIRY', 'انتهاء الكارنيه الصحي', 'DATE'),
+    f('employees', 'DEPARTMENT_SHIFT', 'وردية القسم', 'SELECT', { options: ['صباحية', 'مسائية', 'ليلية'] }),
+  ],
+  healthcare_admin: [
+    f('branches', 'FACILITY_LICENSE_NO', 'رقم ترخيص المنشأة', 'TEXT'),
+    f('employees', 'PROFESSIONAL_LICENSE_NO', 'رقم ترخيص المزاولة', 'TEXT'),
+    f('employees', 'PROFESSIONAL_LICENSE_EXPIRY', 'انتهاء ترخيص المزاولة', 'DATE'),
+  ],
+  education: [
+    f('branches', 'STUDENT_CAPACITY', 'الطاقة الاستيعابية (طلاب)', 'NUMBER'),
+    f('employees', 'TEACHING_SUBJECT', 'المادة الدراسية', 'TEXT', { isFilterable: true }),
+    f('employees', 'GRADE_LEVELS', 'المراحل الدراسية', 'MULTI_SELECT', { options: ['ابتدائي', 'إعدادي', 'ثانوي', 'جامعي'] }),
+  ],
+  professional_services: [
+    f('employees', 'BILLING_RATE_HOURLY', 'سعر الساعة', 'NUMBER'),
+    f('leads', 'SERVICE_INTEREST', 'الخدمة المطلوبة', 'TEXT', { isFilterable: true }),
+  ],
+  services: [
+    f('leads', 'SERVICE_INTEREST', 'الخدمة المطلوبة', 'TEXT', { isFilterable: true }),
+  ],
+};
+
 export function getActivityFieldPresets(activityId: string): ActivityFieldPreset[] {
-  return ACTIVITY_FIELD_PRESETS[activityId] || [];
+  const documents = ACTIVITY_FIELD_PRESETS[activityId] || [];
+  const master = ACTIVITY_MASTER_FIELD_PRESETS[activityId] || [];
+  if (!master.length) return documents;
+  // (entityType, code) must stay unique: document presets win on a clash.
+  const seen = new Set(documents.map((p) => `${p.entityType}:${p.code}`));
+  return [...documents, ...master.filter((p) => !seen.has(`${p.entityType}:${p.code}`))];
 }

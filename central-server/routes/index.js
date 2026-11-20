@@ -22,6 +22,7 @@ const monitoringRoutes = require('./monitoring');
 const telemetryRoutes = require('./telemetry');
 const { adminRouter: releasesAdminRoutes, clientRouter: releasesClientRoutes } = require('./releases');
 const { adminRouter: appBackupsAdminRoutes, clientRouter: appBackupsClientRoutes } = require('./appBackups');
+const moduleRoutes = require('./modules');
 const adminExtraRoutes = require('./adminExtra');
 
 /**
@@ -53,6 +54,7 @@ function createApiRouter() {
   router.use('/', adminExtraRoutes);
   router.use('/telemetry', telemetryRoutes);
   router.use('/releases', releasesClientRoutes);
+  router.use('/modules', moduleRoutes);
   router.use('/device/backups', appBackupsClientRoutes);
   router.use('/', systemRoutes);
   router.use('/', configRoutes);

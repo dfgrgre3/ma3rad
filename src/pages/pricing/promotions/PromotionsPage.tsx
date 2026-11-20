@@ -5,7 +5,9 @@ import { localDateString } from '../../../utils/shared/date';
 import { usePermission } from '../../../hooks/domains/auth/usePermission';
 
 import { useToast } from '../../../components/ui/Toast';
+import { ActivityGate } from '../../../components/ui/ActivityGate';
 import { PageHeader } from '../../../components/ui/PageHeader';
+import { useBusinessTerm } from '../../../hooks/domains/config/useBusinessTerm';
 const TYPE_LABELS: Record<Promotion['promotionType'], string> = {
   PERCENTAGE: 'نسبة خصم %',
   FIXED_AMOUNT: 'خصم مبلغ ثابت',
@@ -24,6 +26,7 @@ const fmt = (n: number) => new Intl.NumberFormat('ar-EG').format(n) + ' ج';
 
 export const PromotionsPage: React.FC = () => {
   const toast = useToast();
+  const newPromotionLabel = useBusinessTerm('actions.newPromotion');
   const service = new PricingService();
   const canManage = usePermission()('promotions.manage');
   const [promotions, setPromotions] = useState<Promotion[]>([]);
@@ -116,9 +119,9 @@ export const PromotionsPage: React.FC = () => {
           title="العروض الترويجية والخصومات"
           description="إنشاء وجدولة الحملات الترويجية والخصومات الموسمية للمعارض"
           actions={canManage && (
-            <button onClick={() => setModalOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-warning hover:bg-warning text-white rounded-xl text-sm font-semibold transition shrink-0">
-              <Plus className="w-4 h-4" /> إنشاء عرض جديد
-            </button>
+            <ActivityGate element="new-promotion"><button onClick={() => setModalOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-warning hover:bg-warning text-white rounded-xl text-sm font-semibold transition shrink-0">
+              <Plus className="w-4 h-4" /> {newPromotionLabel}
+            </button></ActivityGate>
           )}
         />
       </div>

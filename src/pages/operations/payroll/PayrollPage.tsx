@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Wallet, Loader2, Trash2, Users, Banknote, Calculator, CheckCircle2, FileDown, Printer, LockKeyhole } from 'lucide-react';
 import { PageHeader } from '../../../components/ui/PageHeader';
+import { ActivityGate } from '../../../components/ui/ActivityGate';
 import { EmployeeService, Employee, PayrollTransaction, PayrollTxType, PayrollRun, PayrollRunItem, PayrollPayOptions, PayrollPaymentMethod, PayrollPaymentReconciliation } from '../../../services/domains/hr/EmployeeService';
 import { AuthService } from '../../../services/domains/auth/AuthService';
 import { PermissionService } from '../../../services/domains/auth/PermissionService';
@@ -231,21 +232,21 @@ export const PayrollPage: React.FC = () => {
                   <label className="text-xs font-bold text-ink-secondary">فترة الرواتب
                     <input type="month" value={period} onChange={(event) => setPeriod(event.target.value)} className="mr-2 rounded-lg border border-line bg-surface px-2 py-1.5 font-mono" />
                   </label>
-                  {canManagePayroll && <button onClick={calculateRun} disabled={saving || (run !== null && run.status !== 'DRAFT')} className="flex items-center gap-1 rounded-lg bg-primary px-3 py-2 text-xs font-bold text-white disabled:opacity-50">
+                  {canManagePayroll && <ActivityGate element="calculate"><button onClick={calculateRun} disabled={saving || (run !== null && run.status !== 'DRAFT')} className="flex items-center gap-1 rounded-lg bg-primary px-3 py-2 text-xs font-bold text-white disabled:opacity-50">
                     <Calculator className="h-3.5 w-3.5" /> {run ? 'إعادة الاحتساب' : 'احتساب الرواتب'}
-                  </button>}
-                  {run && <button onClick={exportRun} className="flex items-center gap-1 rounded-lg border border-line bg-surface px-3 py-2 text-xs font-bold text-ink">
+                  </button></ActivityGate>}
+                  {run && <ActivityGate element="export"><button onClick={exportRun} className="flex items-center gap-1 rounded-lg border border-line bg-surface px-3 py-2 text-xs font-bold text-ink">
                     <FileDown className="h-3.5 w-3.5" /> تصدير CSV
-                  </button>}
+                  </button></ActivityGate>}
                   {canManagePayroll && <button onClick={() => setTaxOpen(true)} className="flex items-center gap-1 rounded-lg border border-line bg-surface px-3 py-2 text-xs font-bold text-ink">
                     قواعد الضريبة
                   </button>}
-                  {run?.status === 'DRAFT' && canApprovePayroll && <button onClick={approveRun} disabled={saving || run.items.some((item) => item.netAmount < 0)} className="flex items-center gap-1 rounded-lg bg-success px-3 py-2 text-xs font-bold text-white disabled:opacity-50">
+                  {run?.status === 'DRAFT' && canApprovePayroll && <ActivityGate element="approve"><button onClick={approveRun} disabled={saving || run.items.some((item) => item.netAmount < 0)} className="flex items-center gap-1 rounded-lg bg-success px-3 py-2 text-xs font-bold text-white disabled:opacity-50">
                     <CheckCircle2 className="h-3.5 w-3.5" /> اعتماد الكشف
-                  </button>}
-                  {run?.status === 'APPROVED' && canApprovePayroll && <button onClick={payRun} disabled={saving} className="flex items-center gap-1 rounded-lg bg-primary px-3 py-2 text-xs font-bold text-white disabled:opacity-50">
+                  </button></ActivityGate>}
+                  {run?.status === 'APPROVED' && canApprovePayroll && <ActivityGate element="pay"><button onClick={payRun} disabled={saving} className="flex items-center gap-1 rounded-lg bg-primary px-3 py-2 text-xs font-bold text-white disabled:opacity-50">
                     <Banknote className="h-3.5 w-3.5" /> صرف جماعي
-                  </button>}
+                  </button></ActivityGate>}
                   {run?.status === 'PAID' && canApprovePayroll && <button onClick={closeRun} disabled={saving} className="flex items-center gap-1 rounded-lg bg-primary px-3 py-2 text-xs font-bold text-white disabled:opacity-50">
                     <LockKeyhole className="h-3.5 w-3.5" /> إغلاق الفترة
                   </button>}

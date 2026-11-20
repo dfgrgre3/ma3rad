@@ -12,6 +12,7 @@ import {
   History,
 } from 'lucide-react';
 import { PageHeader } from '../../../components/ui/PageHeader';
+import { ActivityGate } from '../../../components/ui/ActivityGate';
 import { FinanceExtrasService, Cheque, ChequeType } from '../../../services/domains/finance/FinanceExtrasService';
 import { FinanceEnterpriseService } from '../../../services/domains/finance/FinanceEnterpriseService';
 import { AuthService } from '../../../services/domains/auth/AuthService';
@@ -222,12 +223,12 @@ export const ChequesPage: React.FC = () => {
           icon={<CreditCard className="h-5 w-5" />}
           title="إدارة ودورة حياة الشيكات"
           description="إيداع، تحصيل، ارتداد، إعادة تقديم، وربط تلقائي بالقيود المحاسبية"
-          actions={canManageCheques && <button
+          actions={canManageCheques && <ActivityGate element="new-cheque"><button
             onClick={openNew}
             className="flex items-center gap-2 px-4 py-2 bg-warning hover:bg-warning text-white rounded-xl text-sm font-bold transition shrink-0"
           >
             <Plus className="w-4 h-4" /> {newChequeLabel}
-          </button>}
+          </button></ActivityGate>}
         />
       </div>
 

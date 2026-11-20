@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Factory, Loader2, RefreshCw } from 'lucide-react';
 import { PageHeader } from '../../../components/ui/PageHeader';
+import { resolveActivitySubTabs } from '../../../config/activityElementSpec';
 import { ManufacturingService } from '../../../services/domains/manufacturing/ManufacturingService';
 import { ProductService } from '../../../services/domains/products/ProductService';
 import { BranchService } from '../../../services/domains/organization/BranchService';
@@ -201,7 +202,7 @@ export const ManufacturingPage: React.FC = () => {
       )}
 
       <div className="flex flex-wrap gap-1 border-b border-line">
-        {TABS.map((item) => (
+        {resolveActivitySubTabs(TABS.map((t) => ({ ...t, id: t.key })), '/manufacturing').map((item) => (
           <button
             key={item.key}
             onClick={() => setTab(item.key)}

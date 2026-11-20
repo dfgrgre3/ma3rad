@@ -121,6 +121,8 @@ async function build() {
     'gracefulShutdown.js',
     'autoUpdater.js',
     'safeStorageCompat.js',
+    'moduleDelivery.js',
+    'modulePackages.js',
     'security/crypto.js',
     'security/licenseValidator.js',
     'security/fileIntegrity.js',

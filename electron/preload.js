@@ -32,6 +32,12 @@ contextBridge.exposeInMainWorld('ceramisys', {
     clearCredential: () => ipcRenderer.invoke('central:clear-credential'),
     request: (request) => ipcRenderer.invoke('central:request', request),
   },
+  modules: {
+    status: () => ipcRenderer.invoke('modules:status'),
+    available: () => ipcRenderer.invoke('modules:available'),
+    install: (moduleId) => ipcRenderer.invoke('modules:install', moduleId),
+    remove: (moduleId) => ipcRenderer.invoke('modules:remove', moduleId),
+  },
   centralAppBackup: {
     status: () => ipcRenderer.invoke('central-app-backup:status'),
     list: () => ipcRenderer.invoke('central-app-backup:list'),

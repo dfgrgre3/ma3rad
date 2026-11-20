@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { DataTable } from '../../../components/ui/DataTable';
 import { PageHeader } from '../../../components/ui/PageHeader';
+import { ActivityGate } from '../../../components/ui/ActivityGate';
 import {
   BriefcaseBusiness, CalendarPlus, Clock3, FilePlus2, Loader2, Plus, RefreshCw,
   Search, UserRound, UserRoundCheck, Users, X,
@@ -9,6 +10,7 @@ import { Link } from 'react-router-dom';
 import { RecruitmentService } from '../../../services/domains/hr/RecruitmentService';
 import { usePermission } from '../../../hooks/domains/auth/usePermission';
 import { useToast } from '../../../components/ui/Toast';
+import { useBusinessTerm } from '../../../hooks/domains/config/useBusinessTerm';
 import { localDateString } from '../../../utils/shared/date';
 import type {
   RecruitmentCandidate,
@@ -116,6 +118,8 @@ function SummaryCard({ label, value, icon: Icon, tone }: {
 }
 
 export const RecruitmentPage: React.FC = () => {
+  const newJobLabel = useBusinessTerm('actions.newJobPosting');
+  const newCandidateLabel = useBusinessTerm('actions.newCandidate');
   const service = useMemo(() => new RecruitmentService(), []);
   const toast = useToast();
   const can = usePermission();
@@ -472,14 +476,14 @@ export const RecruitmentPage: React.FC = () => {
             <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
           </button>
           {canManage && (
-            <button
+            <ActivityGate element={tab === 'jobs' ? 'new-vacancy' : 'new-candidate'}><button
               type="button"
               className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-white hover:bg-primary"
               onClick={() => setShowForm((value) => !value)}
             >
               {showForm ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
-              {showForm ? 'إغلاق' : tab === 'jobs' ? 'وظيفة جديدة' : 'تسجيل مرشح'}
-            </button>
+              {showForm ? 'إغلاق' : tab === 'jobs' ? newJobLabel : newCandidateLabel}
+            </button></ActivityGate>
           )}
         </>}
       />
@@ -564,7 +568,7 @@ export const RecruitmentPage: React.FC = () => {
       {showForm && canManage && (
         tab === 'jobs' ? (
           <form onSubmit={submitJob} className="rounded-xl border border-line bg-surface p-4">
-            <h2 className="mb-4 font-bold text-ink">طلب احتياج وظيفي جديد</h2>
+            <h2 className="mb-4 font-bold text-ink">{newJobLabel}</h2>
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
               <label className="text-xs text-ink-secondary">المسمى الوظيفي *
                 <input required maxLength={120} className="mt-1 w-full rounded-lg border border-line px-3 py-2 text-sm" value={jobForm.title} onChange={(event) => setJobForm({ ...jobForm, title: event.target.value })} />
@@ -598,7 +602,7 @@ export const RecruitmentPage: React.FC = () => {
           </form>
         ) : (
           <form onSubmit={submitCandidate} className="rounded-xl border border-line bg-surface p-4">
-            <h2 className="mb-4 font-bold text-ink">تسجيل مرشح</h2>
+            <h2 className="mb-4 font-bold text-ink">{newCandidateLabel}</h2>
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
               <label className="text-xs text-ink-secondary">الوظيفة *
                 <select required className="mt-1 w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm" value={candidateForm.jobId} onChange={(event) => setCandidateForm({ ...candidateForm, jobId: event.target.value })}>

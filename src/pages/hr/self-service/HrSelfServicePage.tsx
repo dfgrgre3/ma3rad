@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { DataTable } from '../../../components/ui/DataTable';
+import { resolveActivitySubTabs } from '../../../config/activityElementSpec';
 import { PageHeader } from '../../../components/ui/PageHeader';
 import {
   UserRound, Wallet, CheckSquare, CalendarDays, ShieldAlert, GraduationCap,
@@ -118,7 +119,7 @@ export const HrSelfServicePage: React.FC = () => {
     { id: 'benefits', label: 'مزاياي وقروضي', icon: <Gift className="h-4 w-4" /> },
     { id: 'requests', label: 'طلباتي', icon: <Inbox className="h-4 w-4" /> },
   ];
-  const visibleTabs = tabs.filter((t) => canTab(t.id));
+  const visibleTabs = resolveActivitySubTabs(tabs.filter((t) => canTab(t.id)), '/hr/self-service');
   const activeTab: Tab = canTab(tab) ? tab : (visibleTabs[0]?.id ?? tab);
 
   return (

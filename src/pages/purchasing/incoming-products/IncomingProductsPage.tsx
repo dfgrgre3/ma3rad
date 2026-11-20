@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { DataTable } from '../../../components/ui/DataTable';
+import { ActivityGate } from '../../../components/ui/ActivityGate';
 import { PageHeader } from '../../../components/ui/PageHeader';
 import { CalendarDays, Check, ChevronDown, Clock3, PackageCheck, Search, Truck, Warehouse } from 'lucide-react';
 import { PurchaseOrderService, PurchaseOrderRow, PurchaseOrderItem } from '../../../services/domains/purchases/PurchaseOrderService';
@@ -114,7 +115,7 @@ export const IncomingProductsPage: React.FC = () => {
       <select value={statusFilter} onChange={(e)=>setStatusFilter(e.target.value)} className="border rounded-xl px-3 py-2 text-sm"><option value="ALL">كل الحالات</option><option value="SENT">مرسل</option><option value="CONFIRMED">مؤكد</option><option value="PARTIAL">استلام جزئي</option></select>
       <input aria-label="من موعد الوصول المتوقع" type="date" value={dateFrom} onChange={(e)=>setDateFrom(e.target.value)} className="border rounded-xl px-2 py-2 text-sm"/><input aria-label="إلى موعد الوصول المتوقع" type="date" value={dateTo} onChange={(e)=>setDateTo(e.target.value)} className="border rounded-xl px-2 py-2 text-sm"/>
       <button onClick={load} className="px-4 py-2 rounded-xl border border-line text-sm font-bold">تحديث</button>
-      <button onClick={()=>report('excel')} className="px-3 py-2 rounded-xl bg-success text-white text-sm">جدول بيانات</button><button onClick={()=>report('pdf')} className="px-3 py-2 rounded-xl bg-primary text-white text-sm">طباعة / مستند</button>
+      <ActivityGate element="export"><button onClick={()=>report('excel')} className="px-3 py-2 rounded-xl bg-success text-white text-sm">جدول بيانات</button></ActivityGate><ActivityGate element="print"><button onClick={()=>report('pdf')} className="px-3 py-2 rounded-xl bg-primary text-white text-sm">طباعة / مستند</button></ActivityGate>
     </div>
     <main className="flex-1 overflow-auto p-4 space-y-3">
       {filtered.map((order) => {
@@ -123,7 +124,7 @@ export const IncomingProductsPage: React.FC = () => {
         return <article key={order.id} className="bg-surface border border-line rounded-2xl overflow-hidden">
           <div className="px-5 py-4 flex flex-wrap items-center justify-between gap-3">
             <button className="text-right" onClick={() => setExpanded(expandedNow ? null : order.id)}><div className="font-black">أمر شراء {order.orderNumber} <ChevronDown className={`inline w-4 h-4 transition ${expandedNow ? 'rotate-180' : ''}`} /></div><div className="text-xs text-muted mt-1">المورد: {order.supplierName || '—'} · {order.supplierPhone || 'لا يوجد هاتف'} · {order.supplierAddress || 'لا يوجد عنوان'} · تاريخ الطلب: {order.date}</div></button>
-            <div className="flex flex-wrap items-center gap-3 text-xs text-ink-secondary"><span className="inline-flex items-center gap-1"><Warehouse className="w-3.5 h-3.5"/>{order.warehouseName || '—'}</span><span className="inline-flex items-center gap-1"><CalendarDays className="w-3.5 h-3.5"/>متوقع: {order.expectedDate || 'غير محدد'}</span><span className={`inline-flex items-center gap-1 font-bold ${overdue ? 'text-danger' : 'text-warning'}`}>{overdue ? <Clock3 className="w-3.5 h-3.5"/> : <Truck className="w-3.5 h-3.5"/>}{overdue ? 'متأخر' : order.status === 'PARTIAL' ? 'وصل جزئيًا' : 'بانتظار الوصول'}</span><button onClick={() => openReceipt(order)} className="inline-flex items-center gap-1 px-3 py-2 rounded-lg bg-success text-white font-bold"><Check className="w-4 h-4"/> تسجيل استلام</button></div>
+            <div className="flex flex-wrap items-center gap-3 text-xs text-ink-secondary"><span className="inline-flex items-center gap-1"><Warehouse className="w-3.5 h-3.5"/>{order.warehouseName || '—'}</span><span className="inline-flex items-center gap-1"><CalendarDays className="w-3.5 h-3.5"/>متوقع: {order.expectedDate || 'غير محدد'}</span><span className={`inline-flex items-center gap-1 font-bold ${overdue ? 'text-danger' : 'text-warning'}`}>{overdue ? <Clock3 className="w-3.5 h-3.5"/> : <Truck className="w-3.5 h-3.5"/>}{overdue ? 'متأخر' : order.status === 'PARTIAL' ? 'وصل جزئيًا' : 'بانتظار الوصول'}</span><ActivityGate element="new-receipt"><button onClick={() => openReceipt(order)} className="inline-flex items-center gap-1 px-3 py-2 rounded-lg bg-success text-white font-bold"><Check className="w-4 h-4"/> تسجيل استلام</button></ActivityGate></div>
           </div>
           <div className="overflow-x-auto"><DataTable
                 ariaLabel="أصناف الطلب الوارد"

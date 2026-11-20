@@ -15,6 +15,7 @@ import { Customer, SalesInvoice } from '../../../types';
 import { DocumentPreviewModal } from '../../../components/documents/DocumentPreviewModal';
 import { exportToExcel } from '../../../utils/export/export';
 import { CustomerStatementWhatsAppOptions } from '../../../components/sales/CustomerStatementWhatsAppOptions';
+import { ActivityGate } from '../../../components/ui/ActivityGate';
 
 const fmt = (n: number) =>
   new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 2 }).format(Number(n) || 0) + ' ج';
@@ -296,15 +297,21 @@ const StatementModal: React.FC<StatementModalProps> = ({ customer, canExport, on
                 <label className="text-xs font-semibold text-muted ">إلى:</label>
                 <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="px-3 py-2 rounded-xl border border-line-strong bg-surface-muted text-sm text-ink focus:outline-none focus:ring-2 focus:ring-primary" />
               </div>
-              <button onClick={handlePrint} className="flex items-center gap-1.5 px-4 py-2 rounded-xl border border-line-strong text-sm font-semibold text-ink-secondary hover:bg-surface-muted dark:hover:bg-primary transition-all">
-                <Printer className="w-3.5 h-3.5" />طباعة
-              </button>
-              {canExport && customer.phone && <button onClick={handleShareWhatsApp} className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-success hover:bg-success text-sm font-semibold text-white transition-all">
-                <MessageCircle className="w-3.5 h-3.5" />إرسال واتساب
-              </button>}
-              <button onClick={handleExport} className="flex items-center gap-1.5 px-4 py-2 rounded-xl border border-line-strong text-sm font-semibold text-ink-secondary hover:bg-surface-muted dark:hover:bg-primary transition-all">
-                <Download className="w-3.5 h-3.5" />جدول بيانات
-              </button>
+              <ActivityGate element="print">
+                <button onClick={handlePrint} className="flex items-center gap-1.5 px-4 py-2 rounded-xl border border-line-strong text-sm font-semibold text-ink-secondary hover:bg-surface-muted dark:hover:bg-primary transition-all">
+                  <Printer className="w-3.5 h-3.5" />طباعة
+                </button>
+              </ActivityGate>
+              {canExport && customer.phone && <ActivityGate element="send">
+                <button onClick={handleShareWhatsApp} className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-success hover:bg-success text-sm font-semibold text-white transition-all">
+                  <MessageCircle className="w-3.5 h-3.5" />إرسال واتساب
+                </button>
+              </ActivityGate>}
+              <ActivityGate element="export">
+                <button onClick={handleExport} className="flex items-center gap-1.5 px-4 py-2 rounded-xl border border-line-strong text-sm font-semibold text-ink-secondary hover:bg-surface-muted dark:hover:bg-primary transition-all">
+                  <Download className="w-3.5 h-3.5" />جدول بيانات
+                </button>
+              </ActivityGate>
             </div>
 
             {/* Summary Cards */}

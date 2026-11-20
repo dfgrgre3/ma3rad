@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { DataTable } from '../../../components/ui/DataTable';
+import { ActivityGate } from '../../../components/ui/ActivityGate';
 import { PageHeader } from '../../../components/ui/PageHeader';
 import { BookOpen, Search, Download } from 'lucide-react';
 import { DatabaseManager } from '../../../database/repositories/databaseManager';
@@ -260,7 +261,7 @@ export const StockLedgerPage: React.FC = () => {
             {entries.length} حركة
           </span>}
           actions={
-            <button
+            <ActivityGate element="export"><button
               type="button"
               onClick={exportLedger}
               disabled={!entries.length || !can('inventory.export')}
@@ -269,7 +270,7 @@ export const StockLedgerPage: React.FC = () => {
             >
               <Download className="w-3.5 h-3.5" />
               تصدير
-            </button>
+            </button></ActivityGate>
           }
         />
       </div>

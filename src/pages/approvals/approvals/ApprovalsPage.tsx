@@ -6,6 +6,7 @@ import { PermissionService } from '../../../services/domains/auth/PermissionServ
 import { SyncChangeApprovalsPanel } from '../../../components/sync/SyncChangeApprovalsPanel';
 import { useToast } from '../../../components/ui/Toast';
 import { PageHeader } from '../../../components/ui/PageHeader';
+import { ActivityGate } from '../../../components/ui/ActivityGate';
 
 const TYPE_CONFIG: Record<ApprovalType, { label: string; color: string }> = {
   DISCOUNT: { label: 'خصم استثنائي', color: 'text-warning bg-warning-soft border-warning-border' },
@@ -103,12 +104,12 @@ const ApprovalRequestCard: React.FC<ApprovalRequestCardProps> = ({
       <div className="flex items-center gap-2 shrink-0">
         {showActions ? (
           <>
-            {canApprove && <button onClick={() => onDecide(request, true)} className="px-3.5 py-2 bg-success hover:bg-success text-white rounded-lg text-xs font-bold transition flex items-center gap-1">
+            {canApprove && <ActivityGate element="approve"><button onClick={() => onDecide(request, true)} className="px-3.5 py-2 bg-success hover:bg-success text-white rounded-lg text-xs font-bold transition flex items-center gap-1">
               <Check className="w-3.5 h-3.5" /> موافقة
-            </button>}
-            {canReject && <button onClick={() => onDecide(request, false)} className="px-3.5 py-2 bg-danger-soft hover:bg-danger-soft text-danger border border-danger-border rounded-lg text-xs font-bold transition flex items-center gap-1">
+            </button></ActivityGate>}
+            {canReject && <ActivityGate element="reject"><button onClick={() => onDecide(request, false)} className="px-3.5 py-2 bg-danger-soft hover:bg-danger-soft text-danger border border-danger-border rounded-lg text-xs font-bold transition flex items-center gap-1">
               <X className="w-3.5 h-3.5" /> رفض
-            </button>}
+            </button></ActivityGate>}
             {canCancel && <button onClick={() => onCancel(request)} className="px-3 py-2 bg-surface-sunken text-ink-secondary rounded-lg text-xs font-bold" title="إلغاء الطلب">
               إلغاء
             </button>}

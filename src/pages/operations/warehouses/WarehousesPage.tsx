@@ -2,7 +2,8 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { Warehouse, Plus, Search, MapPin, Database, Loader2, X, AlertTriangle, Pencil, Power, Star, ArrowLeftRight } from 'lucide-react';
 import { OperationsService, WarehouseRow } from '../../../services/domains/operations/OperationsService';
 import { PageHeader } from '../../../components/ui/PageHeader';
-import { useActivityPageCopy } from '../../../hooks/domains/config/useBusinessTerm';
+import { ActivityGate } from '../../../components/ui/ActivityGate';
+import { useActivityPageCopy, useBusinessTerm } from '../../../hooks/domains/config/useBusinessTerm';
 import { AuthService } from '../../../services/domains/auth/AuthService';
 import { PermissionService } from '../../../services/domains/auth/PermissionService';
 import { CentralLimitGuard } from '../../../components/ui/CentralLimitGuard';
@@ -43,6 +44,7 @@ const formatQuantitiesByUnit = (quantities: Record<string, number>) => {
 
 export const WarehousesPage: React.FC = () => {
   const pageCopy = useActivityPageCopy('inventory');
+  const newWarehouseLabel = useBusinessTerm('actions.newWarehouse');
   const toast = useToast();
   const service = new OperationsService();
   const fieldService = new OperationalFieldService();
@@ -297,9 +299,9 @@ export const WarehousesPage: React.FC = () => {
           actions={
             <CentralLimitGuard metric="maxWarehouses">
               {canManage && (
-                <button onClick={openCreate} className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary text-white rounded-xl text-sm font-semibold transition shrink-0">
-                  <Plus className="w-4 h-4" /> إضافة مخزن جديد
-                </button>
+                <ActivityGate element="new-warehouse"><button onClick={openCreate} className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary text-white rounded-xl text-sm font-semibold transition shrink-0">
+                  <Plus className="w-4 h-4" /> {newWarehouseLabel}
+                </button></ActivityGate>
               )}
             </CentralLimitGuard>
           }
@@ -492,7 +494,7 @@ export const WarehousesPage: React.FC = () => {
         <div className="fixed inset-0 bg-primary/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-surface rounded-2xl border border-line shadow-2xl max-w-md w-full p-6">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-base font-extrabold text-ink">{editingWarehouse ? 'تعديل بيانات المخزن' : 'إضافة مخزن جديد'}</h3>
+              <h3 className="text-base font-extrabold text-ink">{editingWarehouse ? 'تعديل بيانات المخزن' : newWarehouseLabel}</h3>
               <button onClick={() => setModalOpen(false)} className="p-1.5 rounded-lg text-muted hover:bg-surface-sunken"><X className="w-4 h-4" /></button>
             </div>
             <form onSubmit={handleSaveWarehouse} className="space-y-3 text-xs">

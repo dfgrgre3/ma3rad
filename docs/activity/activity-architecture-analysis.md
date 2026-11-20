@@ -1,147 +1,165 @@
 # تحليل بنية الأنشطة (Activity Architecture)
 
 > Written for: مطوّر يعمل على المشروع ويريد معرفة الوضع الحالي قبل تنفيذ صفحات مستقلة لكل نشاط.
-> الحالة: تحليل قراءة فقط. لم يُعدَّل أي كود، ولم يُشغَّل التطبيق ولا الاختبارات.
+> الحالة: **محدّث** — يعكس طبقة تخصيص العناصر/الأزرار التي أُضيفت بعد النسخة السابقة.
+> ملاحظة: يوجد عمل غير مُلتزَم (uncommitted) كبير على نفس الميزة؛ راجع `git status` قبل أي تعديل.
 
 ---
 
 ## 1. نظرة عامة على المشروع
 
-- **الاسم:** `ceramisys-erp` (سيراميسيس) — نظام ERP مكتبي لمعارض السيراميك ومواد التشطيب، مبني على Electron + React + TypeScript + Vite.
-- **حجم الواجهة:** ~507 ملف `tsx` في `src/pages`، و~162 مساراً في `src/router`، و144 بنداً في القائمة الجانبية (`navigationGroups01/02.ts`).
-- **الخلفية المركزية:** `central-server/` (Express) مع تكامل مع Electron (`electron/`).
-- **قاعدة البيانات:** طبقة `src/database` مع ترحيلات (migrations) وschema مقسّمة.
+- **الاسم:** `ceramisys-erp` (سيراميسيس) — نظام ERP مكتبي، مبني على Electron + React + TypeScript + Vite.
+- **الخلفية المركزية:** `central-server/` (Express) للتراخيص والصلاحيات، وتكامل Electron في `electron/`.
+- **قاعدة البيانات:** طبقة `src/database` مع migrations مقسّمة (`part*.ts`).
+- **الحجم الفعلي (حالي):** ~589 ملفاً في `src/pages`، ~162 مساراً في `src/router/routesList.tsx`، ~144 بنداً في القائمة الجانبية.
 
 ---
 
-## 2. الأنشطة المدعومة حالياً
+## 2. الأنشطة المدعومة
 
-يوجد **9 عائلات نشاط** و**25 نشاطاً** معرّفة في `src/config/activityCatalog.ts`، كل نشاط مرتبط بملف تعريف (profile) في `src/config/business-profiles/*.json`.
+`src/config/activityCatalog.ts` يعرّف **9 عائلات و25 نشاطاً**، كل نشاط مرتبط بملف JSON في `src/config/business-profiles/` يحمل: الوحدات المفعّلة، التقارير، لوحة المعلومات، التنقل، قوالب الطباعة، الصلاحيات المقترحة، قواعد التسعير، وسير العمل.
 
-| العائلة | الأنشطة (معرّف ← الاسم) |
+| العائلة | الأنشطة |
 |---|---|
-| التجارة والمعارض (retail) | ceramics (معرض سيراميك)، sanitary، furniture، home_appliances، electronics، clothing، food، cosmetics، automotive، building_materials، lighting، ecommerce، general |
-| التوزيع والاستيراد (distribution) | import_export، logistics |
-| التصنيع والإنتاج (manufacturing) | manufacturing |
-| المقاولات والعقارات (construction) | construction |
-| السيارات والنقل (transport) | workshop |
-| المطاعم والضيافة (hospitality) | hospitality، restaurant |
+| التجارة والمعارض (retail) | ceramics، sanitary، furniture، home_appliances، electronics، clothing، food، cosmetics، automotive، building_materials، lighting، ecommerce، general |
+| التوزيع (distribution) | import_export، logistics |
+| التصنيع (manufacturing) | manufacturing |
+| المقاولات (construction) | construction |
+| النقل/الصيانة (transport) | workshop |
+| الضيافة (hospitality) | hospitality، restaurant |
 | الصحة (healthcare) | healthcare_admin |
 | التعليم (education) | education |
 | الخدمات المهنية (professional_services) | professional_services، services، custom |
 
-**ملاحظة:** نشاط `custom` و`general` موجودان، لكن ليسا "نشاطاً" بالمعنى التجاري؛ قد يحتاجان قراراً منفصلاً.
+النشاط الافتراضي `ceramics` — **قرار مقصود**، لا يُغيَّر.
 
 ---
 
-## 3. الآليات الموجودة فعلاً (ما يعمل اليوم)
+## 3. طبقات التخصيص حسب النشاط (ما يعمل اليوم)
 
-النظام الحالي يطبّق تخصيص النشاط على **ثلاث طبقات**، كلٌّ منها جزئي:
+### 3.1 إخفاء الصفحات — `activityPageVisibility.ts`
+- `FAMILY_HIDDEN_PATHS`: مسارات مخفية لكل عائلة.
+- `ACTIVITY_HIDDEN_PATHS`: استثناءات إضافية لكل نشاط.
+- `ACTIVITY_EXCLUSIVE_PATHS`: مسارات حصرية لنشاط واحد (مثل `/ceramics`).
+- الإخفاء تراكمي، يدعم `*` لمطابقة مقطع واحد (مثلاً `/customers/*/imported-products`).
+- **نقاط التطبيق:** `RouteGuard.tsx` (تحويل إلى `/dashboard`)، `NavigationService.ts` (القائمة)، `activityHubTabs.ts`، `DashboardPage.tsx`، `ReceivablesHubPage.tsx`.
 
-### 3.1 إخفاء الصفحات — `src/config/activityPageVisibility.ts`
-- قواعد "إخفاء فقط" (additive-only): لكل عائلة قائمة مسارات مخفية (`FAMILY_HIDDEN_PATHS`)، ولكل نشاط استثناءات (`ACTIVITY_HIDDEN_PATHS`)، ومسارات حصرية لنشاط واحد (`ACTIVITY_EXCLUSIVE_PATHS`، مثل `/ceramics`).
-- تُطبَّق في: `NavigationService.ts` (القائمة الجانبية)، `RouteGuard.tsx` (حماية المسار)، `activityHubTabs.ts`، `DashboardPage.tsx`.
-- **القيد:** الإخفاء لا يُنشئ صفحة جديدة ولا يغيّر محتوى الصفحة؛ يزيل المسار فقط.
+### 3.2 الأزرار/التبويبات/العناصر داخل الصفحات — `activityElementSpec.ts` (الأحدث)
+- `PAGE_ELEMENT_RULES`: قواعد لـ**~131 مساراً** و~500 عنصر.
+- كل قاعدة عنصر تدعم:
+  - `hiddenFor` / `onlyFor`: إخفاء حسب نشاط أو عائلة.
+  - `hiddenPath` / `hiddenPaths`: إخفاء تلقائي مرتبط بإخفاء صفحة أخرى (زر "POS" يختفي إذا `/pos` مخفي).
+  - `labels`: إعادة تسمية العنصر حسب النشاط (نشاط يتقدم على عائلة).
+- `resolveElementRules`: يطابق المسار الدقيق ثم أقرب مسار أب — فصفحات `/customers/:id` ترث قواعد `/customers`.
+- دوال مساعدة: `resolveActivitySubTabs` (تبويبات داخلية غير مرتبطة بمسارات) و`resolveActivityTabs` (أي شريط تبويبات).
 
-### 3.2 تغيير المصطلحات والعناوين
-- `activityNavLabels.ts` (541 سطراً): تسميات بنود القائمة لكل نشاط.
-- `activityPathCopy_part01..04.ts`: عنوان ووصف كل مسار حسب النشاط/العائلة.
-- `activityPageCopy_activities.ts` و`activityPageCopy_families.ts`: نصوص صفحات الواجهات الرئيسية.
-- `businessTerminology_*.ts` + `terminology/profiles/*.json`: مصطلحات الكيانات (عميل/مورد/مشروع...).
-- `useBusinessTerm.ts`: خطاف (hook) يقرأ المصطلح حسب النشاط المختار.
-- **القيد:** النصوص تُستبدل فقط؛ الأزرار والحقول الداخلية لا تتغير إلا إذا كانت مربوطة بمفتاح ترجمة.
+### 3.3 التحكّمات بلا مسار — `activityUiRules.ts`
+`HIDDEN_CONTROLS` لإخفاء عناصر بلا صفحة مخصصة (مثل `products.barcode-labels`، `sales.promotions`، `inventory.expiry-batches`).
 
-### 3.3 لوحة المعلومات حسب النشاط — `src/config/activityDashboard.ts`
-- 34 تعيين لـ`ActivityDashboardKind` (ceramics، restaurant، hospitality، education، workshop، manufacturing، construction، professional، retail، distribution، generic).
-- لكل نوع لوحة مخصصة؛ معظم الأنشطة التجارية تشترك في لوحة `retail`.
-- مكوّنات اللوحة في `src/components/dashboard/activity/`.
+### 3.4 خطافات الوصول — `src/hooks/domains/config/useActivityUi.ts`
+- `useActivityPathHidden(path)` — المسار مخفي؟
+- `useActivityControlHidden(controlId)` — عنصر تحكم مخفي؟
+- `useActivityElement` / `useActivityElementHidden` / `useActivityElementLabel` / `useActivityElements` — حالة العنصر (ظهور + تسمية) على المسار الحالي.
+- `<ActivityGate>` (`src/components/ui/ActivityGate.tsx`) — wrapper يُخفي أبناءه حسب `path` أو `control` أو `element`.
 
-### 3.4 نمط الحقول (تنسيق فقط) — `src/config/activityFieldPresets.ts`
-- يحدد حقول المنتج/النموذج المقترحة لكل نشاط عبر `productAttributeDefinitions` في ملفات الـprofile.
-- **القيد:** الحقول المُعرَّفة تُضاف لنموذج المنتج، لكن النماذج الأخرى (فاتورة، أمر شراء...) لا تتغير حسب النشاط.
+### 3.5 الواجهة الموحّدة — `activitySpec.ts`
+`getActivitySpec(id)` يعيد كائناً واحداً لكل نشاط يجمّع: `hiddenPaths`، `isPathHidden`، `navLabel`، `pathCopy`، `element(s)`، `tabs`. لا يملك بيانات — يفوّض للمصادر الموجودة. مخصص للمراحل القادمة.
 
-### 3.5 التقارير — `ActivityReports.ts` (جديد وغير مُلتزَم)
-- الـprofiles تعرّف قائمة تقارير لكل نشاط: ceramics 16 تقريراً، general 13، ومطعم/إدارة صحية 5 لكل منهما (من فحص 5 ملفات فقط، لم تُفحص الـ25 كلها).
+### 3.6 التسميات والنصوص
+- `activityNavLabels.ts` (~541 سطراً): تسميات بنود القائمة.
+- `activityPathCopy_part01..04.ts`: عنوان/وصف كل مسار.
+- `activityPageCopy_activities.ts` + `activityPageCopy_families.ts`: نصوص صفحات الـhub (ترتيب الحل: نشاط ← عائلة ← الافتراضي).
+- `businessTerminology_*` + `terminology/profiles/*.json` + `useBusinessTerm`: مصطلحات الكيانات.
+- `posActivityCopy.ts`: نصوص نقطة البيع حسب النشاط.
 
----
+### 3.7 لوحة المعلومات — `activityDashboard.ts`
+~34 تعيين `ActivityDashboardKind` (ceramics، restaurant، hospitality، education، workshop، manufacturing، construction، professional، retail، distribution، generic). معظم الأنشطة التجارية تتشارك لوحة `retail`.
 
-## 4. مقارنة بالمتطلبات الثماني للمستخدم
-
-| # | المتطلب | الحالة | الفجوة |
-|---|---|---|---|
-| 1 | القائمة الجانبية تعرض صفحات النشاط فقط | **جزئي** | القائمة ثابتة (144 بنداً) وتُفلتر بالإخفاء، ولا تُبنى من تعريف النشاط. |
-| 2 | الصفحة الرئيسية تعرض مؤشرات النشاط | **موجود (جزئياً)** | لوحات متعددة الأنواع، لكن `retail` يخدم 12 نشاطاً تجارياً؛ ولم أتحقق من أن KPIs كل لوحة مختلفة فعلاً. |
-| 3 | صفحات داخلية مستقلة لكل نشاط | **غير موجود** | لا توجد صفحات مستقلة؛ الصفحة واحدة تُخفى أو تُعنوَن. مثال: إنتاج تحت تبويبات `ManufacturingPage` وليس صفحة مستقلة. |
-| 4 | الأزرار تتغير أسماؤها ووظائفها | **جزئي وغير متسق** | `SalesView.tsx:413` يحتوي زر "فاتورة جديدة (POS)" ثابتاً. وجدتُ 4 أزرار "جديد" ثابتة فقط في الفحص السريع، لكن لم يُجرَ حصر كامل. |
-| 5 | المصطلحات والعناوين تتغير | **موجود (الأقوى)** | الطبقة الأكثر نضجاً، لكن 76 ملف tsx ما زال يحتوي نصوصاً سيراميكية ثابتة. |
-| 6 | النماذج تتغير حقولها | **جزئي** | الحقول مرتبطة بالمنتج فقط عبر `productAttributeDefinitions`. |
-| 7 | صلاحيات حسب النشاط | **غير مؤكد** | لم أتحقق من `permissionMatrix.ts` بعمق؛ يحتاج فحصاً منفصلاً. |
-| 8 | تقارير حسب النشاط | **جزئي** | التقارير تُعرَّف في الـprofile، لكن قائمة التقارير في الواجهة لم تُفحص بالكامل. |
-
----
-
-## 5. المشكلات المكتشفة
-
-1. **النشاط الافتراضي هو `ceramics`** (`src/services/domains/config/BusinessTypeService.ts`). أي مستخدم لم يحفظ نشاطه يرى واجهة السيراميك. هذا يخالف فكرة "نشاط محايد" ويجب تحديد قرار صريح بشأنه.
-2. **مصدر الحقيقة مشتت:** تعريف النشاط موزّع على 5 مواقع على الأقل: `activityCatalog.ts`، `businessProfiles.ts`، `activityPageVisibility.ts`، `activityNavLabels.ts`، `activityPathCopy_*.ts`. تغيير نشاط واحد يتطلب تعديل عدة ملفات بالتزامن.
-3. **حجم الملفات المقسّمة بالأرقام** (`_part01..04`، `part-10..19`، `inline-087`) يجعل تتبع المنطق صعباً.
-4. **الإخفاء بدل التخصيص:** الاستثناءات تُضاف كقوائم مسارات، وأي مسار جديد يجب تذكّره في عدة قوائم.
-5. **تكرار القواعد:** قواعد النشاط الواحد (مثل `ceramics`) موزّعة بين `ACTIVITY_EXCLUSIVE_PATHS` و`ACTIVITY_KIND` و`ACTIVITY_TAB_LABELS`. لم أتحقق من تعارضها فعلياً؛ يلزم اختبار.
-6. **عمل غير مُلتزَم كبير:** تُظهر `git status` عشرات الملفات المعدّلة والجديدة المتعلقة بالأنشطة (مثل `activityDashboard.ts`، `activityHubTabs.ts`، `posActivityCopy.ts`، `ActivityDashboardService.ts`). **هذا العمل ليس في أي commit بعد**، ويجب التنسيق معه قبل إضافة تغييرات جديدة لتجنب التعارض.
-7. **اختبار التنقل:** `test/navigation-structure.test.ts` معدّل ومُلتزَم بعد؛ لم أشغّله، لذا لا أعرف إن كان يمر.
+### 3.8 الحقول والتقارير — `activityFieldPresets.ts` + ملفات الـprofile
+- `productAttributeDefinitions` تضيف حقولاً مقترحة لنموذج المنتج فقط.
+- `reports` في كل profile تعرّف تقارير النشاط (ceramics 16، general 13، مطعم/صحة 5 لكلٍّ — لم تُفحص الـ25 كلها).
 
 ---
 
-## 6. المراحل السبع — الوضع بعد التحليل التفصيلي
+## 4. التغطية الفعلية — أين نحن
 
-| المرحلة | الوصف | الحالة |
-|---|---|---|
-| 1 | تحليل المشروع وفهم مكوناته | **منجزة** (هذا الملف) |
-| 2 | استخراج الأنشطة | **منجزة**: 25 نشاطاً في 9 عائلات، ويبقى كما هو بقرار المستخدم |
-| 3 | خريطة صفحات لكل نشاط | **منجزة** لـ144 بنداً في القائمة: [docs/activity/activity-page-map.md](activity-page-map.md) |
-| 4 | وظيفة كل صفحة وزر وحقل | **جزئية**: الصفحات والبنود مُحصاة، لكن الأزرار والحقول داخل الصفحات لم تُحصَ بعد |
-| 5 | النصوص التي تتغير | **جزئية**: تسميات القائمة (15 بنداً) وعناوين الصفحات (84 مساراً) مُحصاة. النصوص الثابتة داخل الـ76 ملفاً تحتاج حصراً |
-| 6 | المشترك والخاص | **منجزة** كتصنيف: 110 مشترك، 27 جزئي، 7 خاص |
-| 7 | آلية التحويل الديناميكي | **تصميم مقترح** (القسم 7)، بدون تنفيذ |
+| الطبقة | التغطية |
+|---|---|
+| إخفاء الصفحات | **شامل** — كل المسارات عبر `RouteGuard` + `NavigationService` |
+| تسميات القائمة/عناوين الصفحات | واسع؛ `PageHeader` يطبّق `pathCopy` تلقائياً على أي عنوان نصي |
+| قواعد العناصر (أزرار/تبويبات) | ~131 مساراً بقواعد معرّفة؛ **كل مسار بقواعد غير فارغة رُبط الآن بمكوّناته** (11 دفعة تغطية: daily/purchases، customer-statement، orders-deposits+reservations، ceramics، shifts، fiscal-closing، cashier/cashboxes، ready-deliveries) |
+| ملفات تستخدم hooks/ActivityGate النشاط | لا يزال ~15% من الملفات، لكن **كل صفحة ذات قواعد عناصر مستهلكة** |
 
-### نتائج المحاكاة الجوهرية
-- كل نشاط يرى **127 إلى 134** بنداً من 144، أي أن القائمة تكاد تكون واحدة للجميع.
-- التجاري والصناعي يختلفان في **8 بنود** فقط في الظهور.
-- التسميات تختلف في **15 بنداً** فقط، لكن عناوين الصفحات تختلف في **84 مساراً**.
-
-## 7. تصميم التحويل الديناميكي (مقترح، لم يُنفَّذ)
-
-**المبدأ:** تعريف واحد لكل نشاط يحدد ما يظهر وكيف يُسمّى، ويُقرأ عند التحميل وعند تغيير النشاط دون حذف بيانات.
-
-**الشكل المقترح لتعريف النشاط (ملف واحد لكل نشاط):**
-- `family`: العائلة.
-- `navigation`: قائمة مرتبة بالبنود المرئية، لكل بند `path` و`label` و`order`، وبند بدون `path` يعني مجموعة.
-- `pageCopy`: عنوان ووصف كل صفحة.
-- `actions`: مفاتيح ترجمة للأزرار، مثل `sales.create` ← "فاتورة جديدة" أو "أمر إنتاج جديد".
-- `fields`: الحقول المطلوبة لكل نموذج (فاتورة، منتج، أمر).
-- `reports` و`dashboardKind`.
-
-**قواعد التحويل:**
-1. **لا حذف للبيانات:** تغيير النشاط يغيّر العرض فقط. البيانات المسجلة بنشاط آخر تبقى محفوظة وتظهر في التقارير العامة.
-2. **المتطلبات المشتركة تبقى مشتركة:** البنود المصنفة "مشترك" (110) لا تُعاد كتابتها لكل نشاط.
-3. **الصلاحيات تُفلتر بعد النشاط:** بند يظهر فقط إذا اجتاز نشاطه وصلاحية المستخدم معاً.
-4. **الاحتياط:** إن لم يوجد تعريف لنشاط، يُستخدم تعريف العائلة ثم `general`.
-
-**ترتيب التنفيذ المقترح:** 1) إضافة طبقة قراءة موحدة فوق المصادر الحالية دون تغيير السلوك، 2) نقل تسميات الـ84 مساراً إليها، 3) ربط الأزرار بمفاتيح ترجمة، 4) تغيير الحقول في النماذج الثلاثة الأولى (فاتورة، منتج، أمر)، 5) اختبارات تتحقق أن كل نشاط يرى قائمته المتوقعة.
-
-## 8. الخطوات المقترحة (بالترتيب)
-
-1. **تثبيت الوضع الحالي:** الالتزام (commit) لتغييرات الأنشطة المعلّقة أو تفريعها (branch) قبل أي عمل جديد.
-2. **النشاط الافتراضي `ceramics`:** مقصود بقرار المستخدم، لا يُغيَّر.
-3. **توحيد مصدر الحقيقة:** ملف واحد لكل نشاط (JSON) يحمل: العائلة، المسارات المرئية، تسميات القائمة، الأزرار، الحقول، التقارير، لوحة المعلومات. الملفات الحالية تُولَّد منه أو تُستبدل تدريجياً.
-4. **بناء القائمة الجانبية من تعريف النشاط** بدل الفلترة فقط، مع الإبقاء على `NAV_GROUPS` كمرجع للصلاحيات.
-5. **جرد الأزرار والنماذج الثابتة** (`grep` على النصوص العربية في `src/components` و`src/pages`) وربطها بمفاتيح ترجمة نشاط.
-6. **تحويل ديناميكي:** عند تغيير النشاط تُعاد تهيئة الإعدادات المعتمدة على النشاط فقط، مع حماية البيانات الموجودة (الأنشطة لا تحذف بيانات، تخفي فقط). لم أتحقق بعد من وجود آلية إعادة تحميل عند تغيير `businessType` في الواجهة.
+### صفحات بلا عناصر معلنة (لا تحتاج ربطاً)
+`/sales/cycle`، `/retail`، `/hr/dashboard`، `/hr/alerts`، payroll calendar/notification-settings، `/settings`، `/admin`، `/notifications`، `/finance/cash-forecast`، `/inventory/warehouse-stock`، `/inventory/showroom-stock`، `/customers/imported-products` — قواعدها `{}` فارغة أو عناصرها غير موجودة في الواجهة (أزرار قراءة فقط).
 
 ---
 
-## 9. قرارات تم حسمها
+## 5. الفجوات الجوهرية المتبقية
+
+1. **الوظائف لا تتغير فعلاً** — "فاتورة جديدة" تُسمّى "أمر إنتاج" للتصنيع لكنها تفتح نفس النموذج. لا توجد نماذج/سير عمل مختلفة لكل نشاط (فاتورة مقاولات ≠ فاتورة سوبرماركت في الحقول والمتطلبات). **الحل المقترح في القسم 7.3.**
+2. **العناصر داخل الصفحات المربوطة مغطاة الآن** — كل قاعدة غير فارغة في `PAGE_ELEMENT_RULES` مستهلكة عبر `ActivityGate`/hooks. ما تبقى هو إضافة قواعد *جديدة* لعناصر لم تُعلن بعد (أزرار ثانوية داخل الصفحات).
+3. **النماذج لا تتغير حقولها** إلا حقول المنتج؛ نماذج الفاتورة/الطلب/المشروع ثابتة.
+4. **مصدر الحقيقة مشتت** على ~8 ملفات config — إضافة نشاط تتطلب تعديل عدة أماكن بالتزامن.
+5. **عمل غير مُلتزَم ضخم** على نفس الميزة (`git status` يُظهر عشرات الملفات المعدّلة + migrations) — أي عمل جديد يجب أن يُبنى عليه أو يُنسَّق معه أولاً.
+
+---
+
+## 6. التصميم المقترح للتحويل الديناميكي
+
+**المبدأ:** نفس الصفحات، لكن كل عنصر (زر/حقل/تبويب/نص) يُقرأ من تعريف النشاط — بلا صفحات منفصلة وبلا حذف بيانات.
+
+### قاعدة البيانات المعرفية
+- `hiddenFor`/`onlyFor` على مستوى العنصر (موجود في `activityElementSpec`).
+- `hiddenPath` يربط إخفاء الزر بإخفاء صفحته الهدف تلقائياً — لا تكرار للقوائم.
+- ترتيب الحل: قاعدة النشاط ← قاعدة العائلة ← الافتراضي (نفس نمط `getActivityPageCopy`).
+
+### ما تبقى لتنفيذه
+1. **تغطية الصفحات المتبقية** — ربط ~500 ملف بالـhooks حيث يلزم (أولوية: daily، customers، reports، manufacturing، ثم sales/finance/inventory).
+2. **حقول النماذج حسب النشاط** — تعميم `productAttributeDefinitions` إلى نماذج الفاتورة/الطلب/المشروع عبر مفاتيح `activityFieldPresets`.
+3. **سير العمل حسب النشاط** — `workflows` في الـprofile موجودة كبنية؛ تحتاج ربطاً بالواجهة (خطوات إلزامية/اختيارية).
+4. **توحيد المصدر** — ملف واحد لكل نشاط (أو توليد الملفات الحالية منه) لتفادي التعديل المتزامن في 8 أماكن.
+5. **اختبارات** — `test/activity-ui.test.ts` و`activity-spec.test.ts` موجودان؛ تُضاف اختبارات تحقق أن كل نشاط يرى قائمته المتوقعة بعد كل دفعة تغطية.
+
+### ترتيب التنفيذ المقترح
+dفعات صغيرة لكل مجلد: (1) جرد الأزرار/النصوص الثابتة، (2) إضافة قواعد في `PAGE_ELEMENT_RULES`/`HIDDEN_CONTROLS`، (3) استبدال النص الثابت بمفتاح `labels`/مصطلح، (4) تشغيل `npm test`/lint للمجلد.
+
+---
+
+## 7. آلية تغيير الحقول/الوظائف لكل نشاط (تصميم)
+
+### 7.1 الحقول — موجودة وتعمل
+`activityFieldPresets.ts` (`ACTIVITY_FIELD_PRESETS`) يعرّف حقولاً مخصصة لكل نشاط على مستوى `entityType` (`customers`, `orders`, `sales_invoices`, `quotations`, `products`, `projects`, `suppliers`, `sales_returns`, `purchase_invoices`, `purchase_orders`). تُزرع idempotently في `operational_field_definitions` عند تطبيق الـprofile، وتُعرض عبر `OperationalFieldsForm/Filter/Chips/Summary` داخل نماذج العملاء والمنتجات والمشتريات والمبيعات والموردين.
+
+**الفجوة (تم تقليصها):** كانت `purchase_invoices` (3 حقول) و`purchase_orders` (1) شحيحة — أُضيفت حقول استيراد/جمارك ولوجستيات وتصنيع ومقاولات وأغذية (`INCOTERM`, `LETTER_OF_CREDIT`, `PORT_OF_LOADING`, `CUSTOMS_BROKER`, `FREIGHT_COST`, `VEHICLE_PLATE`, `DRIVER_NAME`, `QC_STATUS`, `WORK_ORDER_REF`, `RETENTION_PERCENT`, `MEASUREMENT_NO`, `BATCH_NUMBER`, `EXPIRY_DATE`...). بقي `employees`/`leads`/`vehicles`/`warehouses`/`branches` بلا presets — توسعة مستقبلية = صفوف `f(entityType, ...)` فقط.
+
+### 7.2 الوظائف/الأزرار — نمطان موجودان
+1. **إخفاء/تسمية عنصر داخل صفحة** — `PAGE_ELEMENT_RULES` + hooks (منفّذ).
+2. **سير عمل مستند** — `workflows` في ملفات الـprofile معرّفة كبنية وتُعرض كشارات في `ManufacturingPage`، لكن **لا تُفرض**: لا إلزام بترتيب خطوات ولا إخفاء زر تحويل حسب النشاط.
+
+### 7.3 `DOC_ELEMENT_RULES` — منفّذ ✅
+`src/config/activityDocumentSpec.ts` يطبّق نفس نمط `PAGE_ELEMENT_RULES` لكن بمفتاح = نوع المستند (`/doc/sales_invoice`, `/doc/sales_order`, `/doc/quotation`, `/doc/purchase_invoice`) — فيُطبَّق أينما عُرض المستند وليس داخل صفحة واحدة فقط. يدعم `hiddenFor`/`onlyFor`/`hiddenPath`/`labels`/`required`، ويُقرأ عبر `useDocElements(docPath)` / `useDocElementHidden` / `useDocElementLabel` في `useActivityUi.ts`.
+
+القواعد الأولى المفعّلة:
+- **فاتورة بيع:** `receipt-thermal` مخفي للمكاتب الخدمية (B2B)، `return` مخفي لغير البائعين للبضائع.
+- **عرض سعر:** `convert-to-order` مخفي للعائلات الخدمية؛ `send` له تسميات لكل نشاط («إرسال للضيف/للنزيل/للمريض/لولي الأمر»).
+- **أمر بيع:** `delivery` يتبع إخفاء `/deliveries` تلقائياً.
+- **فاتورة شراء:** `claim` مقصور على `import_export`/`logistics`/`manufacturing`.
+
+الربط تم في `SalesModals`، `QuotationModals`، `OrderDetailModal_part02`، `OrdersTable` — مع الحفاظ على شروط الصلاحيات (`canUpdate`/`canApprove`...) فتبقى طبقة الأمان كما هي.
+
+### 7.4 المتبقي
+1. ✅ زر الطباعة في `PurchasesView` مربوط بـ`/doc/purchase_invoice`. المتبقي: `PurchaseInvoiceModal` وباقي نماذج المستندات (مرتجعات/أوامر شراء) — لا تحتوي حالياً أزرار إجراءات مستندية.
+2. ✅ فرض الحقول المطلوبة حسب النشاط: `ACTIVITY_REQUIRED_FIELDS` + `isFieldRequiredByActivity` في `activityDocumentSpec.ts`، تُطبَّق في `OperationalFieldService` **عند الإنشاء فقط** (السجلات القديمة تبقى قابلة للتعديل). القواعد الحالية: import_export (INCOTERM)، logistics (VEHICLE_PLATE)، construction (CONTRACT_VALUE/SITE_ADDRESS للمشروع)، food (EXPIRY_DATE). علامة `*` في النموذج لا تظهر لها بعد — الرفض عند الحفظ برسالة.
+3. ✅ فرض `workflows` عبر `DOC_WORKFLOW_GATES`: التصنيع لا يصدر فاتورة من أمر قبل `READY`/`PARTIAL` (يُخفي الزر في `OrderDetailModal_part02` ويرفض في `convertToInvoice`). نشاط جديد = سطر واحد في الخريطة.
+4. ✅ presets لكيانات `employees`/`leads`/`vehicles`/`warehouses` في `ACTIVITY_MASTER_FIELD_PRESETS` (مدمجة في `getActivityFieldPresets`، مع `test/activity-field-presets-master.test.ts`). ويشمل `branches`.
+5. اختبارات: كل نشاط يرى أزرار مستنده المتوقعة — `test/activity-document-spec.test.ts` يغطي الدقة الحالية.
+
+---
+
+## 8. قرارات محسومة
 
 - النشاط الافتراضي `ceramics` مقصود.
-- نفس الصفحة بمحتوى ومصطلحات وأزرار مختلفة (لا صفحات منفصلة).
+- **نفس الصفحة بمحتوى ومصطلحات وأزرار مختلفة** — لا صفحات منفصلة.
 - الأنشطة الـ25 تبقى كما هي.
+- الإخفاء للعرض فقط — تغيير النشاط **لا يحذف بيانات**.

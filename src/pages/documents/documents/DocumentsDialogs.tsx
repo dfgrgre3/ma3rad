@@ -17,6 +17,7 @@ import {
   labelCls,
 } from './documentsShared';
 import type { ContractDraft, DocumentDraft, VersionDraft } from './documentsShared';
+import { useBusinessTerm } from '../../../hooks/domains/config/useBusinessTerm';
 
 interface DocumentEvent {
   id: string;
@@ -78,11 +79,14 @@ export const DocumentsDialogs: React.FC<DocumentsDialogsProps> = ({
   contractDraft,
   setContractDraft,
   submitContract,
-}) => (
+}) => {
+  const newDocumentLabel = useBusinessTerm('actions.newDocument');
+  const newContractLabel = useBusinessTerm('actions.newContract');
+  return (
   <>
 {/* Create document */}
 {createOpen && (
-  <Modal title="مستند جديد" onClose={() => setCreateOpen(false)}>
+  <Modal title={newDocumentLabel} onClose={() => setCreateOpen(false)}>
     <form onSubmit={submitDocument} className="space-y-3 text-xs">
       <div>
         <label className={labelCls}>الشركة *</label>
@@ -209,7 +213,7 @@ export const DocumentsDialogs: React.FC<DocumentsDialogsProps> = ({
 
 {/* Create contract */}
 {contractOpen && (
-  <Modal title="عقد جديد" onClose={() => setContractOpen(false)} wide>
+  <Modal title={newContractLabel} onClose={() => setContractOpen(false)} wide>
     <form onSubmit={submitContract} className="space-y-3 text-xs">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
         <div>
@@ -261,4 +265,5 @@ export const DocumentsDialogs: React.FC<DocumentsDialogsProps> = ({
   </Modal>
 )}
   </>
-);
+  );
+};

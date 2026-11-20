@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Target, ListChecks, Award, ClipboardList, TrendingUp, Gift } from 'lucide-react';
+import { resolveActivitySubTabs } from '../../../config/activityElementSpec';
 import { PageHeader } from '../../../components/ui/PageHeader';
 import { PerformanceService, PerformanceCycle, PerformanceKpi, PerformanceGoal, PerformanceEvaluation, PerformancePip, PerformanceReward } from '../../../services/domains/hr/PerformanceService';
 import { useTabPermissions } from '../../../hooks/domains/auth/useTabPermissions';
@@ -118,7 +119,7 @@ export const PerformancePage: React.FC = () => {
     { id: 'pips', label: 'خطط التحسين PIP', icon: <Award className="h-4 w-4" /> },
     { id: 'rewards', label: 'المكافآت', icon: <Gift className="h-4 w-4" /> },
   ];
-  const visibleTabs = tabs.filter((t) => canTab(t.id));
+  const visibleTabs = resolveActivitySubTabs(tabs.filter((t) => canTab(t.id)), '/hr/performance');
   const activeTab: Tab = canTab(tab) ? tab : (visibleTabs[0]?.id ?? tab);
 
   return (

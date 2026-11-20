@@ -8,6 +8,7 @@ import { formatProductQuantity } from '../../../utils/products/productUnits';
 import { PAY_LABEL } from './constants';
 import { sortIndicator, timeOf } from './helpers';
 import { StatusBadge } from './primitives';
+import { useActivityElementHidden, useActivityElementLabel } from '../../../hooks/domains/config/useActivityUi';
 import type { NumberFormatter, SortDir, SortKey } from '../../../types/dashboard/todayPurchases';
 
 export interface InvoicesPanelProps {
@@ -44,7 +45,14 @@ export const InvoicesPanel: React.FC<InvoicesPanelProps> = ({
   hasFilters, canCreate, canPay, canDelete, onClearFilters, onOpenQuickCreate,
   onPay, onDetails, onPrint, onDelete, sortKey, sortDir, onSort,
   page, pageCount, pageSize, onPageChange, onPageSizeChange, fmt, plain,
-}) => (
+}) => {
+  const payHidden = useActivityElementHidden('payment', '/daily/purchases');
+  const voidHidden = useActivityElementHidden('void', '/daily/purchases');
+  const printHidden = useActivityElementHidden('print', '/daily/purchases');
+  const detailsHidden = useActivityElementHidden('details', '/daily/purchases');
+  const quickHidden = useActivityElementHidden('quick-purchase', '/daily/purchases');
+  const quickLabel = useActivityElementLabel('quick-purchase', '/daily/purchases');
+  return (
   <div role="tabpanel" aria-label="فواتير التوريد">
     {filteredCount === 0 ? (
       <div className="flex flex-col items-center px-4 py-14 text-center">
@@ -55,9 +63,9 @@ export const InvoicesPanel: React.FC<InvoicesPanelProps> = ({
         <p className="mt-1 max-w-sm text-xs text-muted ">{rows.length === 0 ? 'ستظهر فواتير التوريد هنا فور تسجيلها، مع الأصناف وحالة السداد.' : 'غيّر كلمات البحث أو الفلاتر لعرض نتائج أخرى.'}</p>
         {hasFilters ? (
           <button type="button" onClick={onClearFilters} className="mt-4 rounded-lg border border-line px-3 py-2 text-xs font-bold text-ink hover:bg-surface-muted dark:hover:bg-primary">مسح الفلاتر</button>
-        ) : canCreate ? (
+        ) : canCreate && !quickHidden ? (
           <button type="button" onClick={onOpenQuickCreate} className="mt-4 inline-flex items-center gap-2 rounded-lg bg-warning px-4 py-2.5 text-xs font-bold text-white hover:bg-warning">
-            <Plus className="h-4 w-4" /> تسجيل أول فاتورة توريد
+            <Plus className="h-4 w-4" /> تسجيل أول {quickLabel ?? 'فاتورة توريد'}
           </button>
         ) : null}
       </div>
@@ -107,18 +115,22 @@ export const InvoicesPanel: React.FC<InvoicesPanelProps> = ({
                   </div>
                 )}
                 <div className="mt-2 flex items-center justify-end gap-1 border-t border-line pt-2 ">
-                  {canPay && row.remaining > 0 && (
+                  {canPay && !payHidden && row.remaining > 0 && (
                     <button type="button" onClick={() => onPay(row)} aria-label={`سداد للمورد عن الفاتورة ${row.invoiceNumber}`} className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-success hover:bg-success-soft dark:hover:bg-success">
                       <HandCoins className="h-4 w-4" />
                     </button>
                   )}
-                  <button type="button" onClick={() => onDetails(row.id)} aria-label={`تفاصيل الفاتورة ${row.invoiceNumber}`} className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-primary hover:bg-accent-soft dark:hover:bg-primary">
-                    <Eye className="h-4 w-4" />
-                  </button>
-                  <button type="button" onClick={() => onPrint(row)} aria-label={`طباعة الفاتورة ${row.invoiceNumber}`} className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-ink-secondary hover:bg-surface-sunken dark:hover:bg-primary">
-                    <Printer className="h-4 w-4" />
-                  </button>
-                  {canDelete && (
+                  {!detailsHidden && (
+                    <button type="button" onClick={() => onDetails(row.id)} aria-label={`تفاصيل الفاتورة ${row.invoiceNumber}`} className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-primary hover:bg-accent-soft dark:hover:bg-primary">
+                      <Eye className="h-4 w-4" />
+                    </button>
+                  )}
+                  {!printHidden && (
+                    <button type="button" onClick={() => onPrint(row)} aria-label={`طباعة الفاتورة ${row.invoiceNumber}`} className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-ink-secondary hover:bg-surface-sunken dark:hover:bg-primary">
+                      <Printer className="h-4 w-4" />
+                    </button>
+                  )}
+                  {canDelete && !voidHidden && (
                     <button type="button" onClick={() => onDelete(row)} aria-label={`حذف الفاتورة ${row.invoiceNumber}`} className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-danger hover:bg-danger-soft dark:hover:bg-danger">
                       <Trash2 className="h-4 w-4" />
                     </button>
@@ -172,9 +184,11 @@ export const InvoicesPanel: React.FC<InvoicesPanelProps> = ({
                       <div className="flex justify-between"><span className="text-muted ">طريقة السداد</span><span className="font-semibold">{PAY_LABEL[row.paymentType] || row.paymentType}</span></div>
                       <div className="flex justify-between"><span className="text-muted ">بواسطة</span><span className="font-semibold">{row.createdByName || '—'}</span></div>
                       {row.notes && <p className="border-t border-line pt-1.5 text-muted ">{row.notes}</p>}
-                      <button type="button" onClick={() => onPrint(row)} className="mt-1 inline-flex w-full items-center justify-center gap-1 rounded-md border border-line py-1.5 text-[10px] font-bold text-ink-secondary hover:bg-surface-muted dark:hover:bg-primary">
-                        <Printer className="h-3 w-3" /> طباعة الفاتورة
-                      </button>
+                      {!printHidden && (
+                        <button type="button" onClick={() => onPrint(row)} className="mt-1 inline-flex w-full items-center justify-center gap-1 rounded-md border border-line py-1.5 text-[10px] font-bold text-ink-secondary hover:bg-surface-muted dark:hover:bg-primary">
+                          <Printer className="h-3 w-3" /> طباعة الفاتورة
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -276,18 +290,22 @@ export const InvoicesPanel: React.FC<InvoicesPanelProps> = ({
                 key: 'actions', header: 'إجراءات',
                 render: (row) => (
                   <div className="flex items-center gap-1">
-                    {canPay && row.remaining > 0 && (
+                    {canPay && !payHidden && row.remaining > 0 && (
                       <button type="button" title="سداد للمورد" aria-label={`سداد للمورد عن الفاتورة ${row.invoiceNumber}`} onClick={() => onPay(row)} className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-success hover:bg-success-soft dark:hover:bg-success">
                         <HandCoins className="h-3.5 w-3.5" />
                       </button>
                     )}
-                    <button type="button" title="التفاصيل" aria-label={`تفاصيل الفاتورة ${row.invoiceNumber}`} onClick={() => onDetails(row.id)} className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-primary hover:bg-accent-soft dark:hover:bg-primary">
-                      <Eye className="h-3.5 w-3.5" />
-                    </button>
-                    <button type="button" title="طباعة" aria-label={`طباعة الفاتورة ${row.invoiceNumber}`} onClick={() => onPrint(row)} className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-ink-secondary hover:bg-surface-sunken dark:hover:bg-primary">
-                      <Printer className="h-3.5 w-3.5" />
-                    </button>
-                    {canDelete && (
+                    {!detailsHidden && (
+                      <button type="button" title="التفاصيل" aria-label={`تفاصيل الفاتورة ${row.invoiceNumber}`} onClick={() => onDetails(row.id)} className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-primary hover:bg-accent-soft dark:hover:bg-primary">
+                        <Eye className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                    {!printHidden && (
+                      <button type="button" title="طباعة" aria-label={`طباعة الفاتورة ${row.invoiceNumber}`} onClick={() => onPrint(row)} className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-ink-secondary hover:bg-surface-sunken dark:hover:bg-primary">
+                        <Printer className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                    {canDelete && !voidHidden && (
                       <button type="button" title="حذف" aria-label={`حذف الفاتورة ${row.invoiceNumber}`} onClick={() => onDelete(row)} className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-danger hover:bg-danger-soft dark:hover:bg-danger">
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>
@@ -324,4 +342,5 @@ export const InvoicesPanel: React.FC<InvoicesPanelProps> = ({
       </>
     )}
   </div>
-);
+  );
+};
