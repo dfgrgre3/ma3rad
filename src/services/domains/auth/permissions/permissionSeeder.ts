@@ -97,7 +97,9 @@ export class PermissionSeeder {
         `INSERT OR REPLACE INTO system_settings (key, value) VALUES (?, '1')`,
         [markerKey]
       );
-      PermissionSeeder.backfillPartnerPermissions(db, roleCode);
+      // شغّل نفس مجموعة الـ backfills التي تعمل عند الـ reconcile حتى لا تنتظر
+      // الأدوار المدمجة الإقلاع الثاني للحصول على الصلاحيات المشتقة.
+      PermissionSeeder.reconcileSeededRole(db, roleCode, defaults);
     }
   }
 

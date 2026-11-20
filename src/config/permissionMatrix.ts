@@ -318,6 +318,12 @@ const PAGES: PageSpec[] = [
     sections: [section('orders', 'طلبات المطعم'), section('tables', 'الطاولات'), section('menu', 'قائمة الطعام'), section('kitchen', 'شاشة المطبخ')] },
   { key: 'daily_sales', label: 'مبيعات اليوم', module: 'SALES', route: '/daily/sales', legacyView: 'sales.view',
     actions: [...READ, 'export_excel', 'print', 'details'] },
+  { key: 'ceramics', label: 'صالة السيراميك والتصميمات', module: 'SALES', route: '/ceramics', legacyView: 'sales.view',
+    actions: [...READ, 'details'] },
+  { key: 'retail', label: 'مساحة النشاط', module: 'SALES', route: '/retail', legacyView: 'sales.view',
+    actions: [...READ, 'details'] },
+  { key: 'hospitality', label: 'إدارة الفندق والغرف', module: 'SALES', route: '/hospitality', legacyView: 'orders.view',
+    legacyAliases: ['restaurant.view'], actions: [...READ, 'details'] },
 
   // المنتجات والتسعير
   { key: 'catalog', label: 'كتالوج المنتجات', module: 'PRODUCTS', route: '/products', legacyView: 'products.view',
@@ -412,6 +418,8 @@ const PAGES: PageSpec[] = [
     actions: [...READ, 'details'] },
   { key: 'ready_deliveries', label: 'طلبات جاهزة للتسليم', module: 'CUSTOMERS', route: '/customers/ready-deliveries', legacyView: 'sales.view',
     actions: [...READ, 'deliver', 'details'] },
+  { key: 'education', label: 'المؤسسة التعليمية', module: 'CUSTOMERS', route: '/education', legacyView: 'customers.view',
+    actions: [...READ, 'details'] },
   { key: 'partners', label: 'الشركاء وحساباتهم', module: 'PARTNERS', route: '/partners', legacyView: 'partners.view',
     actions: [...WRITE, 'manage', 'transactions', 'profits', 'adjust', 'reverse', 'print', 'share'],
     sections: [
@@ -551,6 +559,8 @@ const PAGES: PageSpec[] = [
     actions: [...WRITE, 'assign', 'approve', 'close', 'handover', 'timeline'] },
   { key: 'facility_management', label: 'إدارة المنشأة والصيانة', module: 'OPERATIONS', route: '/facility-management', legacyView: 'operations.view',
     actions: [...CONFIG, 'timeline'] },
+  { key: 'workshop', label: 'ورشة صيانة السيارات', module: 'OPERATIONS', route: '/workshop', legacyView: 'operations.view',
+    actions: [...WRITE, 'timeline'] },
 
   // التصنيع
   { key: 'overview', label: 'التصنيع', module: 'MANUFACTURING', route: '/manufacturing', legacyView: 'manufacturing.view',
@@ -572,6 +582,8 @@ const PAGES: PageSpec[] = [
   // المشاريع
   { key: 'list', label: 'المشاريع', module: 'PROJECTS', route: '/projects', legacyView: 'projects.view',
     actions: [...WRITE, 'approve', 'assign', 'print', 'timeline', 'analytics'] },
+  { key: 'time_billing', label: 'التتبع بالوقت والأتعاب', module: 'PROJECTS', route: '/time-billing', legacyView: 'projects.view',
+    actions: [...READ, 'details'] },
   { key: 'detail', label: 'تفاصيل المشروع', module: 'PROJECTS', route: '/projects/:id', legacyView: 'projects.view',
     actions: [...READ, 'update', 'delete', 'approve', 'assign', 'print', 'share', 'timeline', 'history'] },
   { key: 'tasks', label: 'مهام المشروع', module: 'PROJECTS', route: '/projects/:id', legacyView: 'projects.tasks.view',
