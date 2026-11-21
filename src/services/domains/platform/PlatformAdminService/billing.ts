@@ -15,6 +15,7 @@ import type {
   PlatformPlanImpactPreview,
   PlatformPlanChangeResult,
   PlatformSubscription,
+  PlatformSubscriptionCreateInput,
   PlatformTrialCreateInput,
   PlatformCoupon,
   PlatformCouponInput,
@@ -32,6 +33,7 @@ export interface BillingApi {
   createPlan(input: PlatformPlanInput): PlatformPlan;
   updatePlan(id: string, input: PlatformPlanInput): PlatformPlan;
   setPlanActive(id: string, active: boolean): void;
+  deletePlan(id: string): void;
   listPlanVersions(planId: string): PlatformPlanVersion[];
   getPlanVersion(planId: string, version: number): PlatformPlanVersion | null;
   listPriceHistory(planId: string): PlatformPriceHistoryEntry[];
@@ -58,16 +60,22 @@ export interface BillingApi {
   validatePlanDeactivation(planId: string): { canDeactivate: boolean; activeSubscriptions: number; message: string };
   // Subscription Management - Delegate to PlatformSubscriptionService
   listSubscriptions(filters?: { status?: string; planId?: string; search?: string }): PlatformSubscription[];
+  createSubscription(input: PlatformSubscriptionCreateInput): PlatformSubscription;
   createTrialSubscription(input: PlatformTrialCreateInput): PlatformSubscription;
   renewTenantSubscription(tenantId: string, months?: number): PlatformTenant;
   cancelTenantSubscription(tenantId: string, reason?: string): PlatformTenant;
+  suspendTenantSubscription(tenantId: string, reason?: string): PlatformTenant;
+  resumeTenantSubscription(tenantId: string): PlatformTenant;
+  setSubscriptionAutoRenew(tenantId: string, autoRenew: boolean): void;
+  updateSubscriptionSeats(tenantId: string, seats: number, branchesLimit?: number): void;
+  listSubscriptionChanges(tenantId: string, limit?: number): Array<Record<string, unknown>>;
   // Coupon Management - Delegate to PlatformCouponService
   listCoupons(): PlatformCoupon[];
   createCoupon(input: PlatformCouponInput): PlatformCoupon;
   validateCoupon(code: string, subtotal: number): { coupon: PlatformCoupon; discount: number };
   applyCoupon(code: string): PlatformCoupon;
   // Invoice & Payment Management - Delegate to PlatformInvoiceService
-  listInvoices(search?: string, status?: string): PlatformInvoice[];
+  listInvoices(search?: string, status?: string, tenantId?: string): PlatformInvoice[];
   getInvoice(id: string): PlatformInvoice | null;
   createInvoice(input: PlatformInvoiceInput): PlatformInvoice;
   setInvoiceStatus(id: string, status: PlatformInvoiceStatus): void;
@@ -94,6 +102,10 @@ export function createBillingApi(): BillingApi {
 
     setPlanActive(id: string, active: boolean) {
       platformPlanService.setPlanActive(id, active);
+    },
+
+    deletePlan(id: string) {
+      platformPlanService.deletePlan(id);
     },
 
     listPlanVersions(planId: string) {
@@ -152,6 +164,10 @@ export function createBillingApi(): BillingApi {
       return platformSubscriptionService.listSubscriptions(filters);
     },
 
+    createSubscription(input: PlatformSubscriptionCreateInput) {
+      return platformSubscriptionService.createSubscription(input);
+    },
+
     createTrialSubscription(input: PlatformTrialCreateInput) {
       return platformSubscriptionService.createTrialSubscription(input);
     },
@@ -162,6 +178,26 @@ export function createBillingApi(): BillingApi {
 
     cancelTenantSubscription(tenantId: string, reason?: string) {
       return platformSubscriptionService.cancelTenantSubscription(tenantId, reason);
+    },
+
+    suspendTenantSubscription(tenantId: string, reason?: string) {
+      return platformSubscriptionService.suspendTenantSubscription(tenantId, reason);
+    },
+
+    resumeTenantSubscription(tenantId: string) {
+      return platformSubscriptionService.resumeTenantSubscription(tenantId);
+    },
+
+    setSubscriptionAutoRenew(tenantId: string, autoRenew: boolean) {
+      platformSubscriptionService.setSubscriptionAutoRenew(tenantId, autoRenew);
+    },
+
+    updateSubscriptionSeats(tenantId: string, seats: number, branchesLimit?: number) {
+      platformSubscriptionService.updateSubscriptionSeats(tenantId, seats, branchesLimit);
+    },
+
+    listSubscriptionChanges(tenantId: string, limit = 50) {
+      return platformSubscriptionService.listSubscriptionChanges(tenantId, limit);
     },
 
     // Coupon Management - Delegate to PlatformCouponService
@@ -182,8 +218,8 @@ export function createBillingApi(): BillingApi {
     },
 
     // Invoice & Payment Management - Delegate to PlatformInvoiceService
-    listInvoices(search = '', status = '') {
-      return platformInvoiceService.listInvoices(search, status);
+    listInvoices(search = '', status = '', tenantId = '') {
+      return platformInvoiceService.listInvoices(search, status, tenantId);
     },
 
     getInvoice(id: string) {

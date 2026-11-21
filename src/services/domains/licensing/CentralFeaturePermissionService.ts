@@ -14,6 +14,7 @@ import {
   isActionAllowed as _isActionAllowed,
   disabledPermissions as _disabledPermissions,
   isPermissionDisabled as _isPermissionDisabled,
+  isPermissionPageHidden as _isPermissionPageHidden,
   allowsPermission as _allowsPermission,
 } from './CentralFeaturePermissionService_part02';
 
@@ -47,5 +48,6 @@ export class CentralFeaturePermissionService {
   static isActionAllowed(pathname: string, action: CentralAction): boolean { return _isActionAllowed(pathname, action); }
   static disabledPermissions(): string[] { return _disabledPermissions(); }
   static isPermissionDisabled(permissionCode: string): boolean { return _isPermissionDisabled(permissionCode); }
+  static isPermissionPageHidden(permissionCode: string): boolean { return _isPermissionPageHidden(permissionCode); }
   static allowsPermission(permissionCode: string, pathname?: string): boolean { return _allowsPermission(permissionCode, pathname); }
 }

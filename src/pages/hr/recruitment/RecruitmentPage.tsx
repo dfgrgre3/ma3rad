@@ -9,6 +9,7 @@ import {
 import { Link } from 'react-router-dom';
 import { RecruitmentService } from '../../../services/domains/hr/RecruitmentService';
 import { usePermission } from '../../../hooks/domains/auth/usePermission';
+import { usePageAccess } from '../../../hooks/domains/licensing/usePageAccess';
 import { useToast } from '../../../components/ui/Toast';
 import { useBusinessTerm } from '../../../hooks/domains/config/useBusinessTerm';
 import { localDateString } from '../../../utils/shared/date';
@@ -127,6 +128,14 @@ export const RecruitmentPage: React.FC = () => {
   const canHire = canManage && can('employees.manage');
   const canCreateContracts = canHire && can('hr.contracts.manage');
   const [tab, setTab] = useState<Tab>('jobs');
+  // قيود أقسام التوظيف من المنصة المركزية — وظائف/مرشحون/مراحل التوظيف.
+  const pageAccess = usePageAccess('/employees/recruitment');
+  const TAB_ALLOWED: Record<Tab, boolean> = {
+    jobs: pageAccess.allows('ui.hr.recruitment.section.jobs.view'),
+    candidates: pageAccess.allows('ui.hr.recruitment.section.candidates.view'),
+  };
+  const canViewStages = pageAccess.allows('ui.hr.recruitment.section.stages.view');
+  const viewTab: Tab = TAB_ALLOWED[tab] ? tab : (TAB_ALLOWED.jobs ? 'jobs' : 'candidates');
   const [jobs, setJobs] = useState<RecruitmentJob[]>([]);
   const [candidates, setCandidates] = useState<RecruitmentCandidate[]>([]);
   const [summary, setSummary] = useState<RecruitmentSummary>({
@@ -476,13 +485,13 @@ export const RecruitmentPage: React.FC = () => {
             <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
           </button>
           {canManage && (
-            <ActivityGate element={tab === 'jobs' ? 'new-vacancy' : 'new-candidate'}><button
+            <ActivityGate element={viewTab === 'jobs' ? 'new-vacancy' : 'new-candidate'}><button
               type="button"
               className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-white hover:bg-primary"
               onClick={() => setShowForm((value) => !value)}
             >
               {showForm ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
-              {showForm ? 'إغلاق' : tab === 'jobs' ? newJobLabel : newCandidateLabel}
+              {showForm ? 'إغلاق' : viewTab === 'jobs' ? newJobLabel : newCandidateLabel}
             </button></ActivityGate>
           )}
         </>}
@@ -500,13 +509,13 @@ export const RecruitmentPage: React.FC = () => {
         {([
           ['jobs', 'الوظائف الشاغرة', BriefcaseBusiness],
           ['candidates', 'المرشحون', Users],
-        ] as const).map(([key, label, Icon]) => (
+        ] as const).filter(([key]) => TAB_ALLOWED[key]).map(([key, label, Icon]) => (
           <button
             key={key}
             type="button"
             onClick={() => { setTab(key); setShowForm(false); setSearch(''); }}
             className={`flex items-center gap-2 border-b-2 px-3 py-2 text-sm font-semibold ${
-              tab === key ? 'border-primary text-primary' : 'border-transparent text-muted hover:text-ink'
+              viewTab === key ? 'border-primary text-primary' : 'border-transparent text-muted hover:text-ink'
             }`}
           >
             <Icon className="h-4 w-4" />{label}
@@ -518,12 +527,12 @@ export const RecruitmentPage: React.FC = () => {
             className="w-full rounded-lg border border-line bg-surface py-2 pe-9 ps-3 text-sm"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            placeholder={tab === 'jobs' ? 'بحث عن وظيفة...' : 'بحث عن مرشح...'}
+            placeholder={viewTab === 'jobs' ? 'بحث عن وظيفة...' : 'بحث عن مرشح...'}
           />
         </label>
       </div>
 
-      {tab === 'jobs' && (
+      {viewTab === 'jobs' && (
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm text-muted">{visibleJobs.length} وظيفة</p>
           <select
@@ -539,7 +548,7 @@ export const RecruitmentPage: React.FC = () => {
         </div>
       )}
 
-      {tab === 'candidates' && (
+      {viewTab === 'candidates' && (
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm text-muted">{visibleCandidates.length} مرشح</p>
           <div className="flex flex-wrap gap-2">
@@ -566,7 +575,7 @@ export const RecruitmentPage: React.FC = () => {
       )}
 
       {showForm && canManage && (
-        tab === 'jobs' ? (
+        viewTab === 'jobs' ? (
           <form onSubmit={submitJob} className="rounded-xl border border-line bg-surface p-4">
             <h2 className="mb-4 font-bold text-ink">{newJobLabel}</h2>
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
@@ -809,7 +818,7 @@ export const RecruitmentPage: React.FC = () => {
 
       {loading ? (
         <div className="flex justify-center py-16"><Loader2 className="h-7 w-7 animate-spin text-primary" /></div>
-      ) : tab === 'jobs' ? (
+      ) : viewTab === 'jobs' ? (
         visibleJobs.length ? (
           <div className="grid gap-3 lg:grid-cols-2">
             {visibleJobs.map((job) => (
@@ -937,7 +946,7 @@ export const RecruitmentPage: React.FC = () => {
                       >
                         عرض سجل الموظف
                       </Link>
-                    ) : canManage && ['SCREENING', 'INTERVIEW'].includes(candidate.status) ? (
+                    ) : canManage && canViewStages && ['SCREENING', 'INTERVIEW'].includes(candidate.status) ? (
                       <button
                         type="button"
                         onClick={() => beginWorkflow(candidate, 'interview')}
@@ -955,7 +964,7 @@ export const RecruitmentPage: React.FC = () => {
                         عرض العقد
                       </Link>
                     )}
-                    {canManage && ['INTERVIEW', 'OFFER'].includes(candidate.status) && (
+                    {canManage && canViewStages && ['INTERVIEW', 'OFFER'].includes(candidate.status) && (
                       <button
                         type="button"
                         onClick={() => beginWorkflow(candidate, 'offer')}

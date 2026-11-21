@@ -4,7 +4,8 @@ import { readFileSync } from 'node:fs';
 import path from 'path';
 import { parseDeploymentModules, stripExcludedModuleImports } from './src/modules/featureModuleLoader';
 import { MODULE_IDS } from './src/config/moduleRegistry';
-import { planModuleChunks, type ChunkInfo } from './src/modules/chunkOwnership';
+import { planPageChunks, type ChunkInfo, type PageUnit } from './src/modules/chunkOwnership';
+import { createHash } from 'node:crypto';
 
 const packageJson = JSON.parse(readFileSync(path.resolve(__dirname, 'package.json'), 'utf8'));
 
@@ -57,12 +58,19 @@ function featureModulesPlugin(enabledModules: string[]): Plugin {
 
 // Downloadable modules: records which page file each `moduleLazy` declaration
 // imports, then (after bundling) emits `module-chunks.json` describing which
-// emitted files belong exclusively to one module. scripts/package-modules.cjs
-// turns that into signed packages. Only active with CERAMISYS_MODULE_PACKAGES=1.
+// emitted files belong to each signed package — one package per page (`pg-…`),
+// plus one shared package per module for chunks several of its pages use.
+// scripts/package-modules.cjs turns that into signed packages. Only active
+// with CERAMISYS_MODULE_PACKAGES=1.
 function moduleChunkManifestPlugin(): Plugin {
   const DECLARATION = /moduleLazy\('([\w-]+)', \(\) => import\('([^']+)'\)/g;
-  // resolved page id → owning module and the files that import it through moduleLazy
-  const pages = new Map<string, { moduleId: string; importers: Set<string>; conflict: boolean }>();
+  const EXPORTED_DECLARATION = /\bexport\s+const\s+(\w+)\s*=\s*moduleLazy\('([\w-]+)',\s*\(\)\s*=>\s*import\('([^']+)'\)/g;
+  const ROUTE_DEF = /\{\s*path:\s*'([^']+)'\s*,\s*element:\s*<P\.(\w+)/g;
+  const normalizeId = (id: string) => id.replace(/\\/g, '/');
+  // resolved page id → module ids declared for it + files importing it
+  const pages = new Map<string, { moduleIds: Set<string>; importers: Set<string> }>();
+  // exported component name → resolved page id (for the route → page mapping)
+  const nameToPage = new Map<string, string>();
   return {
     name: 'ceramisys-module-chunk-manifest',
     enforce: 'pre',
@@ -71,26 +79,56 @@ function moduleChunkManifestPlugin(): Plugin {
       for (const match of code.matchAll(DECLARATION)) {
         const resolved = await this.resolve(match[2], id);
         if (!resolved) continue;
-        const entry = pages.get(resolved.id) ?? { moduleId: match[1], importers: new Set<string>(), conflict: false };
-        // One file serving pages of two modules (e.g. DailyPage) cannot belong to either.
-        if (entry.moduleId !== match[1]) entry.conflict = true;
-        entry.importers.add(id);
-        pages.set(resolved.id, entry);
+        const record = pages.get(resolved.id) ?? { moduleIds: new Set<string>(), importers: new Set<string>() };
+        record.moduleIds.add(match[1]);
+        record.importers.add(id);
+        pages.set(resolved.id, record);
+      }
+      for (const match of code.matchAll(EXPORTED_DECLARATION)) {
+        const resolved = await this.resolve(match[3], id);
+        if (resolved) nameToPage.set(match[1], resolved.id);
       }
       return undefined;
     },
     generateBundle(_options, bundle) {
-      const roots: Record<string, string> = {};
+      // Route path → page id, via the <P.Name> elements in routesList. A page
+      // file can serve several routes (e.g. DailyPage) — all are recorded.
+      const routesByPage = new Map<string, Set<string>>();
+      try {
+        const routesSource = readFileSync(path.resolve(__dirname, 'src/router/routesList.tsx'), 'utf8');
+        for (const match of routesSource.matchAll(ROUTE_DEF)) {
+          const pageId = nameToPage.get(match[2]);
+          if (!pageId) continue;
+          if (!routesByPage.has(pageId)) routesByPage.set(pageId, new Set());
+          routesByPage.get(pageId)!.add(`/${match[1]}`);
+        }
+      } catch { /* route metadata is best-effort; packages still work without it */ }
+
+      const units: Record<string, PageUnit> = {};
+      const unitModules: Record<string, string[]> = {};
+      const unitRoutes: Record<string, string[]> = {};
       for (const [pageId, entry] of pages) {
         const info = this.getModuleInfo(pageId);
         // Only pages whose every importer is a moduleLazy declaration can be split out.
         const pure = info
-          && !entry.conflict
           && info.importers.length === 0
           && info.dynamicImporters.every((importer) => entry.importers.has(importer));
-        if (pure) roots[pageId.replace(/\\/g, '/')] = entry.moduleId;
-        else this.warn(`Module page ${pageId} is also imported outside moduleLazy; it stays in the core bundle.`);
+        if (!pure) {
+          this.warn(`Module page ${pageId} is also imported outside moduleLazy; it stays in the core bundle.`);
+          continue;
+        }
+        const normalized = normalizeId(pageId);
+        const modules = [...entry.moduleIds].sort();
+        const primary = modules[0] ?? 'core';
+        // Stable across machines: hash the path relative to src/, not the absolute id.
+        const rel = normalized.split('/src/').pop() ?? normalized;
+        const hash = createHash('sha256').update(rel).digest('hex').slice(0, 8);
+        const packageId = `pg-${primary}-${hash}`;
+        units[normalized] = { packageId, modules };
+        unitModules[normalized] = modules;
+        unitRoutes[normalized] = [...(routesByPage.get(pageId) ?? [])].sort();
       }
+
       const chunks: ChunkInfo[] = [];
       for (const item of Object.values(bundle)) {
         if (item.type !== 'chunk') continue;
@@ -103,8 +141,45 @@ function moduleChunkManifestPlugin(): Plugin {
           css: [...(item.viteMetadata?.importedCss ?? [])],
         });
       }
-      const plan = planModuleChunks(chunks, roots);
-      this.emitFile({ type: 'asset', fileName: 'module-chunks.json', source: JSON.stringify(plan, null, 2) });
+      const plan = planPageChunks(chunks, units);
+      // Routes served by every unit, keyed by module — fallback for page
+      // packages whose units have no direct route (nested lazy components or
+      // dead exports): they may only render inside their module's pages, so
+      // they inherit that module's route set for visibility filtering.
+      const routesByModule = new Map<string, Set<string>>();
+      for (const [unitKey, mods] of Object.entries(unitModules)) {
+        for (const mod of mods) {
+          const set = routesByModule.get(mod) ?? new Set<string>();
+          for (const route of unitRoutes[unitKey] ?? []) set.add(route);
+          routesByModule.set(mod, set);
+        }
+      }
+      const packages: Record<string, { modules: string[]; pages: string[] }> = {};
+      for (const packageId of Object.keys(plan.modules)) {
+        const mods = new Set<string>();
+        const routes = new Set<string>();
+        for (const unitKey of plan.members[packageId] ?? []) {
+          for (const mod of unitModules[unitKey] ?? []) mods.add(mod);
+          for (const route of unitRoutes[unitKey] ?? []) routes.add(route);
+        }
+        if (routes.size === 0) {
+          for (const mod of mods) {
+            for (const route of routesByModule.get(mod) ?? []) routes.add(route);
+          }
+        }
+        packages[packageId] = { modules: [...mods].sort(), pages: [...routes].sort() };
+      }
+      this.emitFile({
+        type: 'asset',
+        fileName: 'module-chunks.json',
+        source: JSON.stringify({
+          modules: plan.modules,
+          packages,
+          coreChunkCount: plan.coreChunkCount,
+          keptInCore: plan.keptInCore,
+          unsplittablePackages: plan.unsplittablePackages,
+        }, null, 2),
+      });
     },
   };
 }

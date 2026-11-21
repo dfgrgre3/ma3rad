@@ -1,6 +1,7 @@
 ﻿import React, { useState, useEffect } from 'react';
 import { AuthService } from '../../../services/domains/auth/AuthService';
 import { PermissionService } from '../../../services/domains/auth/PermissionService';
+import { usePageAccess } from '../../../hooks/domains/licensing/usePageAccess';
 import { branchAccess } from '../../../services/domains/inventory-count/branchAccess';
 import { loadBranchCountSessions, loadCountProducts, loadCountSessionItems, loadCountWarehouses } from '../../../services/domains/inventory-count/countSessionData';
 import { approveCountSession, cancelCountSession, rejectCountSession, saveCountDraft, startCountSession, submitCountSession } from '../../../services/domains/inventory-count/countSessionService';
@@ -17,6 +18,11 @@ export { loadBranchCountSessions } from '../../../services/domains/inventory-cou
 
 export const InventoryCountPage: React.FC = () => {
   const toast = useToast();
+  // قيود أقسام الجرد من المنصة المركزية — جلسات/أصناف/فروقات.
+  const pageAccess = usePageAccess('/inventory/counts');
+  const canViewSessions = pageAccess.allows('ui.inventory.counts.section.sessions.view');
+  const canViewItems = pageAccess.allows('ui.inventory.counts.section.items.view');
+  const canViewDifferences = pageAccess.allows('ui.inventory.counts.section.differences.view');
   const [sessions, setSessions] = useState<CountSession[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
@@ -122,6 +128,10 @@ export const InventoryCountPage: React.FC = () => {
   };
 
   const handleOpenSession = (session: CountSession) => {
+    if (!canViewItems) {
+      toast.warning('عرض أصناف الجرد معطل من إعدادات المنصة.');
+      return;
+    }
     try {
       const items = loadCountSessionItems(session);
       setActiveSession(session);
@@ -238,18 +248,22 @@ export const InventoryCountPage: React.FC = () => {
     <div className="h-full flex flex-col bg-surface-muted text-ink overflow-hidden">
       {/* Header */}
       <InventoryCountHeader
+        canCreate={canViewSessions}
         onCreateSession={() => { setErrorMsg(''); setSelectedProductIds([]); setProductSearch(''); loadProducts(); setShowCreateModal(true); }}
       />
 
       {/* Toolbar */}
+      {canViewSessions && (
       <CountSessionsToolbar
         search={search}
         onSearchChange={setSearch}
         statusFilter={statusFilter}
         onStatusFilterChange={setStatusFilter}
       />
+      )}
 
       {/* Table Content */}
+      {canViewSessions && (
       <div className="flex-1 overflow-auto p-6">
         <CountSessionsTable
           loading={loading}
@@ -257,6 +271,7 @@ export const InventoryCountPage: React.FC = () => {
           onOpenSession={handleOpenSession}
         />
       </div>
+      )}
 
       {/* Start Session Modal */}
       {showCreateModal && (
@@ -297,6 +312,7 @@ export const InventoryCountPage: React.FC = () => {
           onSaveDraft={handleSaveDraft}
           onPost={handlePostSession}
           canApprove={PermissionService.can(AuthService.getCurrentUser(), 'ui.inventory.counts.approve')}
+          canViewDifferences={canViewDifferences}
           onApprove={handleApproveSession}
           onReject={handleRejectSession}
           onCancelSession={handleCancelSession}

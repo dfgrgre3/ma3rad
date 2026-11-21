@@ -48,6 +48,8 @@ export interface StockTransfersTabsProps {
   onStatusFilterChange: (value: string) => void;
   /** تبويب «ملخص حركة المخازن» يعرض أرصدة المخازن — يُخفى بدون inventory.view. */
   canViewSummary?: boolean;
+  /** تبويبا «الأوامر النشطة» و«السجل» — يُخفيان عند تعطيل قسم القائمة مركزيًا. */
+  canViewList?: boolean;
 }
 
 export interface WorkflowTransfersTableProps {

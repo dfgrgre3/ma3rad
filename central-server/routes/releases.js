@@ -266,6 +266,173 @@ adminRouter.delete(
   }
 );
 
+// ─── Release targets (per-tenant rollout status) ────────────────────────────
+
+const TARGET_STATUSES = ['PENDING', 'SUCCESS', 'FAILED', 'SKIPPED'];
+
+function mapReleaseTargetRow(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    releaseId: row.release_id,
+    tenantId: row.tenant_id,
+    tenantName: row.tenant_name ?? null,
+    status: row.status,
+    error: row.error ?? null,
+    attemptCount: row.attempt_count ?? 0,
+    appliedAt: row.applied_at ?? null,
+    deployedAt: row.deployed_at ?? null,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+async function listReleaseTargets(db, releaseId) {
+  return db.all(
+    `SELECT rt.*, t.name AS tenant_name
+     FROM platform_release_targets rt
+     LEFT JOIN platform_tenants t ON t.id = rt.tenant_id
+     WHERE rt.release_id = ?
+     ORDER BY rt.created_at ASC`,
+    [releaseId]
+  );
+}
+
+adminRouter.get(
+  '/:id/targets',
+  authenticatePlatformUser,
+  requirePlatformPermission(['platform.releases.view']),
+  async (req, res, next) => {
+    try {
+      const db = getDb();
+      const release = await db.get('SELECT id FROM platform_releases WHERE id = ?', [req.params.id]);
+      if (!release) return res.status(404).json({ error: 'Release not found' });
+      const rows = await listReleaseTargets(db, release.id);
+      res.json({ data: rows.map(mapReleaseTargetRow), meta: { total: rows.length }, requestId: req.requestId });
+    } catch (err) { next(err); }
+  }
+);
+
+adminRouter.put(
+  '/:id/targets',
+  authenticatePlatformUser,
+  requirePlatformPermission(['platform.releases.update']),
+  async (req, res, next) => {
+    try {
+      const db = getDb();
+      const release = await db.get('SELECT * FROM platform_releases WHERE id = ?', [req.params.id]);
+      if (!release) return res.status(404).json({ error: 'Release not found' });
+      const { tenantIds } = req.body || {};
+      if (!Array.isArray(tenantIds) || tenantIds.some((t) => typeof t !== 'string')) {
+        return res.status(400).json({ error: 'tenantIds must be an array of strings' });
+      }
+      const uniqueTenantIds = [...new Set(tenantIds.map((t) => t.trim()).filter(Boolean))];
+      if (uniqueTenantIds.length) {
+        const placeholders = uniqueTenantIds.map(() => '?').join(',');
+        const found = await db.all(
+          `SELECT id FROM platform_tenants WHERE id IN (${placeholders})`,
+          uniqueTenantIds
+        );
+        if (found.length !== uniqueTenantIds.length) {
+          return res.status(400).json({ error: 'One or more tenantIds do not exist' });
+        }
+      }
+
+      const existing = await db.all(
+        'SELECT tenant_id FROM platform_release_targets WHERE release_id = ?',
+        [release.id]
+      );
+      const existingIds = new Set(existing.map((r) => r.tenant_id));
+      const wanted = new Set(uniqueTenantIds);
+      const now = nowIso();
+
+      await db.run('BEGIN TRANSACTION');
+      try {
+        for (const tenantId of uniqueTenantIds) {
+          if (existingIds.has(tenantId)) continue;
+          await db.run(
+            `INSERT INTO platform_release_targets (id, release_id, tenant_id, status, attempt_count, created_at, updated_at)
+             VALUES (?, ?, ?, 'PENDING', 0, ?, ?)`,
+            [`rt_${crypto.randomUUID().replace(/-/g, '').slice(0, 16)}`, release.id, tenantId, now, now]
+          );
+        }
+        for (const row of existing) {
+          if (!wanted.has(row.tenant_id)) {
+            await db.run('DELETE FROM platform_release_targets WHERE release_id = ? AND tenant_id = ?', [release.id, row.tenant_id]);
+          }
+        }
+        // Keep the legacy JSON column in sync for existing readers.
+        await db.run('UPDATE platform_releases SET target_tenant_ids = ?, updated_at = ? WHERE id = ?', [
+          JSON.stringify(uniqueTenantIds), now, release.id,
+        ]);
+        await db.exec('COMMIT');
+      } catch (err) {
+        await db.exec('ROLLBACK');
+        throw err;
+      }
+
+      await recordAuditEvent({
+        actorId: req.platformUser?.id, actorName: req.platformUser?.full_name,
+        action: 'RELEASE_TARGETS_SYNCED', resourceType: 'platform_releases', resourceId: release.id,
+        afterData: { tenantIds: uniqueTenantIds },
+        ipAddress: req.ip, userAgent: req.headers['user-agent'],
+      });
+      const rows = await listReleaseTargets(db, release.id);
+      res.json({ data: rows.map(mapReleaseTargetRow), meta: { total: rows.length }, requestId: req.requestId });
+    } catch (err) { next(err); }
+  }
+);
+
+adminRouter.post(
+  '/:id/targets/:tenantId/status',
+  authenticatePlatformUser,
+  requirePlatformPermission(['platform.releases.update']),
+  async (req, res, next) => {
+    try {
+      const db = getDb();
+      const release = await db.get('SELECT id FROM platform_releases WHERE id = ?', [req.params.id]);
+      if (!release) return res.status(404).json({ error: 'Release not found' });
+      const target = await db.get(
+        'SELECT * FROM platform_release_targets WHERE release_id = ? AND tenant_id = ?',
+        [release.id, req.params.tenantId]
+      );
+      if (!target) return res.status(404).json({ error: 'Release target not found' });
+      const { status, error } = req.body || {};
+      if (!TARGET_STATUSES.includes(status)) {
+        return res.status(400).json({ error: `status must be one of ${TARGET_STATUSES.join(', ')}` });
+      }
+      const now = nowIso();
+      const terminal = status === 'SUCCESS' || status === 'FAILED';
+      await db.run(
+        `UPDATE platform_release_targets
+         SET status = ?, error = ?,
+             attempt_count = attempt_count + CASE WHEN ? IN ('SUCCESS','FAILED') THEN 1 ELSE 0 END,
+             applied_at = CASE WHEN ? THEN COALESCE(applied_at, ?) ELSE applied_at END,
+             deployed_at = CASE WHEN ? = 'SUCCESS' THEN ? ELSE deployed_at END,
+             updated_at = ?
+         WHERE id = ?`,
+        [status, error ?? null, status, terminal ? 1 : 0, now, status, now, now, target.id]
+      );
+      await recordAuditEvent({
+        actorId: req.platformUser?.id, actorName: req.platformUser?.full_name,
+        tenantId: target.tenant_id,
+        action: 'RELEASE_TARGET_STATUS_UPDATED', resourceType: 'platform_release_targets', resourceId: target.id,
+        beforeData: { status: target.status },
+        afterData: { status, error: error ?? null },
+        ipAddress: req.ip, userAgent: req.headers['user-agent'],
+      });
+      const row = await db.get(
+        `SELECT rt.*, t.name AS tenant_name
+         FROM platform_release_targets rt
+         LEFT JOIN platform_tenants t ON t.id = rt.tenant_id
+         WHERE rt.id = ?`,
+        [target.id]
+      );
+      res.json({ data: mapReleaseTargetRow(row), requestId: req.requestId });
+    } catch (err) { next(err); }
+  }
+);
+
 // ─── Client-facing API (device-authenticated via hardware id) ────────────────
 
 clientRouter.get('/', async (req, res, next) => {

@@ -7,6 +7,7 @@ import type { User } from '../../types';
 // only the visited page's chunk is downloaded.
 const PlatformDashboardPage = React.lazy(() => import('./PlatformDashboardPage').then(m => ({ default: m.PlatformDashboardPage })));
 const PlatformTenantsPage = React.lazy(() => import('./PlatformTenantsPage').then(m => ({ default: m.PlatformTenantsPage })));
+const PlatformTenantDetailPage = React.lazy(() => import('./PlatformTenantDetailPage').then(m => ({ default: m.PlatformTenantDetailPage })));
 const PlatformLicensesPage = React.lazy(() => import('./PlatformLicensesPage').then(m => ({ default: m.PlatformLicensesPage })));
 const PlatformBillingPage = React.lazy(() => import('./PlatformBillingPage').then(m => ({ default: m.PlatformBillingPage })));
 const PlatformPlansPage = React.lazy(() => import('./PlatformPlansPage').then(m => ({ default: m.PlatformPlansPage })));
@@ -103,6 +104,14 @@ export const PlatformRoutes: React.FC<PlatformRoutesProps> = ({ currentUser, onL
           element={
             <PlatformRouteGuard currentUser={currentUser} targetModule="tenants">
               <PlatformTenantsPage />
+            </PlatformRouteGuard>
+          }
+        />
+        <Route
+          path="tenants/:tenantId"
+          element={
+            <PlatformRouteGuard currentUser={currentUser} targetModule="tenants">
+              <PlatformTenantDetailPage />
             </PlatformRouteGuard>
           }
         />

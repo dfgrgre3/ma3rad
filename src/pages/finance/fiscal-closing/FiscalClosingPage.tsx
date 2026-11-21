@@ -1,4 +1,5 @@
 import type { ElementType, FC } from 'react';
+import { useEffect, useMemo } from 'react';
 import { PageHeader } from '../../../components/ui/PageHeader';
 import {
   AlertCircle,
@@ -12,6 +13,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { usePageAccess } from '../../../hooks/domains/licensing/usePageAccess';
 import { useFiscalClosingPage } from './FiscalClosingPage/useFiscalClosing';
 import { YearSummary } from './FiscalClosingPage/YearSummary';
 import { PeriodsTable } from './FiscalClosingPage/PeriodsTable';
@@ -27,8 +29,20 @@ import {
 } from './FiscalClosingPage/modals';
 import type { PeriodTab } from './FiscalClosingPage/utils';
 
+// تبويبات الإقفال ↔ أقسام مصفوفة الصلاحيات الدقيقة لصفحة /finance/fiscal-closing —
+// تعطيل قسم مركزيًا يخفي تبويباته ويعيد الاختيار لأول تبويب مسموح.
+const TAB_SECTION_CODE: Record<PeriodTab, string> = {
+  overview: 'ui.finance.fiscal_closing.section.periods.view',
+  checks: 'ui.finance.fiscal_closing.section.closing.view',
+  tasks: 'ui.finance.fiscal_closing.section.closing.view',
+  adjustments: 'ui.finance.fiscal_closing.section.closing.view',
+  reports: 'ui.finance.fiscal_closing.section.closing.view',
+  audit: 'ui.finance.fiscal_closing.section.history.view',
+};
+
 export const FiscalClosingPage: FC = () => {
   const state = useFiscalClosingPage();
+  const pageAccess = usePageAccess('/finance/fiscal-closing');
   const {
     service,
     canViewFinance,
@@ -95,14 +109,25 @@ export const FiscalClosingPage: FC = () => {
     selectPeriod,
   } = state;
 
-  const tabs: Array<{ id: PeriodTab; label: string; icon: ElementType; badge?: number }> = [
-    { id: 'overview', label: 'نظرة عامة', icon: CalendarDays },
-    { id: 'checks', label: 'الفحص الآلي', icon: ListChecks, badge: failedChecks.length + warningChecks.length },
-    { id: 'tasks', label: 'المهام', icon: ClipboardList, badge: tasks.length - completedTasks },
-    { id: 'adjustments', label: 'التسويات', icon: Sparkles, badge: adjustments.length },
-    { id: 'reports', label: 'تقرير الإقفال', icon: FileBarChart2 },
-    { id: 'audit', label: 'السجل والاعتمادات', icon: History },
-  ];
+  const visibleTabs = useMemo(() => {
+    const failed = failedChecks.length + warningChecks.length;
+    const pending = tasks.length - completedTasks;
+    const allTabs: Array<{ id: PeriodTab; label: string; icon: ElementType; badge?: number }> = [
+      { id: 'overview', label: 'نظرة عامة', icon: CalendarDays },
+      { id: 'checks', label: 'الفحص الآلي', icon: ListChecks, badge: failed },
+      { id: 'tasks', label: 'المهام', icon: ClipboardList, badge: pending },
+      { id: 'adjustments', label: 'التسويات', icon: Sparkles, badge: adjustments.length },
+      { id: 'reports', label: 'تقرير الإقفال', icon: FileBarChart2 },
+      { id: 'audit', label: 'السجل والاعتمادات', icon: History },
+    ];
+    return allTabs.filter((tab) => pageAccess.allows(TAB_SECTION_CODE[tab.id]));
+  }, [pageAccess, failedChecks.length, warningChecks.length, tasks.length, completedTasks, adjustments.length]);
+
+  useEffect(() => {
+    if (visibleTabs.length > 0 && !visibleTabs.some((tab) => tab.id === activeTab)) {
+      setActiveTab(visibleTabs[0].id);
+    }
+  }, [visibleTabs, activeTab, setActiveTab]);
 
   return (
     <div className="min-h-full space-y-5 bg-surface-muted p-4 text-ink sm:p-6">
@@ -219,7 +244,7 @@ export const FiscalClosingPage: FC = () => {
             state={state}
             activeTab={activeTab}
             onTabChange={setActiveTab}
-            tabs={tabs}
+            tabs={visibleTabs}
           />
         </>
       )}

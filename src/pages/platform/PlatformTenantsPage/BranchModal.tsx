@@ -3,6 +3,12 @@ import { Button } from '../../../components/ui/Button';
 import { Modal } from '../../../components/ui/Modal';
 import { Field, inputClass } from '../components/PlatformUI';
 
+/** Clamp a numeric limit input: finite, integer, minimum 1 (NaN-safe). */
+const clampLimit = (raw: string): number => {
+  const n = Number(raw);
+  return Number.isFinite(n) ? Math.max(1, Math.floor(n)) : 1;
+};
+
 interface BranchModalProps {
   open: boolean;
   onClose: () => void;
@@ -50,10 +56,10 @@ export const BranchModal: React.FC<BranchModalProps> = ({
             <input className={inputClass} dir="ltr" value={branchForm.phone} onChange={(e) => setBranchForm({ ...branchForm, phone: e.target.value })} />
           </Field>
           <Field label="حد المقاعد">
-            <input type="number" min={1} className={inputClass} value={branchForm.seatsLimit} onChange={(e) => setBranchForm({ ...branchForm, seatsLimit: Number(e.target.value) })} />
+            <input type="number" min={1} className={inputClass} value={branchForm.seatsLimit} onChange={(e) => setBranchForm({ ...branchForm, seatsLimit: clampLimit(e.target.value) })} />
           </Field>
           <Field label="حد الأجهزة">
-            <input type="number" min={1} className={inputClass} value={branchForm.devicesLimit} onChange={(e) => setBranchForm({ ...branchForm, devicesLimit: Number(e.target.value) })} />
+            <input type="number" min={1} className={inputClass} value={branchForm.devicesLimit} onChange={(e) => setBranchForm({ ...branchForm, devicesLimit: clampLimit(e.target.value) })} />
           </Field>
           <label className="flex items-center gap-2 text-[12px] font-semibold text-ink sm:col-span-2">
             <input type="checkbox" checked={branchForm.isMain} onChange={(e) => setBranchForm({ ...branchForm, isMain: e.target.checked })} />

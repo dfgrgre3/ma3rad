@@ -71,6 +71,21 @@ export const CentralActivationGate: React.FC<CentralActivationGateProps> = ({ on
     && password.length > 0
     && phone.trim().length > 0;
 
+  // Catalog entries are signed page packages; group them under the business
+  // module that delivers them for display and per-module state tracking.
+  const moduleRows = React.useMemo(() => {
+    const rows = new Map<string, AvailableModuleInfo[]>();
+    for (const entry of catalog) {
+      const mods = entry.modules?.length ? entry.modules : [entry.moduleId];
+      for (const mod of mods) {
+        const list = rows.get(mod) ?? [];
+        list.push(entry);
+        rows.set(mod, list);
+      }
+    }
+    return [...rows.entries()];
+  }, [catalog]);
+
   const setModuleState = (moduleId: string, state: ModuleRowState, reason?: string) => {
     setModuleStates((prev) => ({ ...prev, [moduleId]: state }));
     if (reason) setModuleReasons((prev) => ({ ...prev, [moduleId]: reason }));
@@ -123,10 +138,20 @@ export const CentralActivationGate: React.FC<CentralActivationGateProps> = ({ on
         },
         (modules) => {
           setCatalog(modules);
-          setModuleStates(Object.fromEntries(modules.map((m) => [
-            m.moduleId,
-            m.installed ? 'installed' as const : 'pending' as const,
-          ])));
+          const initial: Record<string, ModuleRowState> = {};
+          const grouped = new Map<string, AvailableModuleInfo[]>();
+          for (const entry of modules) {
+            const mods = entry.modules?.length ? entry.modules : [entry.moduleId];
+            for (const mod of mods) {
+              const list = grouped.get(mod) ?? [];
+              list.push(entry);
+              grouped.set(mod, list);
+            }
+          }
+          for (const [mod, entries] of grouped) {
+            initial[mod] = entries.every((e) => e.installed) ? 'installed' : 'pending';
+          }
+          setModuleStates(initial);
         },
       );
 
@@ -168,23 +193,23 @@ export const CentralActivationGate: React.FC<CentralActivationGateProps> = ({ on
           {phase === 'form' && (
             <>
               <p className="text-sm leading-6 text-ink-secondary">
-                أدخل <span className="font-bold text-ink">كود التفعيل (API)</span> وبيانات الحساب التي أنشأها
-                مسؤول النظام لك. يحدد الكود الصفحات والوحدات المتاحة في نسختك، ولن يتم تنزيل ملفات
-                الصفحات غير المشمولة في اشتراكك.
+                أدخل بيانات الحساب التي أنشأها مسؤول النظام لك. يحدد كود التفعيل
+                (الذي جمعته صفحة التثبيت) الصفحات والوحدات المتاحة في نسختك، ولن يتم
+                تنزيل ملفات الصفحات غير المشمولة في اشتراكك.
               </p>
 
               <div>
-                <label className={labelClass} htmlFor="gate-activation-code">كود التفعيل (API Key)</label>
-                <input
-                  id="gate-activation-code"
-                  type="text"
-                  dir="ltr"
-                  value={activationCode}
-                  onChange={(e) => setActivationCode(e.target.value)}
-                  placeholder="EDAR-XXXX-XXXX-XXXX"
-                  autoComplete="off"
-                  className={inputClass}
-                />
+                <span className={labelClass}>كود التفعيل (API Key)</span>
+                {activationCode.trim() ? (
+                  <div dir="ltr" className="w-full px-3 py-2.5 bg-surface-muted rounded-xl border border-line text-sm font-mono text-ink-secondary select-all">
+                    {activationCode.trim()}
+                  </div>
+                ) : (
+                  <div role="alert" className="flex items-center gap-2 rounded-xl border border-warning-border bg-warning-soft px-3 py-2.5 text-sm text-warning">
+                    <AlertCircle className="h-4 w-4 shrink-0" />
+                    <span>كود التفعيل يُجمع من صفحة التثبيت فقط — لم يُعثر عليه بجانب البرنامج. أعد تشغيل ملف التثبيت وأدخله في خانة الـ API.</span>
+                  </div>
+                )}
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
@@ -284,12 +309,18 @@ export const CentralActivationGate: React.FC<CentralActivationGateProps> = ({ on
                     )}
                   </div>
                   <ul className="divide-y divide-line rounded-xl border border-line overflow-hidden">
-                    {catalog.map((entry) => {
-                      const state = moduleStates[entry.moduleId] ?? 'pending';
-                      const label = MODULE_LABELS.get(entry.moduleId) || entry.moduleId;
+                    {moduleRows.map(([moduleId, entries]) => {
+                      const state = moduleStates[moduleId]
+                        ?? (entries.every((e) => e.installed) ? 'installed' as const : 'pending' as const);
+                      const label = MODULE_LABELS.get(moduleId) || moduleId;
                       return (
-                        <li key={entry.moduleId} className="flex items-center justify-between gap-3 px-4 py-2.5 bg-surface">
-                          <span className="text-sm font-bold text-ink">{label}</span>
+                        <li key={moduleId} className="flex items-center justify-between gap-3 px-4 py-2.5 bg-surface">
+                          <span className="text-sm font-bold text-ink">
+                            {label}
+                            {entries.length > 1 && (
+                              <span className="mr-2 text-[10px] font-medium text-muted">({entries.length} حزمة)</span>
+                            )}
+                          </span>
                           <span className="flex items-center gap-1.5 text-xs">
                             {state === 'installed' && (
                               <span className="inline-flex items-center gap-1 font-bold text-success">

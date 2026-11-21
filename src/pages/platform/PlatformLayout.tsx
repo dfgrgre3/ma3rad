@@ -144,7 +144,8 @@ export const PlatformLayout: React.FC<PlatformLayoutProps> = ({ currentUser, onL
   const location = useLocation();
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = React.useState(false);
-  const currentTitle = TITLES[location.pathname] || 'منصة مالك النظام';
+  const currentTitle = TITLES[location.pathname]
+    || (location.pathname.startsWith('/platform/tenants/') ? 'ملف العميل' : 'منصة مالك النظام');
 
   React.useEffect(() => {
     setMobileOpen(false);

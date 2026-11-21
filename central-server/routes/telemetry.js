@@ -98,4 +98,92 @@ router.post('/errors', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+const METRIC_STATUSES = ['OK', 'WARNING', 'CRITICAL'];
+const MAX_METRICS_PER_REPORT = 50;
+
+function normalizeMetricStatus(value) {
+  const v = String(value || 'OK').toUpperCase();
+  return METRIC_STATUSES.includes(v) ? v : 'OK';
+}
+
+// Device-facing technical metrics ingest. Same device authentication as
+// POST /errors: the tenant is resolved server-side from the registered
+// device so clients cannot spoof another tenant's metric stream.
+router.post('/metrics', async (req, res, next) => {
+  try {
+    const db = getDb();
+    const {
+      deviceId = '', deviceCredential = '', deviceName = '',
+      appVersion = '', os = '',
+      metrics = [],
+      tenantId: claimedTenantId = null,
+    } = req.body || {};
+
+    if (!Array.isArray(metrics) || !metrics.length) {
+      return res.status(400).json({ error: 'metrics must be a non-empty array' });
+    }
+    if (metrics.length > MAX_METRICS_PER_REPORT) {
+      return res.status(400).json({ error: `metrics accepts at most ${MAX_METRICS_PER_REPORT} entries` });
+    }
+    for (const m of metrics) {
+      if (!m || typeof m !== 'object' || !String(m.name || '').trim()) {
+        return res.status(400).json({ error: 'each metric requires a name' });
+      }
+      if (typeof m.value !== 'number' || !Number.isFinite(m.value)) {
+        return res.status(400).json({ error: `metric "${m.name}" value must be a finite number` });
+      }
+    }
+
+    // Resolve tenant from the registered device; fall back to explicit tenantId
+    // only when it matches an existing tenant.
+    let tenantId = null;
+    let device = null;
+    if (deviceId) {
+      device = await db.get(
+        'SELECT * FROM platform_devices WHERE hardware_id = ? OR id = ? LIMIT 1',
+        [deviceId, deviceId]
+      );
+      if (device) {
+        if (device.status !== 'ACTIVE' || !credentialMatches(device, deviceCredential)) {
+          return res.status(401).json({ error: 'Invalid device credential' });
+        }
+        tenantId = device.tenant_id;
+      }
+    }
+    if (!tenantId && claimedTenantId) {
+      const tenant = await db.get('SELECT id FROM platform_tenants WHERE id = ?', [claimedTenantId]);
+      if (tenant) tenantId = tenant.id;
+    }
+
+    const now = nowIso();
+    if (device) {
+      await db.run(
+        'UPDATE platform_devices SET last_seen_at = ?, app_version = COALESCE(?, app_version), os = COALESCE(?, os), updated_at = ? WHERE id = ?',
+        [now, appVersion || null, os || null, now, device.id]
+      );
+    }
+
+    let inserted = 0;
+    for (const m of metrics) {
+      const id = `hm_${crypto.randomUUID().replace(/-/g, '').slice(0, 12)}`;
+      await db.run(
+        `INSERT INTO platform_health_metrics
+          (id, tenant_id, device_id, device_name, metric_name, metric_value, metric_unit, status, details, recorded_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          id, tenantId, device ? device.id : (deviceId || null),
+          (deviceName || device?.name || null)?.toString().slice(0, 200) ?? null,
+          String(m.name).trim().slice(0, 100), m.value,
+          m.unit ? String(m.unit).slice(0, 30) : null,
+          normalizeMetricStatus(m.status),
+          m.details != null ? JSON.stringify(m.details).slice(0, 4000) : null,
+          now,
+        ]
+      );
+      inserted += 1;
+    }
+    res.status(201).json({ success: true, data: { inserted } });
+  } catch (err) { next(err); }
+});
+
 module.exports = router;

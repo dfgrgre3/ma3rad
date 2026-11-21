@@ -1,39 +1,72 @@
 // Tenant-scoped endpoints: tenant CRUD, accounts, directory users, overrides,
 // payments, remote control and branches.
 import type { PlatformAdminApiCore } from './core';
-import type { PlatformTenant, PlatformTenantInput } from '../platformTypes';
+import type {
+  PlatformTenant,
+  PlatformTenantInput,
+  PlatformTenantProfile,
+  PlatformTenantUser,
+  PlatformTenantOverride,
+  PlatformPayment,
+} from '../platformTypes';
+import type {
+  CentralTenantBranch,
+  CentralRemoteConfigRow,
+  CentralTenantRemoteControl,
+  CentralTenantAccountCreated,
+  CentralTenantUserCreated,
+  CentralTenantUserInviteResult,
+  CentralTenantUserDirectoryEntry,
+  CentralTenantSyncResult,
+  CentralTenantArchiveResult,
+  CentralMutationResult,
+} from './centralTypes';
 
 export interface TenantApi {
   listTenants(this: PlatformAdminApiCore, search?: string, status?: string, planId?: string): Promise<PlatformTenant[]>;
   createTenant(this: PlatformAdminApiCore, input: PlatformTenantInput): Promise<PlatformTenant>;
-  updateTenant(this: PlatformAdminApiCore, id: string, payload: Record<string, any>): Promise<any>;
-  setTenantStatus(this: PlatformAdminApiCore, id: string, status: string): Promise<any>;
-  archiveTenant(this: PlatformAdminApiCore, id: string): Promise<any>;
-  getTenantProfile(this: PlatformAdminApiCore, id: string): Promise<any>;
+  updateTenant(this: PlatformAdminApiCore, id: string, payload: Record<string, any>): Promise<PlatformTenant>;
+  setTenantStatus(this: PlatformAdminApiCore, id: string, status: string): Promise<PlatformTenant>;
+  archiveTenant(this: PlatformAdminApiCore, id: string): Promise<CentralTenantArchiveResult>;
+  getTenantProfile(this: PlatformAdminApiCore, id: string): Promise<PlatformTenantProfile>;
   createTenantAccount(
     this: PlatformAdminApiCore,
     id: string,
     input?: { username?: string; email?: string; fullName?: string; password?: string }
-  ): Promise<{ account: any; temporaryPassword: string; activationCode: string }>;
+  ): Promise<CentralTenantAccountCreated>;
   resetTenantAccountPassword(this: PlatformAdminApiCore, id: string): Promise<{ temporaryPassword: string }>;
-  setTenantAccountActive(this: PlatformAdminApiCore, id: string, isActive: boolean): Promise<any>;
-  listTenantUsers(this: PlatformAdminApiCore, tenantId: string): Promise<any[]>;
-  createTenantUser(this: PlatformAdminApiCore, tenantId: string, input: Record<string, any>): Promise<any>;
-  updateTenantUser(this: PlatformAdminApiCore, tenantId: string, userId: string, input: Record<string, any>): Promise<any>;
-  deleteTenantUser(this: PlatformAdminApiCore, tenantId: string, userId: string): Promise<any>;
-  setTenantUserActive(this: PlatformAdminApiCore, tenantId: string, userId: string, isActive: boolean): Promise<any>;
-  resendTenantUserInvite(this: PlatformAdminApiCore, tenantId: string, userId: string): Promise<any>;
-  listTenantOverrides(this: PlatformAdminApiCore, tenantId: string): Promise<any[]>;
-  addTenantOverride(this: PlatformAdminApiCore, tenantId: string, input: Record<string, any>): Promise<any>;
-  removeTenantOverride(this: PlatformAdminApiCore, tenantId: string, overrideId: string): Promise<any>;
-  recordTenantPayment(this: PlatformAdminApiCore, tenantId: string, input: Record<string, any>): Promise<any>;
-  getTenantRemoteControl(this: PlatformAdminApiCore, tenantId: string): Promise<any>;
-  pushTenantConfig(this: PlatformAdminApiCore, tenantId: string, input: { key: string; value: any; scope?: string; targetDeviceIds?: string[] }): Promise<any>;
-  forceTenantSync(this: PlatformAdminApiCore, tenantId: string): Promise<any>;
-  listTenantBranches(this: PlatformAdminApiCore, tenantId: string): Promise<any[]>;
-  createTenantBranch(this: PlatformAdminApiCore, tenantId: string, input: Record<string, any>): Promise<any>;
-  updateTenantBranch(this: PlatformAdminApiCore, tenantId: string, branchId: string, input: Record<string, any>): Promise<any>;
-  closeTenantBranch(this: PlatformAdminApiCore, tenantId: string, branchId: string): Promise<any>;
+  updateTenantAccount(
+    this: PlatformAdminApiCore,
+    id: string,
+    input: { username?: string; email?: string; fullName?: string; password?: string }
+  ): Promise<any>;
+  setTenantAccountActive(this: PlatformAdminApiCore, id: string, isActive: boolean): Promise<CentralMutationResult>;
+  listTenantUsers(this: PlatformAdminApiCore, tenantId: string): Promise<PlatformTenantUser[]>;
+  createTenantUser(this: PlatformAdminApiCore, tenantId: string, input: Record<string, any>): Promise<CentralTenantUserCreated>;
+  updateTenantUser(this: PlatformAdminApiCore, tenantId: string, userId: string, input: Record<string, any>): Promise<PlatformTenantUser>;
+  deleteTenantUser(this: PlatformAdminApiCore, tenantId: string, userId: string): Promise<CentralMutationResult>;
+  setTenantUserActive(this: PlatformAdminApiCore, tenantId: string, userId: string, isActive: boolean): Promise<PlatformTenantUser>;
+  resendTenantUserInvite(this: PlatformAdminApiCore, tenantId: string, userId: string): Promise<CentralTenantUserInviteResult>;
+  listAllTenantUsers(this: PlatformAdminApiCore, filters?: { tenantId?: string; provisioningStatus?: string; status?: string; search?: string }): Promise<CentralTenantUserDirectoryEntry[]>;
+  listTenantOverrides(this: PlatformAdminApiCore, tenantId: string): Promise<PlatformTenantOverride[]>;
+  addTenantOverride(this: PlatformAdminApiCore, tenantId: string, input: Record<string, any>): Promise<PlatformTenantOverride>;
+  removeTenantOverride(this: PlatformAdminApiCore, tenantId: string, overrideId: string): Promise<CentralMutationResult>;
+  recordTenantPayment(this: PlatformAdminApiCore, tenantId: string, input: Record<string, any>): Promise<PlatformPayment>;
+  getTenantRemoteControl(this: PlatformAdminApiCore, tenantId: string): Promise<CentralTenantRemoteControl>;
+  pushTenantConfig(this: PlatformAdminApiCore, tenantId: string, input: { key: string; value: any; scope?: string; targetDeviceIds?: string[] }): Promise<CentralRemoteConfigRow>;
+  forceTenantSync(this: PlatformAdminApiCore, tenantId: string): Promise<CentralTenantSyncResult>;
+  listTenantBranches(this: PlatformAdminApiCore, tenantId: string): Promise<CentralTenantBranch[]>;
+  createTenantBranch(this: PlatformAdminApiCore, tenantId: string, input: Record<string, any>): Promise<CentralTenantBranch>;
+  updateTenantBranch(this: PlatformAdminApiCore, tenantId: string, branchId: string, input: Record<string, any>): Promise<CentralTenantBranch>;
+  closeTenantBranch(this: PlatformAdminApiCore, tenantId: string, branchId: string): Promise<CentralMutationResult>;
+  // ── Tenant API keys ─────────────────────────────────────────────────────────
+  listTenantApiKeys(this: PlatformAdminApiCore, tenantId: string): Promise<any[]>;
+  createTenantApiKey(
+    this: PlatformAdminApiCore,
+    tenantId: string,
+    input: { name: string; scopes?: string[]; expiresInDays?: number | null }
+  ): Promise<any>;
+  revokeTenantApiKey(this: PlatformAdminApiCore, tenantId: string, keyId: string): Promise<CentralMutationResult>;
 }
 
 export function createTenantApi(): TenantApi {
@@ -58,7 +91,7 @@ export function createTenantApi(): TenantApi {
     },
 
     async updateTenant(this: PlatformAdminApiCore, id: string, payload: Record<string, any>) {
-      return this.request<any>({
+      return this.request<PlatformTenant>({
         path: `/api/v1/admin/tenants/${encodeURIComponent(id)}`,
         method: 'PUT',
         body: payload,
@@ -66,7 +99,7 @@ export function createTenantApi(): TenantApi {
     },
 
     async setTenantStatus(this: PlatformAdminApiCore, id: string, status: string) {
-      return this.request<any>({
+      return this.request<PlatformTenant>({
         path: `/api/v1/admin/tenants/${encodeURIComponent(id)}/status`,
         method: 'POST',
         body: { status },
@@ -74,14 +107,14 @@ export function createTenantApi(): TenantApi {
     },
 
     async archiveTenant(this: PlatformAdminApiCore, id: string) {
-      return this.request<any>({
+      return this.request<CentralTenantArchiveResult>({
         path: `/api/v1/admin/tenants/${encodeURIComponent(id)}/archive`,
         method: 'POST',
       });
     },
 
     async getTenantProfile(this: PlatformAdminApiCore, id: string) {
-      return this.request<any>({
+      return this.request<PlatformTenantProfile>({
         path: `/api/v1/admin/tenants/${encodeURIComponent(id)}/profile`,
         method: 'GET',
       });
@@ -92,7 +125,7 @@ export function createTenantApi(): TenantApi {
       id: string,
       input: { username?: string; email?: string; fullName?: string; password?: string } = {}
     ) {
-      return this.request<any>({
+      return this.request<CentralTenantAccountCreated>({
         path: `/api/v1/admin/tenants/${encodeURIComponent(id)}/account`,
         method: 'POST',
         body: input,
@@ -100,14 +133,26 @@ export function createTenantApi(): TenantApi {
     },
 
     async resetTenantAccountPassword(this: PlatformAdminApiCore, id: string) {
-      return this.request<any>({
+      return this.request<{ temporaryPassword: string }>({
         path: `/api/v1/admin/tenants/${encodeURIComponent(id)}/account/reset-password`,
         method: 'POST',
       });
     },
 
-    async setTenantAccountActive(this: PlatformAdminApiCore, id: string, isActive: boolean) {
+    async updateTenantAccount(
+      this: PlatformAdminApiCore,
+      id: string,
+      input: { username?: string; email?: string; fullName?: string; password?: string }
+    ) {
       return this.request<any>({
+        path: `/api/v1/admin/tenants/${encodeURIComponent(id)}/account`,
+        method: 'PUT',
+        body: input,
+      });
+    },
+
+    async setTenantAccountActive(this: PlatformAdminApiCore, id: string, isActive: boolean) {
+      return this.request<CentralMutationResult>({
         path: `/api/v1/admin/tenants/${encodeURIComponent(id)}/account/status`,
         method: 'POST',
         body: { isActive },
@@ -117,12 +162,12 @@ export function createTenantApi(): TenantApi {
     // ── Tenant directory users ────────────────────────────────────────────────
 
     async listTenantUsers(this: PlatformAdminApiCore, tenantId: string) {
-      const rows = await this.request<any[]>({ path: `/api/v1/admin/tenants/${encodeURIComponent(tenantId)}/users`, method: 'GET' });
+      const rows = await this.request<PlatformTenantUser[]>({ path: `/api/v1/admin/tenants/${encodeURIComponent(tenantId)}/users`, method: 'GET' });
       return Array.isArray(rows) ? rows : [];
     },
 
     async createTenantUser(this: PlatformAdminApiCore, tenantId: string, input: Record<string, any>) {
-      return this.request<any>({
+      return this.request<CentralTenantUserCreated>({
         path: `/api/v1/admin/tenants/${encodeURIComponent(tenantId)}/users`,
         method: 'POST',
         body: input,
@@ -130,7 +175,7 @@ export function createTenantApi(): TenantApi {
     },
 
     async updateTenantUser(this: PlatformAdminApiCore, tenantId: string, userId: string, input: Record<string, any>) {
-      return this.request<any>({
+      return this.request<PlatformTenantUser>({
         path: `/api/v1/admin/tenants/${encodeURIComponent(tenantId)}/users/${encodeURIComponent(userId)}`,
         method: 'PUT',
         body: input,
@@ -138,14 +183,14 @@ export function createTenantApi(): TenantApi {
     },
 
     async deleteTenantUser(this: PlatformAdminApiCore, tenantId: string, userId: string) {
-      return this.request<any>({
+      return this.request<CentralMutationResult>({
         path: `/api/v1/admin/tenants/${encodeURIComponent(tenantId)}/users/${encodeURIComponent(userId)}`,
         method: 'DELETE',
       });
     },
 
     async setTenantUserActive(this: PlatformAdminApiCore, tenantId: string, userId: string, isActive: boolean) {
-      return this.request<any>({
+      return this.request<PlatformTenantUser>({
         path: `/api/v1/admin/tenants/${encodeURIComponent(tenantId)}/users/${encodeURIComponent(userId)}/status`,
         method: 'POST',
         body: { isActive },
@@ -153,21 +198,35 @@ export function createTenantApi(): TenantApi {
     },
 
     async resendTenantUserInvite(this: PlatformAdminApiCore, tenantId: string, userId: string) {
-      return this.request<any>({
+      return this.request<CentralTenantUserInviteResult>({
         path: `/api/v1/admin/tenants/${encodeURIComponent(tenantId)}/users/${encodeURIComponent(userId)}/resend-invite`,
         method: 'POST',
       });
     },
 
+    async listAllTenantUsers(this: PlatformAdminApiCore, filters: { tenantId?: string; provisioningStatus?: string; status?: string; search?: string } = {}) {
+      const params = new URLSearchParams();
+      if (filters.tenantId) params.set('tenantId', filters.tenantId);
+      if (filters.provisioningStatus) params.set('provisioningStatus', filters.provisioningStatus);
+      if (filters.status) params.set('status', filters.status);
+      if (filters.search) params.set('search', filters.search);
+      const q = params.toString();
+      const rows = await this.request<CentralTenantUserDirectoryEntry[]>({
+        path: `/api/v1/admin/tenant-users${q ? `?${q}` : ''}`,
+        method: 'GET',
+      });
+      return Array.isArray(rows) ? rows : [];
+    },
+
     // ── Tenant overrides ─────────────────────────────────────────────────────
 
     async listTenantOverrides(this: PlatformAdminApiCore, tenantId: string) {
-      const rows = await this.request<any[]>({ path: `/api/v1/admin/tenants/${encodeURIComponent(tenantId)}/overrides`, method: 'GET' });
+      const rows = await this.request<PlatformTenantOverride[]>({ path: `/api/v1/admin/tenants/${encodeURIComponent(tenantId)}/overrides`, method: 'GET' });
       return Array.isArray(rows) ? rows : [];
     },
 
     async addTenantOverride(this: PlatformAdminApiCore, tenantId: string, input: Record<string, any>) {
-      return this.request<any>({
+      return this.request<PlatformTenantOverride>({
         path: `/api/v1/admin/tenants/${encodeURIComponent(tenantId)}/overrides`,
         method: 'POST',
         body: input,
@@ -175,7 +234,7 @@ export function createTenantApi(): TenantApi {
     },
 
     async removeTenantOverride(this: PlatformAdminApiCore, tenantId: string, overrideId: string) {
-      return this.request<any>({
+      return this.request<CentralMutationResult>({
         path: `/api/v1/admin/tenants/${encodeURIComponent(tenantId)}/overrides/${encodeURIComponent(overrideId)}`,
         method: 'DELETE',
       });
@@ -184,7 +243,7 @@ export function createTenantApi(): TenantApi {
     // ── Payments ──────────────────────────────────────────────────────────────
 
     async recordTenantPayment(this: PlatformAdminApiCore, tenantId: string, input: Record<string, any>) {
-      return this.request<any>({
+      return this.request<PlatformPayment>({
         path: `/api/v1/admin/tenants/${encodeURIComponent(tenantId)}/payments`,
         method: 'POST',
         body: input,
@@ -194,11 +253,11 @@ export function createTenantApi(): TenantApi {
     // ── Remote control ────────────────────────────────────────────────────────
 
     async getTenantRemoteControl(this: PlatformAdminApiCore, tenantId: string) {
-      return this.request<any>({ path: `/api/v1/admin/tenants/${encodeURIComponent(tenantId)}/remote`, method: 'GET' });
+      return this.request<CentralTenantRemoteControl>({ path: `/api/v1/admin/tenants/${encodeURIComponent(tenantId)}/remote`, method: 'GET' });
     },
 
     async pushTenantConfig(this: PlatformAdminApiCore, tenantId: string, input: { key: string; value: any; scope?: string; targetDeviceIds?: string[] }) {
-      return this.request<any>({
+      return this.request<CentralRemoteConfigRow>({
         path: `/api/v1/admin/tenants/${encodeURIComponent(tenantId)}/remote/config`,
         method: 'POST',
         body: input,
@@ -206,7 +265,7 @@ export function createTenantApi(): TenantApi {
     },
 
     async forceTenantSync(this: PlatformAdminApiCore, tenantId: string) {
-      return this.request<any>({
+      return this.request<CentralTenantSyncResult>({
         path: `/api/v1/admin/tenants/${encodeURIComponent(tenantId)}/remote/sync`,
         method: 'POST',
       });
@@ -215,7 +274,7 @@ export function createTenantApi(): TenantApi {
     // ── Tenant branches ────────────────────────────────────────────────────────
 
     async listTenantBranches(this: PlatformAdminApiCore, tenantId: string) {
-      const rows = await this.request<any[]>({
+      const rows = await this.request<CentralTenantBranch[]>({
         path: `/api/v1/admin/tenants/${encodeURIComponent(tenantId)}/branches`,
         method: 'GET',
       });
@@ -223,7 +282,7 @@ export function createTenantApi(): TenantApi {
     },
 
     async createTenantBranch(this: PlatformAdminApiCore, tenantId: string, input: Record<string, any>) {
-      return this.request<any>({
+      return this.request<CentralTenantBranch>({
         path: `/api/v1/admin/tenants/${encodeURIComponent(tenantId)}/branches`,
         method: 'POST',
         body: input,
@@ -231,7 +290,7 @@ export function createTenantApi(): TenantApi {
     },
 
     async updateTenantBranch(this: PlatformAdminApiCore, tenantId: string, branchId: string, input: Record<string, any>) {
-      return this.request<any>({
+      return this.request<CentralTenantBranch>({
         path: `/api/v1/admin/tenants/${encodeURIComponent(tenantId)}/branches/${encodeURIComponent(branchId)}`,
         method: 'PUT',
         body: input,
@@ -239,8 +298,37 @@ export function createTenantApi(): TenantApi {
     },
 
     async closeTenantBranch(this: PlatformAdminApiCore, tenantId: string, branchId: string) {
-      return this.request<any>({
+      return this.request<CentralMutationResult>({
         path: `/api/v1/admin/tenants/${encodeURIComponent(tenantId)}/branches/${encodeURIComponent(branchId)}`,
+        method: 'DELETE',
+      });
+    },
+
+    // ── Tenant API keys ───────────────────────────────────────────────────────
+
+    async listTenantApiKeys(this: PlatformAdminApiCore, tenantId: string) {
+      const rows = await this.request<any[]>({
+        path: `/api/v1/admin/tenants/${encodeURIComponent(tenantId)}/api-keys`,
+        method: 'GET',
+      });
+      return Array.isArray(rows) ? rows : [];
+    },
+
+    async createTenantApiKey(
+      this: PlatformAdminApiCore,
+      tenantId: string,
+      input: { name: string; scopes?: string[]; expiresInDays?: number | null }
+    ) {
+      return this.request<any>({
+        path: `/api/v1/admin/tenants/${encodeURIComponent(tenantId)}/api-keys`,
+        method: 'POST',
+        body: input,
+      });
+    },
+
+    async revokeTenantApiKey(this: PlatformAdminApiCore, tenantId: string, keyId: string) {
+      return this.request<CentralMutationResult>({
+        path: `/api/v1/admin/tenants/${encodeURIComponent(tenantId)}/api-keys/${encodeURIComponent(keyId)}`,
         method: 'DELETE',
       });
     },

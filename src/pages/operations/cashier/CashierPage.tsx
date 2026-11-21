@@ -9,6 +9,7 @@ import { OpenShiftModal } from './OpenShiftModal';
 import { CloseShiftModal } from './CloseShiftModal';
 import { AddExpenseModal } from './AddExpenseModal';
 import { PermissionService } from '../../../services/domains/auth/PermissionService';
+import { usePageAccess } from '../../../hooks/domains/licensing/usePageAccess';
 
 export const CashierPage: React.FC = () => {
   const {
@@ -43,7 +44,12 @@ export const CashierPage: React.FC = () => {
   } = useCashier();
 
   const defaultReg = registers.find((r) => r.isDefault) || registers[0];
-  const canManageShifts = PermissionService.can(currentUser, 'ui.cashier.cashier.manage');
+  // قيود أقسام الخزينة من المنصة المركزية — تخفي أقسام الواجهة عند تعطيلها.
+  const pageAccess = usePageAccess('/cashboxes');
+  const canViewShifts = pageAccess.allows('ui.cashier.cashier.section.shifts.view');
+  const canViewExpenses = pageAccess.allows('ui.cashier.cashier.section.expenses.view');
+  const canViewCashboxes = pageAccess.allows('ui.cashier.cashier.section.cashboxes.view');
+  const canManageShifts = canViewShifts && PermissionService.can(currentUser, 'ui.cashier.cashier.manage');
 
   if (isLoading && registers.length === 0) {
     return (
@@ -74,9 +80,11 @@ export const CashierPage: React.FC = () => {
         onCloseShiftModal={() => setIsCloseShiftModal(true)}
         onOpenExpenseModal={() => setIsExpenseModalOpen(true)}
         onRefresh={loadData}
+        canUseShifts={canViewShifts}
+        canUseExpenses={canViewExpenses}
       />
 
-      {operationsShift && (
+      {canViewShifts && operationsShift && (
         <div className="rounded-xl border border-success-border bg-success-soft/60 p-4 flex items-center justify-between gap-3 flex-wrap">
           <div className="text-sm text-success">
             <span className="font-black">وردية التشغيل الحالية: {operationsShift.definitionName}</span>
@@ -94,20 +102,23 @@ export const CashierPage: React.FC = () => {
         </div>
       )}
 
-      <AutoCloseScheduleCard
-        lastClosedShift={lastClosedShift}
-        autoCloseEnabled={autoCloseEnabled}
-        onAutoCloseEnabledChange={setAutoCloseEnabled}
-        autoCloseTime={autoCloseTime}
-        onAutoCloseTimeChange={setAutoCloseTime}
-        canManageShifts={canManageShifts}
-        onSaveSchedule={saveSchedule}
-      />
+      {canViewShifts && (
+        <AutoCloseScheduleCard
+          lastClosedShift={lastClosedShift}
+          autoCloseEnabled={autoCloseEnabled}
+          onAutoCloseEnabledChange={setAutoCloseEnabled}
+          autoCloseTime={autoCloseTime}
+          onAutoCloseTimeChange={setAutoCloseTime}
+          canManageShifts={canManageShifts}
+          onSaveSchedule={saveSchedule}
+        />
+      )}
 
-      <CashStatusCards defaultRegister={defaultReg} activeShift={activeShift} expenses={expenses} />
+      {canViewCashboxes && <CashStatusCards defaultRegister={defaultReg} activeShift={activeShift} expenses={expenses} />}
 
-      <ExpensesTable expenses={expenses} />
+      {canViewExpenses && <ExpensesTable expenses={expenses} />}
 
+      {canViewShifts && (
       <OpenShiftModal
         isOpen={isOpenShiftModal}
         registers={registers}
@@ -117,7 +128,9 @@ export const CashierPage: React.FC = () => {
         onSubmit={openShift}
         getSuggestedBalance={suggestedOpeningBalance}
       />
+      )}
 
+      {canViewShifts && (
       <CloseShiftModal
         isOpen={isCloseShiftModal}
         activeShift={activeShift}
@@ -125,13 +138,16 @@ export const CashierPage: React.FC = () => {
         onClose={() => setIsCloseShiftModal(false)}
         onSubmit={closeShift}
       />
+      )}
 
+      {canViewExpenses && (
       <AddExpenseModal
         isOpen={isExpenseModalOpen}
         categories={categories}
         onClose={() => setIsExpenseModalOpen(false)}
         onSubmit={addExpense}
       />
+      )}
     </div>
   );
 };

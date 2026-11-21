@@ -207,6 +207,13 @@ export const PlatformOperationsSettingsPage: React.FC = () => {
           .finally(() => setLoading(false));
         return;
       }
+      if (activeTab === 'maintenance') {
+        centralPlatformClient.listMaintenanceWindows()
+          .then((rows) => { setMaintenanceWindows(rows); setLoadError(null); })
+          .catch((e) => setLoadError(e instanceof Error ? e.message : 'تعذر تحميل نوافذ الصيانة.'))
+          .finally(() => setLoading(false));
+        return;
+      }
       setMaintenanceWindows([]);
       setApprovals([]);
       setSyncLogs([]);
@@ -328,24 +335,34 @@ export const PlatformOperationsSettingsPage: React.FC = () => {
       toast.warning('لا تملك صلاحية إدارة العمليات.');
       return;
     }
-    // No central maintenance-window endpoint exists — never write local while
-    // the page is displaying central data.
+    if (!newMaintTitle || !newMaintStart || !newMaintEnd) return;
+    const affectedServices = newMaintServices.split(',').map((s) => s.trim()).filter(Boolean);
+    const resetForm = () => {
+      setNewMaintModalOpen(false);
+      setNewMaintTitle('');
+      setNewMaintDesc('');
+    };
     if (centralActive) {
-      toast.error('جدولة نوافذ الصيانة غير مدعومة في الوضع المركزي بعد.');
+      centralPlatformClient.createMaintenanceWindow({
+        title: newMaintTitle,
+        description: newMaintDesc || undefined,
+        startsAt: new Date(newMaintStart).toISOString(),
+        endsAt: new Date(newMaintEnd).toISOString(),
+        affectedServices,
+      })
+        .then(() => { resetForm(); loadData(); })
+        .catch((e) => toast.error((e as Error).message));
       return;
     }
-    if (!newMaintTitle || !newMaintStart || !newMaintEnd) return;
     try {
       platformAdminService.createMaintenanceWindow({
         title: newMaintTitle,
         description: newMaintDesc || undefined,
         startsAt: newMaintStart,
         endsAt: newMaintEnd,
-        affectedServices: newMaintServices.split(',').map((s) => s.trim()).filter(Boolean),
+        affectedServices,
       });
-      setNewMaintModalOpen(false);
-      setNewMaintTitle('');
-      setNewMaintDesc('');
+      resetForm();
       loadData();
     } catch (e) {
       toast.error((e as Error).message);
@@ -357,11 +374,13 @@ export const PlatformOperationsSettingsPage: React.FC = () => {
       toast.warning('لا تملك صلاحية إدارة العمليات.');
       return;
     }
+    if (!confirm('هل أنت متأكد من إلغاء نافذة الصيانة؟')) return;
     if (centralActive) {
-      toast.error('إدارة نوافذ الصيانة غير مدعومة في الوضع المركزي بعد.');
+      centralPlatformClient.cancelMaintenanceWindow(id)
+        .then(loadData)
+        .catch((e) => toast.error((e as Error).message));
       return;
     }
-    if (!confirm('هل أنت متأكد من إلغاء نافذة الصيانة؟')) return;
     try {
       platformAdminService.cancelMaintenanceWindow(id);
       loadData();
@@ -469,7 +488,7 @@ export const PlatformOperationsSettingsPage: React.FC = () => {
                 إنشاء مهمة تشغيل
               </Button>
             )}
-            {activeTab === 'maintenance' && canManageOperations && !centralActive && (
+            {activeTab === 'maintenance' && canManageOperations && (
               <Button variant="primary" onClick={() => setNewMaintModalOpen(true)}>
                 <Plus className="w-4 h-4 ml-2" />
                 جدولة صيانة
@@ -560,7 +579,7 @@ export const PlatformOperationsSettingsPage: React.FC = () => {
         </button>
       </div>
 
-      {centralActive && (activeTab === 'sync' || activeTab === 'approvals' || activeTab === 'maintenance') && (
+      {centralActive && (activeTab === 'sync' || activeTab === 'approvals') && (
         <div className="rounded-lg border border-warning/50 bg-warning/20 px-4 py-3 text-xs font-semibold text-warning">
           هذا القسم غير متاح في الوضع المركزي بعد — بياناته تُدار على المصدر المحلي فقط.
         </div>

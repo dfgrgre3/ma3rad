@@ -171,6 +171,120 @@ test('ensureModuleInstalled installs once, shares concurrent calls and reports f
   resetModuleInstallerState();
 });
 
+test('planPageChunks assigns page-exclusive chunks to page packages and intra-module shared chunks to the module package', async () => {
+  const { planPageChunks } = await import('../src/modules/chunkOwnership.ts');
+  const chunk = (fileName: string, o: Record<string, unknown> = {}) => ({
+    fileName, isEntry: false, facadeModuleId: null, imports: [], dynamicImports: [], css: [], ...o,
+  });
+  const chunks = [
+    chunk('assets/index.js', { isEntry: true, dynamicImports: ['assets/Orders.js', 'assets/Returns.js', 'assets/Core.js'], imports: ['assets/vendor.js'] }),
+    chunk('assets/vendor.js'),
+    chunk('assets/Core.js'),
+    chunk('assets/Orders.js', { facadeModuleId: '/p/Orders.tsx', imports: ['assets/sales-shared.js', 'assets/orders-only.js'], css: ['assets/Orders.css'] }),
+    chunk('assets/orders-only.js'),
+    chunk('assets/Returns.js', { facadeModuleId: '/p/Returns.js', imports: ['assets/sales-shared.js'] }),
+    chunk('assets/sales-shared.js'),
+  ];
+  const units = {
+    '/p/Orders.tsx': { packageId: 'pg-sales-a', modules: ['sales'] },
+    '/p/Returns.js': { packageId: 'pg-sales-b', modules: ['sales'] },
+  };
+  const plan = planPageChunks(chunks, units);
+  assert.deepEqual(plan.modules['pg-sales-a'], ['assets/Orders.css', 'assets/Orders.js', 'assets/orders-only.js']);
+  assert.deepEqual(plan.modules['pg-sales-b'], ['assets/Returns.js']);
+  assert.deepEqual(plan.modules.sales, ['assets/sales-shared.js']);
+  assert.deepEqual(plan.members.sales, ['/p/Orders.tsx', '/p/Returns.js']);
+  assert.deepEqual(plan.members['pg-sales-a'], ['/p/Orders.tsx']);
+  assert.deepEqual(plan.unsplittablePackages, []);
+});
+
+test('planPageChunks keeps chunks shared across modules in core and multi-module pages get their own package', async () => {
+  const { planPageChunks } = await import('../src/modules/chunkOwnership.ts');
+  const chunk = (fileName: string, o: Record<string, unknown> = {}) => ({
+    fileName, isEntry: false, facadeModuleId: null, imports: [], dynamicImports: [], css: [], ...o,
+  });
+  const chunks = [
+    chunk('assets/index.js', { isEntry: true, dynamicImports: ['assets/Daily.js', 'assets/Orders.js', 'assets/Hr.js'] }),
+    chunk('assets/Daily.js', { facadeModuleId: '/p/Daily.tsx', imports: ['assets/cross.js', 'assets/daily-only.js'] }),
+    chunk('assets/daily-only.js'),
+    chunk('assets/Orders.js', { facadeModuleId: '/p/Orders.tsx', imports: ['assets/cross.js'] }),
+    chunk('assets/Hr.js', { facadeModuleId: '/p/Hr.tsx', imports: ['assets/cross.js'] }),
+    chunk('assets/cross.js'),
+  ];
+  const units = {
+    '/p/Daily.tsx': { packageId: 'pg-sales-daily', modules: ['sales', 'purchasing', 'finance'] },
+    '/p/Orders.tsx': { packageId: 'pg-sales-orders', modules: ['sales'] },
+    '/p/Hr.tsx': { packageId: 'pg-hr-main', modules: ['hr'] },
+  };
+  const plan = planPageChunks(chunks, units);
+  // DailyPage serves three modules: its exclusive chunk still gets a package.
+  assert.deepEqual(plan.modules['pg-sales-daily'], ['assets/Daily.js', 'assets/daily-only.js']);
+  // 'cross.js' is reachable from units spanning sales+purchasing / hr → core.
+  const packaged = Object.values(plan.modules).flat();
+  assert.ok(!packaged.includes('assets/cross.js'), 'cross-module shared chunk stays in core');
+});
+
+test('provisionEntitledModules skips packages hidden by the signed tenant config', async () => {
+  const { provisionEntitledModules, resetModuleInstallerState } = await import('../src/modules/moduleInstaller.ts');
+  resetModuleInstallerState();
+  const CONFIG_KEY = 'central_cached_config';
+  globalThis.localStorage.setItem(CONFIG_KEY, JSON.stringify({
+    schemaVersion: 1,
+    configurationVersion: 1,
+    config: { allowedModules: ['sales'], hiddenMenus: ['/secret-page'] },
+  }));
+  try {
+    const installed: string[] = [];
+    const api = {
+      status: async () => ({ buildId: 'b'.repeat(64), installed: [] }),
+      available: async () => [
+        { moduleId: 'pg-sales-a', version: '1.0.0', sizeBytes: 1, installed: false, modules: ['sales'], pages: ['/orders'] },
+        { moduleId: 'pg-sales-b', version: '1.0.0', sizeBytes: 1, installed: false, modules: ['sales'], pages: ['/secret-page'] },
+        { moduleId: 'pg-hr-c', version: '1.0.0', sizeBytes: 1, installed: false, modules: ['hr'], pages: ['/employees'] },
+      ],
+      install: async (id: string) => { installed.push(id); },
+    };
+    const result = await provisionEntitledModules(api);
+    // Only the visible sales package remains → its module installs once.
+    // The hidden page package and the non-entitled hr module are never requested.
+    assert.deepEqual(installed, ['sales']);
+    assert.deepEqual(result.catalog.map((m) => m.moduleId), ['pg-sales-a']);
+    assert.deepEqual(result.installed, ['sales']);
+    assert.deepEqual(result.failed, []);
+  } finally {
+    globalThis.localStorage.removeItem(CONFIG_KEY);
+    resetModuleInstallerState();
+  }
+});
+
+test('provisionEntitledModules keeps a package when only some of its routes are hidden', async () => {
+  const { provisionEntitledModules, resetModuleInstallerState } = await import('../src/modules/moduleInstaller.ts');
+  resetModuleInstallerState();
+  const CONFIG_KEY = 'central_cached_config';
+  globalThis.localStorage.setItem(CONFIG_KEY, JSON.stringify({
+    schemaVersion: 1,
+    configurationVersion: 1,
+    config: { allowedModules: ['sales'], hiddenMenus: ['/daily/sales'] },
+  }));
+  try {
+    const installed: string[] = [];
+    const api = {
+      status: async () => ({ buildId: 'b'.repeat(64), installed: [] }),
+      available: async () => [
+        // DailyPage serves three routes; hiding one must not remove the file.
+        { moduleId: 'pg-sales-daily', version: '1.0.0', sizeBytes: 1, installed: false, modules: ['sales', 'purchasing'], pages: ['/daily/sales', '/daily/purchases'] },
+      ],
+      install: async (id: string) => { installed.push(id); },
+    };
+    const result = await provisionEntitledModules(api);
+    assert.deepEqual(result.catalog.map((m) => m.moduleId), ['pg-sales-daily']);
+    assert.deepEqual(installed.sort(), ['purchasing', 'sales']);
+  } finally {
+    globalThis.localStorage.removeItem(CONFIG_KEY);
+    resetModuleInstallerState();
+  }
+});
+
 test('provisionEntitledModules installs only entitled catalog modules and reports progress', async () => {
   const { provisionEntitledModules, resetModuleInstallerState } = await import('../src/modules/moduleInstaller.ts');
   resetModuleInstallerState();

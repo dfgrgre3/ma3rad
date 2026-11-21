@@ -166,6 +166,9 @@ export interface PlatformPlanUpgradeRule {
   toPlanId: string;
   allowed: boolean;
   requiresApproval: boolean;
+  /** نسبة رسوم الترقية من الفرق (0-100). */
+  upgradeFeePercent?: number;
+  notes?: string | null;
   createdAt: string;
   updatedAt: string;
 }

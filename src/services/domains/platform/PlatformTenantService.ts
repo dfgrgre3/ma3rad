@@ -12,6 +12,7 @@ import type {
   PlatformTenantAccountInput,
   PlatformTenantProfile,
   PlatformTenantUser,
+  PlatformTenantUserDirectoryEntry,
   PlatformTenantUserInput,
   PlatformTenantUserProvisioningResult,
   PlatformTenantOverride,
@@ -167,6 +168,13 @@ export class PlatformTenantService {
     return tenantAccount.resetTenantAccountPassword(this.ctx, tenantId, temporaryPassword);
   }
 
+  public updateTenantAccount(
+    tenantId: string,
+    input: { username?: string; email?: string; fullName?: string; password?: string }
+  ): PlatformTenantAccount {
+    return tenantAccount.updateTenantAccount(this.ctx, tenantId, input);
+  }
+
   public setTenantAccountActive(tenantId: string, active: boolean): PlatformTenantAccount {
     return tenantAccount.setTenantAccountActive(this.ctx, tenantId, active);
   }
@@ -175,6 +183,10 @@ export class PlatformTenantService {
 
   public listTenantUsers(tenantId: string): PlatformTenantUser[] {
     return tenantUsers.listTenantUsers(this.ctx, tenantId);
+  }
+
+  public listAllTenantUsers(filters: { tenantId?: string; provisioningStatus?: string; status?: string; search?: string } = {}): PlatformTenantUserDirectoryEntry[] {
+    return tenantUsers.listAllTenantUsers(this.ctx, filters);
   }
 
   public createTenantUser(tenantId: string, input: PlatformTenantUserInput): PlatformTenantUserProvisioningResult {

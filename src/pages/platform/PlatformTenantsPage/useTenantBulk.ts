@@ -13,8 +13,8 @@ import { activationText, buildActivation } from './activation';
 interface UseTenantBulkOptions {
   tenants: PlatformTenant[];
   centralActive: boolean;
-  detailId: string | null;
-  loadProfile: (id: string) => void;
+  detailId?: string | null;
+  loadProfile?: (id: string) => void;
   load: () => void;
 }
 
@@ -114,7 +114,7 @@ export function useTenantBulk({ tenants, centralActive, detailId, loadProfile, l
         setBulkActionOpen(false);
         setSelectedIds(new Set());
         load();
-        if (detailId) loadProfile(detailId);
+        if (detailId && loadProfile) loadProfile(detailId);
         return;
       }
       switch (bulkActionType) {
@@ -158,7 +158,7 @@ export function useTenantBulk({ tenants, centralActive, detailId, loadProfile, l
       setBulkActionOpen(false);
       setSelectedIds(new Set());
       load();
-      if (detailId) loadProfile(detailId);
+      if (detailId && loadProfile) loadProfile(detailId);
     } catch (err) {
       toast.error('فشل العملية المجمعة', err instanceof Error ? err.message : undefined);
     } finally {

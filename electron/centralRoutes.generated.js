@@ -3,7 +3,7 @@
  * Source: central-server/routeManifest.js
  * Regenerate with: node central-server/scripts/generate-routes.mjs
  *
- * 179 allowlisted endpoint pattern(s).
+ * 233 allowlisted endpoint pattern(s).
  */
 
 const ROUTE_DEFINITIONS = [
@@ -128,7 +128,8 @@ const ROUTE_DEFINITIONS = [
   {
     "pattern": "/api/v1/admin/tenants/:id/account",
     "methods": [
-      "POST"
+      "POST",
+      "PUT"
     ]
   },
   {
@@ -221,6 +222,19 @@ const ROUTE_DEFINITIONS = [
     ]
   },
   {
+    "pattern": "/api/v1/admin/tenants/:id/api-keys",
+    "methods": [
+      "GET",
+      "POST"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/tenants/:id/api-keys/:keyId",
+    "methods": [
+      "DELETE"
+    ]
+  },
+  {
     "pattern": "/api/v1/admin/plans",
     "methods": [
       "GET",
@@ -228,13 +242,77 @@ const ROUTE_DEFINITIONS = [
     ]
   },
   {
-    "pattern": "/api/v1/admin/plans/:id",
+    "pattern": "/api/v1/admin/plans/upgrade-rules",
     "methods": [
+      "GET",
       "PUT"
     ]
   },
   {
+    "pattern": "/api/v1/admin/plans/:id",
+    "methods": [
+      "GET",
+      "PUT",
+      "DELETE"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/plans/:id/subscribers",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/plans/:id/versions",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/plans/:id/price-history",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/plans/:id/deactivation-check",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/plans/:id/impact-preview",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/plans/:id/copy",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
     "pattern": "/api/v1/admin/subscriptions",
+    "methods": [
+      "GET",
+      "POST"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/subscriptions/trial",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/subscriptions/:tenantId",
+    "methods": [
+      "PATCH"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/subscriptions/:tenantId/history",
     "methods": [
       "GET"
     ]
@@ -258,6 +336,18 @@ const ROUTE_DEFINITIONS = [
     ]
   },
   {
+    "pattern": "/api/v1/admin/subscriptions/:tenantId/suspend",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/subscriptions/:tenantId/resume",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
     "pattern": "/api/v1/admin/licenses",
     "methods": [
       "GET"
@@ -267,6 +357,25 @@ const ROUTE_DEFINITIONS = [
     "pattern": "/api/v1/admin/licenses/issue",
     "methods": [
       "POST"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/licenses/:id",
+    "methods": [
+      "GET",
+      "PATCH"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/licenses/:id/activations",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/licenses/:id/changes",
+    "methods": [
+      "GET"
     ]
   },
   {
@@ -312,6 +421,12 @@ const ROUTE_DEFINITIONS = [
     ]
   },
   {
+    "pattern": "/api/v1/admin/devices/:id/activate",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
     "pattern": "/api/v1/admin/devices/:id/suspend",
     "methods": [
       "POST"
@@ -327,6 +442,24 @@ const ROUTE_DEFINITIONS = [
     "pattern": "/api/v1/admin/devices/:id/revoke",
     "methods": [
       "POST"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/devices/:id/reassign",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/devices/:id/clone-flag",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/devices/:id",
+    "methods": [
+      "DELETE"
     ]
   },
   {
@@ -426,6 +559,19 @@ const ROUTE_DEFINITIONS = [
     "pattern": "/api/v1/admin/operations/usage/:tenantId",
     "methods": [
       "GET"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/operations/maintenance-windows",
+    "methods": [
+      "GET",
+      "POST"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/operations/maintenance-windows/:id/cancel",
+    "methods": [
+      "POST"
     ]
   },
   {
@@ -568,6 +714,12 @@ const ROUTE_DEFINITIONS = [
     ]
   },
   {
+    "pattern": "/api/v1/admin/support/tickets/:id/rating",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
     "pattern": "/api/v1/admin/monitoring/errors",
     "methods": [
       "GET"
@@ -604,6 +756,18 @@ const ROUTE_DEFINITIONS = [
     ]
   },
   {
+    "pattern": "/api/v1/admin/monitoring/health",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/monitoring/metrics",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
     "pattern": "/api/v1/admin/releases",
     "methods": [
       "GET",
@@ -630,7 +794,76 @@ const ROUTE_DEFINITIONS = [
     ]
   },
   {
+    "pattern": "/api/v1/admin/releases/:id/targets",
+    "methods": [
+      "GET",
+      "PUT"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/releases/:id/targets/:tenantId/status",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
     "pattern": "/api/v1/admin/policies",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/policies/documents",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/policies/documents/:slug",
+    "methods": [
+      "GET",
+      "PUT"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/policies/documents/:slug/submit",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/policies/documents/:slug/approve",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/policies/documents/:slug/reject",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/policies/documents/:slug/versions",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/policies/documents/:slug/restore",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/policies/retention",
+    "methods": [
+      "GET",
+      "PUT"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/policies/export",
     "methods": [
       "GET"
     ]
@@ -686,6 +919,19 @@ const ROUTE_DEFINITIONS = [
     "pattern": "/api/v1/admin/feature-flags/:id",
     "methods": [
       "PUT",
+      "DELETE"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/feature-flags/:id/overrides",
+    "methods": [
+      "GET",
+      "POST"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/feature-flags/:id/overrides/:overrideId",
+    "methods": [
       "DELETE"
     ]
   },
@@ -1047,6 +1293,90 @@ const ROUTE_DEFINITIONS = [
     ]
   },
   {
+    "pattern": "/api/v1/admin/tenant-users",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/admin-control/users/overview",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/admin-control/users/search",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/admin-control/users/tenant/:userId",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "pattern": "/api/v1/admin/admin-control/users/staff/:id",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "pattern": "/api/v1/device/provisioning/pending",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "pattern": "/api/v1/device/provisioning/:jobId/result",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "pattern": "/api/v1/device/tenant-users/report",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "pattern": "/api/v1/tenant/v1/me",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "pattern": "/api/v1/tenant/v1/subscription",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "pattern": "/api/v1/tenant/v1/licenses",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "pattern": "/api/v1/tenant/v1/usage",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "pattern": "/api/v1/tenant/v1/devices",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "pattern": "/api/v1/tenant/v1/entitlements",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
     "pattern": "/api/v1/licensing/activate",
     "methods": [
       "POST"
@@ -1078,6 +1408,12 @@ const ROUTE_DEFINITIONS = [
   },
   {
     "pattern": "/api/v1/telemetry/errors",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "pattern": "/api/v1/telemetry/metrics",
     "methods": [
       "POST"
     ]

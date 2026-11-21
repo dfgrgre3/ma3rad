@@ -20,6 +20,8 @@ interface SessionCountModalProps {
   onSaveDraft: () => void;
   onPost: () => void;
   canApprove: boolean;
+  /** إخفاء أعمدة الفروقات عند تعطيل قسم الفروقات مركزيًا. */
+  canViewDifferences?: boolean;
   onApprove: () => void;
   onReject: () => void;
   onCancelSession: () => void;
@@ -63,6 +65,7 @@ export const SessionCountModal: React.FC<SessionCountModalProps> = ({
   onSaveDraft,
   onPost,
   canApprove,
+  canViewDifferences = true,
   onApprove,
   onReject,
   onCancelSession,
@@ -94,7 +97,9 @@ export const SessionCountModal: React.FC<SessionCountModalProps> = ({
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-center">
             <div className="rounded-xl border border-line bg-surface-muted p-3"><div className="text-lg font-black text-ink">{countedItems}/{items.length}</div><div className="text-[11px] text-muted">أصناف تم جردها</div></div>
             <div className="rounded-xl border border-line bg-surface-muted p-3"><div className="text-lg font-black text-warning">{Math.max(0, items.length - countedItems)}</div><div className="text-[11px] text-muted">أصناف متبقية</div></div>
+            {canViewDifferences && (
             <div className="rounded-xl border border-line bg-surface-muted p-3"><div className="text-lg font-black text-primary">{varianceItems}</div><div className="text-[11px] text-muted">فروقات مسجلة</div></div>
+            )}
           </div>
           <div className="relative"><Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" /><input value={itemSearch} onChange={(e) => onItemSearchChange(e.target.value)} placeholder="بحث داخل أصناف الجرد..." className="w-full pr-9 pl-3 py-2 bg-surface border border-line rounded-xl text-sm" /></div>
           <div className="flex items-center justify-between text-xs text-muted bg-surface p-3 rounded-lg border border-line">
@@ -142,7 +147,7 @@ export const SessionCountModal: React.FC<SessionCountModalProps> = ({
                     );
                   },
                 },
-                {
+                ...(canViewDifferences ? [{
                   key: 'variance', header: 'الفارق',
                   render: (row: any) => {
                     const { blindCounting, isCounted } = countCellState(row.item, session);
@@ -187,6 +192,7 @@ export const SessionCountModal: React.FC<SessionCountModalProps> = ({
                     return <span className="font-mono font-bold text-muted">—</span>;
                   },
                 },
+                ] : []),
                 {
                   key: 'notes', header: 'ملاحظات',
                   render: (row: any) => {

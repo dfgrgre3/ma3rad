@@ -1,38 +1,33 @@
 import React from 'react';
-import { DataTable } from '../../components/ui/DataTable';
 import { PageHeader } from '../../components/ui/PageHeader';
-import { GRANULAR_PERMISSIONS } from '../../config/permissionMatrix';
-import { ROUTE_PERMISSIONS } from '../../config/routePermissions';
 import { centralPlatformClient } from '../../services/domains/platform/CentralPlatformClient';
-import type { TenantFeaturePermissions } from '../../services/domains/platform/PlatformAdminApiClient';
+import { AccessPagesEditor } from './components/access/AccessPagesEditor';
+import { PermissionLimitsEditor } from './components/access/PermissionLimitsEditor';
+import { useTenantAccessGating, ALL_MODULE_CODES, buildRegistryToPlatformCodes } from './components/access/useTenantAccessGating';
+import type { FeatureConfigData } from './components/access/featureConfigDraft';
+import { useToast } from '../../components/ui/Toast';
+
+const EMPTY_CONFIG: FeatureConfigData = {
+  hiddenMenus: [],
+  disabledPermissions: [],
+  featurePermissions: [],
+};
 
 /**
  * منصة المستخدمين — الصفحات والصلاحيات.
  *
- * The hide/show rules configured here are persisted on the **central server**
- * (tenant_feature_config) through the Electron bridge — never in localStorage.
- * Enforcement does not stop at hiding a menu entry:
- *   - Tenant ERPs consume hiddenMenus / disabledPermissions / featurePermissions
- *     from the cached central licence config at activation/validation time.
- *   - The platform console enforces its own RBAC on the central server
- *     (requirePlatformPermission / requireTenantScope) and locally in
- *     PlatformAdminService (granular permission matrix, deny-by-default).
- *   - Per-user grants/denies are stored on the staff account
- *     (permissionsOverride) and enforced by PlatformAuthorizationService.
+ * Visual per-scope editor backed by the shared access module: it lists every
+ * tenant-facing page, shows effective visibility (manual hide, feature gate,
+ * module exclusion, permission restriction) and opens the per-page permission
+ * editor. Persists to tenant_feature_config on the central server — never in
+ * localStorage. Non-page permission codes are preserved automatically.
  */
 export const PlatformUserPlatformPermissionsPage: React.FC = () => {
+  const toast = useToast();
   const [tenantKey, setTenantKey] = React.useState<string>('global');
-  const [featurePermissions, setFeaturePermissions] = React.useState<TenantFeaturePermissions>({
-    hiddenMenus: [],
-    disabledPermissions: [],
-    featurePermissions: [],
-  });
-  const [disabledPermissionsText, setDisabledPermissionsText] = React.useState('');
-  const [featurePermissionsText, setFeaturePermissionsText] = React.useState('[]');
+  const [config, setConfig] = React.useState<FeatureConfigData>(EMPTY_CONFIG);
   const [loading, setLoading] = React.useState(false);
-  const [saving, setSaving] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
-  const [notice, setNotice] = React.useState<string | null>(null);
 
   const scope = React.useMemo(() => {
     const value = tenantKey.trim();
@@ -41,15 +36,32 @@ export const PlatformUserPlatformPermissionsPage: React.FC = () => {
     return { tenantId: value, planId: null };
   }, [tenantKey]);
 
+  const tenantGating = useTenantAccessGating(scope.tenantId);
+  const gating = React.useMemo(
+    () =>
+      scope.tenantId
+        ? tenantGating
+        : {
+            featureHiddenPaths: new Set<string>(),
+            moduleCodes: ALL_MODULE_CODES,
+            registryToPlatformCodes: buildRegistryToPlatformCodes(),
+          },
+    [scope.tenantId, tenantGating]
+  );
+
+  const [configVersion, setConfigVersion] = React.useState(0);
+
   const load = React.useCallback(async () => {
     setLoading(true);
     setError(null);
-    setNotice(null);
     try {
-      const data = await centralPlatformClient.getFeaturePermissions(scope);
-      setFeaturePermissions(data);
-      setDisabledPermissionsText(data.disabledPermissions.join('\n'));
-      setFeaturePermissionsText(JSON.stringify(data.featurePermissions, null, 2));
+      if (scope.tenantId) {
+        const effective = await centralPlatformClient.getEffectiveFeaturePermissions(scope.tenantId);
+        setConfig(effective.effective);
+      } else {
+        setConfig(await centralPlatformClient.getFeaturePermissions(scope));
+      }
+      setConfigVersion((v) => v + 1);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : 'تعذر قراءة إعدادات الصلاحيات من السيرفر المركزي.');
     } finally {
@@ -61,84 +73,55 @@ export const PlatformUserPlatformPermissionsPage: React.FC = () => {
     void load();
   }, [load]);
 
-  const toggleHidden = (path: string) => {
-    setFeaturePermissions((prev) => {
-      const next = prev.hiddenMenus.includes(path)
-        ? prev.hiddenMenus.filter((p) => p !== path)
-        : [...prev.hiddenMenus, path];
-      return { ...prev, hiddenMenus: next };
-    });
-  };
-
-  const save = async () => {
-    setSaving(true);
+  const save = async (payload: {
+    hiddenMenus: string[];
+    disabledPermissions: string[];
+    featurePermissions: Array<Record<string, unknown>>;
+  }) => {
+    setLoading(true);
     setError(null);
-    setNotice(null);
     try {
-      const parsedFeature = (() => {
-        try {
-          const parsed = JSON.parse(featurePermissionsText || '[]');
-          return Array.isArray(parsed) ? parsed : [parsed];
-        } catch {
-          throw new Error('صيغة featurePermissions ليست JSON صالحة.');
-        }
-      })();
-      const disabledPermissions = disabledPermissionsText
-        .split('\n')
-        .map((line) => line.trim())
-        .filter(Boolean);
       await centralPlatformClient.setFeaturePermissions({
-        ...scope,
-        hiddenMenus: featurePermissions.hiddenMenus,
-        disabledPermissions,
-        featurePermissions: parsedFeature,
+        tenantId: scope.tenantId,
+        planId: scope.planId,
+        ...payload,
       });
-      setNotice('تم حفظ إعدادات صلاحيات العميل/الخطة على السيرفر المركزي.');
+      toast.success('تم حفظ إعدادات الصلاحيات على السيرفر المركزي');
       await load();
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : 'تعذر حفظ الإعدادات على السيرفر المركزي.');
+      throw saveError;
     } finally {
-      setSaving(false);
+      setLoading(false);
     }
   };
 
-  const hiddenRouteRules = React.useMemo(
-    () => ROUTE_PERMISSIONS.map((rule) => ({ rule, hidden: featurePermissions.hiddenMenus.includes(rule.path) })),
-    [featurePermissions.hiddenMenus],
-  );
-
-  const byRoute = React.useMemo(() => {
-    const map = new Map<string, { module: string; perms: typeof GRANULAR_PERMISSIONS[number][] }>();
-    for (const p of GRANULAR_PERMISSIONS) {
-      const key = p.route || '(بدون مسار)';
-      if (!map.has(key)) map.set(key, { module: p.module, perms: [] });
-      map.get(key)!.perms.push(p);
-    }
-    return Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0], 'ar'));
-  }, []);
+  const scopeLabel = scope.tenantId ? `عميل ${scope.tenantId}` : scope.planId ? `باقة ${scope.planId}` : 'النطاق العام';
 
   return (
     <div className="space-y-6">
       <header className="rounded-2xl border border-line bg-surface p-5 shadow-sm">
         <PageHeader
           bordered={false}
-          title="منصة المستخدمين — صفحات وصلاحيات"
-          description="عرض كامل لجميع صفحات المنصة وكل الصلاحيات على كل صفحة، مع التحكم الفعلي في ظهور القوائم وتعطيل الصلاحيات على مستوى العميل أو الخطة — محفوظ على السيرفر المركزي، وليس على هذا الجهاز."
+          title="منصة المستخدمين — الصفحات والصلاحيات"
+          description="تحكم مرئي في صفحات وميزات كل عميل أو باقة أو النطاق العام: إظهار/إخفاء الصفحات، تقييد التعديل والحذف والتصدير داخل كل صفحة، وتعطيل صلاحيات دقيقة — محفوظ على السيرفر المركزي عبر التكوين الموقّع."
           meta={
             <>
               <p className="mt-1 text-xs text-muted">
-                الصلاحيات على مستوى الموظف تُدار من صفحة «حسابات الموظفين» (grant/deny لكل حساب)، وعلى مستوى
-                الدور من مصفوفة الصلاحيات. الحماية الحقيقية تنفذها واجهات الـ API في الخادم المركزي
-                (requirePlatformPermission / requireTenantScope) وفي خدمة التفويض المحلية.
+                الصلاحيات على مستوى الموظف تُدار من صفحة «حسابات الموظفين»، وعلى مستوى الدور من مصفوفة الصلاحيات.
+                الحماية الحقيقية تنفذها واجهات الـ API في الخادم المركزي (requirePlatformPermission / requireTenantScope)
+                وفي خدمة التفويض المحلية — إخفاء القائمة وحده ليس حماية.
               </p>
               <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
-                <label className="font-semibold text-ink">مفتاح عميل/خطة:</label>
+                <label className="font-semibold text-ink">نطاق الإعدادات:</label>
                 <input
                   value={tenantKey}
                   onChange={(e) => setTenantKey(e.target.value || 'global')}
-                  className="rounded border border-line-strong px-2 py-1 text-xs"
+                  className="w-64 rounded border border-line-strong px-2 py-1 text-xs"
                   placeholder="global أو tenantId أو plan:<planId>"
+                  dir="ltr"
                 />
+                <span className="text-[11px] text-muted">{scopeLabel}</span>
                 <button
                   type="button"
                   onClick={() => void load()}
@@ -149,109 +132,34 @@ export const PlatformUserPlatformPermissionsPage: React.FC = () => {
                 </button>
               </div>
               {error && <div role="alert" className="mt-3 rounded border border-danger-border bg-danger-soft p-2 text-xs text-danger">{error}</div>}
-              {notice && <div role="status" className="mt-3 rounded border border-success-border bg-success-soft p-2 text-xs text-success">{notice}</div>}
-              <div className="mt-3 flex gap-4 text-xs text-muted">
-                <span>مسارات مخفية لهذا النطاق: {featurePermissions.hiddenMenus.length}</span>
-                <span>صلاحيات معطلة: {featurePermissions.disabledPermissions.length}</span>
-                <span>صلاحيات (featurePermissions): {featurePermissions.featurePermissions.length}</span>
+              <div className="mt-2 text-[11px] text-muted">
+                مسارات مخفية: {config.hiddenMenus?.length ?? 0} · صلاحيات معطلة: {config.disabledPermissions?.length ?? 0} · قيود صفحات: {config.featurePermissions?.length ?? 0}
               </div>
             </>
           }
         />
       </header>
 
-      <section className="rounded-2xl border border-line bg-surface p-5 shadow-sm">
-        <h2 className="mb-3 text-lg font-semibold text-ink">خريطة صلاحيات المسارات</h2>
-        <div className="overflow-auto max-h-72 rounded-lg border border-line">
-          <DataTable
-            ariaLabel="خريطة صلاحيات المسارات"
-            rows={hiddenRouteRules.map(({ rule, hidden }, i) => ({ rule, hidden, __i: i }))}
-            rowKey={(row) => `${row.rule.path}-${row.__i}`}
-            dense
-            stickyHeader
-            columns={[
-              {
-                key: 'show', header: 'إظهار', align: 'center',
-                render: ({ rule, hidden }) => (
-                  <input type="checkbox" checked={!hidden} onChange={() => toggleHidden(rule.path)} aria-label={`إظهار ${rule.path}`} />
-                ),
-              },
-              { key: 'path', header: 'المسار', render: ({ rule }) => <span className="font-mono">{rule.path}</span> },
-              { key: 'all', header: 'all', render: ({ rule }) => (rule.all || []).join(', ') },
-              { key: 'any', header: 'any', render: ({ rule }) => (rule.any || []).join(', ') },
-            ]}
+      {loading && !(config.hiddenMenus?.length || config.disabledPermissions?.length || config.featurePermissions?.length) ? (
+        <div className="flex flex-col items-center gap-3 py-16 text-sm font-semibold text-muted">
+          <span className="h-8 w-8 animate-spin rounded-full border-2 border-line border-t-success" />
+          جارٍ تحميل الصفحات...
+        </div>
+      ) : (
+        <>
+          <AccessPagesEditor
+            key={`${scope.tenantId ?? 'global'}:${scope.planId ?? ''}:${configVersion}`}
+            initialConfig={config}
+            gating={gating}
+            onSave={save}
+            canManage
+            scopeLabel={scopeLabel}
           />
-        </div>
-        <div className="mt-4 grid gap-4 md:grid-cols-2">
-          <div>
-            <label htmlFor="disabled-permissions" className="mb-1 block text-xs font-semibold text-ink">
-              الصلاحيات المعطلة (كود صلاحية في كل سطر)
-            </label>
-            <textarea
-              id="disabled-permissions"
-              value={disabledPermissionsText}
-              onChange={(e) => setDisabledPermissionsText(e.target.value)}
-              rows={6}
-              dir="ltr"
-              className="w-full rounded border border-line-strong p-2 font-mono text-xs"
-              placeholder={'sales.create\ninventory.view'}
-            />
-          </div>
-          <div>
-            <label htmlFor="feature-permissions" className="mb-1 block text-xs font-semibold text-ink">
-              featurePermissions (JSON)
-            </label>
-            <textarea
-              id="feature-permissions"
-              value={featurePermissionsText}
-              onChange={(e) => setFeaturePermissionsText(e.target.value)}
-              rows={6}
-              dir="ltr"
-              className="w-full rounded border border-line-strong p-2 font-mono text-xs"
-            />
-          </div>
-        </div>
-        <div className="mt-3 flex items-center justify-between gap-3">
-          <p className="text-[11px] text-muted">
-            يحفظ إلى tenant_feature_config على السيرفر المركزي (PUT /api/v1/admin/config/feature-permissions).
-            يتطلب صلاحية platform.app-configuration.update — إخفاء القائمة وحده ليس حماية للـ API.
-          </p>
-          <button
-            type="button"
-            onClick={() => void save()}
-            disabled={saving || loading}
-            className="shrink-0 rounded bg-primary px-4 py-2 text-xs font-semibold text-white hover:bg-primary disabled:opacity-50"
-          >
-            {saving ? 'جارٍ الحفظ…' : 'حفظ على السيرفر المركزي'}
-          </button>
-        </div>
-      </section>
-
-      <section className="space-y-4">
-        {byRoute.map(([route, info]) => (
-          <div key={route} className="rounded-2xl border border-line bg-surface p-5 shadow-sm">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-base font-semibold text-ink">{route}</h3>
-              <span className="text-xs text-muted">{info.module} · {info.perms.length} صلاحية</span>
-            </div>
-            <div className="overflow-auto max-h-96 rounded-lg border border-line">
-              <DataTable
-                ariaLabel="صلاحيات المسار"
-                rows={info.perms}
-                rowKey={(p) => p.code}
-                dense
-                stickyHeader
-                columns={[
-                  { key: 'code', header: 'الكود', render: (p) => <span className="font-mono">{p.code}</span> },
-                  { key: 'name', header: 'الاسم', render: (p) => p.name },
-                  { key: 'kind', header: 'النوع', render: (p) => p.kind },
-                  { key: 'group', header: 'القسم', render: (p) => p.group },
-                ]}
-              />
-            </div>
-          </div>
-        ))}
-      </section>
+          {scope.tenantId && (
+            <PermissionLimitsEditor tenantId={scope.tenantId} scopeLabel={scopeLabel} canManage />
+          )}
+        </>
+      )}
     </div>
   );
 };

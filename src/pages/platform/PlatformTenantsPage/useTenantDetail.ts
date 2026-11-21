@@ -34,6 +34,7 @@ export function useTenantDetail({ plans, centralActive, canManageTenants, load }
   const [renewMonths, setRenewMonths] = React.useState(12);
   const [planForm, setPlanForm] = React.useState({ planId: '', months: 12, seats: 1 });
   const [accountOpen, setAccountOpen] = React.useState(false);
+  const [accountEditing, setAccountEditing] = React.useState(false);
   const [accountForm, setAccountForm] = React.useState({ username: '', email: '', fullName: '', password: '' });
   const [activationOpen, setActivationOpen] = React.useState(false);
   const [activation, setActivation] = React.useState<PlatformActivationDetails | null>(null);
@@ -163,6 +164,26 @@ export function useTenantDetail({ plans, centralActive, canManageTenants, load }
     );
   };
 
+  const openAccountEdit = () => {
+    if (!canManageTenants) { toast.error('لا تملك صلاحية إدارة العملاء'); return; }
+    const acc = profile?.account;
+    if (!acc) return;
+    setAccountForm({
+      username: acc.username ?? '',
+      email: acc.email ?? '',
+      fullName: acc.fullName ?? '',
+      password: '',
+    });
+    setAccountEditing(true);
+    setAccountOpen(true);
+  };
+
+  const closeAccountModal = () => {
+    setAccountOpen(false);
+    setAccountEditing(false);
+    setAccountForm({ username: '', email: '', fullName: '', password: '' });
+  };
+
   const createAccount = () => {
     if (!canManageTenants) { toast.error('لا تملك صلاحية إدارة العملاء'); return; }
     if (!detailId) return;
@@ -173,6 +194,41 @@ export function useTenantDetail({ plans, centralActive, canManageTenants, load }
     }
     if (accountForm.username.trim() && !/^[a-zA-Z0-9_.-]+$/.test(accountForm.username.trim())) {
       toast.error('اسم المستخدم يجب أن يحتوي على أحرف إنجليزية وأرقام و . _ - فقط');
+      return;
+    }
+    if (accountForm.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(accountForm.email.trim())) {
+      toast.error('البريد الإلكتروني للحساب غير صالح');
+      return;
+    }
+    if (accountEditing) {
+      setWorking(true);
+      const request = centralActive
+        ? centralPlatformClient.updateTenantAccount(detailId, {
+            username: accountForm.username,
+            email: accountForm.email,
+            fullName: accountForm.fullName,
+            password: password || undefined,
+          })
+        : Promise.resolve(platformAdminService.updateTenantAccount(detailId, {
+            username: accountForm.username,
+            email: accountForm.email,
+            fullName: accountForm.fullName,
+            password: password || undefined,
+          }));
+      request
+        .then(() => {
+          const next = centralActive
+            ? centralPlatformClient.getTenantProfile(detailId)
+            : Promise.resolve(platformAdminService.getTenantProfile(detailId));
+          return next.then((profileNext: PlatformTenantProfile) => {
+            setProfile(profileNext);
+            closeAccountModal();
+            toast.success('تم تحديث حساب العميل');
+            load();
+          });
+        })
+        .catch((err) => toast.error('تعذر تحديث الحساب', err instanceof Error ? err.message : undefined))
+        .finally(() => setWorking(false));
       return;
     }
     setWorking(true);
@@ -196,7 +252,7 @@ export function useTenantDetail({ plans, centralActive, canManageTenants, load }
           : Promise.resolve(platformAdminService.getTenantProfile(detailId));
         return next.then((profileNext: PlatformTenantProfile) => {
           setProfile(profileNext);
-          setAccountOpen(false);
+          closeAccountModal();
           setActivation(buildActivation(profileNext, created.temporaryPassword ?? null));
           setActivationOpen(true);
           toast.success('تم إنشاء حساب العميل وتوليد بيانات التفعيل');
@@ -374,6 +430,14 @@ export function useTenantDetail({ plans, centralActive, canManageTenants, load }
   const saveUser = () => {
     if (!canManageTenants) { toast.error('لا تملك صلاحية إدارة العملاء'); return; }
     if (!detailId) return;
+    if (!userForm.fullName.trim()) {
+      toast.error('الاسم الكامل للمستخدم مطلوب');
+      return;
+    }
+    if (userForm.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(userForm.email.trim())) {
+      toast.error('البريد الإلكتروني غير صالح');
+      return;
+    }
     setWorking(true);
     const request = editingUser
       ? (centralActive
@@ -547,6 +611,8 @@ export function useTenantDetail({ plans, centralActive, canManageTenants, load }
     setPlanForm,
     accountOpen,
     setAccountOpen,
+    accountEditing,
+    closeAccountModal,
     accountForm,
     setAccountForm,
     activationOpen,
@@ -586,6 +652,7 @@ export function useTenantDetail({ plans, centralActive, canManageTenants, load }
     changeStatus,
     archive,
     createAccount,
+    openAccountEdit,
     resetPassword,
     toggleAccount,
     renewSubscription,

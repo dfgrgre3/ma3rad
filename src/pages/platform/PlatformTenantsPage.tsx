@@ -1,5 +1,5 @@
 import React from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Building2, Download, Plus, Upload } from 'lucide-react';
 import { platformAdminService, PLATFORM_TENANT_STATUS_LABELS } from '../../services/domains/platform/PlatformAdminService';
 import { centralPlatformClient } from '../../services/domains/platform/CentralPlatformClient';
@@ -14,36 +14,32 @@ import { Button } from '../../components/ui/Button';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { downloadCsv } from './components/PlatformUI';
 import { useToast } from '../../components/ui/Toast';
-import { emptyAccountForm, emptyForm, type CreatedAccountInfo, type NewAccountForm } from './PlatformTenantsPage/constants';
-import { useTenantDetail } from './PlatformTenantsPage/useTenantDetail';
+import { emptyAccountForm, emptyForm, isValidEmail, type CreatedAccountInfo, type NewAccountForm } from './PlatformTenantsPage/constants';
 import { useTenantBulk } from './PlatformTenantsPage/useTenantBulk';
 import { useCsvImport } from './PlatformTenantsPage/useCsvImport';
-import { useRemoteControl } from './PlatformTenantsPage/useRemoteControl';
 import { TenantListSection } from './PlatformTenantsPage/TenantListSection';
 import { TenantStatsSection } from './PlatformTenantsPage/TenantStatsSection';
 import { TenantFormModal } from './PlatformTenantsPage/TenantFormModal';
-import { TenantDetailModal } from './PlatformTenantsPage/TenantDetailModal';
-import { AccountModal } from './PlatformTenantsPage/AccountModal';
-import { ActivationModal } from './PlatformTenantsPage/ActivationModal';
-import { UserModal } from './PlatformTenantsPage/UserModal';
 import { BulkActionModal } from './PlatformTenantsPage/BulkActionModal';
 import { CsvImportModal } from './PlatformTenantsPage/CsvImportModal';
-import { BranchModal } from './PlatformTenantsPage/BranchModal';
 import { TenantCatalogWizard, TenantCreatedModal } from './PlatformTenantsPage/TenantCatalogWizard';
 
 export const PlatformTenantsPage: React.FC = () => {
   const toast = useToast();
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [tenants, setTenants] = React.useState<PlatformTenant[]>([]);
   const [plans, setPlans] = React.useState<PlatformPlan[]>([]);
-  const [search, setSearch] = React.useState('');
+  // Filters persist in the URL (?q / ?status / ?plan) so views are shareable.
+  const [search, setSearch] = React.useState(() => searchParams.get('q') ?? '');
   // Raw input is debounced ~300ms before it hits `search` (and therefore the API).
-  const [searchInput, setSearchInput] = React.useState('');
+  const [searchInput, setSearchInput] = React.useState(() => searchParams.get('q') ?? '');
   React.useEffect(() => {
     const timer = setTimeout(() => setSearch(searchInput), 300);
     return () => clearTimeout(timer);
   }, [searchInput]);
-  const [status, setStatus] = React.useState('');
-  const [planId, setPlanId] = React.useState('');
+  const [status, setStatus] = React.useState(() => searchParams.get('status') ?? '');
+  const [planId, setPlanId] = React.useState(() => searchParams.get('plan') ?? '');
   const [page, setPage] = React.useState(1);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
@@ -109,21 +105,33 @@ export const PlatformTenantsPage: React.FC = () => {
 
   const canManageTenants = canPlatform('tenants', 'platform.tenants.update');
 
-  const [searchParams, setSearchParams] = useSearchParams();
+  // One-shot deep link: ?new=1 opens the create form, then the param is removed.
+  // Filter params (q/status/plan) are persistent state synced by the effect below.
   React.useEffect(() => {
-    const presetStatus = searchParams.get('status');
-    if (presetStatus) setStatus(presetStatus);
-    if (searchParams.get('new') === '1' && canManageTenants) {
+    if (searchParams.get('new') !== '1') return;
+    if (canManageTenants) {
       setEditing(null);
       setForm({ ...emptyForm, planId: plans.find((plan) => plan.isDefault)?.id ?? plans[0]?.id ?? '' });
       setAccountForm(emptyAccountForm);
       setFormOpen(true);
     }
-    if (presetStatus || searchParams.get('new') === '1') {
-      setSearchParams({}, { replace: true });
-    }
+    const next = new URLSearchParams(searchParams);
+    next.delete('new');
+    setSearchParams(next, { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, canManageTenants, plans]);
+
+  // Keep the URL in sync with the active filters (replace, no history spam).
+  // Uses the History API directly so it never triggers router navigations.
+  React.useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    params.delete('new');
+    if (search) params.set('q', search); else params.delete('q');
+    if (status) params.set('status', status); else params.delete('status');
+    if (planId) params.set('plan', planId); else params.delete('plan');
+    const qs = params.toString();
+    window.history.replaceState(null, '', `${window.location.pathname}${qs ? `?${qs}` : ''}${window.location.hash}`);
+  }, [search, status, planId]);
 
   // ─── Advanced (client-side) filters ────────────────────────────────────────
   // The tenant list is fully loaded client-side, so these filters are applied
@@ -176,10 +184,16 @@ export const PlatformTenantsPage: React.FC = () => {
     return true;
   }), [tenants, dateRange, outstandingRange, deviceUtilizationFilter, healthScoreFilter, tenantHealthScore]);
 
-  const detail = useTenantDetail({ plans, centralActive, canManageTenants, load });
-  const bulk = useTenantBulk({ tenants: visibleTenants, centralActive, detailId: detail.detailId, loadProfile: detail.loadProfile, load });
+  // Reset to the first page whenever the visible set changes (filters/search/load).
+  React.useEffect(() => { setPage(1); }, [visibleTenants]);
+
+  const bulk = useTenantBulk({ tenants: visibleTenants, centralActive, load });
   const csv = useCsvImport({ plans, centralActive, load });
-  const remote = useRemoteControl({ detailId: detail.detailId, tab: detail.tab, centralActive, run: detail.run });
+
+  // Customer file opens as a dedicated page, not a modal.
+  const openProfile = (tenant: PlatformTenant) => {
+    navigate(`/platform/tenants/${tenant.id}`);
+  };
 
   const openCreate = () => {
     setEditing(null);
@@ -240,6 +254,10 @@ export const PlatformTenantsPage: React.FC = () => {
       toast.error('اسم الشركة مطلوب');
       return;
     }
+    if (!isValidEmail(form.email)) {
+      toast.error('البريد الإلكتروني غير صالح');
+      return;
+    }
     setSaving(true);
     const fail = (err: unknown) => {
       toast.error('تعذر حفظ العميل', err instanceof Error ? err.message : undefined);
@@ -264,7 +282,6 @@ export const PlatformTenantsPage: React.FC = () => {
     };
     const finishEdit = () => {
       setFormOpen(false);
-      if (detail.detailId && editing?.id === detail.detailId) detail.loadProfile(detail.detailId);
       load();
       setSaving(false);
     };
@@ -331,29 +348,33 @@ export const PlatformTenantsPage: React.FC = () => {
     toast.success('تم حذف الفلتر', name);
   };
 
+  const tenantCsvRow = (tenant: PlatformTenant): Array<string | number> => [
+    tenant.code,
+    tenant.id,
+    tenant.name,
+    tenant.businessType ?? '',
+    tenant.contactName ?? '',
+    tenant.phone ?? '',
+    tenant.email ?? '',
+    tenant.country ?? '',
+    tenant.city ?? '',
+    tenant.address ?? '',
+    tenant.createdAt,
+    tenant.planName ?? '',
+    PLATFORM_TENANT_STATUS_LABELS[tenant.status],
+    tenant.subscriptionStartedAt ?? '',
+    tenant.subscriptionExpiresAt ?? '',
+    tenant.devicesLimit,
+    tenant.devicesUsed ?? 0,
+    tenant.branchesLimit,
+  ];
+
+  const TENANT_CSV_HEADERS = ['رقم العميل', 'Tenant ID', 'الشركة', 'النشاط', 'المسؤول', 'الهاتف', 'البريد', 'الدولة', 'المدينة', 'العنوان', 'تاريخ التسجيل', 'الباقة', 'الحالة', 'بداية الاشتراك', 'نهاية الاشتراك', 'الأجهزة المسموحة', 'الأجهزة المستخدمة', 'الفروع'];
+
   const exportRows = () => {
     downloadCsv('platform-customers.csv', [
-      ['رقم العميل', 'Tenant ID', 'الشركة', 'النشاط', 'المسؤول', 'الهاتف', 'البريد', 'الدولة', 'المدينة', 'العنوان', 'تاريخ التسجيل', 'الباقة', 'الحالة', 'بداية الاشتراك', 'نهاية الاشتراك', 'الأجهزة المسموحة', 'الأجهزة المستخدمة', 'الفروع'],
-      ...visibleTenants.map((tenant) => [
-        tenant.code,
-        tenant.id,
-        tenant.name,
-        tenant.businessType ?? '',
-        tenant.contactName ?? '',
-        tenant.phone ?? '',
-        tenant.email ?? '',
-        tenant.country ?? '',
-        tenant.city ?? '',
-        tenant.address ?? '',
-        tenant.createdAt,
-        tenant.planName ?? '',
-        PLATFORM_TENANT_STATUS_LABELS[tenant.status],
-        tenant.subscriptionStartedAt ?? '',
-        tenant.subscriptionExpiresAt ?? '',
-        tenant.devicesLimit,
-        tenant.devicesUsed ?? 0,
-        tenant.branchesLimit,
-      ]),
+      TENANT_CSV_HEADERS,
+      ...visibleTenants.map(tenantCsvRow),
     ]);
   };
 
@@ -399,7 +420,7 @@ export const PlatformTenantsPage: React.FC = () => {
         handleSelectAll={bulk.handleSelectAll}
         handleSelectOne={bulk.handleSelectOne}
         canManageTenants={canManageTenants}
-        openProfile={detail.openProfile}
+        openProfile={openProfile}
         openEdit={openEdit}
         setBulkActionType={bulk.setBulkActionType}
         setBulkActionOpen={bulk.setBulkActionOpen}
@@ -417,6 +438,7 @@ export const PlatformTenantsPage: React.FC = () => {
         loadFilterPreset={loadFilterPreset}
         saveFilterPreset={saveFilterPreset}
         deleteFilterPreset={deleteFilterPreset}
+        healthScoreFor={tenantHealthScore}
       />
 
       <TenantFormModal
@@ -431,73 +453,6 @@ export const PlatformTenantsPage: React.FC = () => {
         canManageTenants={canManageTenants}
         accountForm={accountForm}
         setAccountForm={setAccountForm}
-      />
-
-      <TenantDetailModal
-        open={Boolean(detail.detailId)}
-        onClose={detail.closeDetail}
-        tenant={detail.tenant}
-        profile={detail.profile}
-        account={detail.account}
-        subscription={detail.subscription}
-        healthChecks={detail.healthChecks}
-        healthScore={detail.healthScore}
-        working={detail.working}
-        canManageTenants={canManageTenants}
-        centralActive={centralActive}
-        tab={detail.tab}
-        setTab={detail.setTab}
-        exportRows={exportRows}
-        openEdit={openEdit}
-        sendActivation={detail.sendActivation}
-        resetPassword={detail.resetPassword}
-        toggleAccount={detail.toggleAccount}
-        changeStatus={detail.changeStatus}
-        resetDevices={detail.resetDevices}
-        cancelSubscription={detail.cancelSubscription}
-        archive={detail.archive}
-        copyToClipboard={detail.copyToClipboard}
-        setAccountOpen={detail.setAccountOpen}
-        branches={detail.branches}
-        setBranchOpen={detail.setBranchOpen}
-        closeBranch={detail.closeBranch}
-        overrides={detail.overrides}
-        overrideForm={detail.overrideForm}
-        setOverrideForm={detail.setOverrideForm}
-        addOverride={detail.addOverride}
-        removeOverride={detail.removeOverride}
-        plans={plans}
-        renewMonths={detail.renewMonths}
-        setRenewMonths={detail.setRenewMonths}
-        renewSubscription={detail.renewSubscription}
-        planForm={detail.planForm}
-        setPlanForm={detail.setPlanForm}
-        changePlan={detail.changePlan}
-        users={detail.users}
-        openUserCreate={detail.openUserCreate}
-        openUserEdit={detail.openUserEdit}
-        toggleUser={detail.toggleUser}
-        deleteUser={detail.deleteUser}
-        remoteControlData={remote.remoteControlData}
-        loadRemoteControlData={remote.loadRemoteControlData}
-        configSending={remote.configSending}
-        forceSync={remote.forceSync}
-        forceSyncWorking={remote.forceSyncWorking}
-        remoteDevices={remote.remoteDevices}
-        selectedDeviceIds={remote.selectedDeviceIds}
-        setSelectedDeviceIds={remote.setSelectedDeviceIds}
-        toggleDeviceStatus={remote.toggleDeviceStatus}
-        configForm={remote.configForm}
-        setConfigForm={remote.setConfigForm}
-        pushConfig={remote.pushConfig}
-        remoteConfig={remote.remoteConfig}
-        remoteHistory={remote.remoteHistory}
-        onOpenCatalog={canManageTenants ? () => {
-          if (detail.tenant) {
-            setCatalogTenant(detail.tenant);
-            setCatalogOpen(true);
-          }
-        } : undefined}
       />
 
       <TenantCreatedModal
@@ -521,39 +476,6 @@ export const PlatformTenantsPage: React.FC = () => {
         centralActive={centralActive}
         canManageTenants={canManageTenants}
         onApplied={load}
-      />
-
-      <AccountModal
-        open={detail.accountOpen}
-        onClose={() => detail.setAccountOpen(false)}
-        accountForm={detail.accountForm}
-        setAccountForm={detail.setAccountForm}
-        working={detail.working}
-        canManageTenants={canManageTenants}
-        createAccount={detail.createAccount}
-      />
-
-      <ActivationModal
-        open={detail.activationOpen && Boolean(detail.activation)}
-        onClose={() => detail.setActivationOpen(false)}
-        activation={detail.activation}
-        copyToClipboard={detail.copyToClipboard}
-        sendActivation={detail.sendActivation}
-        working={detail.working}
-        canManageTenants={canManageTenants}
-        channels={detail.channels}
-        setChannels={detail.setChannels}
-      />
-
-      <UserModal
-        open={detail.userOpen}
-        onClose={() => detail.setUserOpen(false)}
-        editingUser={detail.editingUser}
-        userForm={detail.userForm}
-        setUserForm={detail.setUserForm}
-        working={detail.working}
-        canManageTenants={canManageTenants}
-        saveUser={detail.saveUser}
       />
 
       <BulkActionModal
@@ -583,16 +505,6 @@ export const PlatformTenantsPage: React.FC = () => {
         csvFile={csv.csvFile}
         handleCsvFileSelect={csv.handleCsvFileSelect}
         csvPreview={csv.csvPreview}
-      />
-
-      <BranchModal
-        open={detail.branchOpen}
-        onClose={() => detail.setBranchOpen(false)}
-        branchForm={detail.branchForm}
-        setBranchForm={detail.setBranchForm}
-        working={detail.working}
-        canManageTenants={canManageTenants}
-        saveBranch={detail.saveBranch}
       />
 
     </div>

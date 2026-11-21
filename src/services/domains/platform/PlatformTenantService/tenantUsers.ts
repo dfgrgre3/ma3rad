@@ -4,6 +4,7 @@ import { provisioningQueueService } from '../ProvisioningQueueService';
 import { provisioningExecutorService } from '../ProvisioningExecutorService';
 import type {
   PlatformTenantUser,
+  PlatformTenantUserDirectoryEntry,
   PlatformTenantUserInput,
   PlatformTenantUserProvisioningResult,
 } from '../platformTypes';
@@ -16,6 +17,36 @@ export function listTenantUsers(ctx: TenantServiceContext, tenantId: string): Pl
   ctx.requirePlatformAccess('tenants', 'platform.tenants.view');
   const rows = ctx.db.query<any>('SELECT * FROM platform_tenant_users WHERE tenant_id = ? ORDER BY created_at DESC', [tenantId]);
   return rows.map(mapTenantUser);
+}
+
+export function listAllTenantUsers(
+  ctx: TenantServiceContext,
+  filters: { tenantId?: string; provisioningStatus?: string; status?: string; search?: string } = {},
+): PlatformTenantUserDirectoryEntry[] {
+  ctx.requirePlatformAccess('tenants', 'platform.tenants.view');
+  const tenants = ctx.db.query<any>('SELECT id, name, code FROM platform_tenants ORDER BY name ASC');
+  const tenantName = new Map<string, { name: string; code: string | null }>();
+  for (const t of tenants) tenantName.set(String(t.id), { name: String(t.name ?? t.id), code: t.code ?? null });
+
+  const tenantIds = filters.tenantId ? [filters.tenantId] : [...tenantName.keys()];
+  const result: PlatformTenantUserDirectoryEntry[] = [];
+  for (const tenantId of tenantIds) {
+    let sql = 'SELECT * FROM platform_tenant_users WHERE tenant_id = ?';
+    const params: any[] = [tenantId];
+    if (filters.provisioningStatus) { sql += ' AND provisioning_status = ?'; params.push(filters.provisioningStatus); }
+    if (filters.status) { sql += ' AND status = ?'; params.push(filters.status); }
+    if (filters.search) {
+      sql += ' AND (full_name LIKE ? OR username LIKE ? OR email LIKE ?)';
+      const like = `%${filters.search}%`;
+      params.push(like, like, like);
+    }
+    sql += ' ORDER BY created_at DESC';
+    for (const row of ctx.db.query<any>(sql, params)) {
+      const meta = tenantName.get(tenantId);
+      result.push({ ...mapTenantUser(row), tenantName: meta?.name ?? tenantId, tenantCode: meta?.code ?? null });
+    }
+  }
+  return result;
 }
 
 export function createTenantUser(ctx: TenantServiceContext, tenantId: string, input: PlatformTenantUserInput): PlatformTenantUserProvisioningResult {

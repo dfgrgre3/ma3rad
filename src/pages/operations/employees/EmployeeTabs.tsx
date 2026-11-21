@@ -5,53 +5,41 @@ import type { EmployeeTab } from '../../../types/hr/employeesPage';
 
 interface EmployeeTabsProps {
   activeTab: EmployeeTab;
-  canManageEmployees: boolean;
-  canViewAttendance: boolean;
+  /** Per-tab visibility — combines role grants and central section restrictions. */
+  canViewTab: (tab: EmployeeTab) => boolean;
   onTabChange: (tab: EmployeeTab) => void;
 }
 
+const TAB_STYLE = (active: boolean) =>
+  `px-4 py-2 rounded-lg text-xs font-black transition-all flex items-center gap-2 ${active ? 'bg-warning text-ink shadow-md' : 'text-muted hover:text-ink bg-surface'}`;
+
 export const EmployeeTabs: React.FC<EmployeeTabsProps> = ({
   activeTab,
-  canManageEmployees,
-  canViewAttendance,
+  canViewTab,
   onTabChange,
 }) => {
   return (
     <div className="bg-surface border-b border-line px-6 py-2 flex flex-wrap gap-2">
-      <button
-        onClick={() => onTabChange('directory')}
-        className={`px-4 py-2 rounded-lg text-xs font-black transition-all flex items-center gap-2 ${activeTab === 'directory' ? 'bg-warning text-ink shadow-md' : 'text-muted hover:text-ink bg-surface'
-}`}
-      >
-        <HardHat className="w-4 h-4" />
-        دليل العمال وتوزيعهم
-      </button>
-      {canManageEmployees && (
-        <ActivityGate element="payroll"><button
-          onClick={() => onTabChange('finance')}
-          className={`px-4 py-2 rounded-lg text-xs font-black transition-all flex items-center gap-2 ${activeTab === 'finance' ? 'bg-warning text-ink shadow-md' : 'text-muted hover:text-ink bg-surface'
-}`}
-        >
+      {canViewTab('directory') && (
+        <button onClick={() => onTabChange('directory')} className={TAB_STYLE(activeTab === 'directory')}>
+          <HardHat className="w-4 h-4" />
+          دليل العمال وتوزيعهم
+        </button>
+      )}
+      {canViewTab('finance') && (
+        <ActivityGate element="payroll"><button onClick={() => onTabChange('finance')} className={TAB_STYLE(activeTab === 'finance')}>
           <Landmark className="w-4 h-4" />
           حسابات الأجور والرواتب
         </button></ActivityGate>
       )}
-      {canViewAttendance && (
-        <ActivityGate element="attendance"><button
-          onClick={() => onTabChange('attendance')}
-          className={`px-4 py-2 rounded-lg text-xs font-black transition-all flex items-center gap-2 ${activeTab === 'attendance' ? 'bg-warning text-ink shadow-md' : 'text-muted hover:text-ink bg-surface'
-}`}
-        >
+      {canViewTab('attendance') && (
+        <ActivityGate element="attendance"><button onClick={() => onTabChange('attendance')} className={TAB_STYLE(activeTab === 'attendance')}>
           <UserCheck className="w-4 h-4" />
           سجل الحضور اليومي
         </button></ActivityGate>
       )}
-      {canManageEmployees && (
-        <button
-          onClick={() => onTabChange('analytics')}
-          className={`px-4 py-2 rounded-lg text-xs font-black transition-all flex items-center gap-2 ${activeTab === 'analytics' ? 'bg-warning text-ink shadow-md' : 'text-muted hover:text-ink bg-surface'
-}`}
-        >
+      {canViewTab('analytics') && (
+        <button onClick={() => onTabChange('analytics')} className={TAB_STYLE(activeTab === 'analytics')}>
           <BarChart3 className="w-4 h-4" />
           تقارير المراقبة والتحليلات
         </button>

@@ -6,6 +6,7 @@ import { AuthService } from '../services/domains/auth/AuthService';
 import { CentralLicenseService } from '../services/domains/licensing/CentralLicenseService';
 import { CentralConfigApplier } from '../services/domains/licensing/CentralConfigApplier';
 import { CentralEstablishmentService } from '../services/domains/licensing/CentralEstablishmentService';
+import { TenantIdentityProvisioningService } from '../services/domains/platform/TenantIdentityProvisioningService';
 import { SettingsService } from '../services/domains/config/SettingsService';
 import { AppConfigService } from '../services/domains/config/AppConfigService';
 import {
@@ -111,11 +112,14 @@ export const App: React.FC = () => {
     const refreshAll = async () => {
       await refreshConfig();
       await refreshEstablishment();
+      // توصيل أوامر توفير مستخدمي العميل من لوحة السوبر أدمن إلى حسابات ERP المحلية.
+      await TenantIdentityProvisioningService.sync();
     };
 
     void refreshAll();
     const configTimer = setInterval(() => void refreshConfig(), 60 * 1000);
     const establishmentTimer = setInterval(() => void refreshEstablishment(), 60 * 60 * 1000);
+    const provisioningTimer = setInterval(() => void TenantIdentityProvisioningService.sync(), 60 * 1000);
     let lastRefreshAt = 0;
     const MIN_REFRESH_INTERVAL_MS = 15 * 1000;
     const onFocusOrVisible = () => {
@@ -131,6 +135,7 @@ export const App: React.FC = () => {
     return () => {
       clearInterval(configTimer);
       clearInterval(establishmentTimer);
+      clearInterval(provisioningTimer);
       window.removeEventListener('focus', onFocusOrVisible);
       document.removeEventListener('visibilitychange', onFocusOrVisible);
     };

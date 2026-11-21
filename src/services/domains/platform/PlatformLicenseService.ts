@@ -9,11 +9,13 @@ import type {
   PlatformLicense,
   PlatformLicenseStatus,
   PlatformLicenseActivation,
+  PlatformLicenseChange,
+  PlatformLicenseChangeType,
   PlatformDevice,
   PlatformTenant,
   PlatformPlan,
 } from './platformTypes';
-import { nowIso, toNumber, safeJsonArray, signCertificate, generateLicenseActivationCode } from './platformUtils';
+import { nowIso, toNumber, safeJsonArray, safeJsonObject, signCertificate, generateLicenseActivationCode } from './platformUtils';
 
 export class PlatformLicenseService {
   private db = DatabaseManager.getInstance();
@@ -89,6 +91,53 @@ export class PlatformLicenseService {
   }
 
   // ─── License Management ───────────────────────────────────────────────────────
+
+  /** Append an immutable row to platform_license_changes (parity with central). */
+  private recordLicenseChange(
+    license: { id: string; subscriptionId?: string | null },
+    changeType: PlatformLicenseChangeType,
+    oldValues: Record<string, unknown> | null,
+    newValues: Record<string, unknown> | null,
+    reason?: string | null
+  ): void {
+    const actor = AuthService.getCurrentUser();
+    this.db.run(
+      `INSERT INTO platform_license_changes
+        (id, license_id, subscription_id, change_type, old_values, new_values, actor_id, actor_name, reason)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        `lchg_${uuidv4().replace(/-/g, '').slice(0, 12)}`,
+        license.id,
+        license.subscriptionId ?? null,
+        changeType,
+        oldValues ? JSON.stringify(oldValues) : null,
+        newValues ? JSON.stringify(newValues) : null,
+        actor?.id ?? null,
+        actor?.fullName ?? actor?.username ?? null,
+        reason ?? null,
+      ]
+    );
+  }
+
+  public listLicenseChanges(licenseId: string): PlatformLicenseChange[] {
+    PlatformLicenseService.requirePlatformAccess('licenses', 'platform.licenses.view');
+    const rows = this.db.query<any>(
+      'SELECT * FROM platform_license_changes WHERE license_id = ? ORDER BY created_at DESC, id DESC',
+      [licenseId]
+    );
+    return rows.map((row) => ({
+      id: String(row.id),
+      licenseId: String(row.license_id),
+      subscriptionId: row.subscription_id ?? null,
+      changeType: String(row.change_type) as PlatformLicenseChangeType,
+      oldValues: row.old_values ? safeJsonObject(row.old_values) : null,
+      newValues: row.new_values ? safeJsonObject(row.new_values) : null,
+      actorId: row.actor_id ?? null,
+      actorName: row.actor_name ?? null,
+      reason: row.reason ?? null,
+      createdAt: String(row.created_at),
+    }));
+  }
 
   public listLicenses(search = '', status = ''): PlatformLicense[] {
     PlatformLicenseService.requirePlatformAccess('licenses', 'platform.licenses.view');
@@ -197,6 +246,18 @@ export class PlatformLicenseService {
           [input.planId, start.toISOString(), expires.toISOString(), seats, branchesLimit, deviceLimit, now, input.tenantId]
         );
       }
+
+      this.recordLicenseChange(
+        { id: licenseId, subscriptionId },
+        'ISSUE',
+        null,
+        {
+          licenseKey: '[REDACTED]', tenantId: input.tenantId, planId: input.planId,
+          startsAt: start.toISOString(), expiresAt: expires.toISOString(),
+          seats, deviceLimit, branchesLimit, offlineGracePeriodDays: plan.offlineGracePeriodDays, couplingMode,
+        },
+        'إصدار ترخيص جديد'
+      );
     });
 
 
@@ -241,12 +302,98 @@ export class PlatformLicenseService {
         `UPDATE platform_tenants SET subscription_expires_at = ?, updated_at = ? WHERE id = ?`,
         [newExpires.toISOString(), now, license.tenantId]
       );
+
+      this.recordLicenseChange(
+        license,
+        'RENEW',
+        { expiresAt: license.expiresAt },
+        { expiresAt: newExpires.toISOString() },
+        `تجديد ${months} شهر`
+      );
     });
 
     this.audit('تجديد ترخيص', 'LICENSE', id, { months, newExpiresAt: newExpires.toISOString() });
 
     const updated = this.getLicense(id);
     if (!updated) throw new Error('فشل تجديد الترخيص.');
+    return updated;
+  }
+
+  public updateLicense(id: string, fields: {
+    seats?: number;
+    deviceLimit?: number;
+    branchesLimit?: number;
+    offlineGracePeriodDays?: number;
+    notes?: string | null;
+    couplingMode?: PlatformLicense['couplingMode'];
+  }): PlatformLicense {
+    PlatformLicenseService.requirePlatformAccess('licenses', 'platform.licenses.update');
+
+    const license = this.getLicense(id);
+    if (!license) throw new Error('الترخيص غير موجود.');
+
+    const updates: string[] = [];
+    const params: (string | number | null)[] = [];
+    const push = (column: string, value: string | number | null | undefined) => {
+      if (value === undefined) return;
+      updates.push(`${column} = ?`);
+      params.push(value);
+    };
+
+    push('seats', fields.seats);
+    push('device_limit', fields.deviceLimit);
+    push('branches_limit', fields.branchesLimit);
+    push('offline_grace_period_days', fields.offlineGracePeriodDays);
+    push('notes', fields.notes);
+    push('coupling_mode', fields.couplingMode);
+
+    if (updates.length === 0) return license;
+
+    const now = nowIso();
+    const oldValues: Record<string, unknown> = {};
+    const newValues: Record<string, unknown> = {};
+    const oldByColumn: Record<string, unknown> = {
+      seats: license.seats,
+      device_limit: license.deviceLimit,
+      branches_limit: license.branchesLimit,
+      offline_grace_period_days: license.offlineGracePeriodDays ?? null,
+      notes: license.notes ?? null,
+      coupling_mode: license.couplingMode ?? null,
+    };
+    const columnNames = ['seats', 'device_limit', 'branches_limit', 'offline_grace_period_days', 'notes', 'coupling_mode'];
+    for (const column of columnNames) {
+      const idx = updates.findIndex((u) => u.startsWith(`${column} =`));
+      if (idx === -1) continue;
+      oldValues[column] = oldByColumn[column];
+      newValues[column] = params[idx];
+    }
+    const hasLimitChange = ['seats', 'device_limit', 'branches_limit', 'offline_grace_period_days']
+      .some((column) => column in newValues);
+    const changeType: PlatformLicenseChangeType = fields.couplingMode !== undefined && !hasLimitChange
+      ? 'COUPLING_CHANGE'
+      : hasLimitChange
+        ? 'LIMIT_CHANGE'
+        : 'UPDATE';
+
+    this.db.executeTransaction(() => {
+      this.db.run(`UPDATE platform_licenses SET ${updates.join(', ')}, updated_at = ? WHERE id = ?`, [...params, now, id]);
+
+      const tenantUpdates: string[] = [];
+      const tenantParams: (string | number)[] = [];
+      if (fields.seats !== undefined) { tenantUpdates.push('seats_limit = ?'); tenantParams.push(fields.seats); }
+      if (fields.branchesLimit !== undefined) { tenantUpdates.push('branches_limit = ?'); tenantParams.push(fields.branchesLimit); }
+      if (fields.deviceLimit !== undefined) { tenantUpdates.push('devices_limit = ?'); tenantParams.push(fields.deviceLimit); }
+      if (tenantUpdates.length > 0) {
+        this.db.run(`UPDATE platform_tenants SET ${tenantUpdates.join(', ')}, updated_at = ? WHERE id = ?`, [...tenantParams, now, license.tenantId]);
+      }
+
+      this.recordLicenseChange(license, changeType, oldValues, newValues, 'تعديل بيانات الترخيص');
+    });
+
+    this.audit('تعديل الترخيص', 'LICENSE', id, { fields });
+
+    const updated = this.getLicense(id);
+    if (!updated) throw new Error('فشل تحديث الترخيص.');
     return updated;
   }
 
@@ -257,7 +404,16 @@ export class PlatformLicenseService {
     if (!license) throw new Error('الترخيص غير موجود.');
 
     const now = nowIso();
-    this.db.run('UPDATE platform_licenses SET status = ?, updated_at = ? WHERE id = ?', [status, now, id]);
+    this.db.executeTransaction(() => {
+      this.db.run('UPDATE platform_licenses SET status = ?, updated_at = ? WHERE id = ?', [status, now, id]);
+      this.recordLicenseChange(
+        license,
+        'STATUS_CHANGE',
+        { status: license.status },
+        { status },
+        `تغيير حالة الترخيص إلى ${status}`
+      );
+    });
 
     this.audit('تغيير حالة الترخيص', 'LICENSE', id, { status });
   }
@@ -269,7 +425,16 @@ export class PlatformLicenseService {
     if (!license) throw new Error('الترخيص غير موجود.');
 
     const now = nowIso();
-    this.db.run('UPDATE platform_licenses SET coupling_mode = ?, updated_at = ? WHERE id = ?', [couplingMode, now, id]);
+    this.db.executeTransaction(() => {
+      this.db.run('UPDATE platform_licenses SET coupling_mode = ?, updated_at = ? WHERE id = ?', [couplingMode, now, id]);
+      this.recordLicenseChange(
+        license,
+        'COUPLING_CHANGE',
+        { couplingMode: license.couplingMode ?? 'FULL' },
+        { couplingMode },
+        'تغيير وضع ربط الترخيص'
+      );
+    });
 
     this.audit('تغيير وضع ربط الترخيص', 'LICENSE', id, { couplingMode });
 
@@ -284,32 +449,66 @@ export class PlatformLicenseService {
     const license = this.getLicense(id);
     if (!license) throw new Error('الترخيص غير موجود.');
 
+    const trimmed = hardwareId.trim();
+    if (!trimmed) {
+      // Unbind: clear the hardware id and detach any linked device seat.
+      const now = nowIso();
+      this.db.executeTransaction(() => {
+        this.db.run('UPDATE platform_licenses SET hardware_id = NULL, updated_at = ? WHERE id = ?', [now, id]);
+        if (license.hardwareId) {
+          this.db.run(
+            `UPDATE platform_devices SET license_id = NULL, status = 'OFFLINE', updated_at = ? WHERE license_id = ? AND hardware_id = ?`,
+            [now, id, license.hardwareId]
+          );
+        }
+        this.recordLicenseChange(
+          license,
+          'UNBIND',
+          { hardwareId: license.hardwareId ?? null },
+          { hardwareId: null },
+          'فك ربط الترخيص من الجهاز'
+        );
+      });
+      this.audit('فك ربط الترخيص من الجهاز', 'LICENSE', id, { previousHardwareId: license.hardwareId });
+      return;
+    }
+
     // Check if hardware ID is already bound to another active license
     const existing = this.db.query<any>(
       'SELECT id FROM platform_licenses WHERE hardware_id = ? AND id <> ? AND status IN (\'ACTIVE\',\'ISSUED\')',
-      [hardwareId, id]
+      [trimmed, id]
     )[0];
     if (existing) throw new Error('هذا المعرف العتادي مرتبط بترخيص نشط آخر.');
 
     const now = nowIso();
-    this.db.run('UPDATE platform_licenses SET hardware_id = ?, updated_at = ? WHERE id = ?', [hardwareId, now, id]);
+    this.db.executeTransaction(() => {
+      this.db.run('UPDATE platform_licenses SET hardware_id = ?, updated_at = ? WHERE id = ?', [trimmed, now, id]);
 
-    const existingDevice = this.db.query<any>('SELECT id FROM platform_devices WHERE hardware_id = ?', [hardwareId])[0];
-    if (existingDevice) {
-      this.db.run(
-        `UPDATE platform_devices SET license_id = ?, status = 'ACTIVE', last_seen_at = ?, updated_at = ? WHERE hardware_id = ?`,
-        [id, now, now, hardwareId]
-      );
-    } else {
-      this.db.run(
-        `INSERT INTO platform_devices
-          (id, tenant_id, license_id, hardware_id, status, last_seen_at, created_at, updated_at)
-         VALUES (?, ?, ?, ?, 'ACTIVE', ?, ?, ?)`,
-        [`dev_${uuidv4().replace(/-/g, '').slice(0, 12)}`, license.tenantId, id, hardwareId, now, now, now]
-      );
-    }
+      const existingDevice = this.db.query<any>('SELECT id FROM platform_devices WHERE hardware_id = ?', [trimmed])[0];
+      if (existingDevice) {
+        this.db.run(
+          `UPDATE platform_devices SET license_id = ?, status = 'ACTIVE', last_seen_at = ?, updated_at = ? WHERE hardware_id = ?`,
+          [id, now, now, trimmed]
+        );
+      } else {
+        this.db.run(
+          `INSERT INTO platform_devices
+            (id, tenant_id, license_id, hardware_id, status, last_seen_at, created_at, updated_at)
+           VALUES (?, ?, ?, ?, 'ACTIVE', ?, ?, ?)`,
+          [`dev_${uuidv4().replace(/-/g, '').slice(0, 12)}`, license.tenantId, id, trimmed, now, now, now]
+        );
+      }
 
-    this.audit('ربط ترخيص بمعرف عتادي', 'LICENSE', id, { hardwareId });
+      this.recordLicenseChange(
+        license,
+        'TRANSFER',
+        { hardwareId: license.hardwareId ?? null },
+        { hardwareId: trimmed },
+        'ربط/نقل الترخيص إلى جهاز'
+      );
+    });
+
+    this.audit('ربط ترخيص بمعرف عتادي', 'LICENSE', id, { hardwareId: trimmed });
   }
 
   public deactivateLicenseDevice(id: string, notes?: string): void {
@@ -353,14 +552,17 @@ export class PlatformLicenseService {
   public listDevices(tenantId?: string): PlatformDevice[] {
     PlatformLicenseService.requirePlatformAccess('devices', 'platform.devices.view');
 
-    const where = tenantId ? 'WHERE l.tenant_id = ?' : '';
+    const where = tenantId ? 'WHERE d.tenant_id = ?' : '';
     const params = tenantId ? [tenantId] : [];
 
+    // LEFT JOIN: released/unbound devices (license_id NULL) must stay visible.
+    // Tenant comes from the device row itself so unlicensed devices still
+    // resolve their customer name.
     const rows = this.db.query<any>(
       `SELECT d.*, l.license_key, t.name AS tenantName, t.code AS tenantCode
        FROM platform_devices d
-       JOIN platform_licenses l ON l.id = d.license_id
-       JOIN platform_tenants t ON t.id = l.tenant_id
+       LEFT JOIN platform_licenses l ON l.id = d.license_id
+       JOIN platform_tenants t ON t.id = d.tenant_id
        ${where}
        ORDER BY d.created_at DESC`,
       params
@@ -697,7 +899,7 @@ export class PlatformLicenseService {
     return {
       id: String(row.id),
       tenantId: String(row.tenant_id),
-      licenseId: String(row.license_id),
+      licenseId: row.license_id != null ? String(row.license_id) : null,
       hardwareId: String(row.hardware_id),
       name: row.name ?? row.device_name ?? null,
       os: row.os ?? null,

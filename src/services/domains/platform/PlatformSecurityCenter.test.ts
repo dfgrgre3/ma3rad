@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import type {
   PlatformStaffSession,
   PlatformStaffLogin,
-  PlatformCentralSecurityIncident,
   PlatformSigningKey,
   PlatformCentralSecurityOverview,
+  PlatformSecurityEvent,
 } from './platformTypes';
 
 test('should model staff sessions and trusted devices with remote revocation capability', () => {
@@ -58,6 +58,24 @@ test('should model cryptographic signing key lifecycle and rotation', () => {
   assert.strictEqual(key.algorithm, 'Ed25519');
 });
 
+test('should model unified security events with severity and source IP', () => {
+  const event: PlatformSecurityEvent = {
+    id: 'evt_501',
+    eventType: 'BRUTE_FORCE',
+    severity: 'CRITICAL',
+    title: 'محاولات تخمين كلمات مرور متكررة',
+    description: 'تجاوزت المحاولات الحد المسموح',
+    sourceIp: '203.0.113.44',
+    staffId: 'staff_01',
+    staffName: 'مشرف الدعم',
+    createdAt: '2026-11-21T10:00:00Z',
+  };
+
+  assert.strictEqual(event.severity, 'CRITICAL');
+  assert.strictEqual(event.sourceIp, '203.0.113.44');
+  assert.strictEqual(event.eventType, 'BRUTE_FORCE');
+});
+
 test('should aggregate central security posture metrics and incidents', () => {
   const overview: PlatformCentralSecurityOverview = {
     securityScore: 92,
@@ -75,6 +93,8 @@ test('should aggregate central security posture metrics and incidents', () => {
     recentLogins: [],
     incidents: [],
     signingKeys: [],
+    securityEvents: [],
+    events24hBySeverity: { HIGH: 2, MEDIUM: 5 },
   };
 
   assert.strictEqual(overview.securityScore, 92);

@@ -5,6 +5,7 @@ import { ActivityGate } from '../../../components/ui/ActivityGate';
 import { EmployeeService, Employee, PayrollTransaction, PayrollTxType, PayrollRun, PayrollRunItem, PayrollPayOptions, PayrollPaymentMethod, PayrollPaymentReconciliation } from '../../../services/domains/hr/EmployeeService';
 import { AuthService } from '../../../services/domains/auth/AuthService';
 import { PermissionService } from '../../../services/domains/auth/PermissionService';
+import { usePageAccess } from '../../../hooks/domains/licensing/usePageAccess';
 
 import { TX_LABELS, TX_COLORS, fmt, today } from './payrollDisplay';
 import { PayrollTransactionModal } from './PayrollTransactionModal';
@@ -37,7 +38,12 @@ export const PayrollPage: React.FC = () => {
   const actor = AuthService.getCurrentUser();
   const canViewPayroll = PermissionService.canAny(actor, ['employees.payroll.view', 'employees.payroll.manage', 'employees.payroll.approve', 'employees.manage']);
   const canManagePayroll = PermissionService.canAny(actor, ['employees.payroll.manage', 'employees.manage']);
-  const canApprovePayroll = PermissionService.canAny(actor, ['employees.payroll.approve', 'employees.manage']);
+  // قيود أقسام الرواتب من المنصة المركزية — دورة الرواتب/المسحوبات/الموافقات.
+  const pageAccess = usePageAccess('/employees/payroll');
+  const canViewPayrollSection = pageAccess.allows('ui.employees.payroll.section.payroll.view');
+  const canViewTransactionsSection = pageAccess.allows('ui.employees.payroll.section.transactions.view');
+  const canViewApprovalsSection = pageAccess.allows('ui.employees.payroll.section.approvals.view');
+  const canApprovePayroll = canViewApprovalsSection && PermissionService.canAny(actor, ['employees.payroll.approve', 'employees.manage']);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [transactions, setTransactions] = useState<PayrollTransaction[]>([]);
   const [period, setPeriod] = useState(today().slice(0, 7));
@@ -58,8 +64,8 @@ export const PayrollPage: React.FC = () => {
       try {
         const [employeeList, transactions, loadedRun] = await Promise.all([
           EmployeeService.getAllAsync(),
-          canViewPayroll ? EmployeeService.getTransactionsAsync() : Promise.resolve([]),
-          canViewPayroll ? EmployeeService.getPayrollRunAsync(period) : Promise.resolve(null),
+          canViewPayroll && canViewTransactionsSection ? EmployeeService.getTransactionsAsync() : Promise.resolve([]),
+          canViewPayroll && canViewPayrollSection ? EmployeeService.getPayrollRunAsync(period) : Promise.resolve(null),
         ]);
         setEmployees(employeeList.filter((e) => e.status !== 'SUSPENDED'));
         setTransactions(transactions.slice(0, 100));
@@ -71,7 +77,7 @@ export const PayrollPage: React.FC = () => {
       } catch (e: any) { setError(e?.message || 'تعذر تحميل بيانات الرواتب.'); }
       finally { setLoading(false); }
     })();
-  }, [canViewPayroll, period]);
+  }, [canViewPayroll, canViewPayrollSection, canViewTransactionsSection, period]);
   useEffect(() => { load(); }, [load]);
 
   const totals = useMemo(() => {
@@ -222,6 +228,7 @@ export const PayrollPage: React.FC = () => {
         {error && <div className="px-4 py-2.5 rounded-xl bg-danger-soft border border-danger-border text-danger text-xs font-semibold">{error}</div>}
         {loading ? <div className="py-16 flex justify-center"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div> : (
           <>
+            {canViewPayrollSection && (
             <div className="bg-surface border border-line rounded-xl overflow-hidden">
               <div className="px-4 py-3 border-b border-line bg-surface-muted flex flex-wrap items-center justify-between gap-3">
                 <div>
@@ -335,7 +342,9 @@ export const PayrollPage: React.FC = () => {
                 {canManagePayroll && <button onClick={calculateRun} disabled={saving} className="rounded-lg bg-primary px-4 py-2 font-bold text-white disabled:opacity-50"><Calculator className="ml-1 inline h-4 w-4" /> احتساب المسودة</button>}
               </div>}
             </div>
+            )}
 
+            {canViewTransactionsSection && (
             <div className="bg-surface border border-line rounded-xl overflow-hidden">
               <div className="px-4 py-3 border-b border-line bg-surface-muted flex items-center justify-between">
                 <h3 className="text-sm font-black flex items-center gap-2"><Users className="w-4 h-4 text-muted" /> حركات إضافية للموظفين</h3>
@@ -352,7 +361,9 @@ export const PayrollPage: React.FC = () => {
                 </div>)}
               </div>
             </div>
+            )}
 
+            {canViewTransactionsSection && (
             <div className="bg-surface border border-line rounded-xl overflow-hidden">
               <div className="px-4 py-3 border-b border-line bg-surface-muted flex items-center justify-between">
                 <h3 className="text-sm font-black flex items-center gap-2"><Banknote className="w-4 h-4 text-muted" /> آخر حركات الرواتب</h3>
@@ -375,6 +386,7 @@ export const PayrollPage: React.FC = () => {
                               />
 
             </div>
+            )}
           </>
         )}
       </div>

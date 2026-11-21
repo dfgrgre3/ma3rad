@@ -63,13 +63,24 @@ function createModuleDelivery({ store, getOrigin, getCredential, getDeviceId, bu
         ? entry.manifest.files.reduce((sum, file) => sum + (Number(file.size) || 0), 0)
         : 0,
       installed: store.list().some((item) => item.moduleId === entry.moduleId && item.version === entry.version),
+      // Page-level metadata (absent on legacy module packages).
+      modules: Array.isArray(entry.manifest?.modules) ? entry.manifest.modules : undefined,
+      pages: Array.isArray(entry.manifest?.pages) ? entry.manifest.pages : undefined,
     }));
   }
 
-  async function installNow(moduleId) {
-    const catalog = await fetchCatalog();
-    const entry = catalog.find((item) => item.moduleId === moduleId);
-    if (!entry) throw new Error('This module is not available for this device or application build.');
+  /**
+   * Does this catalog entry deliver (part of) the requested id? The id may be
+   * a business module (`sales` → every package declaring it) or a single
+   * package id (`pg-…` → exactly that package).
+   */
+  function belongsToModule(entry, moduleId) {
+    if (entry.moduleId === moduleId) return true;
+    const mods = Array.isArray(entry.manifest?.modules) ? entry.manifest.modules : null;
+    return Boolean(mods && mods.length && mods.includes(moduleId));
+  }
+
+  async function installPackage(entry) {
     const sizes = new Map((entry.manifest?.files || []).map((file) => [file.path, Number(file.size)]));
     // store.install verifies signature/build/paths BEFORE calling readFile,
     // then checks size and SHA-256 of every downloaded file.
@@ -85,6 +96,23 @@ function createModuleDelivery({ store, getOrigin, getCredential, getDeviceId, bu
       }
       return Buffer.from(await response.arrayBuffer());
     });
+  }
+
+  async function installNow(moduleId) {
+    const catalog = await fetchCatalog();
+    // A business module is delivered as several signed packages (one per page
+    // plus module-shared chunks); install every package the server offers for
+    // it. Packages the tenant's hidden pages map to are never in the catalog.
+    const entries = catalog.filter((entry) => belongsToModule(entry, moduleId));
+    if (entries.length === 0) {
+      throw new Error('This module is not available for this device or application build.');
+    }
+    const results = [];
+    for (const entry of entries) {
+      const installed = store.list().find((item) => item.moduleId === entry.moduleId && item.version === entry.version);
+      results.push(installed ?? await installPackage(entry));
+    }
+    return results;
   }
 
   /** Concurrent requests for the same module share one download. */

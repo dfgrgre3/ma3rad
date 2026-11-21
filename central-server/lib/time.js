@@ -13,4 +13,10 @@ function addMonths(date, months) {
   return result;
 }
 
-module.exports = { nowIso, addMonths };
+function addDays(date, days) {
+  const result = new Date(date.getTime());
+  result.setDate(result.getDate() + days);
+  return result;
+}
+
+module.exports = { nowIso, addMonths, addDays };

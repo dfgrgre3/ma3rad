@@ -49,11 +49,26 @@ export const KeysTab: React.FC<KeysTabProps> = ({
             className="rounded-lg border border-line-strong bg-primary/60 p-3.5 flex items-center justify-between"
           >
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-xs font-bold text-muted">{k.keyAlias}</span>
                 <span className="rounded bg-primary/20 text-primary text-[10px] font-bold px-1.5 py-0.5">
                   v{k.version}
                 </span>
+                {k.isCurrent && (
+                  <span className="rounded bg-success/20 text-success border border-success/30 text-[10px] font-bold px-1.5 py-0.5">
+                    الحالي
+                  </span>
+                )}
+                {k.status === 'REVOKED' && (
+                  <span className="rounded bg-danger/20 text-danger border border-danger/30 text-[10px] font-bold px-1.5 py-0.5">
+                    ملغي
+                  </span>
+                )}
+                {k.status === 'ROTATED' && (
+                  <span className="rounded bg-warning/20 text-warning border border-warning/30 text-[10px] font-bold px-1.5 py-0.5">
+                    مُدوَّر
+                  </span>
+                )}
               </div>
               <p className="text-[11px] text-muted mt-1">
                 الخوارزمية: <span className="font-mono text-muted">{k.algorithm}</span>
@@ -61,15 +76,17 @@ export const KeysTab: React.FC<KeysTabProps> = ({
               <p className="text-[10px] text-muted">تم الإنشاء: {formatDateTime(k.createdAt)}</p>
             </div>
 
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={() => k.keyAlias && onRotateKey(k.keyAlias)}
-              disabled={!canManageSecurity}
-              leadingIcon={<RotateCcw className="h-3.5 w-3.5" />}
-            >
-              تدوير المفتاح
-            </Button>
+            {k.status === 'ACTIVE' && (
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => k.keyAlias && onRotateKey(k.keyAlias)}
+                disabled={!canManageSecurity}
+                leadingIcon={<RotateCcw className="h-3.5 w-3.5" />}
+              >
+                تدوير المفتاح
+              </Button>
+            )}
           </div>
         ))}
       </div>
@@ -110,8 +127,23 @@ export const KeysTab: React.FC<KeysTabProps> = ({
             { key: 'name', header: 'اسم المفتاح', render: (key) => <span className="font-bold text-muted">{key.name}</span> },
             { key: 'prefix', header: 'البادئة', render: (key) => <span className="font-mono text-muted">{key.keyPrefix}...</span> },
             { key: 'scopes', header: 'الصلاحيات', render: (key) => <span className="text-muted">{key.scopes.join(', ') || 'الكل'}</span> },
-            { key: 'status', header: 'الحالة', render: (key) => <span className={`font-bold ${key.isActive ? 'text-success' : 'text-danger'}`}>{key.isActive ? 'نشط' : 'ملغي'}</span> },
-            { key: 'expires', header: 'تاريخ الانتهاء', render: (key) => <span className="text-muted">{key.expiresAt ? formatDateTime(key.expiresAt) : 'دائم'}</span> },
+            {
+              key: 'status', header: 'الحالة',
+              render: (key) => {
+                const expired = key.isActive && key.expiresAt && new Date(key.expiresAt).getTime() < Date.now();
+                if (!key.isActive) return <span className="font-bold text-danger">ملغي</span>;
+                if (expired) return <span className="font-bold text-warning">منتهي الصلاحية</span>;
+                return <span className="font-bold text-success">نشط</span>;
+              },
+            },
+            {
+              key: 'expires', header: 'تاريخ الانتهاء',
+              render: (key) => {
+                if (!key.expiresAt) return <span className="text-muted">دائم</span>;
+                const expired = key.isActive && new Date(key.expiresAt).getTime() < Date.now();
+                return <span className={expired ? 'text-warning font-bold' : 'text-muted'}>{formatDateTime(key.expiresAt)}</span>;
+              },
+            },
             { key: 'lastUsed', header: 'آخر استخدام', render: (key) => <span className="text-muted">{key.lastUsedAt ? formatDateTime(key.lastUsedAt) : 'لم يستخدم'}</span> },
             {
               key: 'actions', header: 'إجراءات', align: 'center',

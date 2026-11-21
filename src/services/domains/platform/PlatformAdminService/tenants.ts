@@ -8,6 +8,7 @@ import type {
   PlatformTenantAccountInput,
   PlatformTenantProfile,
   PlatformTenantUser,
+  PlatformTenantUserDirectoryEntry,
   PlatformTenantUserInput,
   PlatformTenantUserProvisioningResult,
   PlatformTenantOverride,
@@ -25,9 +26,11 @@ export interface TenantApi {
   getTenantProfile(id: string): PlatformTenantProfile;
   getTenantAccount(tenantId: string): PlatformTenantAccount | null;
   createTenantAccount(tenantId: string, input: PlatformTenantAccountInput): PlatformActivationDetails;
+  updateTenantAccount(tenantId: string, input: { username?: string; email?: string; fullName?: string; password?: string }): PlatformTenantAccount;
   resetTenantAccountPassword(tenantId: string, temporaryPassword?: string): PlatformActivationDetails;
   setTenantAccountActive(tenantId: string, active: boolean): PlatformTenantAccount;
   listTenantUsers(tenantId: string): PlatformTenantUser[];
+  listAllTenantUsers(filters?: { tenantId?: string; provisioningStatus?: string; status?: string; search?: string }): PlatformTenantUserDirectoryEntry[];
   createTenantUser(tenantId: string, input: PlatformTenantUserInput): PlatformTenantUserProvisioningResult;
   updateTenantUser(id: string, input: PlatformTenantUserInput): PlatformTenantUser;
   setTenantUserActive(id: string, active: boolean): PlatformTenantUser;
@@ -80,6 +83,10 @@ export function createTenantApi(): TenantApi {
       return platformTenantService.createTenantAccount(tenantId, input);
     },
 
+    updateTenantAccount(tenantId: string, input: { username?: string; email?: string; fullName?: string; password?: string }) {
+      return platformTenantService.updateTenantAccount(tenantId, input);
+    },
+
     resetTenantAccountPassword(tenantId: string, temporaryPassword?: string) {
       return platformTenantService.resetTenantAccountPassword(tenantId, temporaryPassword);
     },
@@ -90,6 +97,10 @@ export function createTenantApi(): TenantApi {
 
     listTenantUsers(tenantId: string) {
       return platformTenantService.listTenantUsers(tenantId);
+    },
+
+    listAllTenantUsers(filters: { tenantId?: string; provisioningStatus?: string; status?: string; search?: string } = {}) {
+      return platformTenantService.listAllTenantUsers(filters);
     },
 
     createTenantUser(tenantId: string, input: PlatformTenantUserInput) {

@@ -25,7 +25,7 @@ import type {
   PlatformPlanChangeType,
   PlatformPeriod,
 } from './platformTypes';
-import { nowIso, toNumber, addMonths, formatDate, signCertificate, generateLicenseActivationCode, safeJsonArray } from './platformUtils';
+import { nowIso, toNumber, addMonths, addDays, formatDate, signCertificate, generateLicenseActivationCode, safeJsonArray } from './platformUtils';
 
 export class PlatformSubscriptionService {
   private db = DatabaseManager.getInstance();
@@ -169,8 +169,8 @@ export class PlatformSubscriptionService {
     this.db.executeTransaction(() => {
       this.db.run(
         `INSERT INTO platform_subscriptions
-          (id, tenant_id, plan_id, status, start_date, end_date, seats, price, billing_cycle, auto_renew, branches_limit)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ROUND(?*100), ?, 1, ?)`,
+          (id, tenant_id, plan_id, status, start_date, end_date, seats, price, billing_cycle, auto_renew, branches_limit, is_trial, trial_ends_at, last_change_type)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ROUND(?*100), ?, 1, ?, ?, ?, 'CREATE')`,
         [
           id, input.tenantId, input.planId,
           input.status ?? 'ACTIVE',
@@ -179,6 +179,8 @@ export class PlatformSubscriptionService {
           toNumber(input.price, plan.price),
           plan.billingCycle,
           toNumber(input.branchesLimit, plan.branchesLimit),
+          input.isTrial ? 1 : 0,
+          input.trialEndsAt ?? null,
         ]
       );
 
@@ -209,6 +211,8 @@ export class PlatformSubscriptionService {
          WHERE id = ?`,
         [input.planId, start.toISOString(), end.toISOString(), toNumber(input.seats, plan.seatsLimit), toNumber(input.branchesLimit, plan.branchesLimit), toNumber(plan.devicesLimit, 1), now, input.tenantId]
       );
+
+      this.recordSubscriptionChange(id, 'CREATE', null, { tenantId: input.tenantId, planId: input.planId, status: input.status ?? 'ACTIVE', startDate: start.toISOString(), endDate: end.toISOString() }, input.isTrial ? 'إنشاء اشتراك تجريبي' : 'إنشاء اشتراك');
     });
 
 
@@ -233,13 +237,13 @@ export class PlatformSubscriptionService {
     const id = `sub_${uuidv4().replace(/-/g, '').slice(0, 12)}`;
     const now = nowIso();
     const start = new Date();
-    const end = addMonths(start, plan.trialDays);
+    const end = addDays(start, Math.max(1, plan.trialDays));
 
     this.db.executeTransaction(() => {
       this.db.run(
         `INSERT INTO platform_subscriptions
-          (id, tenant_id, plan_id, status, start_date, end_date, seats, price, billing_cycle, auto_renew, branches_limit)
-         VALUES (?, ?, ?, 'TRIAL', ?, ?, ?, ?, ?, 1, ?)`,
+          (id, tenant_id, plan_id, status, start_date, end_date, seats, price, billing_cycle, auto_renew, branches_limit, is_trial, trial_ends_at, last_change_type)
+         VALUES (?, ?, ?, 'TRIAL', ?, ?, ?, ?, ?, 1, ?, 1, ?, 'CREATE')`,
         [
           id, input.tenantId, input.planId,
           start.toISOString(), end.toISOString(),
@@ -247,6 +251,7 @@ export class PlatformSubscriptionService {
           0, // trial price
           plan.billingCycle,
           toNumber(input.branchesLimit, plan.branchesLimit),
+          end.toISOString(),
         ]
       );
 
@@ -277,6 +282,8 @@ export class PlatformSubscriptionService {
          WHERE id = ?`,
         [input.planId, start.toISOString(), end.toISOString(), toNumber(input.seats, plan.seatsLimit), toNumber(input.branchesLimit, plan.branchesLimit), toNumber(plan.devicesLimit, 1), now, input.tenantId]
       );
+
+      this.recordSubscriptionChange(id, 'CREATE', null, { tenantId: input.tenantId, planId: input.planId, trial: true, endDate: end.toISOString() }, 'إنشاء اشتراك تجريبي');
     });
 
 
@@ -311,7 +318,7 @@ export class PlatformSubscriptionService {
     this.db.executeTransaction(() => {
       // Update subscription
       this.db.run(
-        `UPDATE platform_subscriptions SET end_date = ?, updated_at = ? WHERE id = ?`,
+        `UPDATE platform_subscriptions SET end_date = ?, last_change_type = 'renewal', updated_at = ? WHERE id = ?`,
         [newEnd.toISOString(), now, activeSub.id]
       );
 
@@ -326,6 +333,8 @@ export class PlatformSubscriptionService {
         `UPDATE platform_tenants SET subscription_expires_at = ?, updated_at = ? WHERE id = ?`,
         [newEnd.toISOString(), now, tenantId]
       );
+
+      this.recordSubscriptionChange(activeSub.id, 'RENEW', { endDate: activeSub.end_date ?? null }, { endDate: newEnd.toISOString(), months }, `تجديد ${months} شهر`);
     });
 
     this.audit('تجديد اشتراك', 'SUBSCRIPTION', activeSub.id, { tenantId, months, newEndDate: newEnd.toISOString() });
@@ -357,11 +366,162 @@ export class PlatformSubscriptionService {
         `UPDATE platform_tenants SET status = 'CANCELLED', updated_at = ? WHERE id = ?`,
         [now, tenantId]
       );
+
+      const cancelledSubs = this.db.query<any>(
+        `SELECT id FROM platform_subscriptions WHERE tenant_id = ? AND status = 'CANCELLED' AND updated_at = ?`,
+        [tenantId, now]
+      );
+      for (const sub of cancelledSubs) {
+        this.recordSubscriptionChange(String(sub.id), 'CANCEL', { status: 'ACTIVE' }, { status: 'CANCELLED' }, reason);
+      }
     });
 
     this.audit('إلغاء اشتراك', 'SUBSCRIPTION', null, { tenantId, reason });
 
     return this.getTenant(tenantId)!;
+  }
+
+  public suspendTenantSubscription(tenantId: string, reason?: string): PlatformTenant {
+    PlatformSubscriptionService.requirePlatformAccess('subscriptions', 'platform.subscriptions.update');
+
+    const tenant = this.getTenant(tenantId);
+    if (!tenant) throw new Error('العميل غير موجود.');
+
+    const now = nowIso();
+    const openSubs = this.db.query<any>(
+      `SELECT id FROM platform_subscriptions WHERE tenant_id = ? AND status IN ('ACTIVE','TRIAL','PAST_DUE')`,
+      [tenantId]
+    );
+    if (openSubs.length === 0) throw new Error('لا يوجد اشتراك مفتوح لإيقافه.');
+
+    this.db.executeTransaction(() => {
+      this.db.run(
+        `UPDATE platform_subscriptions SET status = 'SUSPENDED', updated_at = ?
+         WHERE tenant_id = ? AND status IN ('ACTIVE','TRIAL','PAST_DUE')`,
+        [now, tenantId]
+      );
+      this.db.run(
+        `UPDATE platform_licenses SET status = 'SUSPENDED', updated_at = ?
+         WHERE tenant_id = ? AND status IN ('ACTIVE','ISSUED','TRIAL')`,
+        [now, tenantId]
+      );
+      for (const sub of openSubs) {
+        this.recordSubscriptionChange(String(sub.id), 'SUSPEND', { status: 'ACTIVE' }, { status: 'SUSPENDED' }, reason);
+      }
+    });
+
+    this.audit('إيقاف اشتراك', 'SUBSCRIPTION', null, { tenantId, reason });
+
+    return this.getTenant(tenantId)!;
+  }
+
+  public resumeTenantSubscription(tenantId: string): PlatformTenant {
+    PlatformSubscriptionService.requirePlatformAccess('subscriptions', 'platform.subscriptions.update');
+
+    const tenant = this.getTenant(tenantId);
+    if (!tenant) throw new Error('العميل غير موجود.');
+
+    const now = nowIso();
+    const suspendedSubs = this.db.query<any>(
+      `SELECT id FROM platform_subscriptions WHERE tenant_id = ? AND status = 'SUSPENDED'`,
+      [tenantId]
+    );
+    if (suspendedSubs.length === 0) throw new Error('لا يوجد اشتراك موقوف لتفعيله.');
+
+    this.db.executeTransaction(() => {
+      this.db.run(
+        `UPDATE platform_subscriptions SET status = 'ACTIVE', updated_at = ?
+         WHERE tenant_id = ? AND status = 'SUSPENDED'`,
+        [now, tenantId]
+      );
+      this.db.run(
+        `UPDATE platform_licenses SET status = 'ACTIVE', updated_at = ?
+         WHERE tenant_id = ? AND status = 'SUSPENDED'`,
+        [now, tenantId]
+      );
+      for (const sub of suspendedSubs) {
+        this.recordSubscriptionChange(String(sub.id), 'SUSPEND', { status: 'SUSPENDED' }, { status: 'ACTIVE' }, 'إعادة تفعيل');
+      }
+    });
+
+    this.audit('تفعيل اشتراك', 'SUBSCRIPTION', null, { tenantId });
+
+    return this.getTenant(tenantId)!;
+  }
+
+  public setSubscriptionAutoRenew(tenantId: string, autoRenew: boolean): void {
+    PlatformSubscriptionService.requirePlatformAccess('subscriptions', 'platform.subscriptions.update');
+
+    const tenant = this.getTenant(tenantId);
+    if (!tenant) throw new Error('العميل غير موجود.');
+
+    const now = nowIso();
+    const subs = this.db.query<any>(
+      `SELECT id, auto_renew FROM platform_subscriptions WHERE tenant_id = ? AND status IN ('ACTIVE','TRIAL','PAST_DUE','SUSPENDED')`,
+      [tenantId]
+    );
+    if (subs.length === 0) throw new Error('لا يوجد اشتراك مفتوح لتعديل التجديد التلقائي.');
+
+    this.db.executeTransaction(() => {
+      this.db.run(
+        `UPDATE platform_subscriptions SET auto_renew = ?, updated_at = ?
+         WHERE tenant_id = ? AND status IN ('ACTIVE','TRIAL','PAST_DUE','SUSPENDED')`,
+        [autoRenew ? 1 : 0, now, tenantId]
+      );
+      for (const sub of subs) {
+        this.recordSubscriptionChange(
+          String(sub.id), 'LIMIT_CHANGE',
+          { autoRenew: Boolean(sub.auto_renew) }, { autoRenew },
+          autoRenew ? 'تفعيل التجديد التلقائي' : 'إيقاف التجديد التلقائي'
+        );
+      }
+    });
+
+    this.audit('تعديل التجديد التلقائي', 'SUBSCRIPTION', null, { tenantId, autoRenew });
+  }
+
+  public updateSubscriptionSeats(tenantId: string, seats: number, branchesLimit?: number): void {
+    PlatformSubscriptionService.requirePlatformAccess('subscriptions', 'platform.subscriptions.update');
+
+    const tenant = this.getTenant(tenantId);
+    if (!tenant) throw new Error('العميل غير موجود.');
+
+    const safeSeats = Math.max(1, Math.floor(toNumber(seats, 1)));
+    const safeBranches = branchesLimit != null ? Math.max(1, Math.floor(toNumber(branchesLimit, 1))) : null;
+    const now = nowIso();
+
+    const subs = this.db.query<any>(
+      `SELECT id, seats, branches_limit FROM platform_subscriptions WHERE tenant_id = ? AND status IN ('ACTIVE','TRIAL','PAST_DUE','SUSPENDED')`,
+      [tenantId]
+    );
+    if (subs.length === 0) throw new Error('لا يوجد اشتراك مفتوح لتعديل المقاعد.');
+
+    this.db.executeTransaction(() => {
+      this.db.run(
+        `UPDATE platform_subscriptions SET seats = ?, branches_limit = COALESCE(?, branches_limit), updated_at = ?
+         WHERE tenant_id = ? AND status IN ('ACTIVE','TRIAL','PAST_DUE','SUSPENDED')`,
+        [safeSeats, safeBranches, now, tenantId]
+      );
+      this.db.run(
+        `UPDATE platform_licenses SET seats = ?, branches_limit = COALESCE(?, branches_limit), updated_at = ?
+         WHERE tenant_id = ? AND status IN ('ACTIVE','ISSUED','SUSPENDED','TRIAL')`,
+        [safeSeats, safeBranches, now, tenantId]
+      );
+      this.db.run(
+        `UPDATE platform_tenants SET seats_limit = ?, branches_limit = COALESCE(?, branches_limit), updated_at = ? WHERE id = ?`,
+        [safeSeats, safeBranches, now, tenantId]
+      );
+      for (const sub of subs) {
+        this.recordSubscriptionChange(
+          String(sub.id), 'SEATS_CHANGE',
+          { seats: toNumber(sub.seats, 1), branchesLimit: toNumber(sub.branches_limit, 1) },
+          { seats: safeSeats, branchesLimit: safeBranches ?? toNumber(sub.branches_limit, 1) },
+          'تعديل المقاعد/الفروع'
+        );
+      }
+    });
+
+    this.audit('تعديل مقاعد الاشتراك', 'SUBSCRIPTION', null, { tenantId, seats: safeSeats, branchesLimit: safeBranches });
   }
 
   public changeSubscriptionPlan(
@@ -439,10 +599,10 @@ export class PlatformSubscriptionService {
       // Create new subscription
       this.db.run(
         `INSERT INTO platform_subscriptions
-          (id, tenant_id, plan_id, status, start_date, end_date, seats, price, billing_cycle, auto_renew, branches_limit)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ROUND(?*100), ?, 1, ?)`,
+          (id, tenant_id, plan_id, status, start_date, end_date, seats, price, billing_cycle, auto_renew, branches_limit, last_change_type)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ROUND(?*100), ?, 1, ?, ?)`,
         [subscriptionId, tenantId, targetPlanId, 'ACTIVE', start.toISOString(), expires.toISOString(),
-         tenant.seatsLimit, price, targetPlan.billingCycle, branchesLimit]
+         tenant.seatsLimit, price, targetPlan.billingCycle, branchesLimit, changeType]
       );
 
       // Create new license
@@ -494,6 +654,8 @@ export class PlatformSubscriptionService {
         previousPlanId: currentPlanId, newPlanId: targetPlanId, months, price, branchesLimit,
         reason: options.reason ?? null, source: allowLocal ? 'local' : 'central',
       });
+
+      this.recordSubscriptionChange(subscriptionId, 'PLAN_CHANGE', { planId: currentPlanId }, { planId: targetPlanId, months, price, changeType }, options.reason);
     });
 
     this.audit('تغيير باقة عميل', 'SUBSCRIPTION', null, { tenantId, fromPlan: currentPlanId, toPlan: targetPlanId, changeType });
@@ -715,6 +877,57 @@ export class PlatformSubscriptionService {
     const bytes = randomBytes(16);
     const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('').toUpperCase();
     return `CS-${hex.slice(0, 8)}-${hex.slice(8, 16)}-${hex.slice(16, 24)}-${hex.slice(24, 32)}`;
+  }
+
+  private recordSubscriptionChange(
+    subscriptionId: string,
+    changeType: 'CREATE' | 'RENEW' | 'SUSPEND' | 'CANCEL' | 'EXPIRE' | 'PLAN_CHANGE' | 'LIMIT_CHANGE' | 'SEATS_CHANGE' | 'BRANCHES_CHANGE',
+    oldValues: unknown,
+    newValues: unknown,
+    reason?: string
+  ): void {
+    try {
+      const actor = AuthService.getCurrentUser();
+      this.db.run(
+        `INSERT INTO platform_subscription_changes
+          (id, subscription_id, change_type, old_values, new_values, actor_id, actor_name, reason, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          `sch_${uuidv4().replace(/-/g, '').slice(0, 12)}`,
+          subscriptionId,
+          changeType,
+          JSON.stringify(oldValues ?? null),
+          JSON.stringify(newValues ?? null),
+          actor?.id ?? 'system',
+          actor?.fullName ?? null,
+          reason ?? null,
+          nowIso(),
+        ]
+      );
+    } catch {
+      // Change log is best-effort; never block the business operation.
+    }
+  }
+
+  public listSubscriptionChanges(tenantId: string, limit = 50): Array<Record<string, unknown>> {
+    PlatformSubscriptionService.requirePlatformAccess('subscriptions', 'platform.subscriptions.view');
+
+    return this.db.query<any>(
+      `SELECT c.*, s.tenant_id FROM platform_subscription_changes c
+       JOIN platform_subscriptions s ON s.id = c.subscription_id
+       WHERE s.tenant_id = ?
+       ORDER BY c.created_at DESC LIMIT ?`,
+      [tenantId, Math.max(1, Math.min(200, limit))]
+    ).map((row) => ({
+      id: String(row.id),
+      subscriptionId: String(row.subscription_id),
+      changeType: String(row.change_type),
+      oldValues: row.old_values ?? null,
+      newValues: row.new_values ?? null,
+      actorName: row.actor_name ?? null,
+      reason: row.reason ?? null,
+      createdAt: String(row.created_at),
+    }));
   }
 
   private enqueueTenantOutboxEvent(tenantId: string, eventType: string, payload: unknown): void {

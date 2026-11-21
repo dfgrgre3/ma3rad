@@ -111,6 +111,7 @@ async function migratePlatformIdentityTables() {
     await addColumnIfMissing('platform_users', userColumns, 'failed_login_attempts', `failed_login_attempts INTEGER NOT NULL DEFAULT 0`);
     await addColumnIfMissing('platform_users', userColumns, 'locked_until', `locked_until TEXT`);
     await addColumnIfMissing('platform_users', userColumns, 'deleted_at', `deleted_at TEXT`);
+    await addColumnIfMissing('platform_users', userColumns, 'phone', `phone TEXT`);
     await db.exec('CREATE INDEX IF NOT EXISTS idx_platform_users_deleted ON platform_users(deleted_at)');
   }
 
@@ -279,7 +280,7 @@ async function createTables() {
       license_id TEXT NOT NULL,
       subscription_id TEXT,
       change_type TEXT NOT NULL
-        CHECK(change_type IN ('ISSUE','RENEW','SUSPEND','REVOKE','TRANSFER','MODULE_CHANGE','LIMIT_CHANGE','COUPLING_CHANGE','STATUS_CHANGE')),
+        CHECK(change_type IN ('ISSUE','RENEW','SUSPEND','REVOKE','TRANSFER','MODULE_CHANGE','LIMIT_CHANGE','COUPLING_CHANGE','STATUS_CHANGE','UPDATE','REACTIVATE','UNBIND')),
       old_values TEXT,
       new_values TEXT,
       actor_id TEXT,
@@ -321,6 +322,7 @@ async function createTables() {
       password_hash TEXT NOT NULL,
       full_name TEXT,
       email TEXT,
+      phone TEXT,
       role TEXT NOT NULL DEFAULT 'SUPER_ADMIN',
       permissions TEXT NOT NULL DEFAULT '[]',
       is_active INTEGER NOT NULL DEFAULT 1 CHECK(is_active IN (0,1)),
@@ -547,12 +549,39 @@ async function createTables() {
       invite_expires_at TEXT,
       provisioned_at TEXT,
       last_error TEXT,
+      origin TEXT NOT NULL DEFAULT 'PLATFORM',
       is_active INTEGER NOT NULL DEFAULT 1 CHECK(is_active IN (0,1)),
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (tenant_id) REFERENCES platform_tenants(id) ON DELETE CASCADE
     );
     CREATE INDEX IF NOT EXISTS idx_platform_tenant_users_tenant ON platform_tenant_users(tenant_id, status);
+
+    -- Delivery queue between the platform console and tenant ERP devices.
+    -- One row per identity mutation; a device claims PENDING jobs, applies them
+    -- to its local users table, then reports the outcome via /result.
+    CREATE TABLE IF NOT EXISTS platform_tenant_provisioning_jobs (
+      id TEXT PRIMARY KEY,
+      tenant_id TEXT NOT NULL,
+      tenant_user_id TEXT NOT NULL,
+      event TEXT NOT NULL
+        CHECK(event IN ('PROVISION','UPDATE','STATUS','DELETE')),
+      payload TEXT NOT NULL DEFAULT '{}',
+      status TEXT NOT NULL DEFAULT 'PENDING'
+        CHECK(status IN ('PENDING','CLAIMED','DONE','FAILED','CANCELLED')),
+      attempts INTEGER NOT NULL DEFAULT 0,
+      max_attempts INTEGER NOT NULL DEFAULT 8,
+      last_error TEXT,
+      claimed_by_device_id TEXT,
+      claimed_at TEXT,
+      result_identity_user_id TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      completed_at TEXT,
+      FOREIGN KEY (tenant_id) REFERENCES platform_tenants(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_platform_prov_jobs_tenant_status ON platform_tenant_provisioning_jobs(tenant_id, status, created_at);
+    CREATE INDEX IF NOT EXISTS idx_platform_prov_jobs_user ON platform_tenant_provisioning_jobs(tenant_user_id, status);
 
     CREATE TABLE IF NOT EXISTS platform_tenant_overrides (
       id TEXT PRIMARY KEY,
@@ -821,6 +850,48 @@ async function createTables() {
 
     CREATE TABLE IF NOT EXISTS platform_policies (id TEXT PRIMARY KEY, slug TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
 
+    -- Policies & Compliance: versioned policy documents with a
+    -- draft → pending-approval → published workflow. Mirrors the desktop
+    -- schema (src/database/migrations/part163.ts).
+    CREATE TABLE IF NOT EXISTS platform_policy_documents (
+      id TEXT PRIMARY KEY,
+      slug TEXT NOT NULL UNIQUE,
+      title TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'DRAFT' CHECK(status IN ('DRAFT','PENDING_APPROVAL','PUBLISHED')),
+      draft_content TEXT NOT NULL DEFAULT '',
+      draft_change_summary TEXT,
+      draft_updated_by TEXT,
+      draft_updated_at TEXT,
+      submitted_by TEXT,
+      submitted_at TEXT,
+      current_version_id TEXT,
+      published_at TEXT,
+      published_by TEXT,
+      review_note TEXT,
+      created_by TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_platform_policy_documents_status ON platform_policy_documents(status, updated_at);
+
+    CREATE TABLE IF NOT EXISTS platform_policy_versions (
+      id TEXT PRIMARY KEY,
+      document_id TEXT NOT NULL,
+      version INTEGER NOT NULL,
+      title TEXT NOT NULL,
+      content TEXT NOT NULL,
+      change_summary TEXT,
+      created_by TEXT,
+      created_by_name TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      approved_by TEXT,
+      approved_by_name TEXT,
+      approved_at TEXT,
+      is_current INTEGER NOT NULL DEFAULT 0 CHECK(is_current IN (0,1)),
+      FOREIGN KEY (document_id) REFERENCES platform_policy_documents(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_platform_policy_versions_doc ON platform_policy_versions(document_id, version);
+
     CREATE TABLE IF NOT EXISTS platform_notifications (
       id TEXT PRIMARY KEY,
       tenant_id TEXT,
@@ -872,6 +943,128 @@ async function createTables() {
     );
     CREATE UNIQUE INDEX IF NOT EXISTS idx_platform_ip_bans_active_address ON platform_ip_bans(ip_address) WHERE is_active = 1;
     CREATE INDEX IF NOT EXISTS idx_platform_ip_bans_active ON platform_ip_bans(is_active);
+
+    -- Scheduled maintenance windows announced to tenant admins. The stored
+    -- status only persists CANCELLED; SCHEDULED/ACTIVE/COMPLETED are derived
+    -- from the start/end timestamps at read time.
+    CREATE TABLE IF NOT EXISTS platform_maintenance_windows (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      description TEXT,
+      starts_at TEXT NOT NULL,
+      ends_at TEXT NOT NULL,
+      affected_services TEXT NOT NULL DEFAULT '[]',
+      status TEXT NOT NULL DEFAULT 'SCHEDULED',
+      created_by TEXT,
+      created_at TEXT,
+      updated_at TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_platform_maintenance_windows_status ON platform_maintenance_windows(status, starts_at);
+
+    -- Per-target feature flag overrides (TENANT / PLAN / STAGING_GROUP).
+    CREATE TABLE IF NOT EXISTS platform_feature_flag_overrides (
+      id TEXT PRIMARY KEY,
+      feature_flag_id TEXT NOT NULL,
+      target_type TEXT NOT NULL
+        CHECK(target_type IN ('TENANT','PLAN','STAGING_GROUP')),
+      target_id TEXT NOT NULL,
+      is_enabled INTEGER NOT NULL DEFAULT 1 CHECK(is_enabled IN (0,1)),
+      custom_rollout_percent INTEGER,
+      created_at TEXT,
+      updated_at TEXT,
+      UNIQUE(feature_flag_id, target_type, target_id),
+      FOREIGN KEY (feature_flag_id) REFERENCES platform_feature_flags(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_platform_ff_overrides_flag ON platform_feature_flag_overrides(feature_flag_id);
+
+    -- Per-tenant rollout status for a release.
+    CREATE TABLE IF NOT EXISTS platform_release_targets (
+      id TEXT PRIMARY KEY,
+      release_id TEXT NOT NULL,
+      tenant_id TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'PENDING'
+        CHECK(status IN ('PENDING','SUCCESS','FAILED','SKIPPED')),
+      error TEXT,
+      attempt_count INTEGER NOT NULL DEFAULT 0,
+      applied_at TEXT,
+      deployed_at TEXT,
+      created_at TEXT,
+      updated_at TEXT,
+      UNIQUE(release_id, tenant_id),
+      FOREIGN KEY (release_id) REFERENCES platform_releases(id) ON DELETE CASCADE,
+      FOREIGN KEY (tenant_id) REFERENCES platform_tenants(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_platform_release_targets_release ON platform_release_targets(release_id);
+    CREATE INDEX IF NOT EXISTS idx_platform_release_targets_tenant ON platform_release_targets(tenant_id);
+  `);
+
+  // Plan versioning, price history and upgrade rules — mirrors the desktop
+  // schema (src/database/schema/part-19.ts + migrations/part101.ts).
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS platform_plan_versions (
+      id TEXT PRIMARY KEY,
+      plan_id TEXT NOT NULL,
+      version INTEGER NOT NULL,
+      name TEXT NOT NULL,
+      description TEXT,
+      billing_cycle TEXT NOT NULL DEFAULT 'YEARLY',
+      price REAL NOT NULL DEFAULT 0,
+      monthly_price REAL NOT NULL DEFAULT 0,
+      yearly_price REAL NOT NULL DEFAULT 0,
+      currency TEXT NOT NULL DEFAULT 'EGP',
+      seats_limit INTEGER NOT NULL DEFAULT 1,
+      branches_limit INTEGER NOT NULL DEFAULT 1,
+      devices_limit INTEGER NOT NULL DEFAULT 1,
+      storage_limit_mb INTEGER NOT NULL DEFAULT 500,
+      max_products INTEGER NOT NULL DEFAULT 1000,
+      max_warehouses INTEGER NOT NULL DEFAULT 2,
+      trial_days INTEGER NOT NULL DEFAULT 14,
+      included_modules TEXT NOT NULL DEFAULT '[]',
+      features TEXT NOT NULL DEFAULT '[]',
+      permissions TEXT NOT NULL DEFAULT '[]',
+      offline_grace_period_days INTEGER NOT NULL DEFAULT 14,
+      effective_from TEXT NOT NULL,
+      is_current INTEGER NOT NULL DEFAULT 0 CHECK(is_current IN (0,1)),
+      change_note TEXT,
+      created_by TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (plan_id) REFERENCES platform_plans(id) ON DELETE CASCADE,
+      UNIQUE(plan_id, version)
+    );
+    CREATE INDEX IF NOT EXISTS idx_plan_versions_plan ON platform_plan_versions(plan_id);
+    CREATE INDEX IF NOT EXISTS idx_plan_versions_effective ON platform_plan_versions(effective_from);
+
+    CREATE TABLE IF NOT EXISTS platform_price_history (
+      id TEXT PRIMARY KEY,
+      plan_id TEXT NOT NULL,
+      version INTEGER NOT NULL DEFAULT 1,
+      old_price REAL,
+      new_price REAL NOT NULL,
+      currency TEXT NOT NULL DEFAULT 'EGP',
+      effective_from TEXT NOT NULL,
+      reason TEXT,
+      actor_id TEXT,
+      actor_name TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (plan_id) REFERENCES platform_plans(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_price_history_plan ON platform_price_history(plan_id, effective_from);
+
+    CREATE TABLE IF NOT EXISTS platform_plan_upgrade_rules (
+      id TEXT PRIMARY KEY,
+      from_plan_id TEXT NOT NULL,
+      to_plan_id TEXT NOT NULL,
+      allowed INTEGER NOT NULL DEFAULT 1 CHECK(allowed IN (0,1)),
+      upgrade_fee_percent REAL NOT NULL DEFAULT 0,
+      requires_approval INTEGER NOT NULL DEFAULT 0 CHECK(requires_approval IN (0,1)),
+      notes TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (from_plan_id) REFERENCES platform_plans(id),
+      FOREIGN KEY (to_plan_id) REFERENCES platform_plans(id),
+      UNIQUE(from_plan_id, to_plan_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_upgrade_rules_from ON platform_plan_upgrade_rules(from_plan_id);
+    CREATE INDEX IF NOT EXISTS idx_upgrade_rules_to ON platform_plan_upgrade_rules(to_plan_id);
   `);
 
   // Upgrade stub tables created by earlier versions (CREATE IF NOT EXISTS
@@ -911,6 +1104,9 @@ async function createTables() {
     ['expires_at', 'expires_at TEXT'],
     ['updated_at', 'updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP'],
   ]);
+  await ensureColumns('platform_tenant_users', [
+    ['origin', "origin TEXT NOT NULL DEFAULT 'PLATFORM'"],
+  ]);
   await ensureColumns('platform_app_backups', [
     ['restore_status', "restore_status TEXT NOT NULL DEFAULT 'NONE'"],
     ['restore_requested_by', 'restore_requested_by TEXT'],
@@ -924,11 +1120,17 @@ async function createTables() {
     ['remote_access_requested_at', 'remote_access_requested_at TEXT'],
     ['remote_access_approved_at', 'remote_access_approved_at TEXT'],
     ['remote_access_duration_minutes', 'remote_access_duration_minutes INTEGER'],
+    ['rating', 'rating INTEGER'],
+    ['feedback', 'feedback TEXT'],
+    ['rated_at', 'rated_at TEXT'],
   ]);
   await ensureColumns('platform_remote_sessions', [
     ['expires_at', 'expires_at TEXT'],
   ]);
-
+  await ensureColumns('platform_plans', [
+    ['versioned', 'versioned INTEGER NOT NULL DEFAULT 0'],
+    ['current_version', 'current_version INTEGER NOT NULL DEFAULT 1'],
+  ]);
   // platform_signing_keys.private_key becomes nullable so externally managed
   // keys (PLATFORM_SIGNING_PRIVATE_KEY / PLATFORM_SIGNING_KEY_FILE) keep only
   // public metadata in the database. SQLite cannot drop NOT NULL via ALTER
@@ -960,6 +1162,50 @@ async function createTables() {
     }
     console.log('Migrated platform_signing_keys: private_key is now nullable for externally managed keys');
   }
+
+  // platform_license_changes.change_type CHECK must accept every type the admin
+  // routes record (UPDATE/REACTIVATE/UNBIND were missing, making PATCH /
+  // reactivate / unbind fail with SQLITE_CONSTRAINT). SQLite cannot alter a
+  // CHECK, so rebuild the table when the legacy constraint is still present.
+  const licenseChangesSql = (await db.get(
+    `SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'platform_license_changes'`
+  ))?.sql ?? '';
+  if (licenseChangesSql && !licenseChangesSql.includes("'UNBIND'")) {
+    try {
+      await db.exec(`
+        BEGIN IMMEDIATE;
+        CREATE TABLE platform_license_changes_new (
+          id TEXT PRIMARY KEY,
+          license_id TEXT NOT NULL,
+          subscription_id TEXT,
+          change_type TEXT NOT NULL
+            CHECK(change_type IN ('ISSUE','RENEW','SUSPEND','REVOKE','TRANSFER','MODULE_CHANGE','LIMIT_CHANGE','COUPLING_CHANGE','STATUS_CHANGE','UPDATE','REACTIVATE','UNBIND')),
+          old_values TEXT,
+          new_values TEXT,
+          actor_id TEXT,
+          actor_name TEXT,
+          reason TEXT,
+          created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (license_id) REFERENCES platform_licenses(id) ON DELETE CASCADE,
+          FOREIGN KEY (subscription_id) REFERENCES platform_subscriptions(id) ON DELETE SET NULL
+        );
+        INSERT INTO platform_license_changes_new
+          (id, license_id, subscription_id, change_type, old_values, new_values, actor_id, actor_name, reason, created_at)
+          SELECT id, license_id, subscription_id, change_type, old_values, new_values, actor_id, actor_name, reason, created_at
+          FROM platform_license_changes;
+        DROP TABLE platform_license_changes;
+        ALTER TABLE platform_license_changes_new RENAME TO platform_license_changes;
+        COMMIT;
+      `);
+    } catch (err) {
+      try { await db.exec('ROLLBACK'); } catch { /* no open transaction */ }
+      throw err;
+    }
+    await db.exec('CREATE INDEX IF NOT EXISTS idx_platform_license_changes_license ON platform_license_changes(license_id, created_at)');
+    await db.exec('CREATE INDEX IF NOT EXISTS idx_platform_license_changes_type ON platform_license_changes(change_type)');
+    console.log('Migrated platform_license_changes: expanded change_type CHECK constraint');
+  }
+
   await db.exec('CREATE INDEX IF NOT EXISTS idx_platform_ops_jobs_status ON platform_ops_jobs(status, created_at)');
   await db.exec('CREATE INDEX IF NOT EXISTS idx_platform_ops_jobs_tenant ON platform_ops_jobs(tenant_id)');
   await db.exec('CREATE INDEX IF NOT EXISTS idx_platform_backups_tenant ON platform_backups(tenant_id, created_at)');
@@ -1198,6 +1444,28 @@ async function createTables() {
     CREATE INDEX IF NOT EXISTS idx_platform_health_metrics_recorded ON platform_health_metrics(recorded_at);
 
 `);
+
+  // Device-reported metrics (POST /api/v1/telemetry/metrics) are tagged with
+  // the resolved tenant/device; stub tables created by earlier versions lack
+  // these columns.
+  await ensureColumns('platform_health_metrics', [
+    ['tenant_id', 'tenant_id TEXT'],
+    ['device_id', 'device_id TEXT'],
+    ['device_name', 'device_name TEXT'],
+  ]);
+  // Tenant-scoped API keys: tenant_id NULL/'' = platform staff key (legacy
+  // behaviour); a tenant id scopes the key to that customer's data only.
+  await ensureColumns('platform_api_keys', [
+    ['tenant_id', 'tenant_id TEXT'],
+    ['key_type', "key_type TEXT NOT NULL DEFAULT 'STAFF'"],
+  ]);
+  await db.exec('CREATE INDEX IF NOT EXISTS idx_platform_api_keys_tenant ON platform_api_keys(tenant_id)');
+  await db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_platform_health_metrics_device
+      ON platform_health_metrics(device_id, metric_name, recorded_at);
+    CREATE INDEX IF NOT EXISTS idx_platform_health_metrics_tenant
+      ON platform_health_metrics(tenant_id, metric_name, recorded_at);
+  `);
 
   await db.exec(`
 

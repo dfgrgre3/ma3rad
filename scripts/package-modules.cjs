@@ -38,6 +38,7 @@ function packageModules({ distDir, outDir, version, privateKey, strip = false })
       const bytes = fs.readFileSync(path.join(distDir, relPath));
       return { path: relPath, sha256: sha256Hex(bytes), size: bytes.length, bytes };
     });
+    const meta = plan.packages?.[moduleId] || {};
     const manifest = {
       formatVersion: FORMAT_VERSION,
       moduleId,
@@ -45,6 +46,11 @@ function packageModules({ distDir, outDir, version, privateKey, strip = false })
       buildId,
       files: entries.map(({ path: p, sha256, size }) => ({ path: p, sha256, size })),
     };
+    // Page-level metadata: which registry modules may receive this package and
+    // which app routes it serves — the server uses it to withhold packages
+    // whose pages are all hidden for a tenant.
+    if (Array.isArray(meta.modules) && meta.modules.length) manifest.modules = meta.modules;
+    if (Array.isArray(meta.pages) && meta.pages.length) manifest.pages = meta.pages;
     assertManifestShape(manifest);
     const target = path.join(outDir, moduleId, version);
     fs.rmSync(target, { recursive: true, force: true });

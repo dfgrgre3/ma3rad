@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShieldAlert, ShieldCheck } from 'lucide-react';
+import { ShieldAlert, ShieldCheck, Ban } from 'lucide-react';
 import { Button } from '../../../components/ui/Button';
 import { DataTable } from '../../../components/ui/DataTable';
 import type { PlatformCentralSecurityIncident } from '../../../services/domains/platform/platformTypes';
@@ -8,11 +8,13 @@ import { EmptyState, formatDateTime } from '../components/PlatformUI';
 interface IncidentsTabProps {
   incidents: PlatformCentralSecurityIncident[];
   canManageSecurity: boolean;
+  isCentral?: boolean;
   onOpenIncidentModal: () => void;
   onRespondIncident: (id: string, resolve: boolean) => void;
+  onBanIp?: (ip: string) => void;
 }
 
-export const IncidentsTab: React.FC<IncidentsTabProps> = ({ incidents, canManageSecurity, onOpenIncidentModal, onRespondIncident }) => (
+export const IncidentsTab: React.FC<IncidentsTabProps> = ({ incidents, canManageSecurity, isCentral = false, onOpenIncidentModal, onRespondIncident, onBanIp }) => (
   <div className="space-y-4">
     <div className="flex items-center justify-between">
       <h3 className="text-xs font-bold text-muted">
@@ -20,8 +22,8 @@ export const IncidentsTab: React.FC<IncidentsTabProps> = ({ incidents, canManage
       </h3>
       <Button
         size="sm"
-        disabled={!canManageSecurity}
-        onClick={() => { if (!canManageSecurity) return; onOpenIncidentModal(); }}
+        disabled={!canManageSecurity || isCentral}
+        onClick={() => { if (!canManageSecurity || isCentral) return; onOpenIncidentModal(); }}
         leadingIcon={<ShieldAlert className="h-4 w-4" />}
       >
         تسجيل بلاغ أمني يدوي
@@ -91,16 +93,31 @@ export const IncidentsTab: React.FC<IncidentsTabProps> = ({ incidents, canManage
             { key: 'time', header: 'التوقيت', render: (inc) => <span className="text-xs text-muted">{formatDateTime(inc.createdAt)}</span> },
             {
               key: 'actions', header: 'إجراءات', align: 'center',
-              render: (inc) => inc.status !== 'RESOLVED' ? (
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  disabled={!canManageSecurity}
-                  onClick={() => onRespondIncident(inc.id, true)}
-                >
-                  إغلاق كـ محلول
-                </Button>
-              ) : null,
+              render: (inc) => (
+                <div className="flex items-center justify-center gap-1.5">
+                  {isCentral && onBanIp && (inc.sourceIp || inc.ipAddress) && (
+                    <Button
+                      size="sm"
+                      variant="danger"
+                      disabled={!canManageSecurity}
+                      onClick={() => onBanIp((inc.sourceIp || inc.ipAddress)!)}
+                      leadingIcon={<Ban className="h-3 w-3" />}
+                    >
+                      حظر IP
+                    </Button>
+                  )}
+                  {inc.status !== 'RESOLVED' && !isCentral && (
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      disabled={!canManageSecurity}
+                      onClick={() => onRespondIncident(inc.id, true)}
+                    >
+                      إغلاق كـ محلول
+                    </Button>
+                  )}
+                </div>
+              ),
             },
           ]}
         />

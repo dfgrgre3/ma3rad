@@ -1,9 +1,11 @@
 import React from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   BadgeCheck,
   Check,
   ChevronLeft,
   ChevronRight,
+  Copy,
   Layers3,
   LayoutGrid,
   MonitorSmartphone,
@@ -12,6 +14,7 @@ import {
   Plus,
   RotateCcw,
   Search,
+  Settings2,
   Sparkles,
   Star,
   Trash2,
@@ -21,10 +24,8 @@ import { platformAdminService } from '../../services/domains/platform/PlatformAd
 import { centralPlatformClient } from '../../services/domains/platform/CentralPlatformClient';
 import { getCentralDataSourceState } from '../../hooks/platform/useCentralDataSource';
 import { canPlatform } from '../../hooks/platform/usePlatformPermission';
-import type {
-  PlatformBillingCycle,
-  PlatformPlanInput,
-} from '../../services/domains/platform/platformTypes';
+import type { PlatformPlanInput } from '../../services/domains/platform/platformTypes';
+
 import { PLATFORM_MODULE_TO_REGISTRY_IDS } from '../../config/platformModuleMap';
 import { listTenantPageGroups, listTenantPages, type TenantPage, type TenantPageGroup } from '../../config/tenantPageCatalog';
 import { Button } from '../../components/ui/Button';
@@ -32,125 +33,33 @@ import { Modal } from '../../components/ui/Modal';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { EmptyState, Field, StatusBadge, Toggle, formatMoney, inputClass } from './components/PlatformUI';
 import { useToast } from '../../components/ui/Toast';
-
-// ─── Normalization (local rows are camelCase, central API may return snake_case) ───
-
-const pick = (row: any, ...keys: string[]): any => {
-  for (const key of keys) {
-    const value = row?.[key];
-    if (value !== undefined && value !== null) return value;
-  }
-  return undefined;
-};
-
-const toBool = (value: any): boolean => value === true || value === 1 || value === '1' || value === 'true';
-
-const jsonArray = (value: any): string[] => {
-  if (Array.isArray(value)) return value.map(String).filter(Boolean);
-  if (typeof value !== 'string' || !value.trim()) return [];
-  try {
-    const parsed = JSON.parse(value);
-    return Array.isArray(parsed) ? parsed.map(String).filter(Boolean) : [];
-  } catch {
-    return [];
-  }
-};
-
-/** Central plan prices arrive in minor units (cents); local plans are already major units. */
-const fromMinor = (value: any): number => {
-  const n = Number(value);
-  return Number.isFinite(n) ? n / 100 : 0;
-};
-const major = (value: any): number => {
-  const n = Number(value);
-  return Number.isFinite(n) ? n : 0;
-};
-
-/** NaN-safe numeric parsing clamped to a minimum. */
-const numericInput = (value: string | number | null | undefined, min = 0): number => {
-  const n = Number(value);
-  return Number.isFinite(n) ? Math.max(min, n) : min;
-};
-
-interface CatalogPlan {
-  id: string;
-  code: string;
-  name: string;
-  description?: string | null;
-  billingCycle: PlatformBillingCycle;
-  price: number;
-  currency: string;
-  seatsLimit: number;
-  trialDays: number;
-  includedModules: string[];
-  features: string[];
-  isActive: boolean;
-  isDefault: boolean;
-  subscriberCount: number;
-  raw: any;
-}
-
-const normalizePlan = (row: any, minorUnits = false): CatalogPlan => ({
-  id: String(pick(row, 'id') ?? ''),
-  code: String(pick(row, 'code') ?? ''),
-  name: String(pick(row, 'name') ?? pick(row, 'code') ?? ''),
-  description: pick(row, 'description') ?? null,
-  billingCycle: (pick(row, 'billingCycle', 'billing_cycle') ?? 'MONTHLY') as PlatformBillingCycle,
-  price: minorUnits ? fromMinor(pick(row, 'price')) : major(pick(row, 'price')),
-  currency: String(pick(row, 'currency') ?? 'EGP'),
-  seatsLimit: Number(pick(row, 'seatsLimit', 'seats_limit') ?? 1) || 1,
-  trialDays: Number(pick(row, 'trialDays', 'trial_days') ?? 14) || 14,
-  includedModules: jsonArray(pick(row, 'includedModules', 'included_modules')),
-  features: jsonArray(pick(row, 'features')),
-  isActive: toBool(pick(row, 'isActive', 'is_active')),
-  isDefault: toBool(pick(row, 'isDefault', 'is_default')),
-  subscriberCount: Number(pick(row, 'subscriberCount', 'subscriber_count') ?? 0) || 0,
-  raw: row,
-});
-
-interface CatalogFeature {
-  id: string;
-  code: string;
-  name: string;
-  description?: string | null;
-  category?: string | null;
-  isEnabled: boolean;
-  rolloutPercent: number;
-  isStagingOnly: boolean;
-  minPlanTier?: string | null;
-  pagePaths: string[];
-}
-
-const normalizeFeature = (row: any): CatalogFeature => ({
-  id: String(pick(row, 'id') ?? ''),
-  code: String(pick(row, 'code', 'key') ?? ''),
-  name: String(pick(row, 'name') ?? pick(row, 'code', 'key') ?? ''),
-  description: pick(row, 'description') ?? null,
-  category: pick(row, 'category') ?? null,
-  isEnabled: toBool(pick(row, 'isEnabled', 'is_enabled', 'enabled')),
-  rolloutPercent: Number(pick(row, 'rolloutPercent', 'rollout_percentage', 'rolloutPercentage') ?? 100) || 0,
-  isStagingOnly: toBool(pick(row, 'isStagingOnly', 'is_staging_only')),
-  minPlanTier: pick(row, 'minPlanTier', 'min_plan_tier') ?? null,
-  pagePaths: jsonArray(pick(row, 'pagePaths', 'page_paths')),
-});
-
-interface CatalogModule {
-  id: string;
-  code: string;
-  name: string;
-  description?: string | null;
-  category?: string | null;
-  isEnabled: boolean;
-}
-
-const normalizeModule = (row: any): CatalogModule => ({
-  id: String(pick(row, 'id') ?? ''),
-  code: String(pick(row, 'code') ?? pick(row, 'id') ?? ''),
-  name: String(pick(row, 'name') ?? pick(row, 'code') ?? ''),
-  description: pick(row, 'description') ?? null,
-  category: pick(row, 'category') ?? null,
-  isEnabled: toBool(pick(row, 'isEnabled', 'is_enabled', 'enabled')),
-});
+import {
+  emptyFeatureForm,
+  normalizeFeature,
+  normalizeModule,
+  normalizePlan,
+  numericInput,
+  type CatalogFeature,
+  type CatalogModule,
+  type CatalogPlan,
+  type FeatureFormState,
+} from './PlatformPlanWizardPage/shared';
+import {
+  expandPermissionCodes,
+  featureHiddenPathsForPlan,
+  permissionsForPagePath,
+} from './components/access/pageAccessRules';
+import {
+  emptyFeatureConfigDraft,
+  featureConfigSignature,
+  serializeFeatureConfig,
+  splitFeatureConfig,
+  type TenantFeatureConfigDraft,
+} from './components/access/featureConfigDraft';
+import { PlanDetailsModal } from './PlatformPlanWizardPage/PlanDetailsModal';
+import { PagePermissionsModal, type PagePermissionDraft } from './components/access/PagePermissionsModal';
+import { PlanPreviewPanel } from './PlatformPlanWizardPage/PlanPreviewPanel';
+import { CopyFromPlanModal } from './PlatformPlanWizardPage/CopyFromPlanModal';
 
 // ─── Step indicator ────────────────────────────────────────────────────────────
 
@@ -199,64 +108,6 @@ const StepIndicator: React.FC<{ step: number }> = ({ step }) => (
     </div>
   </div>
 );
-
-// ─── Plan create form ──────────────────────────────────────────────────────────
-
-const CYCLES: Array<{ value: PlatformBillingCycle; label: string }> = [
-  { value: 'MONTHLY', label: 'شهري' },
-  { value: 'QUARTERLY', label: 'ربع سنوي' },
-  { value: 'YEARLY', label: 'سنوي' },
-  { value: 'LIFETIME', label: 'مدى الحياة' },
-];
-
-const emptyPlanForm: PlatformPlanInput = {
-  code: '',
-  name: '',
-  description: '',
-  billingCycle: 'YEARLY',
-  price: 0,
-  monthlyPrice: 0,
-  yearlyPrice: 0,
-  currency: 'EGP',
-  seatsLimit: 3,
-  branchesLimit: 1,
-  devicesLimit: 2,
-  storageLimitMb: 500,
-  maxProducts: 1000,
-  maxWarehouses: 2,
-  trialDays: 14,
-  includedModules: [],
-  features: [],
-  permissions: [],
-  isActive: true,
-};
-
-// ─── Feature form ─────────────────────────────────────────────────────────────
-
-interface FeatureFormState {
-  id?: string;
-  code: string;
-  name: string;
-  description: string;
-  category: string;
-  isEnabled: boolean;
-  rolloutPercent: number;
-  isStagingOnly: boolean;
-  minPlanTier: string;
-  pagePaths: string[];
-}
-
-const emptyFeatureForm: FeatureFormState = {
-  code: '',
-  name: '',
-  description: '',
-  category: '',
-  isEnabled: true,
-  rolloutPercent: 100,
-  isStagingOnly: false,
-  minPlanTier: '',
-  pagePaths: [],
-};
 
 // ─── Page picker modal ────────────────────────────────────────────────────────
 
@@ -377,6 +228,7 @@ const PagePickerModal: React.FC<PagePickerModalProps> = ({ open, onClose, title,
 
 export const PlatformPlanWizardPage: React.FC = () => {
   const toast = useToast();
+  const [searchParams] = useSearchParams();
   const canManage = canPlatform('product', 'platform.product.update') || canPlatform('plans');
   const canManagePlans = canPlatform('plans');
 
@@ -394,12 +246,15 @@ export const PlatformPlanWizardPage: React.FC = () => {
   const [selectedPlanId, setSelectedPlanId] = React.useState<string | null>(null);
   const [moduleDraft, setModuleDraft] = React.useState<Set<string>>(new Set());
   const [featureDraft, setFeatureDraft] = React.useState<Set<string>>(new Set());
-  const [hiddenDraft, setHiddenDraft] = React.useState<Set<string>>(new Set());
+  const [featureConfig, setFeatureConfig] = React.useState<TenantFeatureConfigDraft>(emptyFeatureConfigDraft);
   const [draftLoaded, setDraftLoaded] = React.useState(false);
+  // Serialized snapshot of the last loaded/applied page config — drives the
+  // "unapplied changes" badge for page-permission edits.
+  const featureConfigBaselineRef = React.useRef<string>('');
 
-  // Plan create modal
+  // Plan details modal (create + edit)
   const [planFormOpen, setPlanFormOpen] = React.useState(false);
-  const [planForm, setPlanForm] = React.useState<PlatformPlanInput>(emptyPlanForm);
+  const [editingPlan, setEditingPlan] = React.useState<CatalogPlan | null>(null);
   const [planSaving, setPlanSaving] = React.useState(false);
 
   // Feature modal / picker / delete
@@ -410,12 +265,32 @@ export const PlatformPlanWizardPage: React.FC = () => {
   const [featureSaving, setFeatureSaving] = React.useState(false);
   const [featureSearch, setFeatureSearch] = React.useState('');
 
+  // Copy-from-plan modal
+  const [copyOpen, setCopyOpen] = React.useState(false);
+  const [copying, setCopying] = React.useState(false);
+
+  // Per-page permissions modal
+  const [pagePermTarget, setPagePermTarget] = React.useState<TenantPage | null>(null);
+
+  // Memoized so the modal's seed effect does not reset in-progress edits on
+  // every parent re-render.
+  const pagePermInitialDisabled = React.useMemo(
+    () =>
+      pagePermTarget
+        ? permissionsForPagePath(pagePermTarget.path)
+            .filter((perm) => expandPermissionCodes(perm.code).some((code) => featureConfig.disabledPermissions.has(code)))
+            .map((perm) => perm.code)
+        : [],
+    [pagePermTarget, featureConfig.disabledPermissions]
+  );
+
   const selectedPlan = React.useMemo(
     () => plans.find((plan) => plan.id === selectedPlanId) ?? null,
     [plans, selectedPlanId]
   );
 
   const allPages = React.useMemo(() => listTenantPages(), []);
+  const catalogPaths = React.useMemo(() => new Set(allPages.map((page) => page.path)), [allPages]);
 
   // Pages owned by each platform module code (via the platform→registry map).
   const pagesByModuleCode = React.useMemo(() => {
@@ -426,6 +301,19 @@ export const PlatformPlanWizardPage: React.FC = () => {
     }
     return map;
   }, [allPages]);
+
+  // registry module id → platform module codes that own it (inverted map, for preview).
+  const registryToPlatformCodes = React.useMemo(() => {
+    const map = new Map<string, string[]>();
+    for (const [code, registryIds] of Object.entries(PLATFORM_MODULE_TO_REGISTRY_IDS)) {
+      for (const registryId of registryIds) {
+        const list = map.get(registryId) ?? [];
+        list.push(code);
+        map.set(registryId, list);
+      }
+    }
+    return map;
+  }, []);
 
   const load = React.useCallback(async () => {
     setLoading(true);
@@ -445,11 +333,11 @@ export const PlatformPlanWizardPage: React.FC = () => {
           centralPlatformClient.listModules(),
           centralPlatformClient.listFeatureFlags(),
         ]);
-        setPlans((Array.isArray(pl) ? pl : []).map((row) => normalizePlan(row, true)));
+        setPlans((Array.isArray(pl) ? pl : []).map(normalizePlan));
         setModules((Array.isArray(md) ? md : []).map(normalizeModule));
         setFeatures((Array.isArray(fl) ? fl : []).map(normalizeFeature));
       } else {
-        setPlans(platformAdminService.listPlans().map((row) => normalizePlan(row, false)));
+        setPlans(platformAdminService.listPlans().map(normalizePlan));
         setModules(platformAdminService.listModules().map(normalizeModule));
         setFeatures(platformAdminService.listFeatureFlags().map(normalizeFeature));
       }
@@ -465,28 +353,41 @@ export const PlatformPlanWizardPage: React.FC = () => {
     load();
   }, [load]);
 
-  // ─── Draft init per selected plan ─────────────────────────────────────────
+  // ─── Plan feature-config (hiddenMenus + featurePermissions + disabledPermissions) ───
 
-  const loadPlanHiddenPages = React.useCallback(
-    async (planId: string): Promise<Set<string>> => {
+  const loadPlanFeatureConfig = React.useCallback(
+    async (planId: string): Promise<TenantFeatureConfigDraft> => {
       if (centralActive) {
         try {
           const data = await centralPlatformClient.getFeaturePermissions({ tenantId: null, planId });
-          return new Set(data.hiddenMenus ?? []);
+          return splitFeatureConfig(data, catalogPaths);
         } catch {
-          return new Set();
+          return emptyFeatureConfigDraft();
         }
       }
       try {
         const settings = platformAdminService.getSettings();
-        const raw = settings[`planCatalog.hiddenPages.${planId}`];
-        const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
-        return new Set(Array.isArray(parsed) ? parsed.map(String) : []);
+        const read = (key: string): unknown => {
+          const raw = settings[key];
+          if (raw == null) return undefined;
+          if (typeof raw === 'string') {
+            try { return JSON.parse(raw); } catch { return undefined; }
+          }
+          return raw;
+        };
+        return splitFeatureConfig(
+          {
+            hiddenMenus: (read(`planCatalog.hiddenPages.${planId}`) as string[] | undefined) ?? [],
+            disabledPermissions: (read(`planCatalog.disabledPermissions.${planId}`) as string[] | undefined) ?? [],
+            featurePermissions: (read(`planCatalog.featurePermissions.${planId}`) as Array<Record<string, unknown>> | undefined) ?? [],
+          },
+          catalogPaths
+        );
       } catch {
-        return new Set();
+        return emptyFeatureConfigDraft();
       }
     },
-    [centralActive]
+    [centralActive, catalogPaths]
   );
 
   // Guards against a slower earlier selection overwriting a newer one.
@@ -498,17 +399,24 @@ export const PlatformPlanWizardPage: React.FC = () => {
       setModuleDraft(new Set(plan.includedModules));
       setFeatureDraft(new Set(plan.features));
       setDraftLoaded(false);
-      const hidden = await loadPlanHiddenPages(plan.id);
+      const config = await loadPlanFeatureConfig(plan.id);
       if (seq !== selectSeqRef.current) return; // superseded by a newer selection
-      setHiddenDraft(hidden);
+      setFeatureConfig(config);
+      featureConfigBaselineRef.current = featureConfigSignature(config);
       setDraftLoaded(true);
     },
-    [loadPlanHiddenPages]
+    [loadPlanFeatureConfig]
   );
 
   React.useEffect(() => {
     if (!selectedPlanId && plans.length > 0) {
-      const def = plans.find((plan) => plan.isDefault && plan.isActive) ?? plans.find((plan) => plan.isActive) ?? plans[0];
+      // Deep-link support: /platform/plan-catalog?plan=<id> preselects a plan.
+      const wanted = searchParams.get('plan');
+      const def =
+        (wanted ? plans.find((plan) => plan.id === wanted) : undefined) ??
+        plans.find((plan) => plan.isDefault && plan.isActive) ??
+        plans.find((plan) => plan.isActive) ??
+        plans[0];
       if (def) void selectPlan(def);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -518,48 +426,72 @@ export const PlatformPlanWizardPage: React.FC = () => {
     if (!selectedPlan) return;
     setModuleDraft(new Set(selectedPlan.includedModules));
     setFeatureDraft(new Set(selectedPlan.features));
-    void loadPlanHiddenPages(selectedPlan.id).then(setHiddenDraft);
+    void loadPlanFeatureConfig(selectedPlan.id).then((config) => {
+      setFeatureConfig(config);
+      featureConfigBaselineRef.current = featureConfigSignature(config);
+    });
   };
 
-  // ─── Plan creation ────────────────────────────────────────────────────────
+  // ─── Plan details (create + edit) ─────────────────────────────────────────
 
-  const createPlan = async () => {
+  const openCreatePlan = () => {
+    setEditingPlan(null);
+    setPlanFormOpen(true);
+  };
+
+  const openEditPlan = (plan: CatalogPlan) => {
+    if (!canManagePlans) {
+      toast.warning('لا تملك صلاحية إدارة الخطط');
+      return;
+    }
+    setEditingPlan(plan);
+    setPlanFormOpen(true);
+  };
+
+  const savePlanDetails = async (input: PlatformPlanInput) => {
     if (!canManagePlans) {
       toast.error('لا تملك صلاحية إدارة الخطط');
       return;
     }
-    const name = planForm.name.trim();
-    const code = planForm.code.trim();
+    const name = input.name?.trim() ?? '';
+    const code = input.code?.trim() ?? '';
     if (!name || !code) {
       toast.error('اسم الخطة ورمزها مطلوبان');
       return;
     }
-    if (!/^[A-Z0-9_]+$/.test(code)) {
+    if (!editingPlan && !/^[A-Z0-9_]+$/.test(code)) {
       toast.error('رمز الخطة يجب أن يحتوي على أحرف إنجليزية كبيرة وأرقام و_ فقط');
       return;
     }
     setPlanSaving(true);
     try {
-      const input: PlatformPlanInput = {
-        ...planForm,
+      const payload: PlatformPlanInput = {
+        ...input,
         name,
         code,
-        price: numericInput(planForm.price),
-        monthlyPrice: planForm.monthlyPrice == null ? undefined : numericInput(planForm.monthlyPrice),
-        yearlyPrice: planForm.yearlyPrice == null ? undefined : numericInput(planForm.yearlyPrice),
-        trialDays: planForm.trialDays == null ? undefined : numericInput(planForm.trialDays),
-        seatsLimit: numericInput(planForm.seatsLimit, 1),
+        price: numericInput(input.price),
+        monthlyPrice: input.monthlyPrice == null ? undefined : numericInput(input.monthlyPrice),
+        yearlyPrice: input.yearlyPrice == null ? undefined : numericInput(input.yearlyPrice),
+        trialDays: input.trialDays == null ? undefined : numericInput(input.trialDays),
+        seatsLimit: numericInput(input.seatsLimit, 1),
+        branchesLimit: numericInput(input.branchesLimit, 1),
+        devicesLimit: numericInput(input.devicesLimit, 1),
       };
-      const created = centralActive
-        ? normalizePlan(await centralPlatformClient.createPlan({ ...input }), true)
-        : normalizePlan(platformAdminService.createPlan(input), false);
-      toast.success('تم إنشاء الخطة', created.name);
+      const saved = editingPlan
+        ? centralActive
+          ? await centralPlatformClient.updatePlan(editingPlan.id, payload as Record<string, any>)
+          : platformAdminService.updatePlan(editingPlan.id, payload)
+        : centralActive
+          ? await centralPlatformClient.createPlan(payload as Record<string, any>)
+          : platformAdminService.createPlan(payload);
+      toast.success(editingPlan ? 'تم تحديث بيانات الخطة' : 'تم إنشاء الخطة', name);
       setPlanFormOpen(false);
-      setPlanForm(emptyPlanForm);
+      setEditingPlan(null);
       await load();
-      void selectPlan(created);
+      const savedPlan = normalizePlan(saved);
+      if (savedPlan.id) void selectPlan(savedPlan);
     } catch (err) {
-      toast.error('تعذر إنشاء الخطة', err instanceof Error ? err.message : undefined);
+      toast.error(editingPlan ? 'تعذر تحديث الخطة' : 'تعذر إنشاء الخطة', err instanceof Error ? err.message : undefined);
     } finally {
       setPlanSaving(false);
     }
@@ -699,7 +631,56 @@ export const PlatformPlanWizardPage: React.FC = () => {
     }
   };
 
-  // ─── Apply (plan catalog + hidden pages) ──────────────────────────────────
+  // ─── Per-page permissions draft ───────────────────────────────────────────
+
+  const pagePermCodes = React.useCallback(
+    (path: string) => new Set(permissionsForPagePath(path).map((perm) => perm.code)),
+    []
+  );
+
+  const savePagePermissions = (page: TenantPage, draft: PagePermissionDraft) => {
+    setFeatureConfig((current) => {
+      const hiddenMenus = new Set(current.hiddenMenus);
+      if (draft.hidden) hiddenMenus.add(page.path);
+      else hiddenMenus.delete(page.path);
+
+      const featurePerms = new Map(current.featurePerms);
+      if (draft.featurePerm) featurePerms.set(page.path, draft.featurePerm);
+      else featurePerms.delete(page.path);
+
+      const disabledPermissions = new Set(current.disabledPermissions);
+      // Clear the whole code family (canonical + legacy aliases) so re-enabling
+      // a permission does not leave stale expanded codes behind.
+      for (const code of pagePermCodes(page.path)) {
+        for (const expanded of expandPermissionCodes(code)) disabledPermissions.delete(expanded);
+      }
+      for (const code of draft.disabledCodes) disabledPermissions.add(code);
+
+      return { ...current, hiddenMenus, featurePerms, disabledPermissions };
+    });
+    toast.success('حُفظت صلاحيات الصفحة في المسودة', page.label);
+  };
+
+  // ─── Copy settings from another plan ──────────────────────────────────────
+
+  const copyFromPlan = async (source: CatalogPlan) => {
+    if (!selectedPlan) return;
+    setCopying(true);
+    try {
+      setModuleDraft(new Set(source.includedModules));
+      setFeatureDraft(new Set(source.features));
+      const config = await loadPlanFeatureConfig(source.id);
+      setFeatureConfig(config);
+      setCopyOpen(false);
+      toast.success('نُسخت إعدادات الباقة المصدر إلى المسودة', `${source.name} → ${selectedPlan.name} — راجع ثم اضغط «تطبيق على الباقة»`);
+    } catch (err) {
+      toast.error('تعذر نسخ الإعدادات', err instanceof Error ? err.message : undefined);
+    } finally {
+      setCopying(false);
+    }
+  };
+
+  // ─── Apply (plan catalog + full feature config) ───────────────────────────
 
   const apply = async () => {
     if (!selectedPlan) {
@@ -722,26 +703,37 @@ export const PlatformPlanWizardPage: React.FC = () => {
         });
       }
 
-      const hiddenPaths = [...hiddenDraft];
+      const serialized = serializeFeatureConfig(featureConfig);
+      const hiddenPaths = serialized.hiddenMenus;
+      const featurePermissions = serialized.featurePermissions;
+      const disabledPermissions = [
+        ...new Set(serialized.disabledPermissions.flatMap(expandPermissionCodes)),
+      ];
+
       if (centralActive) {
-        // Fetch current permissions first — a failure must abort the apply so we
-        // never overwrite disabledPermissions/featurePermissions with empty lists.
-        const current = await centralPlatformClient.getFeaturePermissions({ tenantId: null, planId: selectedPlan.id });
+        // The PUT upserts only the (tenant_id NULL, plan_id) row server-side,
+        // so global/tenant-scoped configs are untouched.
         await centralPlatformClient.setFeaturePermissions({
           planId: selectedPlan.id,
           hiddenMenus: hiddenPaths,
-          disabledPermissions: current.disabledPermissions ?? [],
-          featurePermissions: (current.featurePermissions ?? []) as Array<Record<string, unknown>>,
+          disabledPermissions,
+          featurePermissions,
         });
       } else {
         const settings = platformAdminService.getSettings();
         platformAdminService.updateSettings({
           ...settings,
           [`planCatalog.hiddenPages.${selectedPlan.id}`]: JSON.stringify(hiddenPaths),
+          [`planCatalog.disabledPermissions.${selectedPlan.id}`]: JSON.stringify(disabledPermissions),
+          [`planCatalog.featurePermissions.${selectedPlan.id}`]: JSON.stringify(featurePermissions),
         });
       }
 
-      toast.success('تم تطبيق إعدادات الخطة', `${selectedPlan.name} — ${moduleDraft.size} وحدة، ${featureDraft.size} ميزة، ${hiddenPaths.length} صفحة مخفية`);
+      toast.success(
+        'تم تطبيق إعدادات الخطة',
+        `${selectedPlan.name} — ${moduleDraft.size} وحدة، ${featureDraft.size} ميزة، ${hiddenPaths.length} صفحة مخفية، ${disabledPermissions.length} صلاحية معطلة`
+      );
+      featureConfigBaselineRef.current = featureConfigSignature(featureConfig);
       await load();
       await selectPlan({ ...selectedPlan, includedModules: [...moduleDraft], features: [...featureDraft] });
     } catch (err) {
@@ -753,7 +745,8 @@ export const PlatformPlanWizardPage: React.FC = () => {
 
   // ─── Derived counts ───────────────────────────────────────────────────────
 
-  const visiblePageCount = allPages.length - hiddenDraft.size;
+  const hiddenCount = featureConfig.hiddenMenus.size;
+  const visiblePageCount = allPages.length - hiddenCount;
   const filteredFeatures = React.useMemo(() => {
     const term = featureSearch.trim().toLowerCase();
     if (!term) return features;
@@ -769,13 +762,22 @@ export const PlatformPlanWizardPage: React.FC = () => {
       [...moduleDraft].some((code) => !selectedPlan.includedModules.includes(code)) ||
       [...featureDraft].some((code) => !selectedPlan.features.includes(code)));
 
+  const featureConfigKey = React.useMemo(() => featureConfigSignature(featureConfig), [featureConfig]);
+  const configChanged = draftLoaded && featureConfigKey !== featureConfigBaselineRef.current;
+
+  // Preview: pages hidden because their owning feature is not in the plan.
+  const featureHiddenPaths = React.useMemo(
+    () => new Set(featureHiddenPathsForPlan(features, featureDraft)),
+    [features, featureDraft]
+  );
+
   // ─── Render ───────────────────────────────────────────────────────────────
 
   return (
     <div className="space-y-4">
       <PageHeader
         title="منشئ الخطط والصفحات والمميزات"
-        description="معالج بخطوات متتابعة: اختر الباقة، حدد الوحدات والمميزات، ثم تحكم في إظهار وإخفاء كل صفحات موقع المستخدمين — وأضف أو احذف المميزات بحرية."
+        description="معالج بخطوات متتابعة: اختر الباقة، عدّل بياناتها، حدد الوحدات والمميزات، وتحكم في إظهار وإخفاء كل صفحات موقع المستخدمين وصلاحياتها الدقيقة — ثم راجع المعاينة وطبق."
         icon={<Package className="h-5 w-5" />}
       />
 
@@ -796,31 +798,50 @@ export const PlatformPlanWizardPage: React.FC = () => {
           {/* ─── Step 0: Plan selection ─── */}
           {step === 0 && (
             <div className="space-y-3">
-              <div className="flex items-center justify-between rounded-xl border border-line bg-surface px-4 py-3 shadow-sm">
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line bg-surface px-4 py-3 shadow-sm">
                 <p className="text-[12px] font-semibold text-ink-secondary">
                   اختر الباقة التي تريد بناء صفحاتها ومميزاتها — الخطوات التالية تعدّل محتواها فقط، لا أسعارها.
                 </p>
-                {canManagePlans && (
-                  <Button variant="primary" size="sm" leadingIcon={<Plus className="h-3.5 w-3.5" />} onClick={() => setPlanFormOpen(true)}>
-                    خطة جديدة
-                  </Button>
-                )}
+                <div className="flex items-center gap-2">
+                  {canManage && selectedPlan && (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      leadingIcon={<Copy className="h-3.5 w-3.5" />}
+                      onClick={() => setCopyOpen(true)}
+                    >
+                      نسخ من باقة أخرى
+                    </Button>
+                  )}
+                  {canManagePlans && (
+                    <Button variant="primary" size="sm" leadingIcon={<Plus className="h-3.5 w-3.5" />} onClick={openCreatePlan}>
+                      خطة جديدة
+                    </Button>
+                  )}
+                </div>
               </div>
 
               {plans.length === 0 ? (
                 <div className="rounded-xl border border-line bg-surface shadow-sm">
-                  <EmptyState icon={<Layers3 className="h-5 w-5" />} title="لا توجد خطط" description="أنشئ خطة اشتراك أولاً من صفحة خطط الاشتراك." />
+                  <EmptyState icon={<Layers3 className="h-5 w-5" />} title="لا توجد خطط" description="أنشئ خطة اشتراك أولاً من زر «خطة جديدة»." />
                 </div>
               ) : (
                 <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                   {plans.map((plan) => {
                     const active = plan.id === selectedPlanId;
                     return (
-                      <button
+                      <div
                         key={plan.id}
-                        type="button"
+                        role="button"
+                        tabIndex={0}
                         onClick={() => void selectPlan(plan)}
-                        className={`rounded-xl border p-4 text-right shadow-sm transition ${
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter' || event.key === ' ') {
+                            event.preventDefault();
+                            void selectPlan(plan);
+                          }
+                        }}
+                        className={`cursor-pointer rounded-xl border p-4 text-right shadow-sm transition ${
                           active ? 'border-success bg-success-soft/50 ring-1 ring-success' : 'border-line bg-surface hover:border-line-strong'
                         }`}
                       >
@@ -832,7 +853,23 @@ export const PlatformPlanWizardPage: React.FC = () => {
                             </p>
                             <p className="mt-0.5 font-mono text-[10px] text-muted" dir="ltr">{plan.code}</p>
                           </div>
-                          <StatusBadge value={plan.isActive ? 'ACTIVE' : 'CANCELLED'} label={plan.isActive ? 'نشطة' : 'معطلة'} />
+                          <div className="flex items-center gap-1">
+                            <StatusBadge value={plan.isActive ? 'ACTIVE' : 'CANCELLED'} label={plan.isActive ? 'نشطة' : 'معطلة'} />
+                            {canManagePlans && (
+                              <button
+                                type="button"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  openEditPlan(plan);
+                                }}
+                                className="rounded p-1 text-muted hover:bg-accent-soft hover:text-primary"
+                                title="تعديل بيانات الخطة"
+                                aria-label={`تعديل ${plan.name}`}
+                              >
+                                <Pencil className="h-3.5 w-3.5" />
+                              </button>
+                            )}
+                          </div>
                         </div>
                         <p className="mt-2 text-[16px] font-black text-ink">{formatMoney(plan.price, plan.currency)}</p>
                         <p className="mt-2 flex flex-wrap gap-1 text-[10px] font-semibold text-muted">
@@ -840,7 +877,7 @@ export const PlatformPlanWizardPage: React.FC = () => {
                           <span className="rounded-full bg-surface-sunken px-2 py-0.5">{plan.features.length} ميزة</span>
                           <span className="rounded-full bg-surface-sunken px-2 py-0.5">{plan.subscriberCount} مشترك</span>
                         </p>
-                      </button>
+                      </div>
                     );
                   })}
                 </div>
@@ -851,7 +888,7 @@ export const PlatformPlanWizardPage: React.FC = () => {
           {/* ─── Step 1: Modules & their pages ─── */}
           {step === 1 && selectedPlan && (
             <div className="space-y-3">
-              <div className="flex items-center justify-between rounded-xl border border-line bg-surface px-4 py-3 shadow-sm">
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line bg-surface px-4 py-3 shadow-sm">
                 <p className="text-[12px] font-semibold text-ink-secondary">
                   الباقة الحالية: <span className="font-black text-ink">{selectedPlan.name}</span> — فعّل الوحدات التي تشملها الباقة، وكل وحدة تعرض صفحاتها داخل تطبيق العميل.
                 </p>
@@ -907,7 +944,7 @@ export const PlatformPlanWizardPage: React.FC = () => {
                                   key={page.path}
                                   title={page.path}
                                   className={`rounded-full px-2 py-0.5 text-[9.5px] font-semibold ${
-                                    hiddenDraft.has(page.path) ? 'bg-danger-soft text-danger line-through' : 'bg-surface-sunken text-ink-secondary'
+                                    featureConfig.hiddenMenus.has(page.path) ? 'bg-danger-soft text-danger line-through' : 'bg-surface-sunken text-ink-secondary'
                                   }`}
                                 >
                                   {page.label}
@@ -1040,21 +1077,21 @@ export const PlatformPlanWizardPage: React.FC = () => {
             </div>
           )}
 
-          {/* ─── Step 3: Page visibility per plan ─── */}
+          {/* ─── Step 3: Page visibility + granular permissions per plan ─── */}
           {step === 3 && selectedPlan && (
             <div className="space-y-3">
               <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line bg-surface px-4 py-3 shadow-sm">
                 <p className="text-[12px] font-semibold text-ink-secondary">
                   كل صفحات موقع المستخدمين ({allPages.length}) — بدّل أي صفحة لإخفائها عن مشتركي باقة{' '}
-                  <span className="font-black text-ink">{selectedPlan.name}</span>.
+                  <span className="font-black text-ink">{selectedPlan.name}</span>، أي صفحة لضبط صلاحياتها الدقيقة.
                 </p>
                 <div className="flex items-center gap-2 text-[10.5px] font-bold">
                   <span className="rounded-full bg-success-soft px-2.5 py-1 text-success">{visiblePageCount} ظاهرة</span>
-                  <span className="rounded-full bg-danger-soft px-2.5 py-1 text-danger">{hiddenDraft.size} مخفية</span>
-                  {hiddenDraft.size > 0 && (
+                  <span className="rounded-full bg-danger-soft px-2.5 py-1 text-danger">{hiddenCount} مخفية</span>
+                  {hiddenCount > 0 && (
                     <button
                       type="button"
-                      onClick={() => setHiddenDraft(new Set())}
+                      onClick={() => setFeatureConfig((current) => ({ ...current, hiddenMenus: new Set() }))}
                       className="rounded-full bg-surface-sunken px-2.5 py-1 text-ink-secondary hover:bg-surface-sunken"
                     >
                       إظهار الكل
@@ -1071,41 +1108,60 @@ export const PlatformPlanWizardPage: React.FC = () => {
                     <div className="flex items-center justify-between border-b border-line bg-surface-muted px-4 py-2">
                       <p className="text-[12px] font-black text-ink">{group.label}</p>
                       <span className="text-[10px] font-semibold text-muted">
-                        {group.pages.filter((page) => hiddenDraft.has(page.path)).length}/{group.pages.length} مخفية
+                        {group.pages.filter((page) => featureConfig.hiddenMenus.has(page.path)).length}/{group.pages.length} مخفية
                       </span>
                     </div>
                     <div className="grid gap-1 p-2 sm:grid-cols-2 xl:grid-cols-3">
                       {group.pages.map((page: TenantPage) => {
-                        const hidden = hiddenDraft.has(page.path);
+                        const hidden = featureConfig.hiddenMenus.has(page.path);
+                        const hasPerms =
+                          featureConfig.featurePerms.has(page.path) ||
+                          permissionsForPagePath(page.path).some((perm) =>
+                            expandPermissionCodes(perm.code).some((code) => featureConfig.disabledPermissions.has(code))
+                          );
                         return (
-                          <label
+                          <div
                             key={page.path}
-                            className={`flex cursor-pointer items-center justify-between gap-2 rounded-lg border px-2.5 py-1.5 transition ${
+                            className={`flex items-center justify-between gap-1 rounded-lg border px-2 py-1.5 transition ${
                               hidden ? 'border-danger-border bg-danger-soft/40' : 'border-line hover:bg-surface-muted'
                             }`}
                           >
-                            <span className="min-w-0">
-                              <span className={`block truncate text-[11.5px] font-semibold ${hidden ? 'text-danger line-through' : 'text-ink'}`}>
-                                {page.label}
+                            <label className="flex min-w-0 flex-1 cursor-pointer items-center justify-between gap-2">
+                              <span className="min-w-0">
+                                <span className={`block truncate text-[11.5px] font-semibold ${hidden ? 'text-danger line-through' : 'text-ink'}`}>
+                                  {page.label}
+                                </span>
+                                <span className="block truncate font-mono text-[9.5px] text-muted" dir="ltr">{page.path}</span>
                               </span>
-                              <span className="block truncate font-mono text-[9.5px] text-muted" dir="ltr">{page.path}</span>
-                            </span>
-                            <input
-                              type="checkbox"
-                              checked={!hidden}
+                              <input
+                                type="checkbox"
+                                checked={!hidden}
+                                disabled={!canManage}
+                                onChange={(event) =>
+                                  setFeatureConfig((current) => {
+                                    const hiddenMenus = new Set(current.hiddenMenus);
+                                    if (event.target.checked) hiddenMenus.delete(page.path);
+                                    else hiddenMenus.add(page.path);
+                                    return { ...current, hiddenMenus };
+                                  })
+                                }
+                                className="h-3.5 w-3.5 shrink-0 accent-success disabled:opacity-40"
+                                aria-label={`إظهار ${page.label}`}
+                              />
+                            </label>
+                            <button
+                              type="button"
+                              onClick={() => setPagePermTarget(page)}
                               disabled={!canManage}
-                              onChange={(event) =>
-                                setHiddenDraft((current) => {
-                                  const next = new Set(current);
-                                  if (event.target.checked) next.delete(page.path);
-                                  else next.add(page.path);
-                                  return next;
-                                })
-                              }
-                              className="h-3.5 w-3.5 shrink-0 accent-success disabled:opacity-40"
-                              aria-label={`إظهار ${page.label}`}
-                            />
-                          </label>
+                              className={`shrink-0 rounded p-1 transition disabled:opacity-40 ${
+                                hasPerms ? 'bg-accent-soft text-primary' : 'text-muted hover:bg-accent-soft hover:text-primary'
+                              }`}
+                              title="صلاحيات الصفحة الدقيقة"
+                              aria-label={`صلاحيات ${page.label}`}
+                            >
+                              <Settings2 className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
                         );
                       })}
                     </div>
@@ -1113,12 +1169,13 @@ export const PlatformPlanWizardPage: React.FC = () => {
                 ))
               )}
               <p className="text-[11px] font-semibold text-muted">
-                ملاحظة: إخفاء الصفحات يُطبَّق عبر إعدادات الخطة في التكوين الموقّع الذي تستهلكه تطبيقات العملاء — الصفحات المخفية لا تظهر في القوائم ولا يمكن فتحها مباشرة.
+                ملاحظة: إخفاء الصفحات يُطبَّق عبر إعدادات الخطة في التكوين الموقّع الذي تستهلكه تطبيقات العملاء — الصفحات المخفية لا تظهر في القوائم ولا يمكن فتحها مباشرة. زر الترس يفتح صلاحيات الصفحة الدقيقة (عرض فقط / تعديل / حذف / تصدير / صلاحيات معطلة).{' '}
+                {!centralActive && 'في الوضع المحلي تُحفظ الإعدادات محلياً ولا تُفرض على تطبيقات العملاء — الإلزام الفعلي يتم عبر السيرفر المركزي.'}
               </p>
             </div>
           )}
 
-          {/* ─── Step 4: Review & apply ─── */}
+          {/* ─── Step 4: Review, preview & apply ─── */}
           {step === 4 && selectedPlan && (
             <div className="space-y-3">
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -1126,6 +1183,15 @@ export const PlatformPlanWizardPage: React.FC = () => {
                   <p className="text-[10.5px] font-bold text-muted">الباقة</p>
                   <p className="mt-1 text-[14px] font-black text-ink">{selectedPlan.name}</p>
                   <p className="font-mono text-[10px] text-muted" dir="ltr">{selectedPlan.code}</p>
+                  {canManagePlans && (
+                    <button
+                      type="button"
+                      onClick={() => openEditPlan(selectedPlan)}
+                      className="mt-1.5 inline-flex items-center gap-1 text-[10.5px] font-bold text-primary hover:underline"
+                    >
+                      <Pencil className="h-3 w-3" /> تعديل بيانات الخطة
+                    </button>
+                  )}
                 </div>
                 <div className="rounded-xl border border-line bg-surface p-4 shadow-sm">
                   <p className="text-[10.5px] font-bold text-muted">الوحدات المشمولة</p>
@@ -1140,28 +1206,42 @@ export const PlatformPlanWizardPage: React.FC = () => {
                 <div className="rounded-xl border border-line bg-surface p-4 shadow-sm">
                   <p className="text-[10.5px] font-bold text-muted">صفحات موقع المستخدمين</p>
                   <p className="mt-1 text-[20px] font-black text-ink">{visiblePageCount}<span className="text-[12px] font-bold text-muted"> / {allPages.length}</span></p>
-                  <p className="text-[10px] text-danger">{hiddenDraft.size} مخفية عن الباقة</p>
+                  <p className="text-[10px] text-danger">{hiddenCount} مخفية عن الباقة</p>
                 </div>
               </div>
 
               <div className="rounded-xl border border-line bg-surface p-4 shadow-sm">
-                <p className="mb-2 text-[12px] font-black text-ink">الصفحات المخفية عن هذه الباقة ({hiddenDraft.size})</p>
-                {hiddenDraft.size === 0 ? (
-                  <p className="text-[11.5px] text-muted">لا توجد صفحات مخفية — كل صفحات الموقع متاحة لمشتركي الباقة (ضمن حدود الوحدات المفعّلة).</p>
+                <p className="mb-2 text-[12px] font-black text-ink">الصفحات المخفية عن هذه الباقة ({hiddenCount})</p>
+                {hiddenCount === 0 ? (
+                  <p className="text-[11.5px] text-muted">لا توجد صفحات مخفية يدويًا — لكن المعاينة أدناه تشمل صفحات المميزات والوحدات غير المشمولة.</p>
                 ) : (
                   <div className="flex flex-wrap gap-1.5">
-                    {[...hiddenDraft].slice(0, 12).map((path) => (
+                    {[...featureConfig.hiddenMenus].slice(0, 12).map((path) => (
                       <span key={path} className="rounded-full bg-danger-soft px-2.5 py-1 font-mono text-[10px] text-danger" dir="ltr">
                         {path}
                       </span>
                     ))}
-                    {hiddenDraft.size > 12 && (
-                      <span className="rounded-full bg-surface-sunken px-2.5 py-1 text-[10px] font-bold text-muted">+{hiddenDraft.size - 12}</span>
+                    {hiddenCount > 12 && (
+                      <span className="rounded-full bg-surface-sunken px-2.5 py-1 text-[10px] font-bold text-muted">+{hiddenCount - 12}</span>
                     )}
                   </div>
                 )}
+                {(featureConfig.disabledPermissions.size > 0 || featureConfig.featurePerms.size > 0) && (
+                  <p className="mt-2 text-[11px] font-semibold text-muted">
+                    قيود صلاحيات دقيقة: {featureConfig.disabledPermissions.size} صلاحية معطلة، {featureConfig.featurePerms.size} صفحة بقيود قدرات.
+                  </p>
+                )}
               </div>
 
+              <PlanPreviewPanel
+                pageGroups={pageGroups}
+                hiddenDraft={featureConfig.hiddenMenus}
+                featureHiddenPaths={featureHiddenPaths}
+                registryToPlatformCodes={registryToPlatformCodes}
+                moduleDraft={moduleDraft}
+                featurePermsDraft={featureConfig.featurePerms}
+                disabledPermsDraft={featureConfig.disabledPermissions}
+              />
             </div>
           )}
         </>
@@ -1174,7 +1254,7 @@ export const PlatformPlanWizardPage: React.FC = () => {
             <Button variant="ghost" size="sm" onClick={resetDrafts} disabled={applying} leadingIcon={<RotateCcw className="h-3.5 w-3.5" />}>
               استعادة افتراضيات الباقة
             </Button>
-            {planChanged && step < 4 && (
+            {(planChanged || configChanged) && step < 4 && (
               <span className="rounded-full bg-warning-soft px-2.5 py-1 text-[10px] font-bold text-warning">توجد تغييرات غير مطبقة</span>
             )}
           </div>
@@ -1204,58 +1284,19 @@ export const PlatformPlanWizardPage: React.FC = () => {
         </div>
       )}
 
-      {/* ─── Create plan modal ─── */}
-      <Modal
+      {/* ─── Plan details modal (create + edit) ─── */}
+      <PlanDetailsModal
         open={planFormOpen}
-        onClose={() => setPlanFormOpen(false)}
-        title="خطة اشتراك جديدة"
-        description="أنشئ الباقة أولاً ثم انتقل للخطوات التالية لبناء صفحاتها ومميزاتها."
-        size="lg"
-        busy={planSaving}
-        footer={
-          <div className="flex justify-end gap-2">
-            <Button variant="ghost" onClick={() => setPlanFormOpen(false)} disabled={planSaving}>إلغاء</Button>
-            <Button variant="primary" onClick={() => void createPlan()} loading={planSaving} disabled={!canManagePlans}>إنشاء الخطة</Button>
-          </div>
-        }
-      >
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="اسم الخطة" required>
-            <input className={inputClass} value={planForm.name} onChange={(event) => setPlanForm({ ...planForm, name: event.target.value })} />
-          </Field>
-          <Field label="رمز الخطة" required hint="أحرف إنجليزية وأرقام و_ فقط">
-            <input dir="ltr" className={inputClass} value={planForm.code} onChange={(event) => setPlanForm({ ...planForm, code: event.target.value.toUpperCase() })} />
-          </Field>
-          <Field label="دورة الفوترة">
-            <select className={inputClass} value={planForm.billingCycle} onChange={(event) => setPlanForm({ ...planForm, billingCycle: event.target.value as PlatformBillingCycle })}>
-              {CYCLES.map((cycle) => <option key={cycle.value} value={cycle.value}>{cycle.label}</option>)}
-            </select>
-          </Field>
-          <Field label="السعر">
-            <input type="number" min={0} className={inputClass} value={planForm.price ?? 0} onChange={(event) => setPlanForm({ ...planForm, price: numericInput(event.target.value) })} />
-          </Field>
-          <Field label="السعر شهري">
-            <input type="number" min={0} className={inputClass} value={planForm.monthlyPrice ?? 0} onChange={(event) => setPlanForm({ ...planForm, monthlyPrice: numericInput(event.target.value) })} />
-          </Field>
-          <Field label="السعر سنوي">
-            <input type="number" min={0} className={inputClass} value={planForm.yearlyPrice ?? 0} onChange={(event) => setPlanForm({ ...planForm, yearlyPrice: numericInput(event.target.value) })} />
-          </Field>
-          <Field label="أيام التجربة">
-            <input type="number" min={0} className={inputClass} value={planForm.trialDays ?? 14} onChange={(event) => setPlanForm({ ...planForm, trialDays: numericInput(event.target.value) })} />
-          </Field>
-          <Field label="حد المستخدمين">
-            <input type="number" min={1} className={inputClass} value={planForm.seatsLimit ?? 3} onChange={(event) => setPlanForm({ ...planForm, seatsLimit: numericInput(event.target.value, 1) })} />
-          </Field>
-          <Field label="العملة">
-            <select className={inputClass} value={planForm.currency} onChange={(event) => setPlanForm({ ...planForm, currency: event.target.value })}>
-              {['EGP', 'SAR', 'AED', 'USD', 'EUR'].map((currency) => <option key={currency} value={currency}>{currency}</option>)}
-            </select>
-          </Field>
-          <Field label="الوصف" className="sm:col-span-2">
-            <textarea rows={2} className={inputClass} value={planForm.description ?? ''} onChange={(event) => setPlanForm({ ...planForm, description: event.target.value })} />
-          </Field>
-        </div>
-      </Modal>
+        onClose={() => {
+          setPlanFormOpen(false);
+          setEditingPlan(null);
+        }}
+        editing={editingPlan}
+        modules={modules}
+        saving={planSaving}
+        canManagePlans={canManagePlans}
+        onSubmit={(input) => void savePlanDetails(input)}
+      />
 
       {/* ─── Feature form modal ─── */}
       <Modal
@@ -1356,6 +1397,30 @@ export const PlatformPlanWizardPage: React.FC = () => {
         title={featureForm.id ? `صفحات الميزة — ${featureForm.name}` : 'صفحات الميزة الجديدة'}
         selected={new Set(featureForm.pagePaths)}
         onChange={(next) => setFeatureForm({ ...featureForm, pagePaths: [...next] })}
+      />
+
+      {/* ─── Per-page permissions modal ─── */}
+      <PagePermissionsModal
+        open={Boolean(pagePermTarget)}
+        onClose={() => setPagePermTarget(null)}
+        page={pagePermTarget}
+        initiallyHidden={pagePermTarget ? featureConfig.hiddenMenus.has(pagePermTarget.path) : false}
+        initialFeaturePerm={pagePermTarget ? featureConfig.featurePerms.get(pagePermTarget.path) : undefined}
+        initialDisabledCodes={pagePermInitialDisabled}
+        canManage={canManage}
+        onSave={(draft) => {
+          if (pagePermTarget) savePagePermissions(pagePermTarget, draft);
+        }}
+      />
+
+      {/* ─── Copy from plan modal ─── */}
+      <CopyFromPlanModal
+        open={copyOpen}
+        onClose={() => setCopyOpen(false)}
+        plans={plans}
+        excludePlanId={selectedPlanId}
+        loading={copying}
+        onCopy={(source) => void copyFromPlan(source)}
       />
 
       {/* ─── Delete feature confirm ─── */}

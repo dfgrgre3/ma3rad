@@ -6,6 +6,7 @@ import { PermissionService } from '../PermissionService';
 import { CentralUsageLimitService } from '../../licensing/CentralUsageLimitService';
 import { BranchAccessService } from '../BranchAccessService';
 import { AuthServicePins } from './pins';
+import { CentralTenantUserSyncService } from '../../platform/CentralTenantUserSyncService';
 
 /**
  * Admin user-management group for AuthService: listing, creation (with
@@ -87,6 +88,16 @@ export class AuthServiceUserAdmin extends AuthServicePins {
         INSERT INTO audit_logs (id, user_id, user_name, action, module, record_id)
         VALUES (?, ?, ?, 'إنشاء مستخدم جديد', 'USERS', ?)
       `, [`aud_${uuidv4().substring(0, 8)}`, subject.id || performedBy, subject.fullName, id]);
+    });
+
+    CentralTenantUserSyncService.report({
+      event: 'UPSERT',
+      identityUserId: id,
+      username: user.username,
+      fullName: user.fullName,
+      role: user.role,
+      phone: user.phone ?? null,
+      isActive: true,
     });
 
     return {
@@ -235,7 +246,17 @@ export class AuthServiceUserAdmin extends AuthServicePins {
     });
     this.audit(subject, 'تعديل بيانات مستخدم', 'USERS', id, existing, patch);
     PermissionService.invalidate(existing);
-    return this.getUserRecordById(id)!.user;
+    const updated = this.getUserRecordById(id)!.user;
+    CentralTenantUserSyncService.report({
+      event: 'UPSERT',
+      identityUserId: updated.id,
+      username: updated.username,
+      fullName: updated.fullName,
+      role: updated.role,
+      phone: updated.phone ?? null,
+      isActive: updated.isActive,
+    });
+    return updated;
   }
 
   public resetPassword(id: string, newPassword: string, actor?: User | null): void {
@@ -285,6 +306,11 @@ export class AuthServiceUserAdmin extends AuthServicePins {
     });
     this.audit(subject, 'حذف مستخدم', 'USERS', id, existing, null);
     PermissionService.invalidate(existing);
+    CentralTenantUserSyncService.report({
+      event: 'DELETE',
+      identityUserId: existing.id,
+      username: existing.username,
+    });
   }
 
   public getLoginHistory(userId?: string, limit = 100): any[] {

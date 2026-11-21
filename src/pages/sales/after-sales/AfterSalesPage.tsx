@@ -15,6 +15,7 @@ import { PermissionService } from '../../../services/domains/auth/PermissionServ
 
 import { SalesInvoice, SalesReturnItem } from '../../../types';
 import { useToast } from '../../../components/ui/Toast';
+import { usePageAccess } from '../../../hooks/domains/licensing/usePageAccess';
 import { formatProductQuantity } from '../../../utils/products/productUnits';
 import { WarrantyClaimsPanel } from './WarrantyClaimsPanel';
 
@@ -59,7 +60,15 @@ export const AfterSalesPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'returns' | 'warranty' | 'analytics'>('returns');
   // تبويب التحليلات يعرض تجميعات أوسع من السجل — يتطلب صلاحية التحليلات.
   const canAnalytics = PermissionService.can(AuthService.getCurrentUser(), 'sales.analytics.view');
-  const viewTab = activeTab === 'analytics' && !canAnalytics ? 'returns' : activeTab;
+  // تبويب الضمان/المطالبات يعرض أنواع المطالبات الثلاثة (ضمان/إصلاح/شكوى) —
+  // يُخفى فقط عند تعطيل المنصة المركزية للأقسام الثلاثة معًا.
+  const pageAccess = usePageAccess('/sales/after-sales');
+  const canViewClaims = ['warranties', 'repairs', 'claims']
+    .some((key) => pageAccess.allows(`ui.sales.after_sales.section.${key}.view`));
+  const viewTab =
+    (activeTab === 'analytics' && !canAnalytics) || (activeTab === 'warranty' && !canViewClaims)
+      ? 'returns'
+      : activeTab;
   const [loading, setLoading] = useState(true);
 
   // Data states
@@ -215,6 +224,7 @@ export const AfterSalesPage: React.FC = () => {
             <RotateCcw className="w-4 h-4" />
             سجل المرتجعات والإشعارات الدائنة ({returnsList.length})
           </button>
+          {canViewClaims && (
           <button
             onClick={() => setActiveTab('warranty')}
             className={getTabButtonClass(
@@ -225,6 +235,7 @@ export const AfterSalesPage: React.FC = () => {
             <ShieldCheck className="w-4 h-4" />
             مطالبات الضمان وخدمة ما بعد البيع
           </button>
+          )}
           {canAnalytics && (
           <button
             onClick={() => setActiveTab('analytics')}

@@ -65,6 +65,27 @@ export interface PlatformSigningKey {
   updatedAt?: string;
 }
 
+export type PlatformSecurityEventSeverity = 'INFO' | 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+
+/**
+ * Unified security event row. Centrally this maps `platform_security_events`
+ * (snake_case wire → camelCase here); locally it is synthesized from staff
+ * logins and incidents so the events feed works in both data modes.
+ */
+export interface PlatformSecurityEvent {
+  id: string;
+  eventType: string;
+  severity: PlatformSecurityEventSeverity;
+  title: string;
+  description?: string | null;
+  sourceIp?: string | null;
+  tenantId?: string | null;
+  staffId?: string | null;
+  staffName?: string | null;
+  metadata?: Record<string, unknown> | null;
+  createdAt: string;
+}
+
 export interface PlatformCentralSecurityOverview {
   securityScore: number;
   twoFactorEnforcement: {
@@ -81,4 +102,8 @@ export interface PlatformCentralSecurityOverview {
   recentLogins: PlatformStaffLogin[];
   incidents: PlatformCentralSecurityIncident[];
   signingKeys: PlatformSigningKey[];
+  /** Recent platform security events (central: platform_security_events; local: synthesized). */
+  securityEvents?: PlatformSecurityEvent[];
+  /** Severity → count breakdown of events in the last 24h (central overview payload). */
+  events24hBySeverity?: Record<string, number>;
 }

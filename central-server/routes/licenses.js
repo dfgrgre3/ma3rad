@@ -65,6 +65,180 @@ router.get(
   }
 );
 
+router.get(
+  '/:id',
+  authenticatePlatformUser,
+  requirePlatformPermission(['platform.licenses.view', 'platform.licenses.manage']),
+  async (req, res, next) => {
+    try {
+      const db = getDb();
+      const { id } = req.params;
+
+      const license = await db.get(`
+        SELECT l.*, t.name AS tenantName, t.code AS tenantCode, p.name AS planName
+        FROM platform_licenses l
+        JOIN platform_tenants t ON t.id = l.tenant_id
+        LEFT JOIN platform_plans p ON p.id = l.plan_id
+        WHERE l.id = ?
+      `, [id]);
+      if (!license) return res.status(404).json({ error: 'License not found' });
+      if (!(await assertTenantAccess(req, res, license.tenant_id))) return;
+
+      res.json(license);
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+router.get(
+  '/:id/activations',
+  authenticatePlatformUser,
+  requirePlatformPermission(['platform.licenses.view', 'platform.licenses.manage']),
+  async (req, res, next) => {
+    try {
+      const db = getDb();
+      const { id } = req.params;
+
+      const license = await db.get('SELECT * FROM platform_licenses WHERE id = ?', [id]);
+      if (!license) return res.status(404).json({ error: 'License not found' });
+      if (!(await assertTenantAccess(req, res, license.tenant_id))) return;
+
+      const rows = await db.all(
+        `SELECT * FROM platform_license_activations WHERE license_id = ? ORDER BY created_at DESC`,
+        [id]
+      );
+      res.json(rows);
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+router.get(
+  '/:id/changes',
+  authenticatePlatformUser,
+  requirePlatformPermission(['platform.licenses.view', 'platform.licenses.manage']),
+  async (req, res, next) => {
+    try {
+      const db = getDb();
+      const { id } = req.params;
+
+      const license = await db.get('SELECT * FROM platform_licenses WHERE id = ?', [id]);
+      if (!license) return res.status(404).json({ error: 'License not found' });
+      if (!(await assertTenantAccess(req, res, license.tenant_id))) return;
+
+      const rows = await db.all(
+        `SELECT * FROM platform_license_changes WHERE license_id = ? ORDER BY created_at DESC, id DESC`,
+        [id]
+      );
+      res.json(rows);
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+router.patch(
+  '/:id',
+  authenticatePlatformUser,
+  requirePlatformPermission(['platform.licenses.update', 'platform.licenses.manage']),
+  async (req, res, next) => {
+    try {
+      const db = getDb();
+      const { id } = req.params;
+      const {
+        seats,
+        deviceLimit,
+        branchesLimit,
+        offlineGracePeriodDays,
+        notes,
+        couplingMode,
+      } = req.body || {};
+
+      const license = await db.get('SELECT * FROM platform_licenses WHERE id = ?', [id]);
+      if (!license) return res.status(404).json({ error: 'License not found' });
+      if (!(await assertTenantAccess(req, res, license.tenant_id))) return;
+
+      if (couplingMode !== undefined && !['FULL', 'EXPIRY_ONLY', 'NONE'].includes(couplingMode)) {
+        return res.status(400).json({ error: 'Invalid coupling mode' });
+      }
+
+      const columns = [];
+      const params = [];
+      const oldValues = {};
+      const newValues = {};
+      const push = (column, value) => {
+        columns.push(`${column} = ?`);
+        params.push(value);
+        oldValues[column] = license[column];
+        newValues[column] = value;
+      };
+
+      if (seats !== undefined) push('seats', Math.max(1, Math.floor(Number(seats)) || 1));
+      if (deviceLimit !== undefined) push('device_limit', Math.max(1, Math.floor(Number(deviceLimit)) || 1));
+      if (branchesLimit !== undefined) push('branches_limit', Math.max(1, Math.floor(Number(branchesLimit)) || 1));
+      if (offlineGracePeriodDays !== undefined) push('offline_grace_period_days', Math.max(0, Math.floor(Number(offlineGracePeriodDays)) || 0));
+      if (notes !== undefined) push('notes', notes);
+      if (couplingMode !== undefined) push('coupling_mode', couplingMode);
+
+      if (columns.length === 0) {
+        return res.status(400).json({ error: 'No fields to update' });
+      }
+
+      await db.exec('BEGIN TRANSACTION');
+      try {
+        await db.run(
+          `UPDATE platform_licenses SET ${columns.join(', ')}, updated_at = ? WHERE id = ?`,
+          [...params, nowIso(), id]
+        );
+
+        // Keep the tenant limits in sync when license limits change.
+        const tenantUpdates = [];
+        const tenantParams = [];
+        if (seats !== undefined) { tenantUpdates.push('seats_limit = ?'); tenantParams.push(Math.max(1, Math.floor(Number(seats)) || 1)); }
+        if (branchesLimit !== undefined) { tenantUpdates.push('branches_limit = ?'); tenantParams.push(Math.max(1, Math.floor(Number(branchesLimit)) || 1)); }
+        if (deviceLimit !== undefined) { tenantUpdates.push('devices_limit = ?'); tenantParams.push(Math.max(1, Math.floor(Number(deviceLimit)) || 1)); }
+        if (tenantUpdates.length > 0) {
+          await db.run(
+            `UPDATE platform_tenants SET ${tenantUpdates.join(', ')}, updated_at = ? WHERE id = ?`,
+            [...tenantParams, nowIso(), license.tenant_id]
+          );
+        }
+
+        await db.run(
+          `INSERT INTO platform_license_changes
+            (id, license_id, subscription_id, change_type, old_values, new_values, actor_id, actor_name, reason)
+           VALUES (?, ?, ?, 'UPDATE', ?, ?, ?, ?, ?)`,
+          [
+            `lchg_${uuidv4().replace(/-/g, '').slice(0, 12)}`, license.id, license.subscription_id,
+            JSON.stringify(oldValues), JSON.stringify(newValues),
+            req.platformUser.id, req.platformUser.full_name, 'تعديل بيانات الترخيص',
+          ]
+        );
+
+        await db.exec('COMMIT');
+      } catch (err) {
+        await db.exec('ROLLBACK');
+        throw err;
+      }
+
+      const updated = await db.get(`
+        SELECT l.*, t.name AS tenantName, t.code AS tenantCode, p.name AS planName
+        FROM platform_licenses l
+        JOIN platform_tenants t ON t.id = l.tenant_id
+        LEFT JOIN platform_plans p ON p.id = l.plan_id
+        WHERE l.id = ?
+      `, [id]);
+
+      await auditLicenseChange(req, 'LICENSE_UPDATED', id, { fields: Object.keys(newValues) });
+      res.json({ license: updated });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
 router.post(
   '/issue',
   authenticatePlatformUser,
@@ -455,7 +629,7 @@ router.post(
       const { id } = req.params;
       const { newHardwareId, reason } = req.body || {};
 
-      if (!newHardwareId) {
+      if (newHardwareId === undefined) {
         return res.status(400).json({ error: 'newHardwareId is required' });
       }
 
@@ -463,23 +637,62 @@ router.post(
       if (!license) return res.status(404).json({ error: 'License not found' });
       if (!(await assertTenantAccess(req, res, license.tenant_id))) return;
 
+      const targetHardwareId = String(newHardwareId ?? '').trim();
+
+      // Empty target = unbind: clear the hardware binding without counting a transfer.
+      if (!targetHardwareId) {
+        await db.run(
+          `UPDATE platform_licenses SET hardware_id = NULL, activated_at = NULL, updated_at = ? WHERE id = ?`,
+          [nowIso(), id]
+        );
+
+        const boundDevice = await db.get('SELECT * FROM platform_devices WHERE license_id = ? AND hardware_id = ?', [id, license.hardware_id ?? '']);
+        if (boundDevice) {
+          await db.run(
+            `UPDATE platform_devices SET license_id = NULL, status = 'OFFLINE', updated_at = ? WHERE id = ?`,
+            [nowIso(), boundDevice.id]
+          );
+        }
+
+        await db.run(
+          `INSERT INTO platform_license_activations
+            (id, license_id, tenant_id, device_id, activation_code, mode, action, status, notes)
+           VALUES (?, ?, ?, ?, ?, 'ONLINE', 'DEACTIVATE', 'SUCCESS', ?)`,
+          [`lact_${uuidv4().replace(/-/g, '').slice(0, 12)}`, license.id, license.tenant_id, license.hardware_id, license.activation_code, reason || 'فك ربط الترخيص من الجهاز']
+        );
+
+        await db.run(
+          `INSERT INTO platform_license_changes
+            (id, license_id, subscription_id, change_type, old_values, new_values, actor_id, actor_name, reason)
+           VALUES (?, ?, ?, 'UNBIND', ?, ?, ?, ?, ?)`,
+          [
+            `lchg_${uuidv4().replace(/-/g, '').slice(0, 12)}`, license.id, license.subscription_id,
+            JSON.stringify({ hardwareId: license.hardware_id }), JSON.stringify({ hardwareId: null }),
+            req.platformUser.id, req.platformUser.full_name, reason || 'فك ربط الترخيص من الخادم المركزي',
+          ]
+        );
+
+        await auditLicenseChange(req, 'LICENSE_UNBOUND', id, { previousHardwareId: license.hardware_id });
+        return res.json({ licenseId: id, previousHardwareId: license.hardware_id, newHardwareId: null, unbound: true });
+      }
+
       await db.run(
         `UPDATE platform_licenses SET hardware_id = ?, transfer_count = transfer_count + 1, updated_at = ? WHERE id = ?`,
-        [newHardwareId, nowIso(), id]
+        [targetHardwareId, nowIso(), id]
       );
 
       const device = await db.get('SELECT * FROM platform_devices WHERE license_id = ?', [id]);
       if (device) {
         await db.run(
           `UPDATE platform_devices SET hardware_id = ?, updated_at = ? WHERE id = ?`,
-          [newHardwareId, nowIso(), device.id]
+          [targetHardwareId, nowIso(), device.id]
         );
       } else {
         await db.run(
           `INSERT INTO platform_devices
             (id, tenant_id, license_id, hardware_id, name, os, app_version, ip_address, first_activated_at, last_seen_at)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [`pdev_${uuidv4().replace(/-/g, '').slice(0, 12)}`, license.tenant_id, id, newHardwareId, null, null, null, null, nowIso(), nowIso()]
+          [`pdev_${uuidv4().replace(/-/g, '').slice(0, 12)}`, license.tenant_id, id, targetHardwareId, null, null, null, null, nowIso(), nowIso()]
         );
       }
 
@@ -487,7 +700,7 @@ router.post(
         `INSERT INTO platform_license_activations
           (id, license_id, tenant_id, device_id, activation_code, mode, action, status, notes)
          VALUES (?, ?, ?, ?, ?, 'ONLINE', 'TRANSFER', 'SUCCESS', ?)`,
-        [`lact_${uuidv4().replace(/-/g, '').slice(0, 12)}`, license.id, license.tenant_id, newHardwareId, license.activation_code, reason || 'نقل ترخيص إلى جهاز آخر']
+        [`lact_${uuidv4().replace(/-/g, '').slice(0, 12)}`, license.id, license.tenant_id, targetHardwareId, license.activation_code, reason || 'نقل ترخيص إلى جهاز آخر']
       );
 
       await db.run(
@@ -496,7 +709,7 @@ router.post(
          VALUES (?, ?, ?, 'TRANSFER', ?, ?, ?, ?, ?)`,
         [
           `lchg_${uuidv4().replace(/-/g, '').slice(0, 12)}`, license.id, license.subscription_id,
-          JSON.stringify({ hardwareId: license.hardware_id }), JSON.stringify({ hardwareId: newHardwareId }),
+          JSON.stringify({ hardwareId: license.hardware_id }), JSON.stringify({ hardwareId: targetHardwareId }),
           req.platformUser.id, req.platformUser.full_name, reason || 'نقل ترخيص من الخادم المركزي',
         ]
       );
@@ -504,12 +717,12 @@ router.post(
       const updated = await db.get('SELECT * FROM platform_licenses WHERE id = ?', [id]);
       await auditLicenseChange(req, 'LICENSE_TRANSFERRED', id, {
         previousHardwareId: license.hardware_id,
-        newHardwareId,
+        newHardwareId: targetHardwareId,
       });
       res.json({
         licenseId: id,
         previousHardwareId: license.hardware_id,
-        newHardwareId,
+        newHardwareId: targetHardwareId,
         transferCount: updated.transfer_count,
       });
     } catch (err) {

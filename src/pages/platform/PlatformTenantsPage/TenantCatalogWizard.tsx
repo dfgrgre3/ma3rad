@@ -136,7 +136,7 @@ const WIZARD_STEPS = [
 ];
 
 const StepIndicator: React.FC<{ step: number }> = ({ step }) => (
-  <div className="mb-5">
+  <div className="mb-5 rounded-2xl border border-line/70 bg-surface-muted/50 px-4 py-3">
     <ol className="flex items-center gap-1.5 sm:gap-2">
       {WIZARD_STEPS.map((item, index) => {
         const done = index < step;
@@ -148,10 +148,10 @@ const StepIndicator: React.FC<{ step: number }> = ({ step }) => (
               <span
                 className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-[11px] font-black transition ${
                   done
-                    ? 'border-success bg-success text-white'
+                    ? 'border-success bg-success text-white shadow-sm'
                     : active
-                      ? 'border-success bg-success-soft text-success'
-                      : 'border-line bg-surface-muted text-muted'
+                      ? 'border-success bg-success-soft text-success ring-2 ring-success/25'
+                      : 'border-line bg-surface text-muted'
                 }`}
                 aria-current={active ? 'step' : undefined}
               >
@@ -487,21 +487,26 @@ export const TenantCatalogWizard: React.FC<TenantCatalogWizardProps> = ({
                 return (
                   <div
                     key={module.id || module.code}
-                    className={`rounded-xl border p-3 transition ${checked ? 'border-success-border bg-success-soft/40' : 'border-line bg-surface opacity-80'}`}
+                    className={`rounded-2xl border p-3.5 transition ${checked ? 'border-success/50 bg-success-soft/40 shadow-sm' : 'border-line bg-surface opacity-80 hover:opacity-100'}`}
                   >
                     <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <p className="flex flex-wrap items-center gap-1.5 text-[12.5px] font-bold text-ink">
-                          {module.name}
-                          <span className="font-mono text-[9.5px] font-normal text-muted" dir="ltr">{module.code}</span>
-                        </p>
-                        <p className="mt-0.5 text-[10.5px] text-muted">{module.description || 'بدون وصف'}</p>
+                      <div className="flex min-w-0 items-start gap-2.5">
+                        <span className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${checked ? 'bg-success/10 text-success' : 'bg-surface-sunken text-muted'}`}>
+                          <MonitorSmartphone className="h-4 w-4" />
+                        </span>
+                        <div className="min-w-0">
+                          <p className="flex flex-wrap items-center gap-1.5 text-[12.5px] font-bold text-ink">
+                            {module.name}
+                            <span className="font-mono text-[9.5px] font-normal text-muted" dir="ltr">{module.code}</span>
+                          </p>
+                          <p className="mt-0.5 text-[10.5px] text-muted">{module.description || 'بدون وصف'}</p>
+                        </div>
                       </div>
                       <Toggle
                         checked={checked}
                         onChange={(value) => setSelection('MODULE', module.code, value)}
                         label={module.name}
-                        disabled={!canManageTenants || applying}
+                        disabled={!canManageTenants || applying || !module.isEnabled}
                       />
                     </div>
                     <div className="mt-2 flex flex-wrap items-center gap-1.5">
@@ -555,19 +560,24 @@ export const TenantCatalogWizard: React.FC<TenantCatalogWizardProps> = ({
                 return (
                   <div
                     key={feature.id || feature.code}
-                    className={`flex items-start justify-between gap-3 rounded-xl border p-3 transition ${checked ? 'border-success-border bg-success-soft/40' : 'border-line bg-surface opacity-80'}`}
+                    className={`flex items-start justify-between gap-3 rounded-2xl border p-3.5 transition ${checked ? 'border-success/50 bg-success-soft/40 shadow-sm' : 'border-line bg-surface opacity-80 hover:opacity-100'}`}
                   >
-                    <div className="min-w-0">
-                      <p className="flex flex-wrap items-center gap-1.5 text-[12.5px] font-bold text-ink">
-                        {feature.name}
-                        <span className="font-mono text-[9.5px] font-normal text-muted" dir="ltr">{feature.code}</span>
-                      </p>
-                      <p className="mt-0.5 text-[10.5px] text-muted">{feature.description || 'بدون وصف'}</p>
-                      <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                        <span className={`rounded-full border px-2 py-0.5 text-[9.5px] font-bold ${badge.className}`}>{badge.label}</span>
-                        {feature.category && (
-                          <span className="rounded-full border border-line bg-surface-muted px-2 py-0.5 text-[9.5px] font-bold text-muted">{feature.category}</span>
-                        )}
+                    <div className="flex min-w-0 items-start gap-2.5">
+                      <span className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${checked ? 'bg-success/10 text-success' : 'bg-surface-sunken text-muted'}`}>
+                        <Sparkles className="h-4 w-4" />
+                      </span>
+                      <div className="min-w-0">
+                        <p className="flex flex-wrap items-center gap-1.5 text-[12.5px] font-bold text-ink">
+                          {feature.name}
+                          <span className="font-mono text-[9.5px] font-normal text-muted" dir="ltr">{feature.code}</span>
+                        </p>
+                        <p className="mt-0.5 text-[10.5px] text-muted">{feature.description || 'بدون وصف'}</p>
+                        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                          <span className={`rounded-full border px-2 py-0.5 text-[9.5px] font-bold ${badge.className}`}>{badge.label}</span>
+                          {feature.category && (
+                            <span className="rounded-full border border-line bg-surface-muted px-2 py-0.5 text-[9.5px] font-bold text-muted">{feature.category}</span>
+                          )}
+                        </div>
                       </div>
                     </div>
                     <Toggle

@@ -16,7 +16,6 @@ import type {
 import { Button } from '../../components/ui/Button';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { useToast } from '../../components/ui/Toast';
-import { CentralUnsupportedNotice } from './components/CentralUnsupportedNotice';
 import {
   TABS,
   emptyFeature,
@@ -378,29 +377,48 @@ export const PlatformProductPage: React.FC = () => {
 
   const openOverridesModal = (flag: PlatformFeatureFlag) => {
     setSelectedFeatureForOverrides(flag);
+    setNewOverrideTenantId('');
+    setNewOverrideEnabled(true);
     if (centralActive) {
-      // No central per-tenant feature-override endpoints exist.
-      setFeatureOverrides([]);
-      setNewOverrideTenantId('');
-      setNewOverrideEnabled(true);
+      centralPlatformClient.listFeatureFlagOverrides(flag.id)
+        .then(setFeatureOverrides)
+        .catch((err) => {
+          setFeatureOverrides([]);
+          toast.error('تعذر تحميل تخصيصات الميزة', err instanceof Error ? err.message : undefined);
+        });
       return;
     }
     try {
       const ovs = platformAdminService.listFeatureOverrides(flag.id);
       setFeatureOverrides(ovs);
-      setNewOverrideTenantId('');
-      setNewOverrideEnabled(true);
     } catch (err) {
       toast.error('تعذر تحميل تخصيصات الميزة', err instanceof Error ? err.message : undefined);
     }
   };
 
+  const reloadCentralOverrides = (featureId: string) =>
+    centralPlatformClient.listFeatureFlagOverrides(featureId)
+      .then(setFeatureOverrides)
+      .catch(() => setFeatureOverrides([]));
+
   const addOverride = () => {
+    if (!selectedFeatureForOverrides || !newOverrideTenantId) return;
     if (centralActive) {
-      toast.error('غير مدعوم', 'التخصيص لكل عميل غير متاح في الوضع المركزي بعد.');
+      centralPlatformClient.upsertFeatureFlagOverride(selectedFeatureForOverrides.id, {
+        targetType: 'TENANT',
+        targetId: newOverrideTenantId,
+        isEnabled: newOverrideEnabled,
+        customRolloutPercent: null,
+      })
+        .then(() => {
+          toast.success('تمت إضافة التخصيص بنجاح');
+          setNewOverrideTenantId('');
+          return reloadCentralOverrides(selectedFeatureForOverrides.id);
+        })
+        .then(() => load())
+        .catch((err) => toast.error('تعذر حفظ التخصيص', err instanceof Error ? err.message : undefined));
       return;
     }
-    if (!selectedFeatureForOverrides || !newOverrideTenantId) return;
     try {
       platformAdminService.setFeatureOverride({
         featureId: selectedFeatureForOverrides.id,
@@ -420,11 +438,17 @@ export const PlatformProductPage: React.FC = () => {
   };
 
   const removeOverride = (overrideId: string) => {
+    if (!selectedFeatureForOverrides) return;
     if (centralActive) {
-      toast.error('غير مدعوم', 'التخصيص لكل عميل غير متاح في الوضع المركزي بعد.');
+      centralPlatformClient.deleteFeatureFlagOverride(selectedFeatureForOverrides.id, overrideId)
+        .then(() => {
+          toast.success('تم حذف التخصيص');
+          return reloadCentralOverrides(selectedFeatureForOverrides.id);
+        })
+        .then(() => load())
+        .catch((err) => toast.error('تعذر حذف التخصيص', err instanceof Error ? err.message : undefined));
       return;
     }
-    if (!selectedFeatureForOverrides) return;
     try {
       platformAdminService.removeFeatureOverride(overrideId);
       toast.success('تم حذف التخصيص');
@@ -518,10 +542,16 @@ export const PlatformProductPage: React.FC = () => {
     setSelectedReleaseForTargets(release);
     setTargetSearchTerm('');
     if (centralActive) {
-      // Central releases carry targetTenantIds on the release row itself.
-      const central = (release as PlatformRelease & { _central?: CentralReleaseRow })._central;
-      setSelectedTenantIdsForRelease(Array.isArray(central?.targetTenantIds) ? central.targetTenantIds : []);
-      setReleaseTargets([]);
+      centralPlatformClient.listReleaseTargets(release.id)
+        .then((targets) => {
+          setReleaseTargets(targets);
+          setSelectedTenantIdsForRelease(targets.map((t) => t.tenantId));
+        })
+        .catch((err) => {
+          setReleaseTargets([]);
+          setSelectedTenantIdsForRelease([]);
+          toast.error('تعذر استرجاع مستهدفي الإصدار', err instanceof Error ? err.message : undefined);
+        });
       return;
     }
     try {
@@ -541,12 +571,13 @@ export const PlatformProductPage: React.FC = () => {
     }
     setSaving(true);
     if (centralActive) {
-      centralPlatformClient.updateRelease(selectedReleaseForTargets.id, {
-        targetTenantIds: selectedTenantIdsForRelease,
-        rolloutStrategy: selectedTenantIdsForRelease.length ? 'PHASED' : 'FULL',
-        rolloutPercent: 100,
-      })
-        .then(() => { toast.success(`تم إسناد الإصدار إلى ${selectedTenantIdsForRelease.length} عميل.`); setSelectedReleaseForTargets(null); load(); })
+      centralPlatformClient.setReleaseTargets(selectedReleaseForTargets.id, selectedTenantIdsForRelease)
+        .then((targets) => {
+          setReleaseTargets(targets);
+          toast.success(`تم إسناد الإصدار إلى ${selectedTenantIdsForRelease.length} عميل.`);
+          setSelectedReleaseForTargets(null);
+          load();
+        })
         .catch((err) => toast.error('تعذر تحديث مستهدفي الإصدار', err instanceof Error ? err.message : undefined))
         .finally(() => setSaving(false));
       return;
@@ -564,15 +595,18 @@ export const PlatformProductPage: React.FC = () => {
   };
 
   const markTargetStatus = (targetId: string, status: PlatformReleaseTarget['status']) => {
+    if (!selectedReleaseForTargets) return;
+    const target = releaseTargets.find((t) => t.id === targetId);
+    if (!target) return;
     if (centralActive) {
-      // Per-target rollout status tracking has no central endpoint.
-      toast.error('غير مدعوم', 'متابعة حالة كل عميل على حدة غير متاحة في الوضع المركزي بعد.');
+      centralPlatformClient.setReleaseTargetStatus(selectedReleaseForTargets.id, target.tenantId, status)
+        .then(() => centralPlatformClient.listReleaseTargets(selectedReleaseForTargets.id))
+        .then(setReleaseTargets)
+        .then(() => { toast.success('تم تحديث حالة العميل'); load(); })
+        .catch((err) => toast.error('تعذر تحديث الحالة', err instanceof Error ? err.message : undefined));
       return;
     }
-    if (!selectedReleaseForTargets) return;
     try {
-      const target = releaseTargets.find((t) => t.id === targetId);
-      if (!target) return;
       platformAdminService.updateReleaseTargetStatus(selectedReleaseForTargets.id, target.tenantId, status);
       toast.success('تم تحديث حالة العميل');
       setReleaseTargets(platformAdminService.listReleaseTargets(selectedReleaseForTargets.id));
@@ -724,7 +758,6 @@ export const PlatformProductPage: React.FC = () => {
         newOverrideEnabled={newOverrideEnabled}
         setNewOverrideEnabled={setNewOverrideEnabled}
         canManageProduct={canManageProduct}
-        centralActive={centralActive}
         onAddOverride={addOverride}
         onRemoveOverride={removeOverride}
       />
@@ -754,7 +787,7 @@ export const PlatformProductPage: React.FC = () => {
         saving={saving}
         canManageProduct={canManageProduct}
         onSaveTargets={saveTargets}
-        onMarkTargetStatus={centralActive ? undefined : markTargetStatus}
+        onMarkTargetStatus={markTargetStatus}
       />
 
       {/* ─── Rollback Modal ─── */}

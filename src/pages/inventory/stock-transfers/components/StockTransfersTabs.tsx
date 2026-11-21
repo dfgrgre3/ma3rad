@@ -9,9 +9,11 @@ export const StockTransfersTabs: React.FC<StockTransfersTabsProps> = ({
   statusFilter,
   onStatusFilterChange,
   canViewSummary = true,
+  canViewList = true,
 }) => (
   <div className="px-6 pt-4 bg-surface border-b border-line flex items-center justify-between">
     <div className="flex gap-2">
+      {canViewList && (
       <button
         onClick={() => onTabChange('workflow')}
         className={`pb-3 px-3 text-xs font-black border-b-2 transition ${
@@ -22,6 +24,8 @@ export const StockTransfersTabs: React.FC<StockTransfersTabsProps> = ({
       >
         أوامر التحويل النشطة ({workflowCount})
       </button>
+      )}
+      {canViewList && (
       <button
         onClick={() => onTabChange('history')}
         className={`pb-3 px-3 text-xs font-black border-b-2 transition ${
@@ -32,6 +36,7 @@ export const StockTransfersTabs: React.FC<StockTransfersTabsProps> = ({
       >
         سجل حركات التحويل المنفذة ({historyCount})
       </button>
+      )}
       {canViewSummary && (
       <button
         onClick={() => onTabChange('summary')}

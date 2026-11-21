@@ -830,7 +830,10 @@ ipcMain.handle('central:request', async (event, request) => {
     '/api/v1/configuration/current',
     '/api/v1/telemetry/errors',
   ]).has(targetPathname);
-  const usesCredential = requiresCredential || targetPathname === '/api/v1/releases';
+  const isProvisioningChannel = targetPathname === '/api/v1/device/provisioning/pending'
+    || targetPathname.startsWith('/api/v1/device/provisioning/')
+    || targetPathname.startsWith('/api/v1/device/tenant-users/');
+  const usesCredential = requiresCredential || isProvisioningChannel || targetPathname === '/api/v1/releases';
   const credential = usesCredential ? await loadCentralCredential() : null;
   if (requiresCredential && !credential) throw new Error('This device is not activated with the central platform.');
   let requestBody = request.body;
@@ -847,6 +850,9 @@ ipcMain.handle('central:request', async (event, request) => {
     }
   }
   if (credential && ['/api/v1/configuration/establishment', '/api/v1/configuration/current', '/api/v1/releases'].includes(targetPathname)) {
+    headers['X-Device-Credential'] = credential;
+  }
+  if (credential && isProvisioningChannel) {
     headers['X-Device-Credential'] = credential;
   }
   const controller = new AbortController();

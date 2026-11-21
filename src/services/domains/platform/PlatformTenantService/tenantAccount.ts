@@ -96,6 +96,60 @@ export function resetTenantAccountPassword(ctx: TenantServiceContext, tenantId: 
   return buildActivationDetails(ctx, tenant, ctx.getTenantAccount(tenantId)!, account.username, pwd, activationCode, now);
 }
 
+export function updateTenantAccount(
+  ctx: TenantServiceContext,
+  tenantId: string,
+  input: { username?: string; email?: string; fullName?: string; password?: string }
+): PlatformTenantAccount {
+  ctx.requirePlatformAccess('tenants', 'platform.tenants.update');
+
+  const account = ctx.getTenantAccount(tenantId);
+  if (!account) throw new Error('لا يوجد حساب لهذا العميل.');
+
+  const username = input.username?.trim().toLowerCase();
+  if (username !== undefined && username !== account.username) {
+    if (!/^[a-z0-9._-]{3,24}$/.test(username)) {
+      throw new Error('اسم المستخدم يجب أن يكون 3-24 حرفًا من a-z و0-9 و. _ -');
+    }
+    const clash = ctx.db.query<any>(
+      'SELECT id FROM platform_tenant_accounts WHERE username = ? AND id != ?',
+      [username, account.id]
+    )[0];
+    if (clash) throw new Error('اسم المستخدم مستخدم بالفعل.');
+  }
+  if (input.password !== undefined && input.password !== '' && input.password.length < 8) {
+    throw new Error('كلمة المرور يجب أن تكون 8 أحرف على الأقل.');
+  }
+
+  const sets: string[] = [];
+  const params: any[] = [];
+  if (username !== undefined && username !== account.username) {
+    sets.push('username = ?');
+    params.push(username);
+  }
+  if (input.email !== undefined) {
+    sets.push('email = ?');
+    params.push(input.email.trim() || null);
+  }
+  if (input.fullName !== undefined) {
+    sets.push('full_name = ?');
+    params.push(input.fullName.trim() || null);
+  }
+  if (input.password) {
+    sets.push('password_hash = ?');
+    params.push(bcrypt.hashSync(input.password, 10));
+  }
+  if (sets.length === 0) return account;
+  const now = nowIso();
+  sets.push('updated_at = ?');
+  params.push(now, account.id);
+  ctx.db.run(`UPDATE platform_tenant_accounts SET ${sets.join(', ')} WHERE id = ?`, params);
+  ctx.audit('تحديث حساب العميل', 'TENANT_ACCOUNT', account.id, { tenantId });
+  const updated = ctx.getTenantAccount(tenantId);
+  if (!updated) throw new Error('فشل تحديث الحساب.');
+  return updated;
+}
+
 export function setTenantAccountActive(ctx: TenantServiceContext, tenantId: string, active: boolean): PlatformTenantAccount {
   ctx.requirePlatformAccess('tenants', 'platform.tenants.update');
 

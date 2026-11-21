@@ -5,9 +5,11 @@ import { ActivityGate } from '../../../components/ui/ActivityGate';
 
 interface InventoryCountHeaderProps {
   onCreateSession: () => void;
+  /** إخفاء زر بدء جلسة عند تعطيل قسم الجلسات مركزيًا. */
+  canCreate?: boolean;
 }
 
-export const InventoryCountHeader: React.FC<InventoryCountHeaderProps> = ({ onCreateSession }) => {
+export const InventoryCountHeader: React.FC<InventoryCountHeaderProps> = ({ onCreateSession, canCreate = true }) => {
   return (
     <div className="bg-surface border-b border-line px-6 pt-4">
       <PageHeader
@@ -15,13 +17,13 @@ export const InventoryCountHeader: React.FC<InventoryCountHeaderProps> = ({ onCr
         title="جرد المخزون (Inventory Count)"
         description="متابعة ومطابقة الجرد الدوري والمفاجئ للمخازن والمعارض"
         actions={
-          <ActivityGate element="new-count"><button
+          canCreate ? <ActivityGate element="new-count"><button
             onClick={onCreateSession}
             className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary text-white rounded-xl text-sm font-semibold transition shrink-0"
           >
             <Plus className="w-4 h-4" />
             بدء جلسة جرد جديدة
-          </button></ActivityGate>
+          </button></ActivityGate> : undefined
         }
       />
     </div>

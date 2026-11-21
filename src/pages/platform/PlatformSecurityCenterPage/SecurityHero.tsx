@@ -1,12 +1,29 @@
 import React from 'react';
 import { CheckCircle2, AlertTriangle } from 'lucide-react';
-import type { PlatformCentralSecurityOverview } from '../../../services/domains/platform/platformTypes';
+import type { PlatformCentralSecurityOverview, PlatformSecurityEventSeverity } from '../../../services/domains/platform/platformTypes';
 
 interface SecurityHeroProps {
   data: PlatformCentralSecurityOverview;
+  lastUpdated?: Date | null;
 }
 
-export const SecurityHero: React.FC<SecurityHeroProps> = ({ data }) => {
+const SEVERITY_DOT: Record<PlatformSecurityEventSeverity, string> = {
+  CRITICAL: 'bg-danger',
+  HIGH: 'bg-warning',
+  MEDIUM: 'bg-primary',
+  LOW: 'bg-ink-secondary',
+  INFO: 'bg-muted',
+};
+
+const SEVERITY_LABEL: Record<PlatformSecurityEventSeverity, string> = {
+  CRITICAL: 'حرجة',
+  HIGH: 'عالية',
+  MEDIUM: 'متوسطة',
+  LOW: 'منخفضة',
+  INFO: 'معلوماتية',
+};
+
+export const SecurityHero: React.FC<SecurityHeroProps> = ({ data, lastUpdated }) => {
   const isScoreHigh = data.securityScore >= 85;
   const isScoreMedium = data.securityScore >= 65 && data.securityScore < 85;
 
@@ -50,6 +67,30 @@ export const SecurityHero: React.FC<SecurityHeroProps> = ({ data }) => {
           <p className="text-sm text-muted max-w-xl">
             المصادقة الثنائية (2FA) لموظفي المنصة، الجلسات المفتوحة والأجهزة الموثوقة، مفاتيح التوقيع الرقمي، مع تسجيل دقيق لكافة محاولات الدخول والحوادث الأمنية.
           </p>
+
+          {/* 24h severity breakdown */}
+          {data.events24hBySeverity && Object.keys(data.events24hBySeverity).length > 0 && (
+            <div className="flex flex-wrap items-center gap-2 pt-1">
+              <span className="text-[10px] font-bold text-muted">أحداث 24 ساعة:</span>
+              {(['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO'] as PlatformSecurityEventSeverity[])
+                .filter((sev) => (data.events24hBySeverity?.[sev] ?? 0) > 0)
+                .map((sev) => (
+                  <span
+                    key={sev}
+                    className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-surface/5 px-2 py-0.5 text-[10px] font-bold text-muted"
+                  >
+                    <span className={`h-1.5 w-1.5 rounded-full ${SEVERITY_DOT[sev]}`} />
+                    {SEVERITY_LABEL[sev]} {data.events24hBySeverity?.[sev]}
+                  </span>
+                ))}
+            </div>
+          )}
+
+          {lastUpdated && (
+            <p className="text-[10px] text-muted">
+              آخر تحديث للبيانات: {lastUpdated.toLocaleString('ar-EG', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+            </p>
+          )}
         </div>
 
         {/* Quick Metrics Strip */}

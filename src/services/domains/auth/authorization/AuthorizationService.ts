@@ -531,6 +531,11 @@ export class AuthorizationService {
     if (CentralFeaturePermissionService.isPermissionDisabled(requiredCode)) {
       return deny('الميزة معطلة مركزياً', requiredCode, 'central');
     }
+    // صفحة الإجراء مخفية مركزياً بالكامل — يُمنع حتى بدون سياق صفحة،
+    // فلا يمكن استدعاء وظائف صفحة سحبها الاشتراك عبر مسار آخر.
+    if (CentralFeaturePermissionService.isPermissionPageHidden(requiredCode)) {
+      return deny('صفحة هذا الإجراء مخفية في اشتراكك', requiredCode, 'central');
+    }
     if (ctx.path && !CentralFeaturePermissionService.allowsPermission(requiredCode, ctx.path)) {
       return deny('الإجراء غير مسموح في هذه الصفحة مركزياً', requiredCode, 'central');
     }

@@ -32,12 +32,22 @@ import {
 } from '../../../types/hr/employeesPage';
 
 import { useToast } from '../../../components/ui/Toast';
+import { usePageAccess } from '../../../hooks/domains/licensing/usePageAccess';
 export const EmployeesPage: React.FC = () => {
   const toast = useToast();
   const [searchParams] = useSearchParams();
   const canManageEmployees = PermissionService.can(AuthService.getCurrentUser(), 'ui.employees.employees.manage');
   const canExportEmployees = PermissionService.can(AuthService.getCurrentUser(), 'ui.employees.employees.export');
   const canViewAttendance = PermissionService.can(AuthService.getCurrentUser(), 'employees.attendance.view');
+  // قيود الأقسام من المنصة المركزية (tenant_feature_config) — طبقة إضافية
+  // فوق صلاحيات الدور: تعطيل قسم من لوحة السوبر أدمن يخفي تبويبه هنا.
+  const pageAccess = usePageAccess();
+  const sectionAllowed = (key: 'directory' | 'finance' | 'attendance' | 'analytics') =>
+    pageAccess.allows(`ui.employees.employees.section.${key}.view`);
+  const canViewDirectory = sectionAllowed('directory');
+  const canViewFinance = canManageEmployees && sectionAllowed('finance');
+  const canViewAttendanceTab = canViewAttendance && sectionAllowed('attendance');
+  const canViewAnalytics = canManageEmployees && sectionAllowed('analytics');
   // --- Database State ---
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [transactions, setTransactions] = useState<FinancialTransaction[]>([]);
@@ -124,12 +134,15 @@ export const EmployeesPage: React.FC = () => {
 
   // --- Active Tab ---
   const [activeTab, setActiveTab] = useState<EmployeeTab>('directory');
-  // تبويب الحضور يتطلب صلاحية الحضور المنفصلة — الدليل متاح لكل من يملك عرض الموظفين.
-  const viewTab: EmployeeTab =
-    (activeTab === 'attendance' && !canViewAttendance)
-    || ((activeTab === 'finance' || activeTab === 'analytics') && !canManageEmployees)
-      ? 'directory'
-      : activeTab;
+  const TAB_ALLOWED: Record<EmployeeTab, boolean> = {
+    directory: canViewDirectory,
+    finance: canViewFinance,
+    attendance: canViewAttendanceTab,
+    analytics: canViewAnalytics,
+  };
+  // أول تبويب مسموح هو الافتراضي عند تعذّر الوصول للتبويب المطلوب.
+  const fallbackTab = (Object.keys(TAB_ALLOWED) as EmployeeTab[]).find((key) => TAB_ALLOWED[key]) ?? 'directory';
+  const viewTab: EmployeeTab = TAB_ALLOWED[activeTab] ? activeTab : fallbackTab;
 
   // --- Filtering & Search ---
   const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '');
@@ -535,8 +548,7 @@ export const EmployeesPage: React.FC = () => {
       {/* Tabs Switcher */}
       <EmployeeTabs
         activeTab={viewTab}
-        canManageEmployees={canManageEmployees}
-        canViewAttendance={canViewAttendance}
+        canViewTab={(tab) => TAB_ALLOWED[tab]}
         onTabChange={setActiveTab}
       />
 

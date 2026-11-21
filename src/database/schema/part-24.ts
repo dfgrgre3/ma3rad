@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS platform_devices (
   os TEXT,
   app_version TEXT,
   ip_address TEXT,
-  status TEXT NOT NULL DEFAULT 'ACTIVE' CHECK(status IN ('ACTIVE','SUSPENDED','REVOKED','OFFLINE')),
+  status TEXT NOT NULL DEFAULT 'ACTIVE' CHECK(status IN ('ACTIVE','SUSPENDED','REVOKED','OFFLINE','RELEASED','INACTIVE')),
   first_activated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   last_seen_at TEXT,
   clone_suspected INTEGER NOT NULL DEFAULT 0 CHECK(clone_suspected IN (0,1)),

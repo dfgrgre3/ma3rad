@@ -2,6 +2,10 @@ import type { PlatformTenantInput, PlatformTenantStatus } from '../../../service
 
 export const STATUSES: PlatformTenantStatus[] = ['TRIAL', 'ACTIVE', 'SUSPENDED', 'EXPIRED', 'CANCELLED'];
 
+export const TENANTS_PAGE_SIZE = 20;
+
+export const isValidEmail = (email?: string | null): boolean => !email || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+
 export const CYCLE_LABELS: Record<string, string> = {
   MONTHLY: 'شهري',
   QUARTERLY: 'ربع سنوي',
@@ -52,4 +56,4 @@ export interface CreatedAccountInfo {
   loginUrl: string;
 }
 
-export type TabKey = 'overview' | 'subscription' | 'licenses' | 'billing' | 'logs' | 'users' | 'remote';
+export type TabKey = 'overview' | 'subscription' | 'licenses' | 'billing' | 'logs' | 'users' | 'remote' | 'access' | 'api';

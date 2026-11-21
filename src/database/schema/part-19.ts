@@ -443,7 +443,7 @@ CREATE TABLE IF NOT EXISTS platform_license_changes (
   license_id TEXT NOT NULL,
   subscription_id TEXT,
   change_type TEXT NOT NULL
-    CHECK(change_type IN ('ISSUE','RENEW','SUSPEND','REVOKE','TRANSFER','MODULE_CHANGE','LIMIT_CHANGE','COUPLING_CHANGE','STATUS_CHANGE')),
+    CHECK(change_type IN ('ISSUE','RENEW','SUSPEND','REVOKE','TRANSFER','MODULE_CHANGE','LIMIT_CHANGE','COUPLING_CHANGE','STATUS_CHANGE','UPDATE','REACTIVATE','UNBIND')),
   old_values TEXT,
   new_values TEXT,
   actor_id TEXT,
@@ -839,6 +839,30 @@ CREATE TABLE IF NOT EXISTS platform_security_incidents_log (
   created_at TEXT DEFAULT CURRENT_TIMESTAMP,
   resolved_at TEXT
 );
+
+CREATE TABLE IF NOT EXISTS platform_security_incidents (
+  id TEXT PRIMARY KEY,
+  type TEXT NOT NULL,
+  severity TEXT NOT NULL CHECK(severity IN ('CRITICAL', 'HIGH', 'MEDIUM', 'LOW')),
+  title TEXT NOT NULL,
+  description TEXT,
+  details TEXT,
+  source_ip TEXT,
+  ip_address TEXT,
+  tenant_id TEXT,
+  staff_id TEXT,
+  device_id TEXT,
+  status TEXT NOT NULL DEFAULT 'OPEN' CHECK(status IN ('OPEN', 'INVESTIGATING', 'CONTAINED', 'RESOLVED')),
+  response TEXT,
+  containment_action TEXT,
+  metadata TEXT,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT,
+  resolved_at TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_platform_security_incidents_status ON platform_security_incidents(status, created_at);
+CREATE INDEX IF NOT EXISTS idx_platform_security_incidents_severity ON platform_security_incidents(severity);
 
 CREATE TABLE IF NOT EXISTS platform_signing_keys (
   id TEXT PRIMARY KEY,

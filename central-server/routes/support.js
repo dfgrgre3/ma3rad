@@ -40,6 +40,9 @@ function mapTicketRow(row) {
     remoteAccessRequestedAt: row.remote_access_requested_at ?? null,
     remoteAccessApprovedAt: row.remote_access_approved_at ?? null,
     remoteAccessDurationMinutes: row.remote_access_duration_minutes ?? null,
+    rating: row.rating ?? null,
+    feedback: row.feedback ?? null,
+    ratedAt: row.rated_at ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -179,6 +182,38 @@ router.post(
       });
       const row = await getTicketOr404(db, ticketId);
       res.status(201).json({ data: mapTicketRow(row), requestId: req.requestId });
+    } catch (err) { next(err); }
+  }
+);
+
+router.post(
+  '/tickets/:id/rating',
+  authenticatePlatformUser,
+  requirePlatformPermission(['platform.support.update']),
+  async (req, res, next) => {
+    try {
+      const db = getDb();
+      const ticket = await getTicketOr404(db, req.params.id);
+      if (!ticket) return res.status(404).json({ error: 'Ticket not found' });
+      if (!(await assertTenantAccess(req, res, ticket.tenant_id))) return;
+      const rating = Number(req.body?.rating);
+      if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
+        return res.status(400).json({ error: 'rating must be an integer between 1 and 5' });
+      }
+      const feedback = req.body?.feedback !== undefined ? String(req.body.feedback) : null;
+      const now = nowIso();
+      await db.run(
+        'UPDATE platform_support_tickets SET rating = ?, feedback = ?, rated_at = ?, updated_at = ? WHERE id = ?',
+        [rating, feedback, now, now, ticket.id]
+      );
+      await recordAuditEvent({
+        actorId: req.platformUser?.id, actorName: req.platformUser?.full_name, tenantId: ticket.tenant_id,
+        action: 'SUPPORT_TICKET_RATED', resourceType: 'platform_support_tickets', resourceId: ticket.id,
+        afterData: { rating, feedback },
+        ipAddress: req.ip, userAgent: req.headers['user-agent'],
+      });
+      const row = await getTicketOr404(db, ticket.id);
+      res.json({ data: mapTicketRow(row), requestId: req.requestId });
     } catch (err) { next(err); }
   }
 );

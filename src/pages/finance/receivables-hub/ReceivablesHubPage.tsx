@@ -6,6 +6,7 @@ import { getHubTabOrder, resolveHubTabLabel } from '../../../config/activityHubT
 import { isActivityPathHidden } from '../../../config/activityPageVisibility';
 import { getEffectiveBusinessType } from '../../../services/domains/config/BusinessTypeService';
 import { useActivityPageCopy } from '../../../hooks/domains/config/useBusinessTerm';
+import { usePageAccess } from '../../../hooks/domains/licensing/usePageAccess';
 import { PageHeader } from '../../../components/ui/PageHeader';
 
 const DebtsDashboardPage = lazy(() => import('../debts-dashboard/DebtsDashboardPage').then(m => ({ default: m.DebtsDashboardPage })));
@@ -25,13 +26,29 @@ const tabs = [
 ] as const;
 type TabId = (typeof tabs)[number]['id'];
 
+// تبويبات المركز ↔ أقسام مصفوفة الصلاحيات الدقيقة لصفحة /finance/receivables —
+// قيود المنصة المركزية (disabledPermissions / featurePermissions) تخفي القسم
+// حتى لو كان مسار وجهته مستقلاً متاحاً.
+const TAB_SECTION_CODE: Record<TabId, string> = {
+  debts: 'ui.finance.receivables.section.debts.view',
+  other: 'ui.finance.receivables.section.other.view',
+  installments: 'ui.finance.receivables.section.installments.view',
+  'follow-up': 'ui.finance.receivables.section.follow_up.view',
+};
+
 export const ReceivablesHubPage: React.FC<{ initialTab?: TabId }> = ({ initialTab }) => {
   const [params, setParams] = useSearchParams();
   const canAccess = useRouteAccess();
   const pageCopy = useActivityPageCopy('finance');
+  const pageAccess = usePageAccess('/finance/receivables');
   const allowedTabs = useMemo(() => {
     const businessType = getEffectiveBusinessType();
-    const permitted = tabs.filter((item) => item.path !== null && canAccess(item.path) && !isActivityPathHidden(item.path, businessType));
+    const permitted = tabs.filter((item) =>
+      item.path !== null
+      && canAccess(item.path)
+      && !isActivityPathHidden(item.path, businessType)
+      && pageAccess.allows(TAB_SECTION_CODE[item.id])
+    );
     const followUpAllowed = permitted.some((item) => item.id === 'debts' || item.id === 'installments');
     const allowed = tabs
       .filter((item) =>
@@ -46,7 +63,7 @@ export const ReceivablesHubPage: React.FC<{ initialTab?: TabId }> = ({ initialTa
       const rb = rank.get(b.id) ?? order.length;
       return ra === rb ? 0 : ra - rb;
     });
-  }, [canAccess]);
+  }, [canAccess, pageAccess]);
   const requested = params.get('tab') as TabId | null;
   const requestedTab = requested ?? initialTab ?? null;
   const tab: TabId | null = allowedTabs.some(item => item.id === requestedTab)

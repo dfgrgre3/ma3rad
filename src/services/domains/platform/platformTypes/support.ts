@@ -17,6 +17,7 @@ export interface PlatformSupportTicket {
   firstRespondedAt?: string | null;
   rating?: number | null;
   feedback?: string | null;
+  ratedAt?: string | null;
   resolvedAt?: string | null;
   createdAt: string;
   updatedAt: string;

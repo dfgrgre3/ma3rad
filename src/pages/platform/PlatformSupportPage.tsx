@@ -306,10 +306,6 @@ export const PlatformSupportPage: React.FC = () => {
   };
 
   // Remote Access Toggle / Approve
-  const centralOnlyLocal = (feature: string) => {
-    toast.warning(`${feature} غير متاح في الوضع المركزي بعد — متاح على المصدر المحلي فقط.`);
-  };
-
   const handleToggleRemoteRequest = async (requested: boolean) => {
     if (!canManageSupport) { toast.warning('لا تملك صلاحية إدارة الدعم'); return; }
     if (!selectedTicketId) return;
@@ -431,8 +427,17 @@ export const PlatformSupportPage: React.FC = () => {
   // Rate Ticket
   const handleRateTicket = () => {
     if (!canManageSupport) { toast.warning('لا تملك صلاحية إدارة الدعم'); return; }
-    if (centralActive) { centralOnlyLocal('تقييم التذاكر'); return; }
     if (!selectedTicketId) return;
+    if (centralActive) {
+      centralPlatformClient.rateSupportTicket(selectedTicketId, ratingStars, ratingFeedback.trim() || undefined)
+        .then(() => {
+          setIsRateModalOpen(false);
+          loadTicketDetails(selectedTicketId);
+          loadTickets();
+        })
+        .catch((err) => toast.error(err instanceof Error ? err.message : 'تعذر تقييم التذكرة.'));
+      return;
+    }
     try {
       platformAdminService.rateSupportTicket(selectedTicketId, ratingStars, ratingFeedback);
       setIsRateModalOpen(false);

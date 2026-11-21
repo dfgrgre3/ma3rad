@@ -396,12 +396,20 @@ export const PlatformStaffPage: React.FC = () => {
             isActive: formData.isActive,
           });
         } else {
-          await centralPlatformClient.createAdminControlStaff({
+          const created = await centralPlatformClient.createAdminControlStaff({
             fullName: formData.fullName.trim(),
             email: formData.email.trim(),
             phone: formData.phone?.trim() || undefined,
             role: formData.role,
           });
+          const tempPassword = (created as any)?.temporaryPassword;
+          if (tempPassword) {
+            toast.warning(`تم إنشاء الموظف. كلمة المرور المؤقتة: ${tempPassword} — سيُطلب تغييرها عند أول دخول.`);
+            setIsFormOpen(false);
+            loadStaff();
+            loadMfa();
+            return;
+          }
         }
       } else if (editingStaff) {
         platformAdminService.updatePlatformStaff(editingStaff.id, formData);

@@ -11,6 +11,7 @@ import type {
   PlatformLicense,
   PlatformLicenseStatus,
   PlatformLicenseActivation,
+  PlatformLicenseChange,
   PlatformDevice,
 } from '../platformTypes';
 
@@ -89,11 +90,20 @@ export interface ModulesLicensesApi {
   getLicense(id: string): PlatformLicense | null;
   issueLicense(tenantId: string, planId: string, options?: any): PlatformLicense;
   renewLicense(id: string, months?: number): PlatformLicense;
+  updateLicense(id: string, fields: {
+    seats?: number;
+    deviceLimit?: number;
+    branchesLimit?: number;
+    offlineGracePeriodDays?: number;
+    notes?: string | null;
+    couplingMode?: PlatformLicense['couplingMode'];
+  }): PlatformLicense;
   setLicenseStatus(id: string, status: PlatformLicenseStatus): void;
   setLicenseCouplingMode(id: string, couplingMode: PlatformLicense['couplingMode']): PlatformLicense;
   bindLicenseHardware(id: string, hardwareId: string): void;
   deactivateLicenseDevice(id: string, notes?: string): void;
   listLicenseActivations(licenseId: string): PlatformLicenseActivation[];
+  listLicenseChanges(licenseId: string): PlatformLicenseChange[];
   listDevices(tenantId?: string): PlatformDevice[];
   registerDevice(input: {
     licenseId: string;
@@ -260,6 +270,17 @@ export function createModulesLicensesApi(): ModulesLicensesApi {
       return platformLicenseService.renewLicense(id, months);
     },
 
+    updateLicense(id: string, fields: {
+      seats?: number;
+      deviceLimit?: number;
+      branchesLimit?: number;
+      offlineGracePeriodDays?: number;
+      notes?: string | null;
+      couplingMode?: PlatformLicense['couplingMode'];
+    }) {
+      return platformLicenseService.updateLicense(id, fields);
+    },
+
     setLicenseStatus(id: string, status: PlatformLicenseStatus) {
       platformLicenseService.setLicenseStatus(id, status);
     },
@@ -278,6 +299,10 @@ export function createModulesLicensesApi(): ModulesLicensesApi {
 
     listLicenseActivations(licenseId: string) {
       return platformLicenseService.listLicenseActivations(licenseId);
+    },
+
+    listLicenseChanges(licenseId: string) {
+      return platformLicenseService.listLicenseChanges(licenseId);
     },
 
     listDevices(tenantId?: string) {

@@ -53,8 +53,11 @@ export const UserModal: React.FC<UserModalProps> = ({
           <Field label="الهاتف">
             <input className={inputClass} dir="ltr" value={userForm.phone} onChange={(event) => setUserForm({ ...userForm, phone: event.target.value })} />
           </Field>
-          <Field label="الدور">
-            <input className={inputClass} value={userForm.role} onChange={(event) => setUserForm({ ...userForm, role: event.target.value })} placeholder="ADMIN / CASHIER / USER" />
+          <Field label="الدور" hint="اختر دوراً شائعاً أو اكتب دوراً مخصصاً">
+            <input className={inputClass} list="tenant-user-roles" value={userForm.role} onChange={(event) => setUserForm({ ...userForm, role: event.target.value })} placeholder="ADMIN / CASHIER / USER" />
+            <datalist id="tenant-user-roles">
+              {['ADMIN', 'MANAGER', 'CASHIER', 'ACCOUNTANT', 'SALES', 'USER'].map((role) => <option key={role} value={role} />)}
+            </datalist>
           </Field>
           <Field label="الحالة">
             <select className={inputClass} value={userForm.status} onChange={(event) => setUserForm({ ...userForm, status: event.target.value })}>

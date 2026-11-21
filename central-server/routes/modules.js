@@ -9,14 +9,18 @@
  * device run code it did not build. The server's job is entitlement — a device
  * only sees and can only download modules its tenant's plan/license includes.
  *
- * Layout: <dir>/<moduleId>/<version>/{manifest.json,manifest.sig,files/assets/*}
+ * Layout: <dir>/<packageId>/<version>/{manifest.json,manifest.sig,files/assets/*}
+ * A packageId is either a business module id (module-shared chunks, legacy
+ * packages) or a page package id (`pg-…`). Manifests may carry `modules` +
+ * `pages` metadata; visibility (allowed modules ∩ not-all-pages-hidden) is
+ * resolved per device through lib/tenantVisibility.
  */
 
 const express = require('express');
 const fs = require('node:fs');
 const path = require('node:path');
 const { getDb } = require('../lib/db');
-const { resolveDeviceEntitlements } = require('../lib/entitlements');
+const { resolveTenantVisibility, isPackageVisible } = require('../lib/tenantVisibility');
 const { authenticateDevice } = require('../lib/deviceAuth');
 
 const router = express.Router();
@@ -70,6 +74,17 @@ function listVersions(moduleId) {
   }
 }
 
+/** Every package id (directory) published under the packages root. */
+function listPackageIds() {
+  try {
+    return fs.readdirSync(packagesDir(), { withFileTypes: true })
+      .filter((entry) => entry.isDirectory() && MODULE_ID_PATTERN.test(entry.name))
+      .map((entry) => entry.name);
+  } catch {
+    return [];
+  }
+}
+
 // Device identity — X-Device-Id + X-Device-Credential verified against the
 // enrolled credential hash (shared with the other device channels).
 
@@ -81,15 +96,18 @@ router.get('/catalog', authenticateDevice, async (req, res, next) => {
   try {
     const buildId = String(req.query.buildId || '');
     if (!BUILD_ID_PATTERN.test(buildId)) return res.status(400).json({ error: 'buildId is required' });
-    const { allowedModuleIds } = await resolveDeviceEntitlements(getDb(), req.device);
+    // Same visibility inputs as the signed tenant configuration: a package is
+    // offered only when one of its modules is allowed AND not every route it
+    // serves is hidden — so files of hidden pages never reach the device.
+    const visibility = await resolveTenantVisibility(getDb(), req.device);
     const modules = [];
-    for (const moduleId of new Set(allowedModuleIds)) {
-      if (!MODULE_ID_PATTERN.test(moduleId)) continue;
-      const version = listVersions(moduleId).reverse()
-        .find((candidate) => readPackage(moduleId, candidate)?.manifest.buildId === buildId);
+    for (const packageId of listPackageIds()) {
+      const version = listVersions(packageId).reverse()
+        .find((candidate) => readPackage(packageId, candidate)?.manifest.buildId === buildId);
       if (!version) continue;
-      const pkg = readPackage(moduleId, version);
-      modules.push({ moduleId, version, manifest: pkg.manifest, signature: pkg.signature });
+      const pkg = readPackage(packageId, version);
+      if (!isPackageVisible(pkg.manifest, visibility)) continue;
+      modules.push({ moduleId: packageId, version, manifest: pkg.manifest, signature: pkg.signature });
     }
     res.json({ data: { modules }, requestId: req.requestId });
   } catch (err) { next(err); }
@@ -102,13 +120,14 @@ router.get('/:moduleId/:version/files/:name', authenticateDevice, async (req, re
     if (!MODULE_ID_PATTERN.test(moduleId) || !VERSION_PATTERN.test(version) || !FILE_NAME_PATTERN.test(name)) {
       return res.status(400).json({ error: 'Invalid module file request' });
     }
-    const { allowedModuleIds } = await resolveDeviceEntitlements(getDb(), req.device);
-    if (!allowedModuleIds.includes(moduleId)) {
+    const pkg = readPackage(moduleId, version);
+    if (!pkg) return res.status(404).json({ error: 'Module file not found' });
+    const visibility = await resolveTenantVisibility(getDb(), req.device);
+    if (!isPackageVisible(pkg.manifest, visibility)) {
       return res.status(403).json({ error: 'This module is not included in your plan' });
     }
-    const pkg = readPackage(moduleId, version);
-    const listed = pkg?.manifest.files?.some((file) => file.path === `assets/${name}`);
-    if (!pkg || !listed) return res.status(404).json({ error: 'Module file not found' });
+    const listed = pkg.manifest.files?.some((file) => file.path === `assets/${name}`);
+    if (!listed) return res.status(404).json({ error: 'Module file not found' });
     const filePath = path.join(pkg.dir, 'files', 'assets', name);
     res.setHeader('Content-Type', 'application/octet-stream');
     res.setHeader('Cache-Control', 'private, no-store');

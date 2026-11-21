@@ -51,6 +51,7 @@ test('permission-guarded routes declare at least one permission code', () => {
     '/api/v1/admin/auth/mfa/disable',
     // Device-authenticated client endpoints (no platform staff session).
     '/api/v1/telemetry/errors',
+    '/api/v1/telemetry/metrics',
     '/api/v1/releases',
     '/api/v1/configuration/current',
     '/api/v1/device/backups',
@@ -58,6 +59,10 @@ test('permission-guarded routes declare at least one permission code', () => {
     '/api/v1/device/backups/upload',
     '/api/v1/device/backups/:id/download',
     '/api/v1/device/backups/:id/restore-result',
+    // Device-authenticated tenant-identity provisioning channel.
+    '/api/v1/device/provisioning/pending',
+    '/api/v1/device/provisioning/:jobId/result',
+    '/api/v1/device/tenant-users/report',
     '/api/v1/modules/catalog',
     '/api/v1/modules/:moduleId/:version/files/:name',
     // Device licensing endpoints authenticate via the activation-issued
@@ -65,6 +70,13 @@ test('permission-guarded routes declare at least one permission code', () => {
     '/api/v1/licensing/activate',
     '/api/v1/licensing/validate',
     '/api/v1/licensing/heartbeat',
+    // Tenant-facing API — authenticated by tenant-scoped API keys.
+    '/api/v1/tenant/v1/me',
+    '/api/v1/tenant/v1/subscription',
+    '/api/v1/tenant/v1/licenses',
+    '/api/v1/tenant/v1/usage',
+    '/api/v1/tenant/v1/devices',
+    '/api/v1/tenant/v1/entitlements',
   ]);
 
   for (const entry of ROUTE_MANIFEST) {

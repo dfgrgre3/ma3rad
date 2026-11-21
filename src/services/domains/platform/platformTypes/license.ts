@@ -49,6 +49,33 @@ export interface PlatformLicenseActivation {
   createdAt: string;
 }
 
+export type PlatformLicenseChangeType =
+  | 'ISSUE'
+  | 'RENEW'
+  | 'SUSPEND'
+  | 'REVOKE'
+  | 'TRANSFER'
+  | 'MODULE_CHANGE'
+  | 'LIMIT_CHANGE'
+  | 'COUPLING_CHANGE'
+  | 'STATUS_CHANGE'
+  | 'UPDATE'
+  | 'REACTIVATE'
+  | 'UNBIND';
+
+export interface PlatformLicenseChange {
+  id: string;
+  licenseId: string;
+  subscriptionId?: string | null;
+  changeType: PlatformLicenseChangeType;
+  oldValues?: Record<string, unknown> | null;
+  newValues?: Record<string, unknown> | null;
+  actorId?: string | null;
+  actorName?: string | null;
+  reason?: string | null;
+  createdAt: string;
+}
+
 export interface PlatformDevice {
   id: string;
   tenantId: string;
@@ -58,7 +85,7 @@ export interface PlatformDevice {
   os?: string | null;
   appVersion?: string | null;
   ipAddress?: string | null;
-  status: 'ACTIVE' | 'SUSPENDED' | 'REVOKED' | 'OFFLINE';
+  status: 'ACTIVE' | 'SUSPENDED' | 'REVOKED' | 'OFFLINE' | 'RELEASED' | 'INACTIVE';
   firstActivatedAt: string;
   lastSeenAt?: string | null;
   cloneSuspected: boolean;

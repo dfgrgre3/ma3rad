@@ -10,16 +10,22 @@ import { TransferDetailsModal } from './components/TransferDetailsModal';
 import { useStockTransfers } from '../../../hooks/pages/inventory/stock-transfers/useStockTransfers';
 import { AuthService } from '../../../services/domains/auth/AuthService';
 import { PermissionService } from '../../../services/domains/auth/PermissionService';
+import { usePageAccess } from '../../../hooks/domains/licensing/usePageAccess';
 import type { StockTransferTab } from '../../../types/inventory/stockTransfers';
 
 export const StockTransfersPage: React.FC = () => {
   const actor = AuthService.getCurrentUser();
-  const canCreateTransfer = PermissionService.can(actor, 'inventory.transfer');
-  const canApprove = PermissionService.can(actor, 'inventory.transfer.workflow.approve');
-  const canExecute = PermissionService.can(actor, 'inventory.transfer.execute');
-  const canReceive = PermissionService.can(actor, 'inventory.transfer.receive');
+  // قيود أقسام التحويلات من المنصة المركزية — طبقة إضافية فوق صلاحيات الدور.
+  const pageAccess = usePageAccess('/inventory/transfers');
+  const canViewTransferList = pageAccess.allows('ui.inventory.transfers.section.list.view');
+  const canManageTransferItems = pageAccess.allows('ui.inventory.transfers.section.items.manage');
+  const canViewApprovals = pageAccess.allows('ui.inventory.transfers.section.approvals.view');
+  const canCreateTransfer = PermissionService.can(actor, 'inventory.transfer') && canManageTransferItems;
+  const canApprove = PermissionService.can(actor, 'inventory.transfer.workflow.approve') && canViewApprovals;
+  const canExecute = PermissionService.can(actor, 'inventory.transfer.execute') && canViewApprovals;
+  const canReceive = PermissionService.can(actor, 'inventory.transfer.receive') && canManageTransferItems;
   // ملخص أرصدة المخازن صلاحية عرض مخزون — منفصلة عن صلاحيات تنفيذ التحويلات.
-  const canViewSummary = PermissionService.can(actor, 'inventory.view');
+  const canViewSummary = PermissionService.can(actor, 'inventory.view') && canViewTransferList;
   const {
     activeTab,
     setActiveTab,
@@ -63,7 +69,12 @@ export const StockTransfersPage: React.FC = () => {
     handleViewDetails,
   } = useStockTransfers();
 
-  const viewTab: StockTransferTab = activeTab === 'summary' && !canViewSummary ? 'history' : activeTab;
+  const viewTab: StockTransferTab =
+    (activeTab === 'summary' && !canViewSummary)
+      ? (canViewTransferList ? 'history' : 'summary')
+      : (!canViewTransferList && (activeTab === 'workflow' || activeTab === 'history'))
+        ? (canViewSummary ? 'summary' : 'history')
+        : activeTab;
 
   return (
     <div className="h-full flex flex-col bg-surface-muted text-ink overflow-hidden">
@@ -82,6 +93,7 @@ export const StockTransfersPage: React.FC = () => {
         statusFilter={statusFilter}
         onStatusFilterChange={setStatusFilter}
         canViewSummary={canViewSummary}
+        canViewList={canViewTransferList}
       />
 
       <div className="flex-1 overflow-auto p-6">

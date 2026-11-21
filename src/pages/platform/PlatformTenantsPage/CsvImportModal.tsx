@@ -54,14 +54,14 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({
               <p className="px-3 py-2 text-[10.5px] font-semibold text-ink bg-surface-muted border-b">معاينة أول 5 أسطر:</p>
                             <DataTable
                 ariaLabel="معاينة استيراد CSV"
-                rows={csvPreview.slice(1)}
-                rowKey={(row) => row.join('¦')}
+                rows={csvPreview.slice(1).map((cells, index) => ({ cells, index }))}
+                rowKey={(row) => `preview-${row.index}`}
                 minWidth={600}
                 dense
                 columns={csvPreview[0].map((h, i) => ({
                   key: `col-${i}`,
                   header: h || `عمود ${i + 1}`,
-                  render: (row: string[]) => <span className="text-[10.5px]">{row[i] ?? ''}</span>,
+                  render: (row: { cells: string[]; index: number }) => <span className="text-[10.5px]">{row.cells[i] ?? ''}</span>,
                 }))}
               />
             </div>

@@ -15,7 +15,7 @@ import { PLATFORM_TENANT_STATUS_LABELS } from '../../../services/domains/platfor
 import { Button } from '../../../components/ui/Button';
 import { Modal } from '../../../components/ui/Modal';
 import { Field, StatusBadge, Toggle, formatMoney, inputClass } from '../components/PlatformUI';
-import { STATUSES, type NewAccountForm } from './constants';
+import { STATUSES, isValidEmail, type NewAccountForm } from './constants';
 
 interface TenantFormModalProps {
   open: boolean;
@@ -42,8 +42,6 @@ const STEPS: WizardStep[] = [
 
 const ACCOUNT_STEP: WizardStep = { key: 'account', label: 'حساب الدخول', icon: <KeyRound className="h-4 w-4" /> };
 
-const isValidEmail = (email?: string) => !email || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-
 /** Clamp a numeric limit input: finite, integer, minimum 1 (NaN-safe). */
 const clampLimit = (raw: string): number => {
   const n = Number(raw);
@@ -51,7 +49,7 @@ const clampLimit = (raw: string): number => {
 };
 
 const StepIndicator: React.FC<{ step: number; steps: WizardStep[]; onSelect?: (index: number) => void }> = ({ step, steps, onSelect }) => (
-  <div className="mb-5">
+  <div className="mb-5 rounded-2xl border border-line/70 bg-surface-muted/50 px-4 py-3">
     <ol className="flex items-center gap-1.5 sm:gap-2">
       {steps.map((item, index) => {
         const done = index < step;
@@ -66,10 +64,10 @@ const StepIndicator: React.FC<{ step: number; steps: WizardStep[]; onSelect?: (i
                 disabled={!onSelect || !done}
                 className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-[11px] font-black transition ${
                   done
-                    ? 'border-success bg-success text-white'
+                    ? 'border-success bg-success text-white shadow-sm'
                     : active
-                      ? 'border-success bg-success-soft text-success'
-                      : 'border-line bg-surface-muted text-muted'
+                      ? 'border-success bg-success-soft text-success ring-2 ring-success/25'
+                      : 'border-line bg-surface text-muted'
                 } ${done && onSelect ? 'cursor-pointer hover:bg-success' : 'cursor-default'}`}
                 aria-current={active ? 'step' : undefined}
               >
@@ -251,9 +249,9 @@ const ReviewStep: React.FC<{
 
   return (
     <div className="space-y-4">
-      <div className="overflow-hidden rounded-xl border border-line">
+      <div className="overflow-hidden rounded-2xl border border-line">
         {rows.map(([label, value], index) => (
-          <div key={label} className={`flex items-center justify-between gap-3 px-4 py-2.5 text-[12px] ${index % 2 === 0 ? 'bg-surface-muted/60' : 'bg-surface'}`}>
+          <div key={label} className={`flex items-center justify-between gap-3 px-4 py-2.5 text-[12px] ${index % 2 === 0 ? 'bg-surface-muted/50' : 'bg-surface'}`}>
             <span className="font-semibold text-muted">{label}</span>
             <span className="text-left font-bold text-ink">{value}</span>
           </div>
@@ -451,13 +449,13 @@ export const TenantFormModal: React.FC<TenantFormModalProps> = ({
             </select>
           </Field>
           <Field label="حد المستخدمين">
-            <input type="number" min={1} className={inputClass} value={form.seatsLimit ?? 1} onChange={(event) => setForm({ ...form, seatsLimit: Number(event.target.value) })} />
+            <input type="number" min={1} className={inputClass} value={form.seatsLimit ?? 1} onChange={(event) => setForm({ ...form, seatsLimit: clampLimit(event.target.value) })} />
           </Field>
           <Field label="حد الفروع">
-            <input type="number" min={1} className={inputClass} value={form.branchesLimit ?? 1} onChange={(event) => setForm({ ...form, branchesLimit: Number(event.target.value) })} />
+            <input type="number" min={1} className={inputClass} value={form.branchesLimit ?? 1} onChange={(event) => setForm({ ...form, branchesLimit: clampLimit(event.target.value) })} />
           </Field>
           <Field label="حد الأجهزة">
-            <input type="number" min={1} className={inputClass} value={form.devicesLimit ?? 1} onChange={(event) => setForm({ ...form, devicesLimit: Number(event.target.value) })} />
+            <input type="number" min={1} className={inputClass} value={form.devicesLimit ?? 1} onChange={(event) => setForm({ ...form, devicesLimit: clampLimit(event.target.value) })} />
           </Field>
           <Field label="ملاحظات" className="sm:col-span-2">
             <textarea rows={3} className={inputClass} value={form.notes ?? ''} onChange={(event) => setForm({ ...form, notes: event.target.value })} />

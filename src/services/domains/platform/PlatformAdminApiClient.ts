@@ -18,6 +18,7 @@ import { createOperationsApi, type OperationsApi } from './PlatformAdminApiClien
 import { createSupportApi, type SupportApi } from './PlatformAdminApiClient/support';
 import { createSettingsApi, type SettingsApi } from './PlatformAdminApiClient/settings';
 import { createTenantExperienceApi, type TenantExperienceApi } from './PlatformAdminApiClient/tenantExperience';
+import { createPoliciesApi, type PoliciesApi } from './PlatformAdminApiClient/policies';
 
 // Re-export all public types/helpers so existing imports keep working.
 export {
@@ -35,6 +36,8 @@ export type {
   PlatformAuditPage,
   PlatformAuditVerification,
   TenantFeaturePermissions,
+  EffectiveTenantFeaturePermissions,
+  TenantPermissionLimit,
   PlatformRoleSummary,
 } from './PlatformAdminApiClient/core';
 
@@ -50,7 +53,8 @@ export interface PlatformAdminApiClient
     OperationsApi,
     SupportApi,
     SettingsApi,
-    TenantExperienceApi {}
+    TenantExperienceApi,
+    PoliciesApi {}
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- intentional class/interface merge to re-attach split method groups
 export class PlatformAdminApiClient {
@@ -186,7 +190,8 @@ Object.assign(
   createOperationsApi(),
   createSupportApi(),
   createSettingsApi(),
-  createTenantExperienceApi()
+  createTenantExperienceApi(),
+  createPoliciesApi()
 );
 
 export const platformAdminApiClient = new PlatformAdminApiClient();

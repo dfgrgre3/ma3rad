@@ -27,7 +27,7 @@ const JS = Buffer.from('export default 1;');
 let server;
 const devices = {};
 
-function writePackage(moduleId, version, buildId) {
+function writePackage(moduleId, version, buildId, meta = {}) {
   const dir = path.join(packagesDir, moduleId, version);
   fs.mkdirSync(path.join(dir, 'files', 'assets'), { recursive: true });
   fs.writeFileSync(path.join(dir, 'files', 'assets', 'Page-1.js'), JS);
@@ -36,6 +36,8 @@ function writePackage(moduleId, version, buildId) {
     formatVersion: 1, moduleId, version, buildId,
     files: [{ path: 'assets/Page-1.js', sha256: crypto.createHash('sha256').update(JS).digest('hex'), size: JS.length }],
   };
+  if (meta.modules) manifest.modules = meta.modules;
+  if (meta.pages) manifest.pages = meta.pages;
   fs.writeFileSync(path.join(dir, 'manifest.json'), JSON.stringify(manifest));
   fs.writeFileSync(path.join(dir, 'manifest.sig'), 'c2lnbmF0dXJl');
 }
@@ -56,6 +58,7 @@ before(async () => {
   for (const [tenant, code, hwId, modules] of [
     ['tnt_hr', 'MDH', 'hw-hr', ['hr']],
     ['tnt_none', 'MDN', 'hw-none', []],
+    ['tnt_sales', 'MDS', 'hw-sales', ['sales']],
   ]) {
     await db.run(
       `INSERT INTO platform_tenants (id, code, name, status, created_at, updated_at) VALUES (?, ?, ?, 'ACTIVE', ?, ?)`,
@@ -87,11 +90,21 @@ before(async () => {
   await db.run(
     `INSERT INTO platform_tenant_overrides (id, tenant_id, kind, code, is_enabled) VALUES ('ov_tnt_nohash_hr', 'tnt_nohash', 'MODULE', 'hr', 1)`
   );
+  // tnt_sales hides /secret through its tenant feature config: page packages
+  // serving only hidden routes must never be offered or downloadable.
+  await db.run(
+    `INSERT INTO tenant_feature_config (tenant_id, plan_id, hidden_menus, disabled_permissions, feature_permissions, updated_at)
+     VALUES ('tnt_sales', NULL, '["/secret"]', '[]', '[]', ?)`,
+    [now]
+  );
   devices.tnt_nohash = 'hw-nohash';
   writePackage('hr', '1.0.0', BUILD_ID);
   writePackage('hr', '1.2.0', BUILD_ID);
   writePackage('hr', '1.10.0', OTHER_BUILD);
   writePackage('manufacturing', '1.0.0', BUILD_ID);
+  writePackage('pg-sales-orders', '1.0.0', BUILD_ID, { modules: ['sales'], pages: ['/orders'] });
+  writePackage('pg-sales-secret', '1.0.0', BUILD_ID, { modules: ['sales'], pages: ['/secret'] });
+  writePackage('sales', '1.0.0', BUILD_ID, { modules: ['sales'], pages: ['/orders', '/returns'] });
 });
 
 after(async () => {
@@ -153,4 +166,23 @@ test('unsafe file names are rejected before touching the disk', async () => {
     const res = await raw(`/api/v1/modules/hr/1.2.0/files/${name}`, devices.tnt_hr);
     assert.ok([400, 404].includes(res.status), `${name} → ${res.status}`);
   }
+});
+
+test('page packages follow tenant page visibility: hidden pages are never offered or downloadable', async () => {
+  const res = await raw(`/api/v1/modules/catalog?buildId=${BUILD_ID}`, devices.tnt_sales);
+  assert.equal(res.status, 200);
+  const { modules } = (await res.json()).data;
+  const ids = modules.map((m) => m.moduleId).sort();
+  // The package serving only the hidden /secret page is absent; the visible
+  // page package and the module-shared package (still needed by /orders) stay.
+  assert.deepEqual(ids, ['pg-sales-orders', 'sales']);
+
+  // File endpoint applies the same rule independently of the catalog.
+  assert.equal((await raw('/api/v1/modules/pg-sales-orders/1.0.0/files/Page-1.js', devices.tnt_sales)).status, 200);
+  assert.equal((await raw('/api/v1/modules/sales/1.0.0/files/Page-1.js', devices.tnt_sales)).status, 200);
+  assert.equal((await raw('/api/v1/modules/pg-sales-secret/1.0.0/files/Page-1.js', devices.tnt_sales)).status, 403);
+
+  // A tenant without the sales module cannot reach any of its packages.
+  assert.equal((await raw('/api/v1/modules/pg-sales-orders/1.0.0/files/Page-1.js', devices.tnt_hr)).status, 403);
+  assert.equal((await raw('/api/v1/modules/pg-sales-secret/1.0.0/files/Page-1.js', devices.tnt_hr)).status, 403);
 });

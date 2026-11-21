@@ -1,5 +1,46 @@
-// Operations endpoints: backups (central + app), ops jobs, tenant usage and releases.
+// Operations endpoints: backups (central + app), ops jobs, tenant usage,
+// maintenance windows and releases (+ per-release targets).
 import type { PlatformAdminApiCore } from './core';
+import type {
+  PlatformMaintenanceWindow,
+  PlatformMaintenanceStatus,
+  PlatformReleaseTarget,
+} from '../platformTypes';
+
+/** Map a central maintenance-window row (camelCase per contract; snake_case tolerated) to the UI type. */
+function mapMaintenanceWindow(row: any): PlatformMaintenanceWindow {
+  const services = row.affectedServices ?? row.affected_services;
+  return {
+    id: String(row.id ?? ''),
+    title: String(row.title ?? ''),
+    description: row.description ?? undefined,
+    startsAt: String(row.startsAt ?? row.starts_at ?? ''),
+    endsAt: String(row.endsAt ?? row.ends_at ?? ''),
+    affectedServices: Array.isArray(services) ? services.map(String).filter(Boolean) : [],
+    status: String(row.status ?? 'SCHEDULED') as PlatformMaintenanceStatus,
+    createdBy: String(row.createdBy ?? row.created_by ?? ''),
+    createdAt: String(row.createdAt ?? row.created_at ?? ''),
+  };
+}
+
+/** Map a central release-target row to the UI type. */
+function mapReleaseTarget(row: any): PlatformReleaseTarget {
+  return {
+    id: String(row.id ?? ''),
+    releaseId: String(row.releaseId ?? row.release_id ?? ''),
+    tenantId: String(row.tenantId ?? row.tenant_id ?? ''),
+    tenantName: row.tenantName ?? row.tenant_name ?? null,
+    deviceId: row.deviceId ?? row.device_id ?? null,
+    clientVersion: row.clientVersion ?? row.client_version ?? null,
+    attemptCount: Number(row.attemptCount ?? row.attempt_count ?? 0) || 0,
+    status: String(row.status ?? 'PENDING'),
+    appliedAt: row.appliedAt ?? row.applied_at ?? null,
+    error: row.error ?? null,
+    deployedAt: row.deployedAt ?? row.deployed_at ?? null,
+    createdAt: String(row.createdAt ?? row.created_at ?? ''),
+    updatedAt: String(row.updatedAt ?? row.updated_at ?? ''),
+  };
+}
 
 export interface OperationsApi {
   listBackups(this: PlatformAdminApiCore, filters?: { tenantId?: string; status?: string; type?: string; q?: string }): Promise<any[]>;
@@ -24,6 +65,12 @@ export interface OperationsApi {
   publishRelease(this: PlatformAdminApiCore, id: string): Promise<any>;
   rollbackRelease(this: PlatformAdminApiCore, id: string): Promise<any>;
   deleteRelease(this: PlatformAdminApiCore, id: string): Promise<any>;
+  listMaintenanceWindows(this: PlatformAdminApiCore, filters?: { status?: string }): Promise<PlatformMaintenanceWindow[]>;
+  createMaintenanceWindow(this: PlatformAdminApiCore, input: { title: string; description?: string; startsAt: string; endsAt: string; affectedServices?: string[] }): Promise<PlatformMaintenanceWindow>;
+  cancelMaintenanceWindow(this: PlatformAdminApiCore, id: string): Promise<PlatformMaintenanceWindow>;
+  listReleaseTargets(this: PlatformAdminApiCore, releaseId: string): Promise<PlatformReleaseTarget[]>;
+  setReleaseTargets(this: PlatformAdminApiCore, releaseId: string, tenantIds: string[]): Promise<PlatformReleaseTarget[]>;
+  setReleaseTargetStatus(this: PlatformAdminApiCore, releaseId: string, tenantId: string, status: PlatformReleaseTarget['status'], error?: string): Promise<PlatformReleaseTarget>;
 }
 
 export function createOperationsApi(): OperationsApi {
@@ -187,6 +234,51 @@ export function createOperationsApi(): OperationsApi {
 
     async deleteRelease(this: PlatformAdminApiCore, id: string) {
       return this.request<any>({ path: `/api/v1/admin/releases/${encodeURIComponent(id)}`, method: 'DELETE' });
+    },
+
+    // ── Maintenance windows ──────────────────────────────────────────────────
+
+    async listMaintenanceWindows(this: PlatformAdminApiCore, filters: { status?: string } = {}) {
+      const params: Record<string, string> = {};
+      if (filters.status) params.status = filters.status;
+      const qs = new URLSearchParams(params).toString();
+      const rows = await this.request<any[]>({ path: `/api/v1/admin/operations/maintenance-windows${qs ? `?${qs}` : ''}`, method: 'GET' });
+      return (Array.isArray(rows) ? rows : []).map(mapMaintenanceWindow);
+    },
+
+    async createMaintenanceWindow(this: PlatformAdminApiCore, input: { title: string; description?: string; startsAt: string; endsAt: string; affectedServices?: string[] }) {
+      const row = await this.request<any>({ path: '/api/v1/admin/operations/maintenance-windows', method: 'POST', body: input });
+      return mapMaintenanceWindow(row ?? {});
+    },
+
+    async cancelMaintenanceWindow(this: PlatformAdminApiCore, id: string) {
+      const row = await this.request<any>({ path: `/api/v1/admin/operations/maintenance-windows/${encodeURIComponent(id)}/cancel`, method: 'POST' });
+      return mapMaintenanceWindow(row ?? {});
+    },
+
+    // ── Release targets (per-tenant rollout tracking) ───────────────────────
+
+    async listReleaseTargets(this: PlatformAdminApiCore, releaseId: string) {
+      const rows = await this.request<any[]>({ path: `/api/v1/admin/releases/${encodeURIComponent(releaseId)}/targets`, method: 'GET' });
+      return (Array.isArray(rows) ? rows : []).map(mapReleaseTarget);
+    },
+
+    async setReleaseTargets(this: PlatformAdminApiCore, releaseId: string, tenantIds: string[]) {
+      const rows = await this.request<any[]>({
+        path: `/api/v1/admin/releases/${encodeURIComponent(releaseId)}/targets`,
+        method: 'PUT',
+        body: { tenantIds },
+      });
+      return (Array.isArray(rows) ? rows : []).map(mapReleaseTarget);
+    },
+
+    async setReleaseTargetStatus(this: PlatformAdminApiCore, releaseId: string, tenantId: string, status: PlatformReleaseTarget['status'], error?: string) {
+      const row = await this.request<any>({
+        path: `/api/v1/admin/releases/${encodeURIComponent(releaseId)}/targets/${encodeURIComponent(tenantId)}/status`,
+        method: 'POST',
+        body: error !== undefined ? { status, error } : { status },
+      });
+      return mapReleaseTarget(row ?? {});
     },
   };
 }

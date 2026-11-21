@@ -3,18 +3,44 @@ import type { PlatformAdminApiCore } from './core';
 import { CentralApiError, mapCentralInvoice, mapCentralPayment, toNumber } from './core';
 import type {
   PlatformSubscription,
+  PlatformSubscriptionCreateInput,
+  PlatformTrialCreateInput,
   PlatformInvoice,
   PlatformInvoiceInput,
   PlatformInvoiceStatus,
   PlatformPayment,
   PlatformPaymentInput,
 } from '../platformTypes';
+import type {
+  CentralSubscriptionRow,
+  CentralSubscriptionRenewResult,
+  CentralSubscriptionCancelResult,
+  CentralSubscriptionChangePlanResult,
+  CentralSubscriptionCreateResult,
+  CentralSubscriptionStatusResult,
+  CentralSubscriptionSettingsResult,
+  CentralSubscriptionChangeRow,
+  CentralInvoiceRow,
+  CentralPaymentRow,
+} from './centralTypes';
+
+export interface SubscriptionSettingsInput {
+  autoRenew?: boolean;
+  seats?: number;
+  branchesLimit?: number;
+}
 
 export interface BillingApi {
   listSubscriptions(this: PlatformAdminApiCore, filters?: { status?: string; planId?: string; search?: string }): Promise<PlatformSubscription[]>;
-  renewSubscription(this: PlatformAdminApiCore, tenantId: string, months: number): Promise<any>;
-  cancelSubscription(this: PlatformAdminApiCore, tenantId: string, reason?: string): Promise<any>;
-  changeSubscriptionPlan(this: PlatformAdminApiCore, tenantId: string, planId: string, options?: { months?: number; seats?: number; reason?: string }): Promise<any>;
+  createSubscription(this: PlatformAdminApiCore, input: PlatformSubscriptionCreateInput): Promise<CentralSubscriptionCreateResult>;
+  createTrialSubscription(this: PlatformAdminApiCore, input: PlatformTrialCreateInput): Promise<CentralSubscriptionCreateResult>;
+  renewSubscription(this: PlatformAdminApiCore, tenantId: string, months: number): Promise<CentralSubscriptionRenewResult>;
+  cancelSubscription(this: PlatformAdminApiCore, tenantId: string, reason?: string): Promise<CentralSubscriptionCancelResult>;
+  changeSubscriptionPlan(this: PlatformAdminApiCore, tenantId: string, planId: string, options?: { months?: number; seats?: number; reason?: string }): Promise<CentralSubscriptionChangePlanResult>;
+  suspendSubscription(this: PlatformAdminApiCore, tenantId: string, reason?: string): Promise<CentralSubscriptionStatusResult>;
+  resumeSubscription(this: PlatformAdminApiCore, tenantId: string): Promise<CentralSubscriptionStatusResult>;
+  updateSubscriptionSettings(this: PlatformAdminApiCore, tenantId: string, settings: SubscriptionSettingsInput): Promise<CentralSubscriptionSettingsResult>;
+  getSubscriptionHistory(this: PlatformAdminApiCore, tenantId: string, limit?: number): Promise<CentralSubscriptionChangeRow[]>;
   listInvoices(this: PlatformAdminApiCore, filters?: { search?: string; status?: string; tenantId?: string }): Promise<PlatformInvoice[]>;
   getInvoice(this: PlatformAdminApiCore, id: string): Promise<PlatformInvoice | null>;
   createInvoice(this: PlatformAdminApiCore, input: PlatformInvoiceInput, number?: string): Promise<PlatformInvoice>;
@@ -23,7 +49,7 @@ export interface BillingApi {
   listPayments(this: PlatformAdminApiCore, filters?: { tenantId?: string; invoiceId?: string; limit?: number }): Promise<PlatformPayment[]>;
   addPayment(this: PlatformAdminApiCore, input: PlatformPaymentInput): Promise<PlatformPayment>;
   voidPayment(this: PlatformAdminApiCore, id: string): Promise<void>;
-  createPayment(this: PlatformAdminApiCore, input: { tenantId: string; invoiceId?: string; amount: number; method?: string; reference?: string; notes?: string }): Promise<any>;
+  createPayment(this: PlatformAdminApiCore, input: { tenantId: string; invoiceId?: string; amount: number; method?: string; reference?: string; notes?: string }): Promise<CentralPaymentRow>;
 }
 
 export function createBillingApi(): BillingApi {
@@ -36,8 +62,8 @@ export function createBillingApi(): BillingApi {
       if (filters.planId) params.planId = filters.planId;
       if (filters.search) params.search = filters.search;
       const qs = new URLSearchParams(params).toString();
-      const rows = await this.request<any[]>({ path: `/api/v1/admin/subscriptions${qs ? `?${qs}` : ''}`, method: 'GET' });
-      return (Array.isArray(rows) ? rows : []).map((row: any) => ({
+      const rows = await this.request<CentralSubscriptionRow[]>({ path: `/api/v1/admin/subscriptions${qs ? `?${qs}` : ''}`, method: 'GET' });
+      return (Array.isArray(rows) ? rows : []).map((row) => ({
         id: String(row.id),
         tenantId: String(row.tenantId ?? row.tenant_id),
         tenantName: row.tenantName ?? row.tenant_name ?? null,
@@ -57,8 +83,43 @@ export function createBillingApi(): BillingApi {
       }));
     },
 
+    async createSubscription(this: PlatformAdminApiCore, input: PlatformSubscriptionCreateInput) {
+      return this.request<CentralSubscriptionCreateResult>({
+        path: '/api/v1/admin/subscriptions',
+        method: 'POST',
+        body: {
+          tenantId: input.tenantId,
+          planId: input.planId,
+          status: input.status,
+          startDate: input.startDate,
+          endDate: input.endDate,
+          seats: input.seats,
+          price: input.price,
+          autoRenew: input.autoRenew,
+          branchesLimit: input.branchesLimit,
+          isTrial: input.isTrial,
+          trialEndsAt: input.trialEndsAt,
+        },
+      });
+    },
+
+    async createTrialSubscription(this: PlatformAdminApiCore, input: PlatformTrialCreateInput) {
+      return this.request<CentralSubscriptionCreateResult>({
+        path: '/api/v1/admin/subscriptions/trial',
+        method: 'POST',
+        body: {
+          tenantId: input.tenantId,
+          planId: input.planId,
+          trialDays: input.trialDays,
+          seats: input.seats,
+          branchesLimit: input.branchesLimit,
+          couponCode: input.couponCode,
+        },
+      });
+    },
+
     async renewSubscription(this: PlatformAdminApiCore, tenantId: string, months: number) {
-      return this.request<any>({
+      return this.request<CentralSubscriptionRenewResult>({
         path: `/api/v1/admin/subscriptions/${encodeURIComponent(tenantId)}/renew`,
         method: 'POST',
         body: { months },
@@ -66,7 +127,7 @@ export function createBillingApi(): BillingApi {
     },
 
     async cancelSubscription(this: PlatformAdminApiCore, tenantId: string, reason?: string) {
-      return this.request<any>({
+      return this.request<CentralSubscriptionCancelResult>({
         path: `/api/v1/admin/subscriptions/${encodeURIComponent(tenantId)}/cancel`,
         method: 'POST',
         body: { reason },
@@ -79,11 +140,43 @@ export function createBillingApi(): BillingApi {
       planId: string,
       options: { months?: number; seats?: number; reason?: string } = {}
     ) {
-      return this.request<any>({
+      return this.request<CentralSubscriptionChangePlanResult>({
         path: `/api/v1/admin/subscriptions/${encodeURIComponent(tenantId)}/change-plan`,
         method: 'POST',
         body: { planId, months: options.months, seats: options.seats, reason: options.reason },
       });
+    },
+
+    async suspendSubscription(this: PlatformAdminApiCore, tenantId: string, reason?: string) {
+      return this.request<CentralSubscriptionStatusResult>({
+        path: `/api/v1/admin/subscriptions/${encodeURIComponent(tenantId)}/suspend`,
+        method: 'POST',
+        body: { reason },
+      });
+    },
+
+    async resumeSubscription(this: PlatformAdminApiCore, tenantId: string) {
+      return this.request<CentralSubscriptionStatusResult>({
+        path: `/api/v1/admin/subscriptions/${encodeURIComponent(tenantId)}/resume`,
+        method: 'POST',
+        body: {},
+      });
+    },
+
+    async updateSubscriptionSettings(this: PlatformAdminApiCore, tenantId: string, settings: SubscriptionSettingsInput) {
+      return this.request<CentralSubscriptionSettingsResult>({
+        path: `/api/v1/admin/subscriptions/${encodeURIComponent(tenantId)}`,
+        method: 'PATCH',
+        body: settings,
+      });
+    },
+
+    async getSubscriptionHistory(this: PlatformAdminApiCore, tenantId: string, limit = 50) {
+      const rows = await this.request<CentralSubscriptionChangeRow[]>({
+        path: `/api/v1/admin/subscriptions/${encodeURIComponent(tenantId)}/history?limit=${Math.max(1, Math.min(200, limit))}`,
+        method: 'GET',
+      });
+      return Array.isArray(rows) ? rows : [];
     },
 
     // ── Billing: invoices & payments ──────────────────────────────────────────
@@ -94,7 +187,7 @@ export function createBillingApi(): BillingApi {
       if (filters.status) params.status = filters.status;
       if (filters.tenantId) params.tenantId = filters.tenantId;
       const qs = new URLSearchParams(params).toString();
-      const rows = await this.request<any[]>({
+      const rows = await this.request<CentralInvoiceRow[]>({
         path: `/api/v1/admin/billing/invoices${qs ? `?${qs}` : ''}`,
         method: 'GET',
       });
@@ -102,7 +195,7 @@ export function createBillingApi(): BillingApi {
     },
 
     async getInvoice(this: PlatformAdminApiCore, id: string) {
-      const row = await this.request<any>({
+      const row = await this.request<CentralInvoiceRow | null>({
         path: `/api/v1/admin/billing/invoices/${encodeURIComponent(id)}`,
         method: 'GET',
       });
@@ -126,7 +219,7 @@ export function createBillingApi(): BillingApi {
           unitPrice: item.unitPrice,
         })),
       };
-      const row = await this.request<any>({
+      const row = await this.request<CentralInvoiceRow>({
         path: '/api/v1/admin/billing/invoices',
         method: 'POST',
         body: payload,
@@ -135,7 +228,7 @@ export function createBillingApi(): BillingApi {
     },
 
     async setInvoiceStatus(this: PlatformAdminApiCore, id: string, status: PlatformInvoiceStatus) {
-      const row = await this.request<any>({
+      const row = await this.request<CentralInvoiceRow>({
         path: `/api/v1/admin/billing/invoices/${encodeURIComponent(id)}/status`,
         method: 'POST',
         body: { status },
@@ -144,7 +237,7 @@ export function createBillingApi(): BillingApi {
     },
 
     async voidInvoice(this: PlatformAdminApiCore, id: string) {
-      const row = await this.request<any>({
+      const row = await this.request<CentralInvoiceRow>({
         path: `/api/v1/admin/billing/invoices/${encodeURIComponent(id)}/void`,
         method: 'POST',
         body: {},
@@ -158,7 +251,7 @@ export function createBillingApi(): BillingApi {
       if (filters.invoiceId) params.invoiceId = filters.invoiceId;
       if (filters.limit) params.limit = String(filters.limit);
       const qs = new URLSearchParams(params).toString();
-      const rows = await this.request<any[]>({
+      const rows = await this.request<CentralPaymentRow[]>({
         path: `/api/v1/admin/billing/payments${qs ? `?${qs}` : ''}`,
         method: 'GET',
       });
@@ -166,7 +259,7 @@ export function createBillingApi(): BillingApi {
     },
 
     async addPayment(this: PlatformAdminApiCore, input: PlatformPaymentInput) {
-      const row = await this.request<any>({
+      const row = await this.request<CentralPaymentRow>({
         path: '/api/v1/admin/billing/payments',
         method: 'POST',
         body: {
@@ -183,16 +276,16 @@ export function createBillingApi(): BillingApi {
     },
 
     async voidPayment(this: PlatformAdminApiCore, id: string) {
-      await this.request<any>({
+      await this.request<void>({
         path: `/api/v1/admin/billing/payments/${encodeURIComponent(id)}`,
         method: 'DELETE',
       });
     },
 
     async createPayment(this: PlatformAdminApiCore, input: { tenantId: string; invoiceId?: string; amount: number; method?: string; reference?: string; notes?: string }) {
-      const envelope = await this.requestEnvelope<any>({ path: '/api/v1/admin/billing/payments', method: 'POST', body: input });
+      const envelope = await this.requestEnvelope<CentralPaymentRow>({ path: '/api/v1/admin/billing/payments', method: 'POST', body: input });
       if (envelope.success === false) throw new CentralApiError({ status: 0, envelope });
-      return envelope.data;
+      return envelope.data as CentralPaymentRow;
     },
   };
 }

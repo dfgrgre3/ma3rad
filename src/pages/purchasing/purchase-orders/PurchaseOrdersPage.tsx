@@ -11,6 +11,7 @@ import { PermissionService } from '../../../services/domains/auth/PermissionServ
 import type { Product, Supplier } from '../../../types';
 import { DataTable } from '../../../components/ui/DataTable';
 import { useToast } from '../../../components/ui/Toast';
+import { usePageAccess } from '../../../hooks/domains/licensing/usePageAccess';
 import { formatProductQuantity, getProductUnitLabel } from '../../../utils/products/productUnits';
 import { OperationalFieldService, type OperationalFieldDefinition } from '../../../services/domains/products/OperationalFieldService';
 import { OperationalFieldsForm } from '../../../components/products/OperationalFieldsForm';
@@ -41,6 +42,12 @@ export const PurchaseOrdersPage: React.FC = () => {
   const currentUser = AuthService.getCurrentUser();
   const canCreate = PermissionService.can(currentUser, 'ui.purchases.orders.create');
   const canUpdate = PermissionService.can(currentUser, 'ui.purchases.orders.update');
+  // قيود أقسام أوامر الشراء من المنصة المركزية — قائمة/أصناف/استلامات.
+  const pageAccess = usePageAccess('/purchases/orders');
+  const canViewList = pageAccess.allows('ui.purchases.orders.section.list.view');
+  const canViewItems = pageAccess.allows('ui.purchases.orders.section.items.view');
+  const canManageItems = pageAccess.allows('ui.purchases.orders.section.items.manage');
+  const canViewReceipts = pageAccess.allows('ui.purchases.orders.section.receipts.view');
 
   const [rows, setRows] = useState<PurchaseOrderRow[]>([]);
   const [search, setSearch] = useState('');
@@ -82,6 +89,7 @@ export const PurchaseOrdersPage: React.FC = () => {
   useEffect(() => { load();   }, [statusFilter, fieldFilters, load]);
 
   const openDetails = (row: PurchaseOrderRow) => {
+    if (!canViewItems) { toast.warning('عرض بنود أمر الشراء معطل من إعدادات المنصة.'); return; }
     if (expanded === row.id) { setExpanded(null); setDetails(null); return; }
     service.getOrderByIdAsync(row.id).then((det) => { setDetails(det); setExpanded(row.id); })
       .catch((e: any) => toast.error(e?.message));
@@ -163,7 +171,7 @@ export const PurchaseOrdersPage: React.FC = () => {
             <button onClick={load} className="p-2 rounded-xl border border-line bg-surface-muted text-ink-secondary hover:bg-surface-sunken" title="تحديث">
               <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             </button>
-            {canCreate && (
+            {canCreate && canManageItems && (
               <button onClick={openModal} className="flex items-center gap-2 px-4 py-2 bg-warning hover:bg-warning text-white rounded-xl text-sm font-bold">
                 <Plus className="w-4 h-4" /> {newPurchaseOrderLabel}
               </button>
@@ -172,6 +180,7 @@ export const PurchaseOrdersPage: React.FC = () => {
         />
       </div>
 
+      {canViewList && (
       <div className="p-4 bg-surface border-b border-line flex flex-col sm:flex-row gap-3">
         <form onSubmit={(e) => { e.preventDefault(); load(); }} className="relative flex-1">
           <Search className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
@@ -183,7 +192,9 @@ export const PurchaseOrdersPage: React.FC = () => {
         </select>
         <OperationalFieldsFilter fields={fields} values={fieldFilters} onChange={setFieldFilters} />
       </div>
+      )}
 
+      {canViewList && (
       <div className="flex-1 overflow-auto p-6">
         {loading ? (
           <div className="py-16 flex justify-center"><Loader2 className="w-6 h-6 animate-spin text-warning" /></div>
@@ -210,7 +221,7 @@ export const PurchaseOrdersPage: React.FC = () => {
                                   <button onClick={() => openDetails(row)} className="p-1.5 rounded-lg bg-surface-muted border border-line text-ink-secondary" title="تفاصيل"><Eye className="w-3.5 h-3.5" /></button>
                                   {canUpdate && row.status === 'DRAFT' && <button onClick={() => changeStatus(row, 'SENT')} className="p-1.5 rounded-lg bg-accent-soft border border-accent-border text-primary" title="إرسال للمورد"><Send className="w-3.5 h-3.5" /></button>}
                                   {canUpdate && row.status === 'SENT' && <button onClick={() => changeStatus(row, 'CONFIRMED')} className="p-1.5 rounded-lg bg-accent-soft border border-accent-border text-primary" title="تأكيد"><CheckCircle2 className="w-3.5 h-3.5" /></button>}
-                                  {canCreate && !['RECEIVED', 'CANCELLED'].includes(row.status) && <button onClick={() => receive(row)} className="p-1.5 rounded-lg bg-success-soft border border-success-border text-success" title="استلام وترحيل فاتورة"><Truck className="w-3.5 h-3.5" /></button>}
+                                  {canCreate && canViewReceipts && !['RECEIVED', 'CANCELLED'].includes(row.status) && <button onClick={() => receive(row)} className="p-1.5 rounded-lg bg-success-soft border border-success-border text-success" title="استلام وترحيل فاتورة"><Truck className="w-3.5 h-3.5" /></button>}
                                   {canUpdate && !['RECEIVED', 'CANCELLED'].includes(row.status) && <button onClick={() => { if (confirm('إلغاء أمر الشراء؟')) changeStatus(row, 'CANCELLED'); }} className="p-1.5 rounded-lg bg-danger-soft border border-danger-border text-danger" title="إلغاء"><Ban className="w-3.5 h-3.5" /></button>}
                                 </div>
                               ),
@@ -251,6 +262,7 @@ export const PurchaseOrdersPage: React.FC = () => {
           </div>
         )}
       </div>
+      )}
 
       {modalOpen && (
         <div className="fixed inset-0 bg-primary/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">

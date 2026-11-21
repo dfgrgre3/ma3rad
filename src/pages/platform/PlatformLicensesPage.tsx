@@ -12,8 +12,8 @@ import {
   ShieldX,
   ShieldAlert,
   Clock,
-  Users,
-  Settings,
+  Eye,
+  Pencil,
   Link,
 } from 'lucide-react';
 import { platformAdminService } from '../../services/domains/platform/PlatformAdminService';
@@ -29,40 +29,28 @@ import type {
   PlatformCouplingMode,
 } from '../../services/domains/platform/platformTypes';
 import { Button } from '../../components/ui/Button';
-import { Modal } from '../../components/ui/Modal';
 import { PageHeader } from '../../components/ui/PageHeader';
 import {
   EmptyState,
-  Field,
   StatusBadge,
   downloadCsv,
   formatDate,
-  formatDateTime,
   inputClass,
 } from './components/PlatformUI';
-
 import { useToast } from '../../components/ui/Toast';
-const LICENSE_STATUS_LABELS: Record<PlatformLicenseStatus, string> = {
-  ISSUED: 'صادر',
-  ACTIVE: 'نشط',
-  SUSPENDED: 'موقوف',
-  REVOKED: 'ملغي',
-  EXPIRED: 'منتهي',
-};
-
-const COUPLING_LABELS: Record<PlatformCouplingMode, string> = {
-  FULL: 'كامل',
-  EXPIRY_ONLY: 'انتهاء الصلاحية فقط',
-  NONE: 'مستقل',
-};
-
-const STATUSES: PlatformLicenseStatus[] = ['ACTIVE', 'ISSUED', 'SUSPENDED', 'EXPIRED', 'REVOKED'];
-
-/** Clamp a numeric input: finite, integer, minimum `min` (NaN-safe). */
-const clampInt = (raw: string, min: number): number => {
-  const n = Number(raw);
-  return Number.isFinite(n) ? Math.max(min, Math.floor(n)) : min;
-};
+import {
+  COUPLING_LABELS,
+  LICENSE_STATUS_LABELS,
+  STATUSES,
+  daysUntilExpiry,
+} from './PlatformLicensesPage/licenseData';
+import { LicenseStatsBar } from './PlatformLicensesPage/LicenseStatsBar';
+import { LicenseDetailsDrawer } from './PlatformLicensesPage/LicenseDetailsDrawer';
+import { EditLicenseModal, type LicenseUpdatePayload } from './PlatformLicensesPage/EditLicenseModal';
+import { IssueLicenseModal, type IssueLicenseForm } from './PlatformLicensesPage/IssueLicenseModal';
+import { RenewLicenseModal } from './PlatformLicensesPage/RenewLicenseModal';
+import { BindHardwareModal } from './PlatformLicensesPage/BindHardwareModal';
+import { DeviceActionModal, type DeviceAction, type DeviceActionTarget } from './PlatformLicensesPage/DeviceActionModal';
 
 export const PlatformLicensesPage: React.FC = () => {
   const toast = useToast();
@@ -78,32 +66,29 @@ export const PlatformLicensesPage: React.FC = () => {
     return () => clearTimeout(timer);
   }, [searchInput]);
   const [status, setStatus] = React.useState('');
+  const [planFilter, setPlanFilter] = React.useState('');
+  const [expiringOnly, setExpiringOnly] = React.useState(false);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
 
   const [issueOpen, setIssueOpen] = React.useState(false);
-  const [issueForm, setIssueForm] = React.useState({
-    tenantId: '',
-    planId: '',
-    months: 12,
-    seats: 5,
-    branchesLimit: 1,
-    offlineGracePeriodDays: 14,
-    couplingMode: 'FULL' as PlatformCouplingMode,
-    notes: '',
-  });
   const [saving, setSaving] = React.useState(false);
+
+  const [detailsTarget, setDetailsTarget] = React.useState<PlatformLicense | null>(null);
+  const [editTarget, setEditTarget] = React.useState<PlatformLicense | null>(null);
 
   const [renewTarget, setRenewTarget] = React.useState<PlatformLicense | null>(null);
   const [renewMonths, setRenewMonths] = React.useState(12);
 
   const [hardwareTarget, setHardwareTarget] = React.useState<PlatformLicense | null>(null);
   const [hardwareId, setHardwareId] = React.useState('');
-  const [deviceTarget, setDeviceTarget] = React.useState<{ id: string; hardwareId: string; tenantId: string; status: string } | null>(null);
-  const [deviceAction, setDeviceAction] = React.useState<'suspend' | 'release' | 'revoke' | null>(null);
+  const [deviceTarget, setDeviceTarget] = React.useState<DeviceActionTarget | null>(null);
+  const [deviceAction, setDeviceAction] = React.useState<DeviceAction | null>(null);
   const [cloneAlerts, setCloneAlerts] = React.useState<string[]>([]);
   const [centralMode, setCentralMode] = React.useState(false);
   const [devices, setDevices] = React.useState<PlatformDevice[]>([]);
+
+  const misconfiguredError = 'مصدر البيانات مضبوط على «المركزي» لكن جسر الاتصال بالسيرفر غير متاح في هذا الإصدار.';
 
   const load = React.useCallback(async () => {
     setLoading(true);
@@ -111,7 +96,7 @@ export const PlatformLicensesPage: React.FC = () => {
       const central = getCentralDataSourceState();
       setCentralMode(central.active);
       if (central.misconfigured) {
-        throw new Error('مصدر البيانات مضبوط على «المركزي» لكن جسر الاتصال بالسيرفر غير متاح في هذا الإصدار.');
+        throw new Error(misconfiguredError);
       }
       if (central.active) {
         const [centralLicenses, centralDevices] = await Promise.all([
@@ -136,7 +121,7 @@ export const PlatformLicensesPage: React.FC = () => {
   React.useEffect(() => {
     const central = getCentralDataSourceState();
     if (central.misconfigured) {
-      setError('مصدر البيانات مضبوط على «المركزي» لكن جسر الاتصال بالسيرفر غير متاح في هذا الإصدار.');
+      setError(misconfiguredError);
       return;
     }
     const loadRefs = async () => {
@@ -159,57 +144,42 @@ export const PlatformLicensesPage: React.FC = () => {
     void loadRefs();
   }, []);
 
-  const openIssue = () => {
-    const defaultPlan = plans.find((plan) => plan.isDefault) ?? plans[0];
-    setIssueForm({
-      tenantId: tenants[0]?.id ?? '',
-      planId: defaultPlan?.id ?? '',
-      months: 12,
-      seats: defaultPlan?.seatsLimit ?? 5,
-      branchesLimit: defaultPlan?.branchesLimit ?? 1,
-      offlineGracePeriodDays: defaultPlan?.offlineGracePeriodDays ?? 14,
-      couplingMode: 'FULL',
-      notes: '',
-    });
-    setIssueOpen(true);
-  };
-
-  const issue = async () => {
+  const issue = async (form: IssueLicenseForm) => {
     if (!canManageLicenses) {
       toast.error('لا تملك صلاحية إدارة التراخيص');
       return;
     }
-    if (!issueForm.tenantId || !issueForm.planId) {
+    if (!form.tenantId || !form.planId) {
       toast.error('اختر العميل والخطة');
       return;
     }
     const central = getCentralDataSourceState();
     if (central.misconfigured) {
-      toast.error('مصدر البيانات مضبوط على «المركزي» لكن جسر الاتصال بالسيرفر غير متاح في هذا الإصدار.');
+      toast.error(misconfiguredError);
       return;
     }
     setSaving(true);
     try {
       if (central.active) {
         const result: any = await centralPlatformClient.issueLicense({
-          tenantId: issueForm.tenantId,
-          planId: issueForm.planId,
-          months: issueForm.months,
-          seats: issueForm.seats,
-          branchesLimit: issueForm.branchesLimit,
-          offlineGracePeriodDays: issueForm.offlineGracePeriodDays,
-          couplingMode: issueForm.couplingMode,
-          notes: issueForm.notes || undefined,
+          tenantId: form.tenantId,
+          planId: form.planId,
+          months: form.months,
+          seats: form.seats,
+          branchesLimit: form.branchesLimit,
+          offlineGracePeriodDays: form.offlineGracePeriodDays,
+          couplingMode: form.couplingMode,
+          notes: form.notes || undefined,
         });
         toast.success('تم إصدار الترخيص', result?.license?.licenseKey ?? result?.license?.license_key ?? '');
       } else {
-        const license = platformAdminService.issueLicense(issueForm.tenantId, issueForm.planId, {
-          months: issueForm.months,
-          seats: issueForm.seats,
-          branchesLimit: issueForm.branchesLimit,
-          offlineGracePeriodDays: issueForm.offlineGracePeriodDays,
-          couplingMode: issueForm.couplingMode,
-          notes: issueForm.notes,
+        const license = platformAdminService.issueLicense(form.tenantId, form.planId, {
+          months: form.months,
+          seats: form.seats,
+          branchesLimit: form.branchesLimit,
+          offlineGracePeriodDays: form.offlineGracePeriodDays,
+          couplingMode: form.couplingMode,
+          notes: form.notes,
         });
         toast.success('تم إصدار الترخيص', license.licenseKey);
       }
@@ -231,7 +201,7 @@ export const PlatformLicensesPage: React.FC = () => {
     if (!window.confirm(`${verb} الترخيص ${license.licenseKey}؟`)) return;
     const central = getCentralDataSourceState();
     if (central.misconfigured) {
-      toast.error('مصدر البيانات مضبوط على «المركزي» لكن جسر الاتصال بالسيرفر غير متاح في هذا الإصدار.');
+      toast.error(misconfiguredError);
       return;
     }
     try {
@@ -253,6 +223,48 @@ export const PlatformLicensesPage: React.FC = () => {
     }
   };
 
+  const saveEdit = async (payload: LicenseUpdatePayload) => {
+    if (!editTarget) return;
+    if (!canManageLicenses) {
+      toast.error('لا تملك صلاحية إدارة التراخيص');
+      return;
+    }
+    const central = getCentralDataSourceState();
+    if (central.misconfigured) {
+      toast.error(misconfiguredError);
+      return;
+    }
+    setSaving(true);
+    try {
+      if (central.active) {
+        await centralPlatformClient.updateLicense(editTarget.id, {
+          seats: payload.seats,
+          deviceLimit: payload.deviceLimit,
+          branchesLimit: payload.branchesLimit,
+          offlineGracePeriodDays: payload.offlineGracePeriodDays,
+          notes: payload.notes,
+          couplingMode: payload.couplingMode,
+        });
+      } else {
+        platformAdminService.updateLicense(editTarget.id, {
+          seats: payload.seats,
+          deviceLimit: payload.deviceLimit,
+          branchesLimit: payload.branchesLimit,
+          offlineGracePeriodDays: payload.offlineGracePeriodDays,
+          notes: payload.notes,
+          couplingMode: payload.couplingMode,
+        });
+      }
+      toast.success('تم حفظ تعديلات الترخيص');
+      setEditTarget(null);
+      await load();
+    } catch (err) {
+      toast.error('تعذر حفظ التعديلات', err instanceof Error ? err.message : undefined);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const renew = async () => {
     if (!renewTarget) return;
     if (!canManageLicenses) {
@@ -261,7 +273,7 @@ export const PlatformLicensesPage: React.FC = () => {
     }
     const central = getCentralDataSourceState();
     if (central.misconfigured) {
-      toast.error('مصدر البيانات مضبوط على «المركزي» لكن جسر الاتصال بالسيرفر غير متاح في هذا الإصدار.');
+      toast.error(misconfiguredError);
       return;
     }
     try {
@@ -285,7 +297,7 @@ export const PlatformLicensesPage: React.FC = () => {
     }
     const central = getCentralDataSourceState();
     if (central.misconfigured) {
-      toast.error('مصدر البيانات مضبوط على «المركزي» لكن جسر الاتصال بالسيرفر غير متاح في هذا الإصدار.');
+      toast.error(misconfiguredError);
       return;
     }
     try {
@@ -312,7 +324,7 @@ export const PlatformLicensesPage: React.FC = () => {
     }
   };
 
-  const openDeviceAction = (action: 'suspend' | 'release' | 'revoke', device: { id: string; hardwareId: string; tenantId: string; status: string }) => {
+  const openDeviceAction = (action: DeviceAction, device: DeviceActionTarget) => {
     setDeviceTarget(device);
     setDeviceAction(action);
   };
@@ -325,7 +337,7 @@ export const PlatformLicensesPage: React.FC = () => {
     }
     const central = getCentralDataSourceState();
     if (central.misconfigured) {
-      toast.error('مصدر البيانات مضبوط على «المركزي» لكن جسر الاتصال بالسيرفر غير متاح في هذا الإصدار.');
+      toast.error(misconfiguredError);
       return;
     }
     try {
@@ -360,26 +372,22 @@ export const PlatformLicensesPage: React.FC = () => {
       toast.error('لا تملك صلاحية إدارة التراخيص');
       return;
     }
-    if (!hardwareId.trim()) {
-      toast.error('أدخل معرف الجهاز (Hardware ID)');
-      return;
-    }
     const central = getCentralDataSourceState();
     if (central.misconfigured) {
-      toast.error('مصدر البيانات مضبوط على «المركزي» لكن جسر الاتصال بالسيرفر غير متاح في هذا الإصدار.');
+      toast.error(misconfiguredError);
       return;
     }
     try {
       if (central.active) {
-        await centralPlatformClient.transferLicense(hardwareTarget.id, hardwareId.trim(), 'ربط جهاز من لوحة التراخيص');
+        await centralPlatformClient.transferLicense(hardwareTarget.id, hardwareId.trim(), hardwareId.trim() ? 'ربط جهاز من لوحة التراخيص' : 'فك ربط الجهاز من لوحة التراخيص');
       } else {
         platformAdminService.bindLicenseHardware(hardwareTarget.id, hardwareId);
       }
-      toast.success('تم ربط الترخيص بالجهاز');
+      toast.success(hardwareId.trim() ? 'تم ربط الترخيص بالجهاز' : 'تم فك ربط الترخيص من الجهاز');
       setHardwareTarget(null);
       await load();
     } catch (err) {
-      toast.error('تعذر ربط الجهاز', err instanceof Error ? err.message : undefined);
+      toast.error('تعذر تحديث ربط الجهاز', err instanceof Error ? err.message : undefined);
     }
   };
 
@@ -397,7 +405,7 @@ export const PlatformLicensesPage: React.FC = () => {
         includeChanges: true,
       }).licenses as any[]);
       if (central.misconfigured) {
-        toast.error('مصدر البيانات مضبوط على «المركزي» لكن جسر الاتصال بالسيرفر غير متاح في هذا الإصدار.');
+        toast.error(misconfiguredError);
         return;
       }
       const rows = [
@@ -436,29 +444,53 @@ export const PlatformLicensesPage: React.FC = () => {
       return;
     }
     downloadCsv('platform-licenses.csv', [
-      ['المفتاح', 'العميل', 'الخطة', 'الحالة', 'تاريخ الإصدار', 'يبدأ من', 'ينتهي في', 'المستخدمون', 'الأجهزة', 'الفروع', 'معرف الجهاز', 'الربط'],
-      ...licenses.map((license) => [
-        license.licenseKey,
-        license.tenantName ?? '',
-        license.planName ?? '',
-        LICENSE_STATUS_LABELS[license.status],
-        license.issuedAt,
-        license.startsAt ?? '',
-        license.expiresAt ?? '',
-        license.seats,
-        license.deviceLimit,
-        license.branchesLimit,
-        license.hardwareId ?? '',
-        license.couplingMode ?? 'FULL',
-      ]),
+      ['المفتاح', 'العميل', 'الخطة', 'الحالة', 'تاريخ الإصدار', 'يبدأ من', 'ينتهي في', 'الأيام المتبقية', 'المستخدمون', 'الأجهزة', 'الفروع', 'معرف الجهاز', 'الربط'],
+      ...licenses.map((license) => {
+        const days = daysUntilExpiry(license.expiresAt);
+        return [
+          license.licenseKey,
+          license.tenantName ?? '',
+          license.planName ?? '',
+          LICENSE_STATUS_LABELS[license.status],
+          license.issuedAt,
+          license.startsAt ?? '',
+          license.expiresAt ?? '',
+          days === null ? '' : days,
+          license.seats,
+          license.deviceLimit,
+          license.branchesLimit,
+          license.hardwareId ?? '',
+          license.couplingMode ?? 'FULL',
+        ];
+      }),
     ]);
+  };
+
+  const filteredLicenses = React.useMemo(() => {
+    let rows = licenses;
+    if (planFilter) rows = rows.filter((license) => license.planId === planFilter);
+    if (expiringOnly) {
+      rows = rows.filter((license) => {
+        const days = daysUntilExpiry(license.expiresAt);
+        return days !== null && days <= 30 && license.status !== 'REVOKED';
+      });
+    }
+    return rows;
+  }, [licenses, expiringOnly, planFilter]);
+
+  const expiryCell = (license: PlatformLicense) => {
+    const days = daysUntilExpiry(license.expiresAt);
+    if (days === null) return <span className="text-[11px] text-muted">—</span>;
+    if (days < 0) return <span className="text-[11px] font-bold text-danger">منتهي منذ {Math.abs(days)} يوم</span>;
+    if (days <= 30) return <span className="text-[11px] font-bold text-warning">متبقي {days} يوم</span>;
+    return <span className="text-[11px] text-ink-secondary">متبقي {days} يوم</span>;
   };
 
   return (
     <div className="space-y-4">
       <PageHeader
         title="إدارة التراخيص"
-        description="إصدار وتجديد وإيقاف تراخيص العملاء وربطها بالأجهزة."
+        description="إصدار وتجديد وتعديل تراخيص العملاء وربطها بالأجهزة ومتابعة سجل التفعيلات."
         icon={<KeyRound className="h-5 w-5" />}
         actions={
           <div className="flex flex-wrap gap-2">
@@ -475,7 +507,7 @@ export const PlatformLicensesPage: React.FC = () => {
                 <Button variant="secondary" size="sm" leadingIcon={<Clock className="h-3.5 w-3.5" />} onClick={() => void exportCompliance()}>
                   تقرير الامتثال
                 </Button>
-                <Button variant="primary" size="sm" leadingIcon={<Plus className="h-3.5 w-3.5" />} onClick={openIssue}>
+                <Button variant="primary" size="sm" leadingIcon={<Plus className="h-3.5 w-3.5" />} onClick={() => setIssueOpen(true)}>
                   إصدار ترخيص
                 </Button>
               </>
@@ -483,6 +515,8 @@ export const PlatformLicensesPage: React.FC = () => {
           </div>
         }
       />
+
+      <LicenseStatsBar licenses={licenses} />
 
       <div className="flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface p-3 shadow-sm">
         <div className="relative min-w-[220px] flex-1">
@@ -500,7 +534,20 @@ export const PlatformLicensesPage: React.FC = () => {
             <option key={value} value={value}>{LICENSE_STATUS_LABELS[value]}</option>
           ))}
         </select>
-        <span className="rounded-full bg-surface-sunken px-2.5 py-1 text-[11px] font-bold text-ink-secondary">{licenses.length} ترخيص</span>
+        <select value={planFilter} onChange={(event) => setPlanFilter(event.target.value)} className={`${inputClass} max-w-[170px]`}>
+          <option value="">كل الخطط</option>
+          {plans.map((plan) => (
+            <option key={plan.id} value={plan.id}>{plan.name}</option>
+          ))}
+        </select>
+        <button
+          type="button"
+          onClick={() => setExpiringOnly((value) => !value)}
+          className={`rounded-full px-3 py-1.5 text-[11px] font-bold transition ${expiringOnly ? 'bg-warning-soft text-warning' : 'bg-surface-sunken text-muted hover:text-ink'}`}
+        >
+          ينتهي خلال 30 يوم
+        </button>
+        <span className="rounded-full bg-surface-sunken px-2.5 py-1 text-[11px] font-bold text-ink-secondary">{filteredLicenses.length} ترخيص</span>
       </div>
 
       {error && (
@@ -510,7 +557,7 @@ export const PlatformLicensesPage: React.FC = () => {
       <section className="overflow-hidden rounded-xl border border-line bg-surface shadow-sm">
         {loading ? (
           <div className="py-16 text-center text-sm font-semibold text-muted">جارٍ تحميل التراخيص...</div>
-        ) : licenses.length === 0 ? (
+        ) : filteredLicenses.length === 0 ? (
           <EmptyState
             icon={<KeyRound className="h-5 w-5" />}
             title="لا توجد تراخيص مطابقة"
@@ -520,9 +567,9 @@ export const PlatformLicensesPage: React.FC = () => {
           <div className="overflow-x-auto">
             <DataTable<PlatformLicense>
               ariaLabel="التراخيص"
-              rows={licenses}
+              rows={filteredLicenses}
               rowKey={(license) => String(license.id)}
-              minWidth={1000}
+              minWidth={1100}
               dense
               tableClassName="text-[11px]"
               rowClassName={() => 'transition hover:bg-surface-muted/60'}
@@ -541,6 +588,7 @@ export const PlatformLicensesPage: React.FC = () => {
                 { key: 'status', header: 'الحالة', render: (license) => <StatusBadge value={license.status} label={LICENSE_STATUS_LABELS[license.status]} /> },
                 { key: 'start', header: 'يبدأ من', render: (license) => <span className="text-[11px] text-ink-secondary">{formatDate(license.startsAt)}</span> },
                 { key: 'end', header: 'ينتهي في', render: (license) => <span className="text-[11px] text-ink-secondary">{formatDate(license.expiresAt)}</span> },
+                { key: 'remaining', header: 'المتبقي', render: expiryCell },
                 { key: 'seats', header: 'المستخدمون', render: (license) => <span className="text-[11px] font-semibold text-ink">{license.seats}</span> },
                 { key: 'devices', header: 'الأجهزة', render: (license) => <span className="text-[11px] font-semibold text-ink">{license.deviceLimit}</span> },
                 { key: 'branches', header: 'الفروع', render: (license) => <span className="text-[11px] font-semibold text-ink">{license.branchesLimit}</span> },
@@ -549,12 +597,18 @@ export const PlatformLicensesPage: React.FC = () => {
                   key: 'actions', header: 'إجراءات',
                   render: (license) => (
                     <span className="flex items-center gap-1">
+                      <button type="button" onClick={() => setDetailsTarget(license)} className="rounded p-1.5 text-muted hover:bg-accent-soft hover:text-primary" title="التفاصيل">
+                        <Eye className="h-3.5 w-3.5" />
+                      </button>
                       {canManageLicenses && (
                         <>
                           <button type="button" onClick={() => { setRenewTarget(license); setRenewMonths(12); }} className="rounded p-1.5 text-muted hover:bg-success-soft hover:text-success" title="تجديد">
                             <RefreshCw className="h-3.5 w-3.5" />
                           </button>
-                          <button type="button" onClick={() => { setHardwareTarget(license); setHardwareId(license.hardwareId ?? ''); }} className="rounded p-1.5 text-muted hover:bg-accent-soft hover:text-primary" title="ربط جهاز">
+                          <button type="button" onClick={() => setEditTarget(license)} className="rounded p-1.5 text-muted hover:bg-accent-soft hover:text-primary" title="تعديل">
+                            <Pencil className="h-3.5 w-3.5" />
+                          </button>
+                          <button type="button" onClick={() => { setHardwareTarget(license); setHardwareId(license.hardwareId ?? ''); }} className="rounded p-1.5 text-muted hover:bg-accent-soft hover:text-primary" title={license.hardwareId ? 'تغيير/فك الربط' : 'ربط جهاز'}>
                             <Cpu className="h-3.5 w-3.5" />
                           </button>
                           <button
@@ -616,121 +670,6 @@ export const PlatformLicensesPage: React.FC = () => {
         )}
       </section>
 
-      {/* Issue license */}
-      <Modal
-        open={issueOpen}
-        onClose={() => setIssueOpen(false)}
-        title="إصدار ترخيص جديد"
-        description="اختر العميل والخطة ومدة الترخيص."
-        size="md"
-        busy={saving}
-        footer={
-          <div className="flex justify-end gap-2">
-            <Button variant="ghost" onClick={() => setIssueOpen(false)} disabled={saving}>إلغاء</Button>
-            <Button variant="primary" onClick={() => void issue()} loading={saving} disabled={!canManageLicenses}>إصدار الترخيص</Button>
-          </div>
-        }
-      >
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="العميل" required className="sm:col-span-2">
-            <select className={inputClass} value={issueForm.tenantId} onChange={(event) => setIssueForm({ ...issueForm, tenantId: event.target.value })}>
-              <option value="">اختر العميل</option>
-              {tenants.map((tenant) => (
-                <option key={tenant.id} value={tenant.id}>{tenant.name} — {tenant.code}</option>
-              ))}
-            </select>
-          </Field>
-          <Field label="الخطة" required>
-            <select
-              className={inputClass}
-              value={issueForm.planId}
-              onChange={(event) => {
-                const plan = plans.find((item) => item.id === event.target.value);
-                setIssueForm({ ...issueForm, planId: event.target.value, seats: plan?.seatsLimit ?? issueForm.seats, branchesLimit: plan?.branchesLimit ?? issueForm.branchesLimit, offlineGracePeriodDays: plan?.offlineGracePeriodDays ?? issueForm.offlineGracePeriodDays });
-              }}
-            >
-              <option value="">اختر الخطة</option>
-              {plans.map((plan) => (
-                <option key={plan.id} value={plan.id}>{plan.name}</option>
-              ))}
-            </select>
-          </Field>
-          <Field label="المدة (أشهر)">
-            <input type="number" min={1} className={inputClass} value={issueForm.months} onChange={(event) => setIssueForm({ ...issueForm, months: clampInt(event.target.value, 1) })} />
-          </Field>
-          <Field label="عدد المستخدمين">
-            <input type="number" min={1} className={inputClass} value={issueForm.seats} onChange={(event) => setIssueForm({ ...issueForm, seats: clampInt(event.target.value, 1) })} />
-          </Field>
-          <Field label="الفروع المسموح بها">
-            <input type="number" min={1} className={inputClass} value={issueForm.branchesLimit} onChange={(event) => setIssueForm({ ...issueForm, branchesLimit: clampInt(event.target.value, 1) })} />
-          </Field>
-          <Field label="فترة السماح أوفلاين (أيام)">
-            <input type="number" min={0} className={inputClass} value={issueForm.offlineGracePeriodDays} onChange={(event) => setIssueForm({ ...issueForm, offlineGracePeriodDays: clampInt(event.target.value, 0) })} />
-          </Field>
-          <Field label="نوع الربط بالاشتراك">
-            <select className={inputClass} value={issueForm.couplingMode} onChange={(event) => setIssueForm({ ...issueForm, couplingMode: event.target.value as PlatformCouplingMode })}>
-              <option value="FULL">كامل (المزامنة التلقائية)</option>
-              <option value="EXPIRY_ONLY">انتهاء الصلاحية فقط</option>
-              <option value="NONE">مستقل تماماً</option>
-            </select>
-          </Field>
-          <Field label="ملاحظات" className="sm:col-span-2">
-            <textarea rows={2} className={inputClass} value={issueForm.notes} onChange={(event) => setIssueForm({ ...issueForm, notes: event.target.value })} />
-          </Field>
-        </div>
-      </Modal>
-
-      {/* Renew */}
-      <Modal
-        open={Boolean(renewTarget)}
-        onClose={() => setRenewTarget(null)}
-        title="تجديد الترخيص"
-        description={renewTarget ? `تجديد ترخيص ${renewTarget.tenantName ?? ''} منذ تاريخ الانتهاء الحالي.` : undefined}
-        size="sm"
-        footer={
-          <div className="flex justify-end gap-2">
-            <Button variant="ghost" onClick={() => setRenewTarget(null)}>إلغاء</Button>
-            <Button variant="primary" onClick={() => void renew()} disabled={!canManageLicenses}>تجديد</Button>
-          </div>
-        }
-      >
-        <Field label="المدة (أشهر)">
-          <input type="number" min={1} className={inputClass} value={renewMonths} onChange={(event) => setRenewMonths(clampInt(event.target.value, 1))} />
-        </Field>
-        {renewTarget && (
-          <p className="mt-3 rounded-lg bg-surface-muted px-3 py-2 text-[11px] text-ink-secondary">
-            ينتهي حالياً في <b>{formatDate(renewTarget.expiresAt)}</b>
-          </p>
-        )}
-      </Modal>
-
-      {/* Hardware */}
-      <Modal
-        open={Boolean(hardwareTarget)}
-        onClose={() => setHardwareTarget(null)}
-        title="ربط الترخيص بجهاز"
-        description="أدخل معرف الجهاز (Hardware ID) لتقييد الترخيص به."
-        size="sm"
-        footer={
-          <div className="flex justify-end gap-2">
-            <Button variant="ghost" onClick={() => setHardwareTarget(null)}>إلغاء</Button>
-            <Button variant="primary" onClick={() => void bindHardware()} disabled={!canManageLicenses}>حفظ الربط</Button>
-          </div>
-        }
-      >
-        <Field label="معرف الجهاز" hint="اتركه فارغاً لإلغاء الربط">
-          <input dir="ltr" className={inputClass} value={hardwareId} onChange={(event) => setHardwareId(event.target.value)} />
-        </Field>
-        {hardwareTarget && (
-          <p className="mt-3 rounded-lg bg-surface-muted px-3 py-2 font-mono text-[11px] text-ink-secondary" dir="ltr">
-            {hardwareTarget.licenseKey}
-          </p>
-        )}
-        <p className="mt-3 text-[10.5px] text-muted">
-          آخر تحديث: {formatDateTime(hardwareTarget?.updatedAt)}
-        </p>
-      </Modal>
-
       {/* Clone alerts */}
       {cloneAlerts.length > 0 && (
         <section className="rounded-lg border border-warning-border bg-warning-soft p-4">
@@ -743,32 +682,58 @@ export const PlatformLicensesPage: React.FC = () => {
         </section>
       )}
 
-      {/* Device action modal */}
-      <Modal
-        open={Boolean(deviceTarget)}
+      <IssueLicenseModal
+        open={issueOpen}
+        saving={saving}
+        canManage={canManageLicenses}
+        tenants={tenants}
+        plans={plans}
+        onClose={() => setIssueOpen(false)}
+        onSubmit={(form) => void issue(form)}
+      />
+
+      <EditLicenseModal
+        license={editTarget}
+        saving={saving}
+        canManage={canManageLicenses}
+        onClose={() => setEditTarget(null)}
+        onSave={(payload) => void saveEdit(payload)}
+      />
+
+      <LicenseDetailsDrawer
+        license={detailsTarget ? licenses.find((item) => item.id === detailsTarget.id) ?? detailsTarget : null}
+        canManage={canManageLicenses}
+        centralMode={centralMode}
+        licenses={licenses}
+        onClose={() => setDetailsTarget(null)}
+        onChanged={() => void load()}
+      />
+
+      <RenewLicenseModal
+        license={renewTarget}
+        months={renewMonths}
+        onMonthsChange={setRenewMonths}
+        canManage={canManageLicenses}
+        onClose={() => setRenewTarget(null)}
+        onConfirm={() => void renew()}
+      />
+
+      <BindHardwareModal
+        license={hardwareTarget}
+        hardwareId={hardwareId}
+        onHardwareIdChange={setHardwareId}
+        canManage={canManageLicenses}
+        onClose={() => setHardwareTarget(null)}
+        onConfirm={() => void bindHardware()}
+      />
+
+      <DeviceActionModal
+        target={deviceTarget}
+        action={deviceAction}
+        canManage={canManageLicenses}
         onClose={() => { setDeviceTarget(null); setDeviceAction(null); }}
-        title={deviceAction === 'suspend' ? 'إيقاف الجهاز' : deviceAction === 'release' ? 'تحرير الجهاز' : 'إلغاء الجهاز'}
-        size="sm"
-        footer={
-          <div className="flex justify-end gap-2">
-            <Button variant="ghost" onClick={() => { setDeviceTarget(null); setDeviceAction(null); }}>إلغاء</Button>
-            <Button variant="danger" onClick={() => void executeDeviceAction()} disabled={!canManageLicenses}>
-              {deviceAction === 'suspend' ? 'تأكيد الإيقاف' : deviceAction === 'release' ? 'تأكيد التحرير' : 'تأكيد الإلغاء'}
-            </Button>
-          </div>
-        }
-      >
-        {deviceTarget && (
-          <>
-            <p className="text-[11px] text-ink-secondary mb-3">
-              الجهاز: <span className="font-mono text-[10px] text-ink" dir="ltr">{deviceTarget.hardwareId}</span>
-            </p>
-            <p className="text-[11px] text-ink-secondary mb-1">
-              الإجراء: {deviceAction === 'suspend' ? 'إيقاف' : deviceAction === 'release' ? 'تحرير' : 'إلغاء'}
-            </p>
-          </>
-        )}
-      </Modal>
+        onConfirm={() => void executeDeviceAction()}
+      />
     </div>
   );
 };

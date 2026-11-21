@@ -30,6 +30,8 @@ export interface PlatformTenantUser {
   inviteExpiresAt?: string | null,
   provisionedAt?: string | null,
   lastError?: string | null,
+  /** Where the directory row came from: 'PLATFORM' (console-created) or 'DEVICE' (reported by tenant ERP). */
+  origin?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -60,4 +62,10 @@ export interface PlatformTenantUserProvisioningResult {
   loginUrl?: string;
   provisioned: boolean;
   message: string;
+}
+
+/** Cross-tenant directory row used by the super-admin monitoring view. */
+export interface PlatformTenantUserDirectoryEntry extends PlatformTenantUser {
+  tenantName: string;
+  tenantCode?: string | null;
 }

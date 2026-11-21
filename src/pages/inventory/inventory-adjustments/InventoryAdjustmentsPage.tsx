@@ -8,6 +8,7 @@ import { CheckCircle2, ChevronRight, FileText, Plus, Search, Wrench } from 'luci
 import { DatabaseManager } from '../../../database/repositories/databaseManager';
 import { AuthService } from '../../../services/domains/auth/AuthService';
 import { PermissionService } from '../../../services/domains/auth/PermissionService';
+import { usePageAccess } from '../../../hooks/domains/licensing/usePageAccess';
 import { BranchAccessService } from '../../../services/domains/auth/BranchAccessService';
 import { InventoryService } from '../../../services/domains/inventory/InventoryService';
 import { formatProductQuantity, getStockQuantityLabel } from '../../../utils/products/productUnits';
@@ -102,8 +103,14 @@ export const InventoryAdjustmentsPage: React.FC = () => {
   const toast = useToast();
   const actor = AuthService.getCurrentUser();
   const canCreate = PermissionService.can(actor, 'inventory.adjust');
-  const canApprove = PermissionService.can(actor, 'inventory.adjustment.approve');
-  const canPost = PermissionService.can(actor, 'inventory.adjustment.post');
+  // قيود أقسام التسويات من المنصة المركزية — قائمة/أصناف/موافقات.
+  const pageAccess = usePageAccess('/inventory/adjustments');
+  const canViewList = pageAccess.allows('ui.inventory.adjustments.section.list.view');
+  const canViewItems = pageAccess.allows('ui.inventory.adjustments.section.items.view');
+  const canManageItems = pageAccess.allows('ui.inventory.adjustments.section.items.manage');
+  const canViewApprovals = pageAccess.allows('ui.inventory.adjustments.section.approvals.view');
+  const canApprove = canViewApprovals && PermissionService.can(actor, 'inventory.adjustment.approve');
+  const canPost = canViewApprovals && PermissionService.can(actor, 'inventory.adjustment.post');
   const [adjustments, setAdjustments] = useState<Adjustment[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
@@ -172,6 +179,10 @@ export const InventoryAdjustmentsPage: React.FC = () => {
   };
 
   const handleViewDetails = (adjustment: Adjustment) => {
+    if (!canViewItems) {
+      toast.warning('عرض بنود التسوية معطل من إعدادات المنصة.');
+      return;
+    }
     const db = DatabaseManager.getInstance();
     try {
       branchAccess.requireWarehouseAccess(adjustment.warehouseId);
@@ -261,7 +272,7 @@ export const InventoryAdjustmentsPage: React.FC = () => {
           icon={<Wrench className="w-5 h-5" />}
           title="تسويات المخزون"
           description="طلب ← اعتماد من مستخدم آخر ← ترحيل مخزني ومالي"
-          actions={canCreate && (
+          actions={canCreate && canManageItems && (
             <ActivityGate element="new-adjustment"><button
               onClick={() => { setErrorMsg(''); setShowCreateModal(true); }}
               className="flex items-center gap-2 px-4 py-2 bg-warning hover:bg-warning text-white rounded-xl text-sm font-semibold transition shrink-0"
@@ -273,6 +284,7 @@ export const InventoryAdjustmentsPage: React.FC = () => {
         />
       </div>
 
+      {canViewList && (
       <div className="flex flex-wrap items-center gap-2 border-b border-line bg-warning-soft px-6 py-2 text-xs text-warning">
         <span className="rounded-full bg-warning px-2 py-1 font-black">{pendingCount}</span>
         <span>طلب تسوية بانتظار الاعتماد أو الترحيل</span>
@@ -280,7 +292,9 @@ export const InventoryAdjustmentsPage: React.FC = () => {
           <span className="text-warning">{!canApprove && 'اعتماد: تحتاج صلاحية inventory.adjustment.approve. '}{!canPost && 'ترحيل: تحتاج صلاحية inventory.adjustment.post.'}</span>
         )}
       </div>
+      )}
 
+      {canViewList && (<>
       <div className="p-4 bg-surface border-b border-line flex gap-3">
         <div className="relative flex-1">
           <Search className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
@@ -373,6 +387,7 @@ export const InventoryAdjustmentsPage: React.FC = () => {
           </div>
         )}
       </div>
+      </>)}
 
       <AdjustmentModals
         showDetailModal={showDetailModal}

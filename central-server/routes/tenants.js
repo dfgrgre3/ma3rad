@@ -293,6 +293,37 @@ function mapTenantUserRow(row) {
   };
 }
 
+// ─── Tenant-identity provisioning queue ──────────────────────────────────────
+// Every mutation of a directory user that is (or will be) provisioned into the
+// tenant ERP's local `users` table enqueues one job. The tenant device claims
+// and executes it through /api/v1/device/provisioning/*.
+
+async function enqueueProvisioningJob(db, { tenantId, tenantUserId, event, payload }) {
+  const id = `tpj_${uuidv4().replace(/-/g, '').slice(0, 12)}`;
+  const now = nowIso();
+  await db.run(
+    `INSERT INTO platform_tenant_provisioning_jobs (id, tenant_id, tenant_user_id, event, payload, status, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, 'PENDING', ?, ?)`,
+    [id, tenantId, tenantUserId, event, JSON.stringify(payload || {}), now, now]
+  );
+  return id;
+}
+
+async function cancelPendingProvisioningJobs(db, tenantUserId) {
+  const now = nowIso();
+  await db.run(
+    `UPDATE platform_tenant_provisioning_jobs
+        SET status = 'CANCELLED', completed_at = ?, updated_at = ?
+      WHERE tenant_user_id = ? AND status IN ('PENDING', 'CLAIMED')`,
+    [now, now, tenantUserId]
+  );
+}
+
+function isProvisionableRow(row) {
+  const status = row?.provisioning_status;
+  return Boolean(status) && status !== 'DIRECTORY_ONLY' && status !== 'NOT_REQUESTED';
+}
+
 function mapOverrideRow(row) {
   if (!row) return null;
   return {
@@ -754,6 +785,68 @@ router.post(
   }
 );
 
+/** Update the tenant account profile; optional password sets a new one. */
+router.put(
+  '/:id/account',
+  authenticatePlatformUser,
+  requirePlatformPermission(['platform.tenants.update', 'platform.tenants.manage']),
+  async (req, res, next) => {
+    try {
+      const db = getDb();
+      const { id } = req.params;
+      if (!(await assertTenantAccess(req, res, id))) return;
+      const account = await db.get('SELECT * FROM platform_tenant_accounts WHERE tenant_id = ?', [id]);
+      if (!account) return res.status(404).json({ error: 'Tenant account not found' });
+
+      const { username, email, fullName, password } = req.body || {};
+      let nextUsername = account.username;
+      if (username !== undefined) {
+        nextUsername = String(username).trim().toLowerCase();
+        if (!/^[a-z0-9._-]{3,24}$/.test(nextUsername)) {
+          return res.status(400).json({ error: 'username must be 3-24 chars of a-z, 0-9, . _ -' });
+        }
+        if (nextUsername !== account.username) {
+          const clash = await db.get('SELECT 1 FROM platform_tenant_accounts WHERE username = ? AND id != ?', [nextUsername, account.id]);
+          if (clash) return res.status(400).json({ error: 'Username already taken' });
+        }
+      }
+      if (password !== undefined && password !== null && String(password).length > 0 && String(password).length < 8) {
+        return res.status(400).json({ error: 'Password must be at least 8 characters' });
+      }
+
+      const sets = ['username = ?', 'email = ?', 'full_name = ?', 'updated_at = ?'];
+      const params = [
+        nextUsername,
+        email !== undefined ? email : account.email,
+        fullName !== undefined ? (fullName ? String(fullName).trim() : null) : account.full_name,
+        nowIso(),
+      ];
+      if (password !== undefined && password !== null && String(password).length > 0) {
+        sets.push('password_hash = ?');
+        params.push(await bcrypt.hash(String(password), 10));
+      }
+      params.push(account.id);
+      await db.run(`UPDATE platform_tenant_accounts SET ${sets.join(', ')} WHERE id = ?`, params);
+      await recordAuditEvent({
+        actorId: req.platformUser?.id,
+        actorName: req.platformUser?.full_name,
+        tenantId: id,
+        action: 'TENANT_ACCOUNT_UPDATED',
+        resourceType: 'platform_tenant_accounts',
+        resourceId: account.id,
+        beforeData: { username: account.username },
+        afterData: { username: nextUsername, passwordChanged: Boolean(password) },
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+      const updated = await db.get('SELECT * FROM platform_tenant_accounts WHERE id = ?', [account.id]);
+      res.json(mapAccount(updated));
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
 /** Suspend/reactivate the tenant's ERP admin account. */
 router.post(
   '/:id/account/status',
@@ -853,6 +946,23 @@ router.post(
          provisionIdentity ? inviteExpiresAt : null, now, now]
       );
       const row = await db.get('SELECT * FROM platform_tenant_users WHERE id = ?', [userId]);
+      if (provisionIdentity) {
+        await enqueueProvisioningJob(db, {
+          tenantId: id,
+          tenantUserId: userId,
+          event: 'PROVISION',
+          payload: {
+            username: finalUsername,
+            fullName: String(fullName).trim(),
+            email: email ?? null,
+            phone: phone ?? null,
+            role: role || 'USER',
+            temporaryPassword: String(temporaryPassword),
+            mode,
+            inviteExpiresAt,
+          },
+        });
+      }
       await recordAuditEvent({
         actorId: req.platformUser?.id, actorName: req.platformUser?.full_name, tenantId: id,
         action: 'TENANT_USER_CREATED', resourceType: 'platform_tenant_users', resourceId: userId,
@@ -881,10 +991,13 @@ router.put(
       if (!existing) return res.status(404).json({ error: 'User not found' });
       if (!(await assertTenantAccess(req, res, id))) return;
       const { fullName, username, email, phone, role, notes, status } = req.body || {};
+      const nextUsername = username !== undefined
+        ? String(username).trim().toLowerCase()
+        : existing.username;
       await db.run(
         `UPDATE platform_tenant_users SET username=?, full_name=?, email=?, phone=?, role=?, notes=?, status=?, updated_at=? WHERE id=?`,
         [
-          username !== undefined ? String(username).trim().toLowerCase() : existing.username,
+          nextUsername,
           fullName !== undefined ? String(fullName).trim() : existing.full_name,
           email !== undefined ? email : existing.email,
           phone !== undefined ? phone : existing.phone,
@@ -894,6 +1007,22 @@ router.put(
           nowIso(), userId,
         ]
       );
+      if (isProvisionableRow(existing)) {
+        await enqueueProvisioningJob(db, {
+          tenantId: id,
+          tenantUserId: userId,
+          event: 'UPDATE',
+          payload: {
+            username: nextUsername,
+            previousUsername: nextUsername !== existing.username ? existing.username : null,
+            fullName: fullName !== undefined ? String(fullName).trim() : existing.full_name,
+            email: email !== undefined ? email : existing.email,
+            phone: phone !== undefined ? phone : existing.phone,
+            role: role !== undefined ? role : existing.role,
+            isActive: (status !== undefined ? status : existing.status) === 'ACTIVE',
+          },
+        });
+      }
       const row = await db.get('SELECT * FROM platform_tenant_users WHERE id = ?', [userId]);
       res.json(mapTenantUserRow(row));
     } catch (err) { next(err); }
@@ -911,6 +1040,15 @@ router.delete(
       const existing = await db.get('SELECT * FROM platform_tenant_users WHERE id = ? AND tenant_id = ?', [userId, id]);
       if (!existing) return res.status(404).json({ error: 'User not found' });
       if (!(await assertTenantAccess(req, res, id))) return;
+      await cancelPendingProvisioningJobs(db, userId);
+      if (isProvisionableRow(existing)) {
+        await enqueueProvisioningJob(db, {
+          tenantId: id,
+          tenantUserId: userId,
+          event: 'DELETE',
+          payload: { username: existing.username },
+        });
+      }
       await db.run('DELETE FROM platform_tenant_users WHERE id = ?', [userId]);
       await recordAuditEvent({
         actorId: req.platformUser?.id, actorName: req.platformUser?.full_name, tenantId: id,
@@ -937,6 +1075,14 @@ router.post(
       if (!(await assertTenantAccess(req, res, id))) return;
       await db.run('UPDATE platform_tenant_users SET status = ?, is_active = ?, updated_at = ? WHERE id = ?',
         [isActive ? 'ACTIVE' : 'SUSPENDED', isActive ? 1 : 0, nowIso(), userId]);
+      if (isProvisionableRow(existing)) {
+        await enqueueProvisioningJob(db, {
+          tenantId: id,
+          tenantUserId: userId,
+          event: 'STATUS',
+          payload: { username: existing.username, isActive },
+        });
+      }
       const row = await db.get('SELECT * FROM platform_tenant_users WHERE id = ?', [userId]);
       res.json(mapTenantUserRow(row));
     } catch (err) { next(err); }
@@ -962,6 +1108,21 @@ router.post(
            provisioning_status='INVITED', status='INVITED', last_error=NULL, updated_at=? WHERE id=?`,
         [await bcrypt.hash(inviteCode, 10), await bcrypt.hash(temporaryPassword, 10), inviteExpiresAt, nowIso(), userId]
       );
+      await enqueueProvisioningJob(db, {
+        tenantId: id,
+        tenantUserId: userId,
+        event: 'PROVISION',
+        payload: {
+          username: existing.username,
+          fullName: existing.full_name,
+          email: existing.email,
+          phone: existing.phone,
+          role: existing.role,
+          temporaryPassword: String(temporaryPassword),
+          mode: 'INVITE',
+          inviteExpiresAt,
+        },
+      });
       const row = await db.get('SELECT * FROM platform_tenant_users WHERE id = ?', [userId]);
       res.json({ user: mapTenantUserRow(row), inviteCode, temporaryPassword });
     } catch (err) { next(err); }
@@ -1328,6 +1489,137 @@ router.delete(
       });
       res.json({ data: { id: branchId, status: 'CLOSED' }, requestId: req.requestId });
     } catch (err) { next(err); }
+  }
+);
+
+// ─── Tenant API keys ─────────────────────────────────────────────────────────
+// Customer-scoped keys for /api/v1/tenant/v1/*. The plaintext key is returned
+// exactly once at creation; only its SHA-256 is stored.
+
+const API_KEY_SCOPES = new Set(['read', '*']);
+
+function mapApiKeyRow(row) {
+  if (!row) return null;
+  let scopes = [];
+  try { scopes = JSON.parse(row.scopes || '[]'); } catch { scopes = []; }
+  return {
+    id: row.id,
+    tenantId: row.tenant_id ?? null,
+    name: row.name,
+    prefix: row.prefix ?? null,
+    scopes: Array.isArray(scopes) ? scopes : [],
+    isActive: Boolean(row.is_active) && !row.revoked_at,
+    lastUsedAt: row.last_used_at ?? null,
+    expiresAt: row.expires_at ?? null,
+    createdAt: row.created_at,
+    revokedAt: row.revoked_at ?? null,
+  };
+}
+
+router.get(
+  '/:id/api-keys',
+  authenticatePlatformUser,
+  requirePlatformPermission(['platform.tenants.view', 'platform.tenants.manage']),
+  async (req, res, next) => {
+    try {
+      const db = getDb();
+      const { id } = req.params;
+      if (!(await getTenantOr404(db, req, res, id))) return;
+      const rows = await db.all(
+        'SELECT * FROM platform_api_keys WHERE tenant_id = ? ORDER BY created_at DESC',
+        [id]
+      );
+      res.json(rows.map(mapApiKeyRow));
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+router.post(
+  '/:id/api-keys',
+  authenticatePlatformUser,
+  requirePlatformPermission(['platform.tenants.update', 'platform.tenants.manage']),
+  async (req, res, next) => {
+    try {
+      const db = getDb();
+      const { id } = req.params;
+      const tenant = await getTenantOr404(db, req, res, id);
+      if (!tenant) return;
+
+      const name = String(req.body?.name || '').trim();
+      if (!name) return res.status(400).json({ error: 'name is required' });
+      const scopes = Array.isArray(req.body?.scopes) && req.body.scopes.length
+        ? [...new Set(req.body.scopes.map(String))]
+        : ['read'];
+      const invalidScope = scopes.find((s) => !API_KEY_SCOPES.has(s));
+      if (invalidScope) {
+        return res.status(400).json({ error: `Unsupported scope '${invalidScope}'. Allowed: ${[...API_KEY_SCOPES].join(', ')}` });
+      }
+      const expiresInDays = req.body?.expiresInDays != null ? Number(req.body.expiresInDays) : null;
+      if (expiresInDays != null && (!Number.isFinite(expiresInDays) || expiresInDays <= 0)) {
+        return res.status(400).json({ error: 'expiresInDays must be a positive number' });
+      }
+
+      const { hashApiKey, KEY_PATTERN } = require('../lib/apiKeyAuth');
+      const keyId = `key_${uuidv4().replace(/-/g, '').slice(0, 12)}`;
+      const plainKey = `pk_${crypto.randomBytes(24).toString('hex')}`;
+      if (!KEY_PATTERN.test(plainKey)) throw new Error('generated key failed format check');
+      const expiresAt = expiresInDays
+        ? new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000).toISOString()
+        : null;
+      const now = nowIso();
+      await db.run(
+        `INSERT INTO platform_api_keys
+           (id, tenant_id, key_type, name, key_hash, prefix, scopes, is_active, expires_at, created_by, created_at)
+         VALUES (?, ?, 'TENANT', ?, ?, ?, ?, 1, ?, ?, ?)`,
+        [keyId, id, name.slice(0, 120), hashApiKey(plainKey), plainKey.slice(0, 12), JSON.stringify(scopes), expiresAt, req.platformUser?.id, now]
+      );
+      const row = await db.get('SELECT * FROM platform_api_keys WHERE id = ?', [keyId]);
+      await recordAuditEvent({
+        actorId: req.platformUser?.id,
+        actorName: req.platformUser?.full_name,
+        tenantId: id,
+        action: 'TENANT_API_KEY_CREATED',
+        resourceType: 'platform_api_keys',
+        resourceId: keyId,
+        afterData: { name, scopes },
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+      res.status(201).json({ ...mapApiKeyRow(row), key: plainKey });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+router.delete(
+  '/:id/api-keys/:keyId',
+  authenticatePlatformUser,
+  requirePlatformPermission(['platform.tenants.update', 'platform.tenants.manage']),
+  async (req, res, next) => {
+    try {
+      const db = getDb();
+      const { id, keyId } = req.params;
+      if (!(await getTenantOr404(db, req, res, id))) return;
+      const key = await db.get('SELECT * FROM platform_api_keys WHERE id = ? AND tenant_id = ?', [keyId, id]);
+      if (!key) return res.status(404).json({ error: 'API key not found' });
+      await db.run('UPDATE platform_api_keys SET is_active = 0, revoked_at = ? WHERE id = ?', [nowIso(), keyId]);
+      await recordAuditEvent({
+        actorId: req.platformUser?.id,
+        actorName: req.platformUser?.full_name,
+        tenantId: id,
+        action: 'TENANT_API_KEY_REVOKED',
+        resourceType: 'platform_api_keys',
+        resourceId: keyId,
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+      res.json({ data: { id: keyId, revoked: true }, requestId: req.requestId });
+    } catch (err) {
+      next(err);
+    }
   }
 );
 

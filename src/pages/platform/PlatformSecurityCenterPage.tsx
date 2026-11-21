@@ -11,11 +11,16 @@ import { getCentralDataSourceState } from '../../hooks/platform/useCentralDataSo
 import { canPlatform } from '../../hooks/platform/usePlatformPermission';
 import type {
   PlatformCentralSecurityOverview,
+  PlatformCentralSecurityIncident,
   PlatformApiKey,
   PlatformTenant,
   PlatformStaffSession,
+  PlatformStaffLogin,
   PlatformSigningKey,
+  PlatformSecurityEvent,
+  PlatformSecurityEventSeverity,
 } from '../../services/domains/platform/platformTypes';
+import type { CentralSecurityEventRow } from '../../services/domains/platform/PlatformAdminApiClient/centralTypes';
 import { CentralUnsupportedNotice } from './components/CentralUnsupportedNotice';
 import type { PlatformOwnerAuditEntry } from '../../services/domains/platform/PlatformBootstrapService';
 import { PageHeader } from '../../components/ui/PageHeader';
@@ -27,6 +32,7 @@ import { TabsBar } from './PlatformSecurityCenterPage/TabsBar';
 import { OverviewTab } from './PlatformSecurityCenterPage/OverviewTab';
 import { SessionsTab } from './PlatformSecurityCenterPage/SessionsTab';
 import { LoginsTab } from './PlatformSecurityCenterPage/LoginsTab';
+import { EventsTab } from './PlatformSecurityCenterPage/EventsTab';
 import { KeysTab } from './PlatformSecurityCenterPage/KeysTab';
 import { IncidentsTab } from './PlatformSecurityCenterPage/IncidentsTab';
 import { IncidentModal } from './PlatformSecurityCenterPage/IncidentModal';
@@ -49,6 +55,87 @@ const parseScopes = (value: unknown): string[] => {
   }
   return [];
 };
+
+const parseMetadata = (value: unknown): Record<string, unknown> | null => {
+  if (value && typeof value === 'object' && !Array.isArray(value)) return value as Record<string, unknown>;
+  if (typeof value === 'string' && value) {
+    try {
+      const parsed = JSON.parse(value);
+      return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : null;
+    } catch {
+      return null;
+    }
+  }
+  return null;
+};
+
+const EVENT_SEVERITIES: PlatformSecurityEventSeverity[] = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO'];
+
+const normalizeEventSeverity = (value?: string | null): PlatformSecurityEventSeverity => {
+  const upper = String(value ?? '').toUpperCase();
+  return (EVENT_SEVERITIES as string[]).includes(upper) ? (upper as PlatformSecurityEventSeverity) : 'INFO';
+};
+
+const mapCentralSecurityEvent = (row: CentralSecurityEventRow): PlatformSecurityEvent => ({
+  id: String(row.id),
+  eventType: String(row.event_type ?? row.eventType ?? 'UNKNOWN'),
+  severity: normalizeEventSeverity(row.severity),
+  title: String(row.title ?? row.event_type ?? 'حدث أمني'),
+  description: row.description ?? null,
+  sourceIp: row.source_ip ?? row.sourceIp ?? null,
+  tenantId: row.tenant_id ?? row.tenantId ?? null,
+  staffId: row.staff_id ?? row.staffId ?? null,
+  staffName: row.staff_name ?? row.staffName ?? null,
+  metadata: parseMetadata(row.metadata),
+  createdAt: String(row.created_at ?? row.createdAt ?? ''),
+});
+
+/** Central mode has no incidents endpoint — surface CRITICAL security events as read-only incident candidates. */
+const eventToIncidentCandidate = (event: PlatformSecurityEvent): PlatformCentralSecurityIncident => ({
+  id: `evt-${event.id}`,
+  type: event.eventType,
+  severity: event.severity === 'INFO' || event.severity === 'LOW' ? 'MEDIUM' : (event.severity as PlatformCentralSecurityIncident['severity']),
+  title: event.title,
+  description: event.description ?? null,
+  details: event.description ?? null,
+  sourceIp: event.sourceIp ?? null,
+  ipAddress: event.sourceIp ?? null,
+  tenantId: event.tenantId ?? null,
+  staffId: event.staffId ?? null,
+  status: 'OPEN',
+  createdAt: event.createdAt,
+  updatedAt: event.createdAt,
+});
+
+const loginToSecurityEvent = (login: PlatformStaffLogin): PlatformSecurityEvent => ({
+  id: `login-${login.id}`,
+  eventType: login.status === 'SUCCESS' ? 'LOGIN_SUCCESS' : login.status === 'BLOCKED' ? 'LOGIN_BLOCKED' : 'LOGIN_FAILED',
+  severity: login.status === 'SUCCESS' ? 'INFO' : login.status === 'BLOCKED' ? 'HIGH' : 'MEDIUM',
+  title: login.status === 'SUCCESS'
+    ? 'تسجيل دخول ناجح'
+    : login.status === 'BLOCKED'
+    ? 'محاولة دخول من IP محظور'
+    : 'محاولة دخول فاشلة',
+  description: login.failureReason ?? null,
+  sourceIp: login.ipAddress ?? null,
+  staffId: login.staffId ?? null,
+  staffName: login.username ?? login.email ?? null,
+  metadata: { email: login.email, userAgent: login.userAgent ?? null, mfaUsed: login.mfaUsed ?? null },
+  createdAt: login.attemptedAt,
+});
+
+const incidentToSecurityEvent = (incident: PlatformCentralSecurityIncident): PlatformSecurityEvent => ({
+  id: `incident-${incident.id}`,
+  eventType: 'SECURITY_INCIDENT',
+  severity: normalizeEventSeverity(incident.severity?.toLowerCase()),
+  title: incident.title,
+  description: incident.details ?? incident.description ?? null,
+  sourceIp: incident.sourceIp ?? incident.ipAddress ?? null,
+  tenantId: incident.tenantId ?? null,
+  staffId: incident.staffId ?? null,
+  metadata: { incidentStatus: incident.status, containmentAction: incident.containmentAction ?? null },
+  createdAt: incident.createdAt,
+});
 
 const mapCentralSession = (row: any): PlatformStaffSession => ({
   id: String(row.id),
@@ -95,6 +182,8 @@ const mapCentralSigningKey = (row: any, currentKeyId: string | null): PlatformSi
   };
 };
 
+const AUTO_REFRESH_MS = 30_000;
+
 export const PlatformSecurityCenterPage: React.FC = () => {
   const toast = useToast();
   const [tab, setTab] = useState<SecurityTab>('OVERVIEW');
@@ -106,6 +195,7 @@ export const PlatformSecurityCenterPage: React.FC = () => {
   const [ownerAccounts, setOwnerAccounts] = useState<PlatformOwnerAuditEntry[]>([]);
   const [isCentral, setIsCentral] = useState(false);
   const [ipBans, setIpBans] = useState<PlatformIpBan[]>([]);
+  const [lastLoadedAt, setLastLoadedAt] = useState<Date | null>(null);
 
   // Filters
   const [loginFilterFailed, setLoginFilterFailed] = useState(false);
@@ -134,13 +224,13 @@ export const PlatformSecurityCenterPage: React.FC = () => {
   // Load Security Overview
   const canManageSecurity = canPlatform('security-center');
 
-  const loadSecurity = useCallback(async () => {
-    setLoading(true);
+  const loadSecurity = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const centralState = getCentralDataSourceState();
       setIsCentral(centralState.active);
       if (centralState.active) {
-        const [overviewRaw, sessionsRaw, devicesRaw, keysRaw, tenantList, bans, signingRaw, settings] = await Promise.all([
+        const [overviewRaw, sessionsRaw, devicesRaw, keysRaw, tenantList, bans, signingRaw, settings, eventsRaw, staffRaw] = await Promise.all([
           centralPlatformClient.getSecurityOverview(),
           centralPlatformClient.listStaffSessions(),
           centralPlatformClient.listStaffDevices(),
@@ -149,6 +239,8 @@ export const PlatformSecurityCenterPage: React.FC = () => {
           centralPlatformClient.listIpBans(),
           centralPlatformClient.listCentralSigningKeys(),
           centralPlatformClient.getSettings().catch(() => ({} as Record<string, string>)),
+          centralPlatformClient.listSecurityEvents({ limit: 200 }).catch(() => []),
+          centralPlatformClient.listAdminControlStaff().catch(() => []),
         ]);
         const overview = (overviewRaw ?? {}) as Record<string, any>;
         const signing = (signingRaw ?? {}) as { keys?: any[]; currentKeyId?: string | null };
@@ -157,39 +249,85 @@ export const PlatformSecurityCenterPage: React.FC = () => {
         const failedLogins24h = Number(overview.failedLogins24h ?? 0);
         const activeSessions = Number(overview.activeSessions ?? sessions.length);
         const mfaEnforcement = (settings['platform.staffMfaEnforcement'] as 'off' | 'optional' | 'required' | undefined) ?? 'optional';
-        // Central overview endpoint only exposes raw counters — derive the
-        // same posture shape the tabs expect.
-        const securityScore = Math.max(
-          0,
-          Math.min(100, 100 - Math.min(30, failedLogins24h * 2) - (activeSessions > 50 ? 10 : 0)),
-        );
+
+        const securityEvents = (Array.isArray(eventsRaw) ? eventsRaw : []).map(mapCentralSecurityEvent);
+        const events24hBySeverity: Record<string, number> = {};
+        for (const item of Array.isArray(overview.events24h) ? overview.events24h : []) {
+          const sev = normalizeEventSeverity(item?.severity);
+          events24hBySeverity[sev] = (events24hBySeverity[sev] ?? 0) + Number(item?.count ?? 0);
+        }
+
+        // Real MFA compliance from admin-control staff rows (mfa_enabled may be absent).
+        const staffRows = (Array.isArray(staffRaw) ? staffRaw : []).filter((row: any) => {
+          const active = row.is_active ?? row.isActive;
+          const deleted = row.deleted_at ?? row.deletedAt;
+          return active !== 0 && active !== false && !deleted;
+        });
+        const mfaFieldPresent = staffRows.some((row: any) => row.mfaEnabled !== undefined || row.mfa_enabled !== undefined);
+        const compliantStaffCount = staffRows.filter((row: any) => Boolean(row.mfaEnabled ?? row.mfa_enabled)).length;
+
+        // CRITICAL security events double as read-only incident candidates centrally.
+        const incidentCandidates = securityEvents
+          .filter((event) => event.severity === 'CRITICAL')
+          .map(eventToIncidentCandidate);
+        const openIncidents = incidentCandidates.length;
+
+        let securityScore = 100;
+        securityScore -= Math.min(30, failedLogins24h * 2);
+        securityScore -= Math.min(25, (events24hBySeverity.CRITICAL ?? 0) * 10 + (events24hBySeverity.HIGH ?? 0) * 5);
+        securityScore -= openIncidents * 10 > 20 ? 20 : openIncidents * 10;
+        securityScore -= activeSessions > 50 ? 10 : 0;
+        if (mfaEnforcement === 'required' && mfaFieldPresent && staffRows.length > 0 && compliantStaffCount < staffRows.length) {
+          securityScore -= 10;
+        }
+        securityScore = Math.max(0, Math.min(100, securityScore));
+
         setData({
           securityScore,
           twoFactorEnforcement: {
             enabled: mfaEnforcement === 'required',
-            compliantStaffCount: 0,
-            totalStaffCount: 0,
+            compliantStaffCount: mfaFieldPresent ? compliantStaffCount : 0,
+            totalStaffCount: mfaFieldPresent ? staffRows.length : 0,
           },
           activeStaffSessionsCount: activeSessions,
           failedLogins24hCount: failedLogins24h,
-          activeIncidentsCount: 0,
+          activeIncidentsCount: openIncidents,
           signingKeysCount: Array.isArray(signing.keys) ? signing.keys.length : 0,
           trustedDevicesCount: devicesCount,
           sessions,
           recentLogins: [],
-          incidents: [],
+          incidents: incidentCandidates,
           signingKeys: (signing.keys ?? []).map((k) => mapCentralSigningKey(k, signing.currentKeyId ?? null)),
+          securityEvents,
+          events24hBySeverity,
         });
         setApiKeys((keysRaw as any[]).map(mapCentralApiKey));
         setTenants(tenantList as any);
         setIpBans(bans as PlatformIpBan[]);
       } else {
         setIpBans([]);
-        setData(platformAdminService.getPlatformSecurityOverview());
+        const overview = platformAdminService.getPlatformSecurityOverview();
+        // Local mode has no security-events table — synthesize the feed from
+        // staff logins and incidents so the EVENTS tab works identically.
+        const synthesizedEvents: PlatformSecurityEvent[] = [
+          ...overview.recentLogins.map(loginToSecurityEvent),
+          ...overview.incidents.map(incidentToSecurityEvent),
+        ]
+          .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+          .slice(0, 200);
+        const localEvents24h: Record<string, number> = {};
+        const dayAgo = Date.now() - 24 * 60 * 60 * 1000;
+        for (const event of synthesizedEvents) {
+          if (new Date(event.createdAt).getTime() >= dayAgo) {
+            localEvents24h[event.severity] = (localEvents24h[event.severity] ?? 0) + 1;
+          }
+        }
+        setData({ ...overview, securityEvents: synthesizedEvents, events24hBySeverity: localEvents24h });
         setApiKeys(platformAdminService.listApiKeys());
         setTenants(platformAdminService.listTenants());
       }
       setError(null);
+      setLastLoadedAt(new Date());
     } catch (err) {
       setError(err instanceof Error ? err.message : 'تعذر تحميل مركز الأمان.');
     } finally {
@@ -199,12 +337,20 @@ export const PlatformSecurityCenterPage: React.FC = () => {
       } catch {
         setOwnerAccounts([]);
       }
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, []);
 
   useEffect(() => {
     loadSecurity();
+  }, [loadSecurity]);
+
+  // Silent auto-refresh — paused while the tab is hidden to avoid needless calls.
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      if (!document.hidden) void loadSecurity(true);
+    }, AUTO_REFRESH_MS);
+    return () => window.clearInterval(timer);
   }, [loadSecurity]);
 
   // Revoke Single Session
@@ -426,6 +572,16 @@ export const PlatformSecurityCenterPage: React.FC = () => {
     }
   };
 
+  // Quick-ban from a session/event/login row — same confirm flow, tagged reason.
+  const handleQuickBanIp = async (ip: string) => {
+    if (!ip || !isCentral) return;
+    try {
+      await handleBanIp({ ipAddress: ip, reason: 'حظر سريع من مركز الأمان' });
+    } catch {
+      // handleBanIp already surfaced the error toast.
+    }
+  };
+
   const handleLiftIpBan = (id: string) => {
     if (!confirm('هل أنت متأكد من فك حظر عنوان IP هذا؟')) return;
     void (async () => {
@@ -477,6 +633,49 @@ export const PlatformSecurityCenterPage: React.FC = () => {
     });
   }, [data, loginFilterFailed, loginSearch]);
 
+  // Central mode has no staff-login endpoint — derive login rows from
+  // login-type security events (best effort) so the tab is not dead.
+  const centralLogins = useMemo<PlatformStaffLogin[]>(() => {
+    if (!isCentral || !data?.securityEvents) return [];
+    return data.securityEvents
+      .filter((event) => event.eventType.includes('LOGIN') || event.eventType.includes('AUTH'))
+      .map((event) => {
+        const meta = event.metadata ?? {};
+        const success = meta.success === true || meta.succeeded === true;
+        const blocked = String(event.eventType).includes('BLOCK') || String(event.severity) === 'CRITICAL';
+        return {
+          id: event.id,
+          staffId: event.staffId ?? null,
+          username: event.staffName ?? null,
+          email: String(meta.email ?? meta.username ?? event.staffName ?? event.title ?? '—'),
+          ipAddress: event.sourceIp ?? null,
+          userAgent: typeof meta.userAgent === 'string' ? meta.userAgent : null,
+          status: success ? 'SUCCESS' : blocked ? 'BLOCKED' : 'FAILED',
+          failureReason: event.description ?? null,
+          mfaUsed: typeof meta.mfaUsed === 'boolean' ? meta.mfaUsed : undefined,
+          attemptedAt: event.createdAt,
+        } satisfies PlatformStaffLogin;
+      })
+      .sort((a, b) => new Date(b.attemptedAt).getTime() - new Date(a.attemptedAt).getTime())
+      .slice(0, 150);
+  }, [isCentral, data]);
+
+  const filteredCentralLogins = useMemo(() => {
+    return centralLogins.filter((l) => {
+      if (loginFilterFailed && l.status === 'SUCCESS') return false;
+      if (
+        loginSearch &&
+        !l.email.toLowerCase().includes(loginSearch.toLowerCase()) &&
+        !(l.ipAddress || '').includes(loginSearch)
+      ) {
+        return false;
+      }
+      return true;
+    });
+  }, [centralLogins, loginFilterFailed, loginSearch]);
+
+  const securityEvents = data?.securityEvents ?? [];
+
   if (error) {
     return (
       <div role="alert" className="rounded-xl border border-danger bg-danger/40 p-5 text-danger">
@@ -484,6 +683,9 @@ export const PlatformSecurityCenterPage: React.FC = () => {
           <AlertTriangle className="h-6 w-6 text-danger" />
           <span className="font-bold">{error}</span>
         </div>
+        <Button size="sm" variant="secondary" className="mt-3" onClick={() => loadSecurity()} leadingIcon={<RefreshCw className="h-3.5 w-3.5" />}>
+          إعادة المحاولة
+        </Button>
       </div>
     );
   }
@@ -508,10 +710,15 @@ export const PlatformSecurityCenterPage: React.FC = () => {
         icon={<ShieldCheck className="h-6 w-6 text-success" />}
         actions={
           <div className="flex items-center gap-2">
+            {lastLoadedAt && (
+              <span className="hidden sm:inline text-[10px] text-muted">
+                آخر تحديث: {lastLoadedAt.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}
+              </span>
+            )}
             <Button
               variant="secondary"
               size="sm"
-              onClick={loadSecurity}
+              onClick={() => loadSecurity()}
               leadingIcon={<RefreshCw className="h-3.5 w-3.5" />}
             >
               تحديث
@@ -530,21 +737,29 @@ export const PlatformSecurityCenterPage: React.FC = () => {
       />
 
       {/* Hero: Central Security Posture Score Card */}
-      <SecurityHero data={data} />
+      <SecurityHero data={data} lastUpdated={lastLoadedAt} />
 
       {/* Owner account audit — owner-only review of every account claiming the owner role */}
       <OwnerAccountsSection ownerAccounts={ownerAccounts} />
 
       {/* Navigation Tabs */}
-      <TabsBar tab={tab} onTabChange={setTab} sessionsCount={data.sessions.length} incidentsCount={data.incidents.length} />
+      <TabsBar
+        tab={tab}
+        onTabChange={setTab}
+        sessionsCount={data.sessions.length}
+        incidentsCount={data.incidents.length}
+        eventsCount={securityEvents.length}
+      />
 
       {/* TAB 1: OVERVIEW & ACTIVE THREATS */}
       {tab === 'OVERVIEW' && (
         <OverviewTab
           data={data}
           canManageSecurity={canManageSecurity}
+          isCentral={isCentral}
           onToggleMfaPolicy={handleToggleMfaPolicy}
           onRespondIncident={handleRespondIncident}
+          onNavigateTab={setTab}
         />
       )}
 
@@ -553,27 +768,42 @@ export const PlatformSecurityCenterPage: React.FC = () => {
         <SessionsTab
           sessions={data.sessions}
           canManageSecurity={canManageSecurity}
+          isCentral={isCentral}
           onRevokeSession={handleRevokeSession}
           onRevokeAllOtherSessions={handleRevokeAllOtherSessions}
+          onBanIp={handleQuickBanIp}
         />
       )}
 
-      {/* TAB 3: STAFF LOGINS AUDIT — no central endpoint for the login log yet */}
+      {/* TAB 3: STAFF LOGINS AUDIT — centrally derived from security events */}
       {tab === 'LOGINS' && (
-        isCentral ? (
+        isCentral && centralLogins.length === 0 ? (
           <CentralUnsupportedNotice feature="سجل محاولات دخول الموظفين" />
         ) : (
           <LoginsTab
-            logins={filteredLogins}
+            logins={isCentral ? filteredCentralLogins : filteredLogins}
             loginSearch={loginSearch}
             onLoginSearchChange={setLoginSearch}
             loginFilterFailed={loginFilterFailed}
             onLoginFilterFailedChange={setLoginFilterFailed}
+            isCentral={isCentral}
+            canManageSecurity={canManageSecurity}
+            onBanIp={handleQuickBanIp}
           />
         )
       )}
 
-      {/* TAB 4: API & SIGNING KEYS */}
+      {/* TAB 4: SECURITY EVENTS FEED */}
+      {tab === 'EVENTS' && (
+        <EventsTab
+          events={securityEvents}
+          isCentral={isCentral}
+          canManageSecurity={canManageSecurity}
+          onBanIp={handleQuickBanIp}
+        />
+      )}
+
+      {/* TAB 5: API & SIGNING KEYS */}
       {tab === 'KEYS' && (
         <KeysTab
           signingKeys={data.signingKeys}
@@ -595,20 +825,22 @@ export const PlatformSecurityCenterPage: React.FC = () => {
         />
       )}
 
-      {/* TAB 5: INCIDENTS & EMERGENCY PLAYBOOK — local store only */}
+      {/* TAB 6: INCIDENTS & EMERGENCY PLAYBOOK — central shows CRITICAL events read-only */}
       {tab === 'INCIDENTS' && (
         <>
           {isCentral && <CentralUnsupportedNotice feature="سجل الحوادث الأمنية والاستجابة لها" />}
           <IncidentsTab
             incidents={data.incidents}
-            canManageSecurity={canManageSecurity && !isCentral}
+            canManageSecurity={canManageSecurity}
+            isCentral={isCentral}
             onOpenIncidentModal={() => setIsIncidentModalOpen(true)}
             onRespondIncident={handleRespondIncident}
+            onBanIp={handleQuickBanIp}
           />
         </>
       )}
 
-      {/* TAB 6: IP BANS */}
+      {/* TAB 7: IP BANS */}
       {tab === 'IP_BANS' && (
         <IpBansTab
           bans={ipBans}

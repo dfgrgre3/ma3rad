@@ -31,6 +31,7 @@ const MODULE_ID_PATTERN = /^[a-z][a-z0-9-]{0,40}$/;
 const VERSION_PATTERN = /^[0-9A-Za-z][0-9A-Za-z._-]{0,63}$/;
 const ASSET_PATH_PATTERN = /^assets\/[A-Za-z0-9_][A-Za-z0-9_.-]{0,199}\.(?:js|css)$/;
 const SHA256_PATTERN = /^[a-f0-9]{64}$/;
+const PAGE_PATH_PATTERN = /^\/[A-Za-z0-9_~.:/*-]{0,299}$/;
 const MAX_FILES = 400;
 const MAX_FILE_BYTES = 20 * 1024 * 1024;
 const MAX_PACKAGE_BYTES = 120 * 1024 * 1024;
@@ -84,6 +85,20 @@ function assertManifestShape(manifest) {
   if (typeof manifest.version !== 'string' || !VERSION_PATTERN.test(manifest.version)) fail('bad version');
   if (typeof manifest.buildId !== 'string' || !SHA256_PATTERN.test(manifest.buildId)) fail('bad build id');
   if (!Array.isArray(manifest.files) || manifest.files.length === 0 || manifest.files.length > MAX_FILES) fail('bad file list');
+  // Optional page-level metadata (signed like everything else): which registry
+  // modules may receive this package and which app routes it serves.
+  if (manifest.modules !== undefined) {
+    if (!Array.isArray(manifest.modules) || manifest.modules.length > 32
+      || manifest.modules.some((id) => typeof id !== 'string' || !MODULE_ID_PATTERN.test(id))) {
+      fail('bad modules list');
+    }
+  }
+  if (manifest.pages !== undefined) {
+    if (!Array.isArray(manifest.pages) || manifest.pages.length > 200
+      || manifest.pages.some((p) => typeof p !== 'string' || !PAGE_PATH_PATTERN.test(p))) {
+      fail('bad pages list');
+    }
+  }
   const seen = new Set();
   let total = 0;
   for (const file of manifest.files) {

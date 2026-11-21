@@ -9,32 +9,13 @@ import type {
 } from '../../../services/domains/platform/platformTypes';
 import { useToast } from '../../../components/ui/Toast';
 import { STATUSES } from './constants';
+import { parseCsv, stripBom } from './csv';
 
 interface UseCsvImportOptions {
   plans: PlatformPlan[];
   centralActive: boolean;
   load: () => void;
 }
-
-/** Minimal RFC-4180-ish CSV line parser (handles quotes and escaped quotes). */
-const parseCsvLine = (line: string): string[] => {
-  const values: string[] = [];
-  let current = '';
-  let inQuotes = false;
-  for (let j = 0; j < line.length; j++) {
-    const char = line[j];
-    if (char === '"') {
-      if (inQuotes && line[j + 1] === '"') { current += '"'; j++; }
-      else inQuotes = !inQuotes;
-    } else if (char === ',' && !inQuotes) {
-      values.push(current.trim()); current = '';
-    } else current += char;
-  }
-  values.push(current.trim());
-  return values;
-};
-
-const stripBom = (content: string): string => content.charCodeAt(0) === 0xfeff ? content.slice(1) : content;
 
 const ALLOWED_STATUSES = new Set<string>(STATUSES);
 
@@ -53,8 +34,7 @@ export function useCsvImport({ plans, centralActive, load }: UseCsvImportOptions
     const reader = new FileReader();
     reader.onload = (e) => {
       const content = stripBom((e.target?.result as string) ?? '');
-      const lines = content.trim().split('\n');
-      const preview = lines.slice(0, 5).map(parseCsvLine);
+      const preview = parseCsv(content).slice(0, 5);
       setCsvPreview(preview);
     };
     reader.readAsText(file, 'utf-8');
@@ -77,8 +57,8 @@ export function useCsvImport({ plans, centralActive, load }: UseCsvImportOptions
           seatslimit: 'seatsLimit', 'seats': 'seatsLimit', brancheslimit: 'branchesLimit', branches: 'branchesLimit',
           deviceslimit: 'devicesLimit', devices: 'devicesLimit', notes: 'notes', 'ملاحظات': 'notes',
         };
-        const lines = content.split(/\r?\n/).filter((line) => line.trim().length > 0);
-        const resolvedHeaders = lines.length > 0 ? parseCsvLine(lines[0]).map((h) => headerMap[h.trim().toLowerCase()] ?? null) : [];
+        const rows = parseCsv(content);
+        const resolvedHeaders = rows.length > 0 ? rows[0].map((h) => headerMap[h.trim().toLowerCase()] ?? null) : [];
         // Fetch the tenant directory once and match rows in memory (avoids N+1 API calls).
         const existingTenants: PlatformTenant[] = await centralPlatformClient.listTenants();
         const findExisting = (input: PlatformTenantInput): PlatformTenant | undefined =>
@@ -89,10 +69,10 @@ export function useCsvImport({ plans, centralActive, load }: UseCsvImportOptions
         let created = 0;
         let updated = 0;
         const errors: Array<{ row: number; error: string }> = [];
-        for (let i = 1; i < lines.length; i++) {
+        for (let i = 1; i < rows.length; i++) {
           const rowNumber = i + 1;
           try {
-            const values = parseCsvLine(lines[i]);
+            const values = rows[i];
             const input: Record<string, string | number> = { name: '' };
             values.forEach((value, index) => {
               const field = resolvedHeaders[index];

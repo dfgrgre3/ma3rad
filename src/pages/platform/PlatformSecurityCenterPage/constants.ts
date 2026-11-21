@@ -1,4 +1,4 @@
-export type SecurityTab = 'OVERVIEW' | 'SESSIONS' | 'LOGINS' | 'KEYS' | 'INCIDENTS' | 'IP_BANS';
+export type SecurityTab = 'OVERVIEW' | 'SESSIONS' | 'LOGINS' | 'EVENTS' | 'KEYS' | 'INCIDENTS' | 'IP_BANS';
 
 export interface IncidentFormState {
   type: string;

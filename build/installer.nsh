@@ -6,7 +6,7 @@ Var CeramiApiKeyValue
 
 ; Custom page shown after the install-directory page and before files are
 ; copied: the client enters the license API key (activation code) issued by
-; the central platform. It may be left empty and entered later inside the app.
+; the central platform. It is REQUIRED — the app never asks for it again.
 !macro customPageAfterChangeDir
   Page custom CeramiSysApiKeyPage CeramiSysApiKeyPageLeave
 !macroend
@@ -18,7 +18,7 @@ Function CeramiSysApiKeyPage
     Abort
   ${EndIf}
 
-  ${NSD_CreateLabel} $0 0 0 100% 24u "أدخل كود التفعيل (API Key) الخاص بترخيص البرنامج. يمكنك ترك الحقل فارغًا والتفعيل لاحقًا من داخل البرنامج."
+  ${NSD_CreateLabel} $0 0 0 100% 24u "أدخل كود التفعيل (API Key) الخاص بترخيص البرنامج — مطلوب، وهو الطريقة الوحيدة لإدخاله."
   Pop $0
   ${NSD_CreateText} $0 0 36u 100% 12u ""
   Pop $CeramiApiKeyInput
@@ -29,7 +29,34 @@ FunctionEnd
 
 Function CeramiSysApiKeyPageLeave
   ${NSD_GetText} $CeramiApiKeyInput $1
-  StrCpy $CeramiApiKeyValue $1
+  ; The API key is collected ONLY on this installer page — it cannot be
+  ; entered later inside the app, so an empty value must not pass.
+  StrCmp $1 "" ceramiApiKeyMissing
+  ; The key is embedded verbatim into pending-activation.json — reject
+  ; characters that would break the JSON string.
+  StrStr $1 '"' $3
+  StrCmp $3 "" ceramiApiKeyCheckBackslash
+  Goto ceramiApiKeyBadChars
+  ceramiApiKeyCheckBackslash:
+  StrStr $1 '\' $3
+  StrCmp $3 "" ceramiApiKeyCheckCr
+  Goto ceramiApiKeyBadChars
+  ceramiApiKeyCheckCr:
+  StrStr $1 "$\r" $3
+  StrCmp $3 "" ceramiApiKeyCheckLf
+  Goto ceramiApiKeyBadChars
+  ceramiApiKeyCheckLf:
+  StrStr $1 "$\n" $3
+  StrCmp $3 "" ceramiApiKeyOk
+  ceramiApiKeyBadChars:
+    MessageBox MB_OK|MB_ICONEXCLAMATION "كود التفعيل يحتوي على رموز غير مسموحة — أدخل الكود كما صدر دون أي إضافات."
+    Abort
+  ceramiApiKeyOk:
+    StrCpy $CeramiApiKeyValue $1
+    Return
+  ceramiApiKeyMissing:
+    MessageBox MB_OK|MB_ICONEXCLAMATION "كود التفعيل (API Key) مطلوب ولا يمكن تركه فارغًا."
+    Abort
 FunctionEnd
 !endif
 

@@ -15,7 +15,7 @@ import type {
   PlatformPlanCopyResult,
   PlatformPlanImpactPreview,
 } from './platformTypes';
-import { nowIso, toNumber, safeJsonArray, safeJsonObject, addMonths } from './platformUtils';
+import { nowIso, toNumber, safeJsonArray } from './platformUtils';
 
 export class PlatformPlanService {
   private db = DatabaseManager.getInstance();
@@ -95,9 +95,19 @@ export class PlatformPlanService {
   public listPlans(includeInactive = true): PlatformPlan[] {
     PlatformPlanService.requirePlatformAccess('plans', 'platform.plans.view');
 
-    const where = includeInactive ? '' : 'WHERE is_active = 1';
+    const where = includeInactive ? '' : 'WHERE p.is_active = 1';
     const rows = this.db.query<any>(
-      `SELECT * FROM platform_plans ${where} ORDER BY sort_order, name`
+      `SELECT p.*,
+              COALESCE(sc.cnt, 0) AS subscriber_count
+       FROM platform_plans p
+       LEFT JOIN (
+         SELECT plan_id, COUNT(*) AS cnt
+         FROM platform_subscriptions
+         WHERE status IN ('ACTIVE','TRIAL')
+         GROUP BY plan_id
+       ) sc ON sc.plan_id = p.id
+       ${where}
+       ORDER BY p.sort_order, p.name`
     );
 
     return rows.map(this.mapPlan);
@@ -115,6 +125,12 @@ export class PlatformPlanService {
 
     const id = `plan_${uuidv4().replace(/-/g, '').slice(0, 12)}`;
     const now = nowIso();
+    const isDefault = input.isDefault === true;
+    const versioned = input.versioned === true;
+
+    if (isDefault) {
+      this.db.run('UPDATE platform_plans SET is_default = 0, updated_at = ? WHERE is_default = 1', [now]);
+    }
 
     this.db.run(
       `INSERT INTO platform_plans
@@ -141,15 +157,50 @@ export class PlatformPlanService {
         JSON.stringify(input.features ?? []),
         JSON.stringify(input.permissions ?? []),
         input.isActive !== false ? 1 : 0,
-        0,
-        0,
+        isDefault ? 1 : 0,
+        toNumber(input.sortOrder, 0),
         0,
         toNumber(input.offlineGracePeriodDays, 14),
-        input.versioned ? 1 : 0,
-        input.versioned ? 1 : null,
+        versioned ? 1 : 0,
+        1,
         now, now,
       ]
     );
+
+    if (versioned) {
+      const created = this.getPlan(id);
+      if (created) {
+        this.createPlanVersion({
+          planId: id,
+          version: created.currentVersion ?? 1,
+          name: created.name,
+          description: created.description ?? undefined,
+          billingCycle: created.billingCycle,
+          price: created.price,
+          monthlyPrice: created.monthlyPrice,
+          yearlyPrice: created.yearlyPrice,
+          currency: created.currency,
+          seatsLimit: created.seatsLimit,
+          branchesLimit: created.branchesLimit,
+          devicesLimit: created.devicesLimit,
+          storageLimitMb: created.storageLimitMb,
+          maxProducts: created.maxProducts,
+          maxWarehouses: created.maxWarehouses,
+          trialDays: created.trialDays,
+          includedModules: created.includedModules,
+          features: created.features,
+          permissions: created.permissions,
+          isActive: created.isActive,
+          isDefault: created.isDefault,
+          sortOrder: created.sortOrder,
+          offlineGracePeriodDays: created.offlineGracePeriodDays,
+          effectiveFrom: input.effectiveFrom ?? now,
+          isCurrent: true,
+          changeNote: input.initialChangeNote,
+          createdBy: AuthService.getCurrentUser()?.id ?? 'system',
+        });
+      }
+    }
 
     this.audit('إنشاء خطة', 'PLAN', id, { name: input.name, code });
 
@@ -173,6 +224,11 @@ export class PlatformPlanService {
 
     const code = (input.code ?? existing.code).trim().toUpperCase();
     const now = nowIso();
+    const nextIsDefault = input.isDefault !== undefined ? input.isDefault === true : existing.isDefault === true;
+
+    if (nextIsDefault && !existing.isDefault) {
+      this.db.run('UPDATE platform_plans SET is_default = 0, updated_at = ? WHERE is_default = 1 AND id <> ?', [now, id]);
+    }
 
     // Handle versioning
     if (existing.versioned) {
@@ -197,10 +253,12 @@ export class PlatformPlanService {
         features: input.features ?? existing.features,
         permissions: input.permissions ?? existing.permissions,
         isActive: input.isActive ?? existing.isActive,
-        isDefault: input.isDefault ?? existing.isDefault,
+        isDefault: nextIsDefault,
         sortOrder: toNumber(input.sortOrder ?? existing.sortOrder),
         offlineGracePeriodDays: toNumber(input.offlineGracePeriodDays ?? existing.offlineGracePeriodDays),
-        effectiveFrom: nowIso(),
+        effectiveFrom: input.effectiveFrom ?? nowIso(),
+        isCurrent: true,
+        changeNote: input.initialChangeNote,
         createdBy: AuthService.getCurrentUser()?.id ?? 'system',
       });
     }
@@ -210,7 +268,7 @@ export class PlatformPlanService {
          code = ?, name = ?, description = ?, billing_cycle = ?, price = ROUND(?*100), monthly_price = ROUND(?*100), yearly_price = ROUND(?*100), currency = ?,
          seats_limit = ?, branches_limit = ?, devices_limit = ?, storage_limit_mb = ?, max_products = ?, max_warehouses = ?,
          trial_days = ?, included_modules = ?, features = ?, permissions = ?, is_active = ?,
-         offline_grace_period_days = ?, updated_at = ?
+         is_default = ?, sort_order = ?, versioned = ?, offline_grace_period_days = ?, updated_at = ?
        WHERE id = ?`,
       [
         code, input.name?.trim() ?? existing.name, input.description?.trim() ?? existing.description,
@@ -230,18 +288,36 @@ export class PlatformPlanService {
         JSON.stringify(input.features ?? existing.features),
         JSON.stringify(input.permissions ?? existing.permissions),
         input.isActive !== undefined ? (input.isActive ? 1 : 0) : (existing.isActive ? 1 : 0),
+        nextIsDefault ? 1 : 0,
+        toNumber(input.sortOrder ?? existing.sortOrder),
+        (input.versioned ?? existing.versioned) ? 1 : 0,
         toNumber(input.offlineGracePeriodDays ?? existing.offlineGracePeriodDays),
         now, id,
       ]
     );
 
-    // Record price history if price changed
+    // Record price history if price changed (schema-tolerant: two historical
+    // shapes exist — changed_at/changed_by vs effective_from/actor_*).
     const newPrice = toNumber(input.price ?? input.yearlyPrice ?? existing.price);
     if (newPrice !== existing.price) {
+      const historyCols = this.db
+        .query<{ name: string }>(`PRAGMA table_info('platform_price_history')`)
+        .map((col) => col.name);
+      const hasChangedCols = historyCols.includes('changed_at') && historyCols.includes('changed_by');
       this.db.run(
-        `INSERT INTO platform_price_history (id, plan_id, old_price, new_price, changed_at, changed_by)
-         VALUES (?, ?, ROUND(?*100), ROUND(?*100), ?, ?)`,
-        [`ph_${uuidv4().replace(/-/g, '').slice(0, 12)}`, id, existing.price, newPrice, now, AuthService.getCurrentUser()?.id ?? 'system']
+        hasChangedCols
+          ? `INSERT INTO platform_price_history (id, plan_id, old_price, new_price, changed_at, changed_by)
+             VALUES (?, ?, ROUND(?*100), ROUND(?*100), ?, ?)`
+          : `INSERT INTO platform_price_history (id, plan_id, version, old_price, new_price, currency, effective_from, reason, actor_id, actor_name)
+             VALUES (?, ?, ?, ROUND(?*100), ROUND(?*100), ?, ?, ?, ?, ?)`,
+        hasChangedCols
+          ? [`ph_${uuidv4().replace(/-/g, '').slice(0, 12)}`, id, existing.price, newPrice, now, AuthService.getCurrentUser()?.id ?? 'system']
+          : [
+              `ph_${uuidv4().replace(/-/g, '').slice(0, 12)}`, id, existing.currentVersion ?? 1,
+              existing.price, newPrice, input.currency ?? existing.currency, now,
+              input.initialChangeNote ?? null, AuthService.getCurrentUser()?.id ?? 'system',
+              AuthService.getCurrentUser()?.fullName ?? AuthService.getCurrentUser()?.username ?? 'system',
+            ]
       );
     }
 
@@ -268,6 +344,41 @@ export class PlatformPlanService {
     this.audit(active ? 'تفعيل خطة' : 'تعطيل خطة', 'PLAN', id, {});
   }
 
+  public deletePlan(id: string): void {
+    PlatformPlanService.requirePlatformAccess('plans', 'platform.plans.delete');
+
+    const existing = this.getPlan(id);
+    if (!existing) throw new Error('الخطة غير موجودة.');
+
+    const subscriptionCount = toNumber(
+      this.db.query<any>(
+        'SELECT COUNT(*) AS c FROM platform_subscriptions WHERE plan_id = ?',
+        [id]
+      )[0]?.c,
+      0
+    );
+    if (subscriptionCount > 0) {
+      throw new Error(`لا يمكن حذف الخطة: مرتبطة بـ ${subscriptionCount} اشتراك. عطّلها بدلاً من ذلك.`);
+    }
+    const licenseCount = toNumber(
+      this.db.query<any>(
+        'SELECT COUNT(*) AS c FROM platform_licenses WHERE plan_id = ?',
+        [id]
+      )[0]?.c,
+      0
+    );
+    if (licenseCount > 0) {
+      throw new Error(`لا يمكن حذف الخطة: مرتبطة بـ ${licenseCount} ترخيص.`);
+    }
+
+    this.db.run('DELETE FROM platform_plan_upgrade_rules WHERE from_plan_id = ? OR to_plan_id = ?', [id, id]);
+    this.db.run('DELETE FROM platform_plan_versions WHERE plan_id = ?', [id]);
+    this.db.run('DELETE FROM platform_price_history WHERE plan_id = ?', [id]);
+    this.db.run('DELETE FROM platform_plans WHERE id = ?', [id]);
+
+    this.audit('حذف خطة', 'PLAN', id, { name: existing.name, code: existing.code }, { oldValues: existing });
+  }
+
   // ─── Plan Versioning ──────────────────────────────────────────────────────────
 
   public listPlanVersions(planId: string): PlatformPlanVersion[] {
@@ -284,15 +395,19 @@ export class PlatformPlanService {
 
   public listPriceHistory(planId: string): PlatformPriceHistoryEntry[] {
     PlatformPlanService.requirePlatformAccess('plans', 'platform.plans.view');
-    const rows = this.db.query<any>('SELECT * FROM platform_price_history WHERE plan_id = ? ORDER BY changed_at DESC', [planId]);
-    return rows.map((row) => ({
-      id: String(row.id),
-      planId: String(row.plan_id),
-      oldPrice: toNumber(row.old_price, 0) / 100,
-      newPrice: toNumber(row.new_price, 0) / 100,
-      changedAt: String(row.changed_at),
-      changedBy: String(row.changed_by),
-    }));
+    // Two historical table shapes exist: changed_at/changed_by (older) and
+    // effective_from/actor_* (migration 150). Read defensively and sort in JS.
+    const rows = this.db.query<any>('SELECT * FROM platform_price_history WHERE plan_id = ?', [planId]);
+    return rows
+      .map((row) => ({
+        id: String(row.id),
+        planId: String(row.plan_id),
+        oldPrice: toNumber(row.old_price, 0) / 100,
+        newPrice: toNumber(row.new_price, 0) / 100,
+        changedAt: String(row.changed_at ?? row.created_at ?? row.effective_from ?? ''),
+        changedBy: String(row.changed_by ?? row.actor_name ?? row.actor_id ?? ''),
+      }))
+      .sort((a, b) => String(b.changedAt).localeCompare(String(a.changedAt)));
   }
 
   // ─── Plan Copy ────────────────────────────────────────────────────────────────
@@ -337,9 +452,9 @@ export class PlatformPlanService {
     const rules = this.listPlanUpgradeRules().filter(r => r.fromPlanId === sourcePlanId);
     for (const rule of rules) {
       this.db.run(
-        `INSERT INTO platform_plan_upgrade_rules (id, from_plan_id, to_plan_id, allowed, requires_approval, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [`pur_${uuidv4().replace(/-/g, '').slice(0, 12)}`, id, rule.toPlanId, rule.allowed, rule.requiresApproval ? 1 : 0, now, now]
+        `INSERT INTO platform_plan_upgrade_rules (id, from_plan_id, to_plan_id, allowed, upgrade_fee_percent, requires_approval, notes, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [`pur_${uuidv4().replace(/-/g, '').slice(0, 12)}`, id, rule.toPlanId, rule.allowed ? 1 : 0, toNumber(rule.upgradeFeePercent, 0), rule.requiresApproval ? 1 : 0, rule.notes ?? null, now]
       );
     }
 
@@ -359,15 +474,21 @@ export class PlatformPlanService {
   public listPlanUpgradeRules(): PlatformPlanUpgradeRule[] {
     PlatformPlanService.requirePlatformAccess('plans', 'platform.plans.view');
     const rows = this.db.query<any>('SELECT * FROM platform_plan_upgrade_rules ORDER BY from_plan_id, to_plan_id');
-    return rows.map((row) => ({
+    return rows.map(this.mapUpgradeRule);
+  }
+
+  private mapUpgradeRule(row: any): PlatformPlanUpgradeRule {
+    return {
       id: String(row.id),
       fromPlanId: String(row.from_plan_id),
       toPlanId: String(row.to_plan_id),
       allowed: Boolean(row.allowed),
       requiresApproval: Boolean(row.requires_approval),
+      upgradeFeePercent: toNumber(row.upgrade_fee_percent, 0),
+      notes: row.notes ?? null,
       createdAt: String(row.created_at),
-      updatedAt: String(row.updated_at),
-    }));
+      updatedAt: String(row.updated_at ?? row.created_at),
+    };
   }
 
   public setPlanUpgradeRule(input: PlatformPlanUpgradeRuleInput): PlatformPlanUpgradeRule {
@@ -380,29 +501,21 @@ export class PlatformPlanService {
 
     if (existing) {
       this.db.run(
-        'UPDATE platform_plan_upgrade_rules SET allowed = ?, requires_approval = ?, updated_at = ? WHERE id = ?',
-        [input.allowed ? 1 : 0, input.requiresApproval ? 1 : 0, now, existing.id]
+        'UPDATE platform_plan_upgrade_rules SET allowed = ?, upgrade_fee_percent = ?, requires_approval = ?, notes = ? WHERE id = ?',
+        [input.allowed ? 1 : 0, toNumber(input.upgradeFeePercent, 0), input.requiresApproval ? 1 : 0, input.notes ?? null, existing.id]
       );
     } else {
       this.db.run(
-        `INSERT INTO platform_plan_upgrade_rules (id, from_plan_id, to_plan_id, allowed, requires_approval, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [`pur_${uuidv4().replace(/-/g, '').slice(0, 12)}`, input.fromPlanId, input.toPlanId, input.allowed ? 1 : 0, input.requiresApproval ? 1 : 0, now, now]
+        `INSERT INTO platform_plan_upgrade_rules (id, from_plan_id, to_plan_id, allowed, upgrade_fee_percent, requires_approval, notes, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [`pur_${uuidv4().replace(/-/g, '').slice(0, 12)}`, input.fromPlanId, input.toPlanId, input.allowed ? 1 : 0, toNumber(input.upgradeFeePercent, 0), input.requiresApproval ? 1 : 0, input.notes ?? null, now]
       );
     }
 
     this.audit('تعيين قاعدة ترقية خطة', 'PLAN_UPGRADE_RULE', existing?.id ?? null, { fromPlanId: input.fromPlanId, toPlanId: input.toPlanId });
 
     const row = this.db.query<any>('SELECT * FROM platform_plan_upgrade_rules WHERE from_plan_id = ? AND to_plan_id = ?', [input.fromPlanId, input.toPlanId])[0];
-    return {
-      id: String(row.id),
-      fromPlanId: String(row.from_plan_id),
-      toPlanId: String(row.to_plan_id),
-      allowed: Boolean(row.allowed),
-      requiresApproval: Boolean(row.requires_approval),
-      createdAt: String(row.created_at),
-      updatedAt: String(row.updated_at),
-    };
+    return this.mapUpgradeRule(row);
   }
 
   // ─── Plan Change Impact ───────────────────────────────────────────────────────
@@ -486,8 +599,8 @@ export class PlatformPlanService {
       `INSERT INTO platform_plan_versions
         (id, plan_id, version, name, description, billing_cycle, price, monthly_price, yearly_price, currency,
          seats_limit, branches_limit, devices_limit, storage_limit_mb, max_products, max_warehouses,
-         trial_days, included_modules, features, permissions, is_active, is_default, sort_order,
-         offline_grace_period_days, created_by, created_at)
+         trial_days, included_modules, features, permissions,
+         offline_grace_period_days, effective_from, is_current, change_note, created_by, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ROUND(?*100), ROUND(?*100), ROUND(?*100), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id, input.planId, input.version, input.name, input.description ?? null,
@@ -495,10 +608,15 @@ export class PlatformPlanService {
         input.seatsLimit, input.branchesLimit, input.devicesLimit,
         input.storageLimitMb, input.maxProducts, input.maxWarehouses,
         input.trialDays, JSON.stringify(input.includedModules), JSON.stringify(input.features), JSON.stringify(input.permissions),
-        input.isActive ? 1 : 0, input.isDefault ? 1 : 0, input.sortOrder,
-        input.offlineGracePeriodDays, input.createdBy, now,
+        input.offlineGracePeriodDays, input.effectiveFrom ?? now, input.isCurrent ? 1 : 0,
+        input.changeNote ?? null, input.createdBy ?? null, now,
       ]
     );
+
+    if (input.isCurrent) {
+      this.db.run('UPDATE platform_plan_versions SET is_current = 0 WHERE plan_id = ? AND id <> ?', [input.planId, id]);
+      this.db.run('UPDATE platform_plan_versions SET is_current = 1 WHERE id = ?', [id]);
+    }
 
     this.db.run('UPDATE platform_plans SET current_version = ? WHERE id = ?', [input.version, input.planId]);
   }
@@ -556,13 +674,14 @@ export class PlatformPlanService {
       includedModules: safeJsonArray(row.included_modules),
       features: safeJsonArray(row.features),
       permissions: safeJsonArray(row.permissions),
-      isActive: Boolean(row.is_active),
+      isActive: row.is_active === undefined || row.is_active === null ? true : Boolean(row.is_active),
       isDefault: Boolean(row.is_default),
       sortOrder: toNumber(row.sort_order, 0),
       offlineGracePeriodDays: toNumber(row.offline_grace_period_days, 14),
-      effectiveFrom: String(row.created_at),
+      effectiveFrom: String(row.effective_from ?? row.created_at),
       isCurrent: Boolean(row.is_current),
-      createdBy: String(row.created_by),
+      changeNote: row.change_note ?? null,
+      createdBy: row.created_by ?? null,
       createdAt: String(row.created_at),
     };
   }

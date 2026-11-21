@@ -194,3 +194,54 @@ test('package-modules writes signed packages that the store accepts, and strips 
   await store.install(manifest, signature, async (p) => fs.readFileSync(path.join(base, 'files', p)));
   assert.equal((await store.readAsset('assets/HrPage-1.js')).toString(), 'hr page');
 });
+
+test('page-level manifests carry modules/pages and the store accepts them', async () => {
+  const { assertManifestShape } = require('../electron/modulePackages.js');
+  const keys = keyPair();
+  const store = new ModuleStore(tempRoot(), { publicKey: keys.publicKey, buildId: BUILD_ID });
+  const pkg = makePackage(keys, { moduleId: 'pg-sales-a1b2c3d4' });
+  pkg.manifest.modules = ['sales'];
+  pkg.manifest.pages = ['/orders', '/products/:id'];
+  pkg.signature = signManifest(pkg.manifest, keys.privateKey);
+  await store.install(pkg.manifest, pkg.signature, async (p) => Buffer.from(pkg.contents[p]));
+  assert.equal(store.isInstalled('pg-sales-a1b2c3d4'), true);
+
+  // Invalid metadata shapes are rejected before anything is trusted.
+  const bad = makePackage(keys);
+  bad.manifest.modules = ['NOT VALID!'];
+  assert.throws(() => assertManifestShape(bad.manifest), /bad modules list/);
+  const badPages = makePackage(keys);
+  badPages.manifest.pages = ['orders'];
+  assert.throws(() => assertManifestShape(badPages.manifest), /bad pages list/);
+});
+
+test('package-modules writes page metadata from the plan into signed manifests', async () => {
+  const { packageModules } = require('../scripts/package-modules.cjs');
+  const keys = keyPair();
+  const dist = tempRoot();
+  const out = tempRoot();
+  fs.mkdirSync(path.join(dist, 'assets'));
+  fs.writeFileSync(path.join(dist, 'index.html'), '<html>build</html>');
+  fs.writeFileSync(path.join(dist, 'assets', 'index-1.js'), 'core');
+  fs.writeFileSync(path.join(dist, 'assets', 'OrdersPage-1.js'), 'orders page');
+  fs.writeFileSync(path.join(dist, 'assets', 'Shared-1.js'), 'shared');
+  fs.writeFileSync(path.join(dist, 'module-chunks.json'), JSON.stringify({
+    modules: {
+      'pg-sales-a1b2c3d4': ['assets/OrdersPage-1.js'],
+      sales: ['assets/Shared-1.js'],
+    },
+    packages: {
+      'pg-sales-a1b2c3d4': { modules: ['sales'], pages: ['/orders'] },
+      sales: { modules: ['sales'], pages: ['/orders', '/returns'] },
+    },
+    coreChunkCount: 1, keptInCore: [], unsplittablePackages: [],
+  }));
+
+  packageModules({ distDir: dist, outDir: out, version: '2.0.0', privateKey: keys.privateKey });
+  const pageManifest = JSON.parse(fs.readFileSync(path.join(out, 'pg-sales-a1b2c3d4', '2.0.0', 'manifest.json'), 'utf8'));
+  assert.deepEqual(pageManifest.modules, ['sales']);
+  assert.deepEqual(pageManifest.pages, ['/orders']);
+  const sharedManifest = JSON.parse(fs.readFileSync(path.join(out, 'sales', '2.0.0', 'manifest.json'), 'utf8'));
+  assert.deepEqual(sharedManifest.modules, ['sales']);
+  assert.deepEqual(sharedManifest.pages, ['/orders', '/returns']);
+});

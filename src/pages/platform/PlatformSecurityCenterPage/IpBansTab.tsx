@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Ban, ShieldOff, Plus, AlertTriangle } from 'lucide-react';
+import { Ban, ShieldOff, Plus, AlertTriangle, Copy } from 'lucide-react';
 import { Button } from '../../../components/ui/Button';
 import { DataTable } from '../../../components/ui/DataTable';
 import { formatDateTime } from '../components/PlatformUI';
@@ -25,6 +25,24 @@ interface IpBansTabProps {
 
 const isBanActive = (ban: PlatformIpBan) =>
   ban.is_active === 1 && (!ban.expires_at || new Date(ban.expires_at).getTime() > Date.now());
+
+const formatRemaining = (expiresAt: string): string => {
+  const ms = new Date(expiresAt).getTime() - Date.now();
+  if (ms <= 0) return 'منتهي';
+  const hours = Math.floor(ms / 3_600_000);
+  const days = Math.floor(hours / 24);
+  if (days > 0) return `متبقٍ ${days} يوم و${hours % 24} ساعة`;
+  if (hours > 0) return `متبقٍ ${hours} ساعة`;
+  return `متبقٍ ${Math.max(1, Math.floor(ms / 60_000))} دقيقة`;
+};
+
+const copyText = async (value: string) => {
+  try {
+    await navigator.clipboard.writeText(value);
+  } catch {
+    // Clipboard may be unavailable (non-secure context) — silently ignore.
+  }
+};
 
 export const IpBansTab: React.FC<IpBansTabProps> = ({ bans, canManageSecurity, isCentral, onBan, onLift }) => {
   const [ipAddress, setIpAddress] = useState('');
@@ -139,7 +157,19 @@ export const IpBansTab: React.FC<IpBansTabProps> = ({ bans, canManageSecurity, i
             columns={[
               {
                 key: 'ip', header: 'عنوان IP',
-                render: (ban) => <span dir="ltr" className="font-mono font-bold text-muted">{ban.ip_address}</span>,
+                render: (ban) => (
+                  <span className="inline-flex items-center gap-1.5">
+                    <span dir="ltr" className="font-mono font-bold text-muted">{ban.ip_address}</span>
+                    <button
+                      type="button"
+                      onClick={() => void copyText(ban.ip_address)}
+                      className="text-muted hover:text-primary"
+                      title="نسخ عنوان IP"
+                    >
+                      <Copy className="h-3 w-3" />
+                    </button>
+                  </span>
+                ),
               },
               { key: 'reason', header: 'السبب', render: (ban) => <span className="text-muted">{ban.reason || '—'}</span> },
               {
@@ -156,7 +186,16 @@ export const IpBansTab: React.FC<IpBansTabProps> = ({ bans, canManageSecurity, i
               },
               {
                 key: 'expires', header: 'ينتهي في',
-                render: (ban) => <span className="text-muted">{ban.expires_at ? formatDateTime(ban.expires_at) : 'دائم'}</span>,
+                render: (ban) => (
+                  <span className="text-muted">
+                    {ban.expires_at ? (
+                      <span className="flex flex-col">
+                        <span>{formatDateTime(ban.expires_at)}</span>
+                        {isBanActive(ban) && <span className="text-[10px] text-warning font-bold">{formatRemaining(ban.expires_at)}</span>}
+                      </span>
+                    ) : 'دائم'}
+                  </span>
+                ),
               },
               { key: 'by', header: 'بواسطة', render: (ban) => <span className="text-muted">{ban.banned_by_name || '—'}</span> },
               { key: 'created', header: 'تاريخ الحظر', render: (ban) => <span className="text-muted">{formatDateTime(ban.created_at)}</span> },

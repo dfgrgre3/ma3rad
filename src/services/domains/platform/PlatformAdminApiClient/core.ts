@@ -107,6 +107,22 @@ export interface TenantFeaturePermissions {
   featurePermissions: Array<Record<string, unknown>>;
 }
 
+/** Effective (layer-merged) feature config plus the tenant's own stored row. */
+export interface EffectiveTenantFeaturePermissions {
+  effective: TenantFeaturePermissions;
+  tenant: TenantFeaturePermissions;
+}
+
+/** Per-tenant permission limit row (tenant_permission_limits). */
+export interface TenantPermissionLimit {
+  permissionCode: string;
+  maxAmount?: number | null;
+  costVisible?: number | null;
+  profitVisible?: number | null;
+  disabled?: number | boolean;
+  updatedAt?: string;
+}
+
 export interface PlatformRoleSummary {
   code: string;
   name: string;
@@ -131,7 +147,7 @@ export function toNumber(value: unknown, fallback = 0): number {
 }
 
 /** Map a central `platform_licenses` row (+ joined tenant/plan names) to the UI type. */
-export function mapCentralLicense(row: any): PlatformLicense {
+export function mapCentralLicense(row: Record<string, any>): PlatformLicense {
   return {
     id: String(row.id),
     tenantId: String(row.tenant_id ?? row.tenantId ?? ''),
@@ -163,7 +179,7 @@ export function mapCentralLicense(row: any): PlatformLicense {
 }
 
 /** Map a central `platform_devices` row to the UI type. */
-export function mapCentralDevice(row: any): PlatformDevice {
+export function mapCentralDevice(row: Record<string, any>): PlatformDevice {
   return {
     id: String(row.id),
     tenantId: String(row.tenant_id ?? row.tenantId ?? ''),
@@ -184,7 +200,7 @@ export function mapCentralDevice(row: any): PlatformDevice {
 }
 
 /** Map a central `platform_invoices` row to the UI type (amounts are major units). */
-export function mapCentralInvoice(row: any): PlatformInvoice {
+export function mapCentralInvoice(row: Record<string, any>): PlatformInvoice {
   return {
     id: String(row.id),
     number: String(row.number ?? row.id ?? ''),
@@ -203,7 +219,7 @@ export function mapCentralInvoice(row: any): PlatformInvoice {
     notes: row.notes ?? null,
     createdAt: String(row.createdAt ?? row.created_at ?? ''),
     items: Array.isArray(row.items)
-      ? row.items.map((item: any) => ({
+      ? row.items.map((item: Record<string, any>) => ({
           id: item.id ? String(item.id) : undefined,
           description: String(item.description ?? ''),
           quantity: toNumber(item.quantity, 0),
@@ -215,7 +231,7 @@ export function mapCentralInvoice(row: any): PlatformInvoice {
 }
 
 /** Map a central `platform_payments` row to the UI type (amounts are major units). */
-export function mapCentralPayment(row: any): PlatformPayment {
+export function mapCentralPayment(row: Record<string, any>): PlatformPayment {
   return {
     id: String(row.id),
     invoiceId: row.invoiceId ?? row.invoice_id ?? null,
@@ -244,6 +260,6 @@ export interface PlatformAdminApiCore {
   setBaseUrl(url: string | null): void;
   isAvailable(): boolean;
   getSettings(): Promise<Record<string, string>>;
-  updateSettings(settings: Record<string, string>): Promise<any>;
-  getPlatformPolicies(): Promise<{ terms: string; privacy: string; retention: any; updatedAt: string }>;
+  updateSettings(settings: Record<string, string>): Promise<Record<string, any>>;
+  getPlatformPolicies(): Promise<{ terms: string; privacy: string; retention: Record<string, any>; updatedAt: string }>;
 }

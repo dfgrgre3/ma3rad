@@ -5,14 +5,24 @@ const { getDb } = require('../lib/db');
 const { nowIso } = require('../lib/time');
 const { authenticatePlatformUser, requirePlatformPermission, getScopedTenantIds, assertTenantAccess } = require('../middleware/auth');
 const { signString, getKeyId } = require('../lib/signing');
-const { resolveDeviceEntitlements } = require('../lib/entitlements');
 const { authenticateDevice } = require('../lib/deviceAuth');
-const { FEATURE_CODE_TO_PAGE_PATHS } = require('../lib/featurePageMap');
+const { resolveTenantVisibility, loadEffectiveFeatureConfig, resolveFeatureHiddenPaths } = require('../lib/tenantVisibility');
+const { resolveDeviceEntitlements } = require('../lib/entitlements');
 
 const router = express.Router();
 
 function parseJsonArray(raw) {
   try { return JSON.parse(raw || '[]'); } catch { return []; }
+}
+
+function mapFeatureConfigRow(row) {
+  return row
+    ? {
+        hiddenMenus: parseJsonArray(row.hiddenMenus ?? row.hidden_menus),
+        disabledPermissions: parseJsonArray(row.disabledPermissions ?? row.disabled_permissions),
+        featurePermissions: parseJsonArray(row.featurePermissions ?? row.feature_permissions),
+      }
+    : { hiddenMenus: [], disabledPermissions: [], featurePermissions: [] };
 }
 
 /**
@@ -25,108 +35,20 @@ router.get('/configuration/current', authenticateDevice, async (req, res, next) 
   try {
     const db = getDb();
     const device = req.device;
-    // Plan, license snapshot and effective module set (shared with module delivery).
-    const { tenantId, planId, license, baseFeatures, allowedModuleIds } = await resolveDeviceEntitlements(db, device);
-
-    // Effective feature set: license snapshot → plan defaults → tenant
-    // overrides (kind='FEATURE'). Features absent from the set hide the pages
-    // they own via hiddenMenus.
-    const featureOverrides = await db.all(
-      `SELECT code, is_enabled AS isEnabled FROM platform_tenant_overrides
-       WHERE tenant_id = ? AND kind = 'FEATURE'`,
-      [tenantId]
-    );
-    const effectiveFeatureCodes = new Set(baseFeatures.map(String));
-    for (const row of featureOverrides) {
-      const code = String(row.code || '');
-      if (!code) continue;
-      if (row.isEnabled) effectiveFeatureCodes.add(code);
-      else effectiveFeatureCodes.delete(code);
-    }
-    // Only gate feature-owned pages when the tenant actually has a feature
-    // set (license/plan features or explicit overrides) — otherwise tenants
-    // without plan features would lose pages they never had gated.
-    const featureGatingActive = baseFeatures.length > 0 || featureOverrides.length > 0;
-    let featureHiddenPaths = [];
-    if (featureGatingActive) {
-      // Dynamic page ownership: page_paths stored on each feature flag
-      // (admin-managed) merged over the built-in static map.
-      const flagRows = await db.all('SELECT key, page_paths AS pagePaths FROM platform_feature_flags').catch(() => []);
-      const dynamicMap = { ...FEATURE_CODE_TO_PAGE_PATHS };
-      for (const row of flagRows || []) {
-        const code = String(row.key || '');
-        if (!code) continue;
-        let paths = [];
-        try { paths = JSON.parse(row.pagePaths || '[]'); } catch { paths = []; }
-        if (Array.isArray(paths) && paths.length) {
-          dynamicMap[code] = [...new Set([...(dynamicMap[code] || []), ...paths.map(String)])];
-        }
-      }
-      featureHiddenPaths = Object.entries(dynamicMap)
-        .filter(([code]) => !effectiveFeatureCodes.has(code))
-        .flatMap(([, paths]) => paths);
-    }
-
-    // Layered feature config: global → tenant → tenant+plan (later wins).
-    const featureRows = await db.all(
-      `SELECT tenant_id AS tenantId, plan_id AS planId, hidden_menus AS hiddenMenus,
-              disabled_permissions AS disabledPermissions, feature_permissions AS featurePermissions,
-              updated_at AS updatedAt
-       FROM tenant_feature_config
-       WHERE (tenant_id IS NULL OR tenant_id = '' OR tenant_id = ?)
-         AND (plan_id IS NULL OR plan_id = ?)`,
-      [tenantId, planId || '']
-    );
-    const merged = { hiddenMenus: [], disabledPermissions: [], featurePermissions: [] };
-    const rank = (row) => (row.tenantId ? 1 : 0) + (row.planId ? 2 : 0);
-    const ordered = featureRows.slice().sort((a, b) => rank(a) - rank(b));
-    let maxFeatureUpdated = '';
-    for (const row of ordered) {
-      const hidden = parseJsonArray(row.hiddenMenus);
-      const disabled = parseJsonArray(row.disabledPermissions);
-      const features = parseJsonArray(row.featurePermissions);
-      if (hidden.length) merged.hiddenMenus = hidden;
-      if (disabled.length) merged.disabledPermissions = disabled;
-      if (features.length) merged.featurePermissions = features;
-      if (row.updatedAt > maxFeatureUpdated) maxFeatureUpdated = row.updatedAt;
-    }
-    // Pages owned by features the tenant's plan/overrides exclude.
-    if (featureHiddenPaths.length) {
-      merged.hiddenMenus = [...new Set([...merged.hiddenMenus, ...featureHiddenPaths])];
-    }
-
-    // Permission limits: tenant-specific rows override global ('' tenant) rows.
-    const limitRows = await db.all(
-      `SELECT tenant_id AS tenantId, permission_code AS permissionCode, max_amount AS maxAmount,
-              cost_visible AS costVisible, profit_visible AS profitVisible, disabled, updated_at AS updatedAt
-       FROM tenant_permission_limits WHERE tenant_id IN ('', ?) ORDER BY tenant_id`,
-      [tenantId]
-    );
-    const limitsByCode = new Map();
-    let maxLimitUpdated = '';
-    for (const row of limitRows) {
-      limitsByCode.set(row.permissionCode, {
-        permissionCode: row.permissionCode,
-        maxAmount: row.maxAmount ?? null,
-        costVisible: row.costVisible ?? null,
-        profitVisible: row.profitVisible ?? null,
-        disabled: row.disabled ? 1 : 0,
-      });
-      if (row.updatedAt > maxLimitUpdated) maxLimitUpdated = row.updatedAt;
-    }
+    // Plan, license snapshot, effective module set, merged hidden menus and
+    // feature permissions — the same visibility inputs module package
+    // delivery uses, so offered files match the pages the tenant can see.
+    const visibility = await resolveTenantVisibility(db, device);
+    const { tenantId, planId, allowedModuleIds, configurationVersion } = visibility;
 
     const inner = {
-      hiddenMenus: merged.hiddenMenus,
-      disabledPermissions: merged.disabledPermissions,
-      featurePermissions: merged.featurePermissions,
-      permissionLimits: [...limitsByCode.values()],
+      hiddenMenus: visibility.hiddenMenus,
+      disabledPermissions: visibility.disabledPermissions,
+      featurePermissions: visibility.featurePermissions,
+      permissionLimits: visibility.permissionLimits,
       allowedModules: allowedModuleIds,
       usageLimits: {},
     };
-    const configurationVersion = Math.max(
-      1,
-      Math.floor(Date.parse(maxFeatureUpdated || maxLimitUpdated || '') / 1000) || 1
-    );
     const configJson = JSON.stringify(inner);
     const { signature } = signString(configJson);
 
@@ -153,6 +75,34 @@ router.get(
   async (req, res, next) => {
     try {
       const db = getDb();
+      // ?forTenant=<id> returns the layer-merged EFFECTIVE config the tenant's
+      // devices will receive plus the tenant's own stored row — used by the
+      // per-tenant access editor so it can seed from what is actually applied.
+      if (req.query.forTenant) {
+        const tenantId = String(req.query.forTenant);
+        if (!(await assertTenantAccess(req, res, tenantId))) return;
+        const tenant = await db.get('SELECT id, plan_id AS planId FROM platform_tenants WHERE id = ?', [tenantId]);
+        if (!tenant) return res.status(404).json({ error: 'Tenant not found' });
+        const planId = tenant.planId || '';
+        const [{ merged }, tenantRow, featureHidden] = await Promise.all([
+          loadEffectiveFeatureConfig(db, tenantId, planId),
+          db.get(
+            'SELECT hidden_menus AS hiddenMenus, disabled_permissions AS disabledPermissions, feature_permissions AS featurePermissions FROM tenant_feature_config WHERE tenant_id IS ? AND plan_id IS ?',
+            [tenantId, null]
+          ),
+          // Same feature-gating inputs devices get, so the preview matches the
+          // signed configuration exactly (feature-owned hidden page paths).
+          resolveDeviceEntitlements(db, { tenant_id: tenantId, license_id: null })
+            .then((ent) => resolveFeatureHiddenPaths(db, tenantId, ent.baseFeatures)),
+        ]);
+        if (featureHidden.length) {
+          merged.hiddenMenus = [...new Set([...merged.hiddenMenus, ...featureHidden])];
+        }
+        return res.json({
+          data: { effective: merged, tenant: mapFeatureConfigRow(tenantRow) },
+          requestId: req.requestId,
+        });
+      }
       const tenantId = req.query.tenantId || null;
       const planId = req.query.planId || null;
       if (tenantId) {

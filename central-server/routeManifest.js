@@ -68,8 +68,9 @@ const ROUTE_MANIFEST = [
   route('/api/v1/admin/tenants/:id/profile', ['GET'], {
     GET: ['platform.tenants.view', 'platform.tenants.manage'],
   }),
-  route('/api/v1/admin/tenants/:id/account', ['POST'], {
+  route('/api/v1/admin/tenants/:id/account', ['POST', 'PUT'], {
     POST: ['platform.tenants.update', 'platform.tenants.manage'],
+    PUT: ['platform.tenants.update', 'platform.tenants.manage'],
   }),
   route('/api/v1/admin/tenants/:id/account/reset-password', ['POST'], {
     POST: ['platform.tenants.update', 'platform.tenants.manage'],
@@ -118,18 +119,59 @@ const ROUTE_MANIFEST = [
     PUT: ['platform.tenants.update', 'platform.tenants.manage'],
     DELETE: ['platform.tenants.update', 'platform.tenants.manage'],
   }),
+  route('/api/v1/admin/tenants/:id/api-keys', ['GET', 'POST'], {
+    GET: ['platform.tenants.view', 'platform.tenants.manage'],
+    POST: ['platform.tenants.update', 'platform.tenants.manage'],
+  }),
+  route('/api/v1/admin/tenants/:id/api-keys/:keyId', ['DELETE'], {
+    DELETE: ['platform.tenants.update', 'platform.tenants.manage'],
+  }),
 
   // ── Plans ─────────────────────────────────────────────────────────────────
   route('/api/v1/admin/plans', ['GET', 'POST'], {
     GET: ['platform.plans.view', 'platform.plans.manage'],
     POST: ['platform.plans.create', 'platform.plans.manage', 'platform.plans.update'],
   }),
-  route('/api/v1/admin/plans/:id', ['PUT'], {
+  route('/api/v1/admin/plans/upgrade-rules', ['GET', 'PUT'], {
+    GET: ['platform.plans.view', 'platform.plans.manage'],
     PUT: ['platform.plans.update', 'platform.plans.manage'],
+  }),
+  route('/api/v1/admin/plans/:id', ['GET', 'PUT', 'DELETE'], {
+    GET: ['platform.plans.view', 'platform.plans.manage'],
+    PUT: ['platform.plans.update', 'platform.plans.manage'],
+    DELETE: ['platform.plans.delete', 'platform.plans.manage'],
+  }),
+  route('/api/v1/admin/plans/:id/subscribers', ['GET'], {
+    GET: ['platform.plans.view', 'platform.plans.manage'],
+  }),
+  route('/api/v1/admin/plans/:id/versions', ['GET'], {
+    GET: ['platform.plans.view', 'platform.plans.manage'],
+  }),
+  route('/api/v1/admin/plans/:id/price-history', ['GET'], {
+    GET: ['platform.plans.view', 'platform.plans.manage'],
+  }),
+  route('/api/v1/admin/plans/:id/deactivation-check', ['GET'], {
+    GET: ['platform.plans.view', 'platform.plans.manage'],
+  }),
+  route('/api/v1/admin/plans/:id/impact-preview', ['POST'], {
+    POST: ['platform.plans.view', 'platform.plans.manage'],
+  }),
+  route('/api/v1/admin/plans/:id/copy', ['POST'], {
+    POST: ['platform.plans.create', 'platform.plans.manage', 'platform.plans.update'],
   }),
 
   // ── Subscriptions ──────────────────────────────────────────────────────────
-  route('/api/v1/admin/subscriptions', ['GET'], {
+  route('/api/v1/admin/subscriptions', ['GET', 'POST'], {
+    GET: ['platform.subscriptions.view'],
+    POST: ['platform.subscriptions.create', 'platform.subscriptions.manage', 'platform.subscriptions.update'],
+  }),
+  route('/api/v1/admin/subscriptions/trial', ['POST'], {
+    POST: ['platform.subscriptions.create', 'platform.subscriptions.manage', 'platform.subscriptions.update'],
+  }),
+  route('/api/v1/admin/subscriptions/:tenantId', ['PATCH'], {
+    PATCH: ['platform.subscriptions.update', 'platform.subscriptions.manage'],
+  }),
+  route('/api/v1/admin/subscriptions/:tenantId/history', ['GET'], {
     GET: ['platform.subscriptions.view'],
   }),
   route('/api/v1/admin/subscriptions/:tenantId/renew', ['POST'], {
@@ -141,6 +183,12 @@ const ROUTE_MANIFEST = [
   route('/api/v1/admin/subscriptions/:tenantId/change-plan', ['POST'], {
     POST: ['platform.subscriptions.update'],
   }),
+  route('/api/v1/admin/subscriptions/:tenantId/suspend', ['POST'], {
+    POST: ['platform.subscriptions.update', 'platform.subscriptions.manage'],
+  }),
+  route('/api/v1/admin/subscriptions/:tenantId/resume', ['POST'], {
+    POST: ['platform.subscriptions.update', 'platform.subscriptions.manage'],
+  }),
 
   // ── Licenses ──────────────────────────────────────────────────────────────
   route('/api/v1/admin/licenses', ['GET'], {
@@ -148,6 +196,16 @@ const ROUTE_MANIFEST = [
   }),
   route('/api/v1/admin/licenses/issue', ['POST'], {
     POST: ['platform.licenses.create', 'platform.licenses.manage'],
+  }),
+  route('/api/v1/admin/licenses/:id', ['GET', 'PATCH'], {
+    GET: ['platform.licenses.view', 'platform.licenses.manage'],
+    PATCH: ['platform.licenses.update', 'platform.licenses.manage'],
+  }),
+  route('/api/v1/admin/licenses/:id/activations', ['GET'], {
+    GET: ['platform.licenses.view', 'platform.licenses.manage'],
+  }),
+  route('/api/v1/admin/licenses/:id/changes', ['GET'], {
+    GET: ['platform.licenses.view', 'platform.licenses.manage'],
   }),
   route('/api/v1/admin/licenses/:id/renew', ['POST'], {
     POST: ['platform.licenses.update', 'platform.licenses.manage'],
@@ -172,6 +230,9 @@ const ROUTE_MANIFEST = [
   route('/api/v1/admin/devices', ['GET'], {
     GET: ['platform.devices.view'],
   }),
+  route('/api/v1/admin/devices/:id/activate', ['POST'], {
+    POST: ['platform.devices.update'],
+  }),
   route('/api/v1/admin/devices/:id/suspend', ['POST'], {
     POST: ['platform.devices.update'],
   }),
@@ -180,6 +241,15 @@ const ROUTE_MANIFEST = [
   }),
   route('/api/v1/admin/devices/:id/revoke', ['POST'], {
     POST: ['platform.devices.update'],
+  }),
+  route('/api/v1/admin/devices/:id/reassign', ['POST'], {
+    POST: ['platform.devices.update'],
+  }),
+  route('/api/v1/admin/devices/:id/clone-flag', ['POST'], {
+    POST: ['platform.devices.update'],
+  }),
+  route('/api/v1/admin/devices/:id', ['DELETE'], {
+    DELETE: ['platform.devices.update', 'platform.devices.manage'],
   }),
   route('/api/v1/admin/devices/:id/credential', ['PUT'], {
     PUT: ['platform.devices.update'],
@@ -237,6 +307,13 @@ const ROUTE_MANIFEST = [
   }),
   route('/api/v1/admin/operations/usage/:tenantId', ['GET'], {
     GET: ['platform.operations.view', 'platform.platform-health.view', 'platform.tenants.view'],
+  }),
+  route('/api/v1/admin/operations/maintenance-windows', ['GET', 'POST'], {
+    GET: ['platform.operations.view'],
+    POST: ['platform.operations.create', 'platform.operations.update'],
+  }),
+  route('/api/v1/admin/operations/maintenance-windows/:id/cancel', ['POST'], {
+    POST: ['platform.operations.update'],
   }),
 
   // ── Integrations ───────────────────────────────────────────────────────────
@@ -321,6 +398,9 @@ const ROUTE_MANIFEST = [
   route('/api/v1/admin/support/:id/remote-sessions', ['GET'], {
     GET: ['platform.support.view'],
   }),
+  route('/api/v1/admin/support/tickets/:id/rating', ['POST'], {
+    POST: ['platform.support.update'],
+  }),
 
   // ── Error monitoring ────────────────────────────────────────────────────────
   route('/api/v1/admin/monitoring/errors', ['GET'], {
@@ -341,6 +421,12 @@ const ROUTE_MANIFEST = [
   route('/api/v1/admin/monitoring/errors/:id/reopen', ['POST'], {
     POST: ['platform.platform-health.update', 'platform.operations.update', 'platform.system-health.update'],
   }),
+  route('/api/v1/admin/monitoring/health', ['GET'], {
+    GET: ['platform.platform-health.view', 'platform.operations.view', 'platform.system-health.view'],
+  }),
+  route('/api/v1/admin/monitoring/metrics', ['GET'], {
+    GET: ['platform.platform-health.view', 'platform.operations.view', 'platform.system-health.view'],
+  }),
 
   // ── Releases & phased rollout ───────────────────────────────────────────────
   route('/api/v1/admin/releases', ['GET', 'POST'], {
@@ -357,10 +443,46 @@ const ROUTE_MANIFEST = [
   route('/api/v1/admin/releases/:id/rollback', ['POST'], {
     POST: ['platform.releases.approve', 'platform.releases.update'],
   }),
+  route('/api/v1/admin/releases/:id/targets', ['GET', 'PUT'], {
+    GET: ['platform.releases.view'],
+    PUT: ['platform.releases.update'],
+  }),
+  route('/api/v1/admin/releases/:id/targets/:tenantId/status', ['POST'], {
+    POST: ['platform.releases.update'],
+  }),
 
-  // ── Policies ───────────────────────────────────────────────────────────────
+  // ── Policies & Compliance ──────────────────────────────────────────────────
   route('/api/v1/admin/policies', ['GET'], {
     GET: ['platform.policies.view'],
+  }),
+  route('/api/v1/admin/policies/documents', ['GET'], {
+    GET: ['platform.policies.view'],
+  }),
+  route('/api/v1/admin/policies/documents/:slug', ['GET', 'PUT'], {
+    GET: ['platform.policies.view'],
+    PUT: ['platform.policies.update', 'platform.policies.create'],
+  }),
+  route('/api/v1/admin/policies/documents/:slug/submit', ['POST'], {
+    POST: ['platform.policies.update'],
+  }),
+  route('/api/v1/admin/policies/documents/:slug/approve', ['POST'], {
+    POST: ['platform.policies.approve'],
+  }),
+  route('/api/v1/admin/policies/documents/:slug/reject', ['POST'], {
+    POST: ['platform.policies.approve'],
+  }),
+  route('/api/v1/admin/policies/documents/:slug/versions', ['GET'], {
+    GET: ['platform.policies.view'],
+  }),
+  route('/api/v1/admin/policies/documents/:slug/restore', ['POST'], {
+    POST: ['platform.policies.update'],
+  }),
+  route('/api/v1/admin/policies/retention', ['GET', 'PUT'], {
+    GET: ['platform.policies.view'],
+    PUT: ['platform.policies.update'],
+  }),
+  route('/api/v1/admin/policies/export', ['GET'], {
+    GET: ['platform.policies.export'],
   }),
 
   // ── Feature permissions / dynamic app configuration ─────────────────────────
@@ -394,6 +516,13 @@ const ROUTE_MANIFEST = [
   }),
   route('/api/v1/admin/feature-flags/:id', ['PUT', 'DELETE'], {
     PUT: ['platform.product.update', 'platform.product.manage'],
+    DELETE: ['platform.product.delete', 'platform.product.manage'],
+  }),
+  route('/api/v1/admin/feature-flags/:id/overrides', ['GET', 'POST'], {
+    GET: ['platform.product.view', 'platform.product.manage'],
+    POST: ['platform.product.update', 'platform.product.manage'],
+  }),
+  route('/api/v1/admin/feature-flags/:id/overrides/:overrideId', ['DELETE'], {
     DELETE: ['platform.product.delete', 'platform.product.manage'],
   }),
   route('/api/v1/admin/staff/sessions', ['GET'], {
@@ -597,6 +726,39 @@ const ROUTE_MANIFEST = [
     PUT: ['platform.admincontrol.update', 'platform.admincontrol.manage'],
     DELETE: ['platform.admincontrol.delete', 'platform.admincontrol.manage'],
   }),
+  // Cross-tenant directory of tenant users with live provisioning status.
+  route('/api/v1/admin/tenant-users', ['GET'], {
+    GET: ['platform.tenants.view', 'platform.tenants.manage', 'platform.admincontrol.view', 'platform.admincontrol.manage'],
+  }),
+  // Unified users hub: aggregated overview, cross-type search and per-user detail.
+  route('/api/v1/admin/admin-control/users/overview', ['GET'], {
+    GET: ['platform.admincontrol.view', 'platform.admincontrol.manage', 'platform.tenants.view'],
+  }),
+  route('/api/v1/admin/admin-control/users/search', ['GET'], {
+    GET: ['platform.admincontrol.view', 'platform.admincontrol.manage', 'platform.tenants.view'],
+  }),
+  route('/api/v1/admin/admin-control/users/tenant/:userId', ['GET'], {
+    GET: ['platform.admincontrol.view', 'platform.admincontrol.manage', 'platform.tenants.view'],
+  }),
+  route('/api/v1/admin/admin-control/users/staff/:id', ['GET'], {
+    GET: ['platform.admincontrol.view', 'platform.admincontrol.manage'],
+  }),
+
+  // Device-authenticated tenant-identity provisioning channel (X-Device-Id +
+  // X-Device-Credential; tenant resolved from the registered device).
+  route('/api/v1/device/provisioning/pending', ['GET'], null),
+  route('/api/v1/device/provisioning/:jobId/result', ['POST'], null),
+  // Reverse channel: devices report local user mutations to the directory.
+  route('/api/v1/device/tenant-users/report', ['POST'], null),
+
+  // Customer-facing read-only API — authenticated by tenant-scoped API keys
+  // (Authorization: Bearer pk_...), not by a platform staff session.
+  route('/api/v1/tenant/v1/me', ['GET'], null),
+  route('/api/v1/tenant/v1/subscription', ['GET'], null),
+  route('/api/v1/tenant/v1/licenses', ['GET'], null),
+  route('/api/v1/tenant/v1/usage', ['GET'], null),
+  route('/api/v1/tenant/v1/devices', ['GET'], null),
+  route('/api/v1/tenant/v1/entitlements', ['GET'], null),
 
   // ── Client-owned endpoints (device-authenticated, served by this server) ──
   route('/api/v1/licensing/activate', ['POST'], null),
@@ -607,6 +769,7 @@ const ROUTE_MANIFEST = [
   // X-Device-Credential); served by this server, no platform user required.
   route('/api/v1/configuration/current', ['GET'], null),
   route('/api/v1/telemetry/errors', ['POST'], null),
+  route('/api/v1/telemetry/metrics', ['POST'], null),
   route('/api/v1/releases', ['GET'], null),
   // Device-authenticated signed feature-module packages (entitlement-checked).
   route('/api/v1/modules/catalog', ['GET'], null),

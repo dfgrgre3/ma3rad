@@ -20,3 +20,5 @@ export * from './platformTypes/health';
 export * from './platformTypes/staff';
 export * from './platformTypes/security';
 export * from './platformTypes/comms';
+export * from './platformTypes/usersHub';
+export * from './platformTypes/policies';

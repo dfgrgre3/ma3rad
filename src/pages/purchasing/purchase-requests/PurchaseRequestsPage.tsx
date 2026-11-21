@@ -13,6 +13,7 @@ import { ProductPicker } from '../../../components/products/ProductPicker';
 import { OperationsService } from '../../../services/domains/operations/OperationsService';
 import { AuthService } from '../../../services/domains/auth/AuthService';
 import { PermissionService } from '../../../services/domains/auth/PermissionService';
+import { usePageAccess } from '../../../hooks/domains/licensing/usePageAccess';
 import { useNavigate } from 'react-router-dom';
 import { Product } from '../../../types';
 import { formatProductQuantity, getProductUnitLabel } from '../../../utils/products/productUnits';
@@ -47,8 +48,14 @@ export const PurchaseRequestsPage: React.FC = () => {
 
   const currentUser = AuthService.getCurrentUser();
   const canCreate = PermissionService.can(currentUser, 'ui.purchases.requests.create');
-  const canApprove = PermissionService.can(currentUser, 'ui.purchases.requests.approve');
-  const canReject = PermissionService.can(currentUser, 'ui.purchases.requests.reject');
+  // قيود أقسام طلبات الشراء من المنصة المركزية — قائمة/أصناف/موافقات.
+  const pageAccess = usePageAccess('/purchases/requests');
+  const canViewList = pageAccess.allows('ui.purchases.requests.section.list.view');
+  const canViewItems = pageAccess.allows('ui.purchases.requests.section.items.view');
+  const canManageItems = pageAccess.allows('ui.purchases.requests.section.items.manage');
+  const canViewApprovals = pageAccess.allows('ui.purchases.requests.section.approvals.view');
+  const canApprove = canViewApprovals && PermissionService.can(currentUser, 'ui.purchases.requests.approve');
+  const canReject = canViewApprovals && PermissionService.can(currentUser, 'ui.purchases.requests.reject');
   const canCancelRequest = PermissionService.can(currentUser, 'ui.purchases.requests.cancel_request');
 
   const [requests, setRequests] = useState<PurchaseRequest[]>([]);
@@ -94,6 +101,7 @@ export const PurchaseRequestsPage: React.FC = () => {
   }, [load]);
 
   const openDetails = async (r: PurchaseRequest) => {
+    if (!canViewItems) { toast.warning('عرض بنود الطلب معطل من إعدادات المنصة.'); return; }
     if (expanded === r.id) {
       setExpanded(null);
       return;
@@ -222,7 +230,7 @@ export const PurchaseRequestsPage: React.FC = () => {
           title="طلبات الشراء والتوريد الداخلي"
           description="اقتراحات حد إعادة الطلب، طلبات التوريد، والاعتماد المتدرج حسب القيمة المالية"
           actions={<>
-            {canCreate && (
+            {canCreate && canManageItems && (
               <button
                 onClick={openReorderSuggestions}
                 className="flex items-center gap-2 px-3.5 py-2 bg-warning-soft hover:bg-warning-soft text-warning border border-warning-border rounded-xl text-xs font-bold transition"
@@ -230,7 +238,7 @@ export const PurchaseRequestsPage: React.FC = () => {
                 <Sparkles className="w-4 h-4 text-warning" /> اقتراحات حد إعادة الطلب
               </button>
             )}
-            {canCreate && (
+            {canCreate && canManageItems && (
               <ActivityGate element="new-request"><button
                 onClick={openModal}
                 className="flex items-center gap-2 px-4 py-2 bg-warning hover:bg-warning text-white rounded-xl text-sm font-semibold transition shrink-0"
@@ -243,6 +251,7 @@ export const PurchaseRequestsPage: React.FC = () => {
       </div>
 
       {/* Filter bar */}
+      {canViewList && (
       <div className="p-4 bg-surface border-b border-line flex flex-col sm:flex-row gap-3">
         <form onSubmit={(e) => { e.preventDefault(); load(); }} className="relative flex-1">
           <Search className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
@@ -264,8 +273,10 @@ export const PurchaseRequestsPage: React.FC = () => {
           ))}
         </select>
       </div>
+      )}
 
       {/* Requests Table */}
+      {canViewList && (
       <div className="flex-1 overflow-auto p-6">
         {error && <div className="mb-3 px-4 py-2.5 rounded-xl bg-danger-soft border border-danger-border text-danger text-xs font-semibold">{error}</div>}
         {loading ? (
@@ -382,6 +393,7 @@ export const PurchaseRequestsPage: React.FC = () => {
           </div>
         )}
       </div>
+      )}
 
       {/* Reorder Suggestions Modal */}
       {suggestionsModal && (

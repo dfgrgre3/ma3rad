@@ -25,6 +25,9 @@ const { adminRouter: releasesAdminRoutes, clientRouter: releasesClientRoutes } =
 const { adminRouter: appBackupsAdminRoutes, clientRouter: appBackupsClientRoutes } = require('./appBackups');
 const moduleRoutes = require('./modules');
 const adminExtraRoutes = require('./adminExtra');
+const provisioningRoutes = require('./provisioning');
+const tenantUserSyncRoutes = require('./tenantUserSync');
+const tenantApiRoutes = require('./tenantApi');
 
 /**
  * Mounts every central API router under /api/v1.
@@ -58,6 +61,9 @@ function createApiRouter() {
   router.use('/releases', releasesClientRoutes);
   router.use('/modules', moduleRoutes);
   router.use('/device/backups', appBackupsClientRoutes);
+  router.use('/device/provisioning', provisioningRoutes);
+  router.use('/device/tenant-users', tenantUserSyncRoutes);
+  router.use('/tenant/v1', tenantApiRoutes);
   router.use('/', systemRoutes);
   router.use('/', configRoutes);
 

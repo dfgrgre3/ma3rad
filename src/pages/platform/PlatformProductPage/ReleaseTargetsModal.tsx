@@ -18,8 +18,7 @@ interface ReleaseTargetsModalProps {
   saving: boolean;
   canManageProduct: boolean;
   onSaveTargets: () => void;
-  /** Undefined in central mode — per-target status tracking is local-only. */
-  onMarkTargetStatus?: (targetId: string, status: PlatformReleaseTarget['status']) => void;
+  onMarkTargetStatus: (targetId: string, status: PlatformReleaseTarget['status']) => void;
 }
 
 export const ReleaseTargetsModal: React.FC<ReleaseTargetsModalProps> = ({

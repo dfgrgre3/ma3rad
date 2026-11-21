@@ -21,6 +21,10 @@ export interface CentralTicketRow {
   remoteAccessRequestedAt?: string | null;
   remoteAccessApprovedAt?: string | null;
   remoteAccessDurationMinutes?: number | null;
+  rating?: number | null;
+  feedback?: string | null;
+  ratedAt?: string | null;
+  resolvedAt?: string | null;
   createdAt: string;
   updatedAt: string;
   messages?: CentralMessageRow[];
@@ -63,6 +67,10 @@ export function mapCentralTicket(row: CentralTicketRow): PlatformSupportTicket {
     assignedTo: row.assigneeName ?? null,
     remoteAccessRequested: Boolean(row.remoteAccessRequested),
     remoteAccessApproved: Boolean(row.remoteAccessApproved),
+    rating: row.rating ?? null,
+    feedback: row.feedback ?? null,
+    ratedAt: row.ratedAt ?? null,
+    resolvedAt: row.resolvedAt ?? null,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };

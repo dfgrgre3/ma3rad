@@ -51,6 +51,8 @@ const PLATFORM_TABLES = [
   'platform_role_permissions',
   'platform_releases',
   'platform_policies',
+  'platform_policy_documents',
+  'platform_policy_versions',
 ];
 
 // Tenant-scoped platform tables restored from a backup artifact, parents

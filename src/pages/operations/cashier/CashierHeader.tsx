@@ -8,6 +8,10 @@ interface Props {
   currentUser: User | null;
   activeShift: CashShift | null;
   isLoading: boolean;
+  /** إخفاء أزرار الورديات عند تعطيل قسم الورديات مركزيًا. */
+  canUseShifts?: boolean;
+  /** إخفاء زر سند الصرف عند تعطيل قسم المصروفات مركزيًا. */
+  canUseExpenses?: boolean;
   onOpenShiftModal: () => void;
   onCloseShiftModal: () => void;
   onOpenExpenseModal: () => void;
@@ -18,13 +22,15 @@ export const CashierHeader: React.FC<Props> = ({
   currentUser,
   activeShift,
   isLoading,
+  canUseShifts = true,
+  canUseExpenses = true,
   onOpenShiftModal,
   onCloseShiftModal,
   onOpenExpenseModal,
   onRefresh,
 }) => {
-  const canOpenShift = PermissionService.can(currentUser, 'cashier.shift.open');
-  const canCloseShift = PermissionService.can(currentUser, 'cashier.shift.close');
+  const canOpenShift = canUseShifts && PermissionService.can(currentUser, 'cashier.shift.open');
+  const canCloseShift = canUseShifts && PermissionService.can(currentUser, 'cashier.shift.close');
 
   return (
     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -59,6 +65,7 @@ export const CashierHeader: React.FC<Props> = ({
           </ActivityGate>
         ) : null}
 
+        {canUseExpenses && (
         <button
           onClick={onOpenExpenseModal}
           disabled={!activeShift}
@@ -67,6 +74,7 @@ export const CashierHeader: React.FC<Props> = ({
           <Plus className="w-4 h-4" />
           <span>سند صرف مصروف</span>
         </button>
+        )}
 
         <button
           onClick={onRefresh}

@@ -42,6 +42,128 @@ function safeJson(value) {
   try { return JSON.parse(value); } catch { return value; }
 }
 
+// ─── Maintenance windows ─────────────────────────────────────────────────────
+
+function effectiveMaintenanceStatus(row, now = Date.now()) {
+  if (row.status === 'CANCELLED') return 'CANCELLED';
+  const starts = Date.parse(row.starts_at);
+  const ends = Date.parse(row.ends_at);
+  if (Number.isFinite(ends) && now > ends) return 'COMPLETED';
+  if (Number.isFinite(starts) && now >= starts && (!Number.isFinite(ends) || now <= ends)) return 'ACTIVE';
+  return 'SCHEDULED';
+}
+
+function mapMaintenanceWindowRow(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    title: row.title,
+    description: row.description ?? null,
+    startsAt: row.starts_at,
+    endsAt: row.ends_at,
+    affectedServices: safeJson(row.affected_services) || [],
+    status: effectiveMaintenanceStatus(row),
+    createdBy: row.created_by ?? null,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+router.get(
+  '/maintenance-windows',
+  authenticatePlatformUser,
+  requirePlatformPermission(['platform.operations.view']),
+  async (req, res, next) => {
+    try {
+      const db = getDb();
+      const { status = '' } = req.query;
+      const rows = await db.all(
+        'SELECT * FROM platform_maintenance_windows ORDER BY starts_at ASC LIMIT 500'
+      );
+      let windows = rows.map(mapMaintenanceWindowRow);
+      if (status) windows = windows.filter((w) => w.status === status);
+      res.json({ data: windows, meta: { total: windows.length }, requestId: req.requestId });
+    } catch (err) { next(err); }
+  }
+);
+
+router.post(
+  '/maintenance-windows',
+  authenticatePlatformUser,
+  requirePlatformPermission(['platform.operations.create', 'platform.operations.update']),
+  async (req, res, next) => {
+    try {
+      const db = getDb();
+      const { title, description = null, startsAt, endsAt, affectedServices = [] } = req.body || {};
+      if (!title || !String(title).trim()) {
+        return res.status(400).json({ error: 'title is required' });
+      }
+      const starts = Date.parse(startsAt);
+      const ends = Date.parse(endsAt);
+      if (!Number.isFinite(starts) || !Number.isFinite(ends)) {
+        return res.status(400).json({ error: 'startsAt and endsAt must be valid ISO timestamps' });
+      }
+      if (ends <= starts) {
+        return res.status(400).json({ error: 'endsAt must be after startsAt' });
+      }
+      if (affectedServices !== undefined && !Array.isArray(affectedServices)) {
+        return res.status(400).json({ error: 'affectedServices must be an array of strings' });
+      }
+      const id = `mw_${crypto.randomUUID().replace(/-/g, '').slice(0, 16)}`;
+      const now = nowIso();
+      await db.run(
+        `INSERT INTO platform_maintenance_windows
+          (id, title, description, starts_at, ends_at, affected_services, status, created_by, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, 'SCHEDULED', ?, ?, ?)`,
+        [
+          id, String(title).trim(), description || null,
+          new Date(starts).toISOString(), new Date(ends).toISOString(),
+          JSON.stringify(affectedServices.filter((s) => typeof s === 'string')),
+          req.platformUser?.id ?? null, now, now,
+        ]
+      );
+      await recordAuditEvent({
+        actorId: req.platformUser?.id, actorName: req.platformUser?.full_name,
+        action: 'MAINTENANCE_WINDOW_CREATED', resourceType: 'platform_maintenance_windows', resourceId: id,
+        afterData: { title: String(title).trim(), startsAt, endsAt },
+        ipAddress: req.ip, userAgent: req.headers['user-agent'],
+      });
+      const row = await db.get('SELECT * FROM platform_maintenance_windows WHERE id = ?', [id]);
+      res.status(201).json({ data: mapMaintenanceWindowRow(row), requestId: req.requestId });
+    } catch (err) { next(err); }
+  }
+);
+
+router.post(
+  '/maintenance-windows/:id/cancel',
+  authenticatePlatformUser,
+  requirePlatformPermission(['platform.operations.update']),
+  async (req, res, next) => {
+    try {
+      const db = getDb();
+      const window = await db.get('SELECT * FROM platform_maintenance_windows WHERE id = ?', [req.params.id]);
+      if (!window) return res.status(404).json({ error: 'Maintenance window not found' });
+      const status = effectiveMaintenanceStatus(window);
+      if (!['SCHEDULED', 'ACTIVE'].includes(status)) {
+        return res.status(409).json({ error: `Cannot cancel maintenance window in status ${status}` });
+      }
+      const now = nowIso();
+      await db.run(
+        "UPDATE platform_maintenance_windows SET status = 'CANCELLED', updated_at = ? WHERE id = ?",
+        [now, window.id]
+      );
+      await recordAuditEvent({
+        actorId: req.platformUser?.id, actorName: req.platformUser?.full_name,
+        action: 'MAINTENANCE_WINDOW_CANCELLED', resourceType: 'platform_maintenance_windows', resourceId: window.id,
+        beforeData: { status },
+        ipAddress: req.ip, userAgent: req.headers['user-agent'],
+      });
+      const row = await db.get('SELECT * FROM platform_maintenance_windows WHERE id = ?', [window.id]);
+      res.json({ data: mapMaintenanceWindowRow(row), requestId: req.requestId });
+    } catch (err) { next(err); }
+  }
+);
+
 router.get(
   '/jobs',
   authenticatePlatformUser,

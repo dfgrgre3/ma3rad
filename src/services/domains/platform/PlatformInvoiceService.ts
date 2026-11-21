@@ -89,12 +89,16 @@ export class PlatformInvoiceService {
 
   // ─── Invoice Management ───────────────────────────────────────────────────────
 
-  public listInvoices(search = '', status = ''): PlatformInvoice[] {
+  public listInvoices(search = '', status = '', tenantId = ''): PlatformInvoice[] {
     PlatformInvoiceService.requirePlatformAccess('invoices', 'platform.invoices.view');
 
     const where: string[] = [];
     const params: (string | number)[] = [];
 
+    if (tenantId) {
+      where.push('i.tenant_id = ?');
+      params.push(tenantId);
+    }
     if (search) {
       where.push('(i.id LIKE ? OR t.name LIKE ? OR t.code LIKE ?)');
       const term = `%${search}%`;

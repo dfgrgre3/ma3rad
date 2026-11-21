@@ -1,9 +1,12 @@
 'use strict';
 
 const express = require('express');
+const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 const { v4: uuidv4 } = require('uuid');
 const { getDb } = require('../lib/db');
 const { recordAuditEvent } = require('../lib/audit');
+const { invalidatePermissionsCache } = require('../identity');
 const {
   authenticatePlatformUser,
   requirePlatformPermission,
@@ -360,6 +363,154 @@ router.delete(
         resourceType: 'platform_feature_flags',
         resourceId: req.params.id,
         beforeData: { key: flag.key, name: flag.name },
+        ipAddress: req.ip,
+      });
+      res.json({ data: { deleted: true }, requestId: req.requestId });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// ── Feature flag overrides (per TENANT / PLAN / STAGING_GROUP) ─────────────
+const OVERRIDE_TARGET_TYPES = ['TENANT', 'PLAN', 'STAGING_GROUP'];
+
+function mapFlagOverrideRow(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    featureId: row.feature_flag_id,
+    targetType: row.target_type,
+    targetId: row.target_id,
+    targetName: row.target_name ?? null,
+    isEnabled: Boolean(row.is_enabled),
+    customRolloutPercent: row.custom_rollout_percent ?? null,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+async function getFlagOverrideRows(db, flagId) {
+  return db.all(
+    `SELECT o.*, t.name AS target_name
+     FROM platform_feature_flag_overrides o
+     LEFT JOIN platform_tenants t ON o.target_type = 'TENANT' AND t.id = o.target_id
+     WHERE o.feature_flag_id = ?
+     ORDER BY o.created_at ASC`,
+    [flagId]
+  );
+}
+
+router.get(
+  '/admin/feature-flags/:id/overrides',
+  authenticatePlatformUser,
+  requirePlatformPermission(['platform.product.view', 'platform.product.manage']),
+  async (req, res, next) => {
+    try {
+      const db = getDb();
+      const flag = await db.get('SELECT id FROM platform_feature_flags WHERE id = ?', [req.params.id]);
+      if (!flag) return res.status(404).json({ error: 'Feature flag not found' });
+      const rows = await getFlagOverrideRows(db, flag.id);
+      // Resolve PLAN target names (and fall back for STAGING_GROUP) in a second pass.
+      const planIds = [...new Set(rows.filter((r) => r.target_type === 'PLAN').map((r) => r.target_id))];
+      const planNames = new Map();
+      if (planIds.length) {
+        const plans = await db.all(
+          `SELECT id, name FROM platform_plans WHERE id IN (${planIds.map(() => '?').join(',')})`,
+          planIds
+        );
+        for (const p of plans) planNames.set(p.id, p.name);
+      }
+      const data = rows.map((row) => {
+        let targetName = row.target_name ?? null;
+        if (row.target_type === 'PLAN') targetName = planNames.get(row.target_id) ?? null;
+        if (row.target_type === 'STAGING_GROUP') targetName = row.target_id;
+        return mapFlagOverrideRow({ ...row, target_name: targetName });
+      });
+      res.json({ data, meta: { total: data.length }, requestId: req.requestId });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+router.post(
+  '/admin/feature-flags/:id/overrides',
+  authenticatePlatformUser,
+  requirePlatformPermission(['platform.product.update', 'platform.product.manage']),
+  async (req, res, next) => {
+    try {
+      const db = getDb();
+      const flag = await db.get('SELECT id FROM platform_feature_flags WHERE id = ?', [req.params.id]);
+      if (!flag) return res.status(404).json({ error: 'Feature flag not found' });
+      const { targetType, targetId, isEnabled, customRolloutPercent } = req.body || {};
+      if (!OVERRIDE_TARGET_TYPES.includes(targetType)) {
+        return res.status(400).json({ error: `targetType must be one of ${OVERRIDE_TARGET_TYPES.join(', ')}` });
+      }
+      if (!targetId || !String(targetId).trim()) {
+        return res.status(400).json({ error: 'targetId is required' });
+      }
+      if (typeof isEnabled !== 'boolean') {
+        return res.status(400).json({ error: 'isEnabled must be a boolean' });
+      }
+      let percent = null;
+      if (customRolloutPercent !== undefined && customRolloutPercent !== null) {
+        const parsed = Number(customRolloutPercent);
+        if (!Number.isInteger(parsed) || parsed < 0 || parsed > 100) {
+          return res.status(400).json({ error: 'customRolloutPercent must be an integer between 0 and 100' });
+        }
+        percent = parsed;
+      }
+      const id = `ffo_${uuidv4().replace(/-/g, '').slice(0, 12)}`;
+      const now = nowIso();
+      await db.run(
+        `INSERT INTO platform_feature_flag_overrides
+          (id, feature_flag_id, target_type, target_id, is_enabled, custom_rollout_percent, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(feature_flag_id, target_type, target_id)
+         DO UPDATE SET is_enabled = excluded.is_enabled,
+                       custom_rollout_percent = excluded.custom_rollout_percent,
+                       updated_at = excluded.updated_at`,
+        [id, flag.id, targetType, String(targetId).trim(), isEnabled ? 1 : 0, percent, now, now]
+      );
+      const row = await db.get(
+        'SELECT * FROM platform_feature_flag_overrides WHERE feature_flag_id = ? AND target_type = ? AND target_id = ?',
+        [flag.id, targetType, String(targetId).trim()]
+      );
+      await recordAuditEvent({
+        actorId: req.platformUser?.id,
+        action: 'FEATURE_FLAG_OVERRIDE_UPSERTED',
+        resourceType: 'platform_feature_flag_overrides',
+        resourceId: row.id,
+        afterData: { featureFlagId: flag.id, targetType, targetId: String(targetId).trim(), isEnabled, customRolloutPercent: percent },
+        ipAddress: req.ip,
+      });
+      res.json({ data: mapFlagOverrideRow(row), requestId: req.requestId });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+router.delete(
+  '/admin/feature-flags/:id/overrides/:overrideId',
+  authenticatePlatformUser,
+  requirePlatformPermission(['platform.product.delete', 'platform.product.manage']),
+  async (req, res, next) => {
+    try {
+      const db = getDb();
+      const row = await db.get(
+        'SELECT * FROM platform_feature_flag_overrides WHERE id = ? AND feature_flag_id = ?',
+        [req.params.overrideId, req.params.id]
+      );
+      if (!row) return res.status(404).json({ error: 'Override not found' });
+      await db.run('DELETE FROM platform_feature_flag_overrides WHERE id = ?', [row.id]);
+      await recordAuditEvent({
+        actorId: req.platformUser?.id,
+        action: 'FEATURE_FLAG_OVERRIDE_DELETED',
+        resourceType: 'platform_feature_flag_overrides',
+        resourceId: row.id,
+        beforeData: { featureFlagId: row.feature_flag_id, targetType: row.target_type, targetId: row.target_id },
         ipAddress: req.ip,
       });
       res.json({ data: { deleted: true }, requestId: req.requestId });
@@ -1858,6 +2009,100 @@ router.post(
 );
 
 // ── Admin Control (Staff & Tenant Users) ──────────────────────────────────
+// Staff accounts live exclusively in `platform_users` (the same table used by
+// /admin/staff and platform authentication). `platform_staff_extended` is a
+// legacy shadow table kept for historical rows only — it is no longer read or
+// written by these endpoints.
+
+const OWNER_ROLE_CODES = new Set(['SUPER_ADMIN', 'OWNER']);
+const isOwnerActor = (user) => OWNER_ROLE_CODES.has(String(user?.role || ''));
+
+function parseJsonArraySafe(value) {
+  if (Array.isArray(value)) return value.map(String);
+  if (typeof value === 'string' && value) {
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed.map(String) : null;
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+const STAFF_SELECT = `
+  SELECT u.id, u.username, u.full_name, u.email, u.phone, u.role, u.permissions,
+         u.is_active, u.last_login_at, u.must_change_password, u.failed_login_attempts,
+         u.locked_until, u.data_scope, u.created_at, u.updated_at,
+         (SELECT m.enabled FROM platform_mfa m WHERE m.user_id = u.id LIMIT 1) AS mfa_enabled
+    FROM platform_users u`;
+
+function mapPlatformUserRow(row) {
+  return {
+    id: row.id,
+    userId: row.id,
+    username: row.username ?? null,
+    fullName: row.full_name ?? null,
+    email: row.email ?? null,
+    phone: row.phone ?? null,
+    role: row.role,
+    isActive: Boolean(row.is_active),
+    mustChangePassword: Boolean(row.must_change_password),
+    mfaEnabled: Boolean(row.mfa_enabled),
+    dataScope: row.data_scope ?? 'ALL',
+    failedLoginAttempts: Number(row.failed_login_attempts ?? 0),
+    lockedUntil: row.locked_until ?? null,
+    lastLoginAt: row.last_login_at ?? null,
+    permissionsOverride: parseJsonArraySafe(row.permissions),
+    createdAt: row.created_at ?? null,
+    updatedAt: row.updated_at ?? null,
+  };
+}
+
+async function countActiveOwners(db, excludeUserId = null) {
+  const row = await db.get(
+    `SELECT COUNT(*) AS c FROM platform_users
+      WHERE role IN ('SUPER_ADMIN','OWNER') AND is_active = 1 AND deleted_at IS NULL
+        AND id <> ?`,
+    [excludeUserId ?? '']
+  );
+  return Number(row?.c ?? 0);
+}
+
+function sanitizeUsernameCandidate(raw) {
+  return String(raw || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]/g, '')
+    .replace(/^[-_.]+|[-_.]+$/g, '')
+    .slice(0, 24);
+}
+
+async function ensureUniqueUsername(db, base) {
+  const root = base || `staff${Date.now().toString(36)}`;
+  let candidate = root;
+  let index = 2;
+  while (await db.get('SELECT 1 FROM platform_users WHERE username = ?', [candidate])) {
+    const suffix = String(index);
+    candidate = `${root.slice(0, Math.max(1, 24 - suffix.length))}${suffix}`;
+    index += 1;
+  }
+  return candidate;
+}
+
+async function syncStaffGrants(db, userId, permissions) {
+  const granted = Array.isArray(permissions) ? permissions.filter((p) => typeof p === 'string' && p) : [];
+  await db.run(`DELETE FROM platform_user_permissions WHERE user_id = ? AND effect = 'GRANT'`, [userId]);
+  for (const code of granted) {
+    if (code === '*') continue;
+    await db.run(
+      `INSERT OR IGNORE INTO platform_user_permissions (user_id, permission_code, effect) VALUES (?, ?, 'GRANT')`,
+      [userId, code]
+    );
+  }
+  return granted;
+}
+
 router.get(
   '/admin/admin-control/staff',
   authenticatePlatformUser,
@@ -1866,13 +2111,17 @@ router.get(
     try {
       const db = getDb();
       const { search, role } = req.query;
-      let query = 'SELECT * FROM platform_staff_extended WHERE deleted_at IS NULL';
+      let query = `${STAFF_SELECT} WHERE u.deleted_at IS NULL`;
       const params = [];
-      if (search) { query += ' AND (full_name LIKE ? OR email LIKE ?)'; params.push(`%${search}%`, `%${search}%`); }
-      if (role) { query += ' AND role = ?'; params.push(role); }
-      query += ' ORDER BY created_at DESC';
+      if (search) {
+        query += ' AND (u.full_name LIKE ? OR u.email LIKE ? OR u.username LIKE ?)';
+        const like = `%${String(search)}%`;
+        params.push(like, like, like);
+      }
+      if (role) { query += ' AND u.role = ?'; params.push(role); }
+      query += ' ORDER BY u.created_at DESC';
       const staff = await db.all(query, params);
-      res.json({ data: staff, requestId: req.requestId });
+      res.json({ data: staff.map(mapPlatformUserRow), requestId: req.requestId });
     } catch (err) { next(err); }
   }
 );
@@ -1897,23 +2146,81 @@ router.post(
   async (req, res, next) => {
     try {
       const db = getDb();
-      const { fullName, email, phone, role, permissions } = req.body || {};
+      const { username, fullName, email, phone, role = 'SUPPORT_AGENT', permissions = [], password } = req.body || {};
       if (!fullName || !email) return res.status(400).json({ error: 'fullName and email are required' });
-      const id = `staff_${uuidv4().replace(/-/g, '').slice(0, 12)}`;
-      const userId = `user_${uuidv4().replace(/-/g, '').slice(0, 12)}`;
-      await db.run(
-        `INSERT INTO platform_users (id, email, full_name, phone, role, is_active, created_at)
-         VALUES (?, ?, ?, ?, ?, 1, ?)`,
-        [userId, email, fullName, phone || null, role || 'SUPPORT_AGENT', nowIso()]
+
+      const actor = req.platformUser;
+      const owner = isOwnerActor(actor);
+      const targetRole = String(role || 'SUPPORT_AGENT').toUpperCase();
+      if (OWNER_ROLE_CODES.has(targetRole) && !owner) {
+        return res.status(403).json({ error: 'Only the platform owner can create or upgrade to a super admin account' });
+      }
+      if (OWNER_ROLE_CODES.has(targetRole)) {
+        const existingOwner = await db.get(
+          `SELECT id FROM platform_users
+            WHERE role IN ('SUPER_ADMIN','OWNER') AND deleted_at IS NULL AND is_active = 1
+            LIMIT 1`
+        );
+        if (existingOwner) {
+          return res.status(409).json({ error: 'A platform owner account already exists; a second owner cannot be created' });
+        }
+      }
+      const requestedPerms = Array.isArray(permissions) ? permissions : [];
+      if (requestedPerms.includes('*') && !owner) {
+        return res.status(403).json({ error: 'Wildcard permission cannot be granted' });
+      }
+
+      const emailKey = String(email).trim().toLowerCase();
+      const existing = await db.get(
+        'SELECT 1 FROM platform_users WHERE username = ? OR (email IS NOT NULL AND LOWER(email) = ?) LIMIT 1',
+        [sanitizeUsernameCandidate(username || emailKey.split('@')[0]), emailKey]
       );
-      await db.run(
-        `INSERT INTO platform_staff_extended (id, user_id, full_name, email, phone, role, is_active, permissions, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`,
-        [id, userId, fullName, email, phone || null, role || 'SUPPORT_AGENT', permissions ? JSON.stringify(permissions) : null, nowIso(), nowIso()]
+      if (existing) return res.status(400).json({ error: 'A staff account with this username or email already exists' });
+
+      const finalUsername = await ensureUniqueUsername(
+        db,
+        sanitizeUsernameCandidate(username || emailKey.split('@')[0]) || `staff${Date.now().toString(36)}`
       );
-      const staff = await db.get('SELECT * FROM platform_staff_extended WHERE id = ?', [id]);
-      await recordAuditEvent({ actorId: req.platformUser?.id, action: 'STAFF_CREATED', resourceType: 'platform_staff_extended', resourceId: id, afterData: { email, role }, ipAddress: req.ip });
-      res.status(201).json({ data: staff, requestId: req.requestId });
+      const generatedPassword = !password;
+      const plainPassword = password || crypto.randomBytes(12).toString('base64url');
+      if (String(plainPassword).length < 8) {
+        return res.status(400).json({ error: 'Password must be at least 8 characters' });
+      }
+      const passwordHash = await bcrypt.hash(String(plainPassword), 10);
+      const id = `usr_${uuidv4().replace(/-/g, '').slice(0, 12)}`;
+      const now = nowIso();
+
+      await db.run(
+        `INSERT INTO platform_users
+           (id, username, password_hash, full_name, email, phone, role, permissions,
+            is_active, must_change_password, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`,
+        [id, finalUsername, passwordHash, String(fullName).trim(), emailKey,
+         phone || null, targetRole, JSON.stringify(requestedPerms),
+         generatedPassword ? 1 : 0, now, now]
+      );
+      const roleRow = await db.get('SELECT code FROM platform_roles WHERE code = ?', [targetRole]);
+      if (roleRow) {
+        await db.run('INSERT OR IGNORE INTO platform_user_roles (user_id, role_code) VALUES (?, ?)', [id, targetRole]);
+      }
+      await syncStaffGrants(db, id, requestedPerms);
+      invalidatePermissionsCache(id);
+
+      const created = await db.get(`${STAFF_SELECT} WHERE u.id = ?`, [id]);
+      await recordAuditEvent({
+        actorId: actor?.id,
+        actorName: actor?.full_name,
+        action: 'STAFF_CREATED',
+        resourceType: 'platform_users',
+        resourceId: id,
+        afterData: { username: finalUsername, email: emailKey, role: targetRole },
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+      res.status(201).json({
+        data: { ...mapPlatformUserRow(created), ...(generatedPassword ? { temporaryPassword: plainPassword } : {}) },
+        requestId: req.requestId,
+      });
     } catch (err) { next(err); }
   }
 );
@@ -1926,21 +2233,81 @@ router.put(
     try {
       const db = getDb();
       const { id } = req.params;
-      const { fullName, email, phone, role, permissions, isActive } = req.body || {};
+      const actor = req.platformUser;
+      const existing = await db.get(`${STAFF_SELECT} WHERE u.id = ? AND u.deleted_at IS NULL`, [id]);
+      if (!existing) return res.status(404).json({ error: 'Staff member not found' });
+
+      const { fullName, email, phone, role, permissions, isActive, password } = req.body || {};
+      const owner = isOwnerActor(actor);
+      const selfEdit = actor?.id === id;
+
+      if (selfEdit && isActive === false) {
+        return res.status(400).json({ error: 'You cannot deactivate your own account' });
+      }
+      if (role !== undefined && OWNER_ROLE_CODES.has(String(role).toUpperCase()) && !owner) {
+        return res.status(403).json({ error: 'Only the platform owner can grant the owner role' });
+      }
+      if (selfEdit && role !== undefined && String(role).toUpperCase() !== String(existing.role).toUpperCase()
+          && OWNER_ROLE_CODES.has(String(existing.role).toUpperCase())) {
+        return res.status(400).json({ error: 'You cannot change your own owner role' });
+      }
+      if (isActive === false && OWNER_ROLE_CODES.has(String(existing.role).toUpperCase())
+          && (await countActiveOwners(db, id)) === 0) {
+        return res.status(409).json({ error: 'Cannot deactivate the last active platform owner' });
+      }
+      if (Array.isArray(permissions) && permissions.includes('*') && !owner) {
+        return res.status(403).json({ error: 'Wildcard permission cannot be granted' });
+      }
+
       const updates = [];
       const params = [];
-      if (fullName !== undefined) { updates.push('full_name = ?'); params.push(fullName); }
-      if (email !== undefined) { updates.push('email = ?'); params.push(email); }
-      if (phone !== undefined) { updates.push('phone = ?'); params.push(phone); }
-      if (role !== undefined) { updates.push('role = ?'); params.push(role); }
-      if (permissions !== undefined) { updates.push('permissions = ?'); params.push(JSON.stringify(permissions)); }
+      if (fullName !== undefined) { updates.push('full_name = ?'); params.push(String(fullName).trim() || null); }
+      if (email !== undefined) { updates.push('email = ?'); params.push(String(email).trim().toLowerCase() || null); }
+      if (phone !== undefined) { updates.push('phone = ?'); params.push(phone || null); }
+      if (role !== undefined) { updates.push('role = ?'); params.push(String(role).toUpperCase()); }
       if (isActive !== undefined) { updates.push('is_active = ?'); params.push(isActive ? 1 : 0); }
-      if (!updates.length) return res.status(400).json({ error: 'No fields to update' });
-      updates.push('updated_at = ?'); params.push(nowIso());
-      params.push(id);
-      await db.run(`UPDATE platform_staff_extended SET ${updates.join(', ')} WHERE id = ?`, params);
-      const staff = await db.get('SELECT * FROM platform_staff_extended WHERE id = ?', [id]);
-      res.json({ data: staff, requestId: req.requestId });
+      if (password !== undefined) {
+        if (String(password).length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters' });
+        updates.push('password_hash = ?');
+        params.push(await bcrypt.hash(String(password), 10));
+        updates.push('must_change_password = 0');
+      }
+      const now = nowIso();
+      if (updates.length) {
+        updates.push('updated_at = ?'); params.push(now, id);
+        await db.run(`UPDATE platform_users SET ${updates.join(', ')} WHERE id = ?`, params);
+      }
+
+      if (role !== undefined) {
+        const nextRole = String(role).toUpperCase();
+        await db.run('DELETE FROM platform_user_roles WHERE user_id = ?', [id]);
+        const roleRow = await db.get('SELECT code FROM platform_roles WHERE code = ?', [nextRole]);
+        if (roleRow) {
+          await db.run('INSERT OR IGNORE INTO platform_user_roles (user_id, role_code) VALUES (?, ?)', [id, nextRole]);
+        }
+      }
+      if (Array.isArray(permissions)) {
+        const granted = await syncStaffGrants(db, id, permissions);
+        await db.run('UPDATE platform_users SET permissions = ?, updated_at = ? WHERE id = ?', [JSON.stringify(granted), now, id]);
+      }
+      invalidatePermissionsCache(id);
+      // Deactivating or changing credentials must kill live sessions.
+      if (isActive === false || password !== undefined) {
+        await db.run('DELETE FROM platform_sessions WHERE user_id = ?', [id]);
+      }
+
+      const staff = await db.get(`${STAFF_SELECT} WHERE u.id = ?`, [id]);
+      await recordAuditEvent({
+        actorId: actor?.id,
+        actorName: actor?.full_name,
+        action: 'STAFF_UPDATED',
+        resourceType: 'platform_users',
+        resourceId: id,
+        afterData: { fullName, email, role, isActive, permissions: Array.isArray(permissions) ? permissions : undefined, passwordChanged: password !== undefined },
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+      res.json({ data: mapPlatformUserRow(staff), requestId: req.requestId });
     } catch (err) { next(err); }
   }
 );
@@ -1952,9 +2319,84 @@ router.delete(
   async (req, res, next) => {
     try {
       const db = getDb();
-      await db.run('UPDATE platform_staff_extended SET deleted_at = ? WHERE id = ?', [nowIso(), req.params.id]);
-      await recordAuditEvent({ actorId: req.platformUser?.id, action: 'STAFF_DELETED', resourceType: 'platform_staff_extended', resourceId: req.params.id, ipAddress: req.ip });
+      const { id } = req.params;
+      const actor = req.platformUser;
+      const existing = await db.get(`${STAFF_SELECT} WHERE u.id = ? AND u.deleted_at IS NULL`, [id]);
+      if (!existing) return res.status(404).json({ error: 'Staff member not found' });
+      if (actor?.id === id) return res.status(400).json({ error: 'You cannot delete your own account' });
+      if (OWNER_ROLE_CODES.has(String(existing.role).toUpperCase()) && (await countActiveOwners(db, id)) === 0) {
+        return res.status(409).json({ error: 'Cannot delete the last active platform owner' });
+      }
+
+      const now = nowIso();
+      await db.run('UPDATE platform_users SET is_active = 0, deleted_at = ?, updated_at = ? WHERE id = ?', [now, now, id]);
+      await db.run('DELETE FROM platform_sessions WHERE user_id = ?', [id]);
+      invalidatePermissionsCache(id);
+      await recordAuditEvent({
+        actorId: actor?.id,
+        actorName: actor?.full_name,
+        action: 'STAFF_DELETED',
+        resourceType: 'platform_users',
+        resourceId: id,
+        ipAddress: req.ip,
+      });
       res.json({ data: { deleted: true }, requestId: req.requestId });
+    } catch (err) { next(err); }
+  }
+);
+
+// ── Cross-tenant user directory (super-admin monitoring) ────────────────────
+router.get(
+  '/admin/tenant-users',
+  authenticatePlatformUser,
+  requirePlatformPermission(['platform.tenants.view', 'platform.tenants.manage', 'platform.admincontrol.view', 'platform.admincontrol.manage']),
+  async (req, res, next) => {
+    try {
+      const db = getDb();
+      const { tenantId = '', provisioningStatus = '', status = '', search = '' } = req.query;
+      const scoped = await getScopedTenantIds(req);
+      const scope = tenantScopePredicate('u.tenant_id', scoped);
+      if (scope.deny) return res.json({ data: [], requestId: req.requestId });
+
+      let sql = `SELECT u.*, t.name AS tenant_name, t.code AS tenant_code
+                   FROM platform_tenant_users u
+                   JOIN platform_tenants t ON t.id = u.tenant_id
+                  WHERE 1=1${scope.clause}`;
+      const params = [...scope.params];
+      if (tenantId) { sql += ' AND u.tenant_id = ?'; params.push(String(tenantId)); }
+      if (provisioningStatus) { sql += ' AND u.provisioning_status = ?'; params.push(String(provisioningStatus)); }
+      if (status) { sql += ' AND u.status = ?'; params.push(String(status)); }
+      if (search) {
+        sql += ' AND (u.full_name LIKE ? OR u.username LIKE ? OR u.email LIKE ?)';
+        const like = `%${String(search)}%`;
+        params.push(like, like, like);
+      }
+      sql += ' ORDER BY t.name ASC, u.created_at DESC LIMIT 1000';
+      const rows = await db.all(sql, params);
+      res.json({
+        data: rows.map((row) => ({
+          id: row.id,
+          tenantId: row.tenant_id,
+          tenantName: row.tenant_name,
+          tenantCode: row.tenant_code,
+          username: row.username ?? null,
+          fullName: row.full_name,
+          email: row.email ?? null,
+          phone: row.phone ?? null,
+          role: row.role,
+          status: row.status,
+          isActive: row.status === 'ACTIVE',
+          provisioningStatus: row.provisioning_status ?? 'NOT_REQUESTED',
+          provisioningMode: row.provisioning_mode ?? null,
+          identityUserId: row.identity_user_id ?? null,
+          inviteExpiresAt: row.invite_expires_at ?? null,
+          provisionedAt: row.provisioned_at ?? null,
+          lastError: row.last_error ?? null,
+          createdAt: row.created_at,
+          updatedAt: row.updated_at,
+        })),
+        requestId: req.requestId,
+      });
     } catch (err) { next(err); }
   }
 );
@@ -2032,6 +2474,291 @@ router.delete(
       const db = getDb();
       await db.run('DELETE FROM platform_tenant_users WHERE tenant_id = ? AND id = ?', [req.params.tenantId, req.params.userId]);
       res.json({ data: { deleted: true }, requestId: req.requestId });
+    } catch (err) { next(err); }
+  }
+);
+
+// ── Unified Users Hub (overview / search / detail) ─────────────────────────
+// One place that aggregates every kind of user the platform manages:
+// platform staff (platform_users) and tenant directory users
+// (platform_tenant_users) with their provisioning pipeline state.
+
+const USERS_READ_PERMISSION = ['platform.admincontrol.view', 'platform.admincontrol.manage', 'platform.tenants.view'];
+
+router.get(
+  '/admin/admin-control/users/overview',
+  authenticatePlatformUser,
+  requirePlatformPermission(USERS_READ_PERMISSION),
+  async (req, res, next) => {
+    try {
+      const db = getDb();
+      const scoped = await getScopedTenantIds(req);
+      const scope = tenantScopePredicate('u.tenant_id', scoped);
+      const jobScope = tenantScopePredicate('j.tenant_id', scoped);
+      const empty = {
+        staff: { total: 0, active: 0, inactive: 0, locked: 0, mustChangePassword: 0, byRole: {} },
+        tenantUsers: { total: 0, byStatus: {}, byProvisioning: {}, byOrigin: {}, newLast7Days: 0 },
+        provisioning: { pending: 0, failed: 0 },
+        recentEvents: [],
+      };
+      if (scope.deny) return res.json({ data: empty, requestId: req.requestId });
+
+      const now = nowIso();
+      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+
+      const [staffAgg, staffRoles, tuStatus, tuProv, tuOrigin, tuNew, provJobs, recentEvents] = await Promise.all([
+        db.get(
+          `SELECT COUNT(*) AS total,
+                  COALESCE(SUM(is_active),0) AS active,
+                  COALESCE(SUM(CASE WHEN is_active = 0 THEN 1 ELSE 0 END),0) AS inactive,
+                  COALESCE(SUM(CASE WHEN locked_until IS NOT NULL AND locked_until > ? THEN 1 ELSE 0 END),0) AS locked,
+                  COALESCE(SUM(must_change_password),0) AS must_change
+             FROM platform_users WHERE deleted_at IS NULL`,
+          [now]
+        ),
+        db.all(`SELECT role, COUNT(*) AS c FROM platform_users WHERE deleted_at IS NULL GROUP BY role`),
+        db.all(`SELECT u.status AS k, COUNT(*) AS c FROM platform_tenant_users u WHERE 1=1${scope.clause} GROUP BY u.status`, scope.params),
+        db.all(`SELECT u.provisioning_status AS k, COUNT(*) AS c FROM platform_tenant_users u WHERE 1=1${scope.clause} GROUP BY u.provisioning_status`, scope.params),
+        db.all(`SELECT u.origin AS k, COUNT(*) AS c FROM platform_tenant_users u WHERE 1=1${scope.clause} GROUP BY u.origin`, scope.params),
+        db.get(`SELECT COUNT(*) AS c FROM platform_tenant_users u WHERE u.created_at >= ?${scope.clause}`, [sevenDaysAgo, ...scope.params]),
+        db.all(
+          `SELECT j.status AS k, COUNT(*) AS c FROM platform_tenant_provisioning_jobs j WHERE j.status IN ('PENDING','CLAIMED','FAILED')${jobScope.clause} GROUP BY j.status`,
+          jobScope.params
+        ),
+        (async () => {
+          // Staff events carry tenant_id NULL; tenant events are scope-filtered.
+          let eventScope = '';
+          const eventParams = [];
+          if (Array.isArray(scoped)) {
+            if (!scoped.length) return [];
+            eventScope = ` AND (tenant_id IS NULL OR tenant_id IN (${scoped.map(() => '?').join(',')}))`;
+            eventParams.push(...scoped);
+          }
+          return db.all(
+            `SELECT id, actor_name, action, resource_type, resource_id, tenant_id, created_at
+               FROM platform_audit_events
+              WHERE resource_type IN ('platform_users','platform_tenant_users')${eventScope}
+              ORDER BY created_at DESC LIMIT 15`,
+            eventParams
+          );
+        })(),
+      ]);
+
+      const byRole = {};
+      for (const r of staffRoles) byRole[String(r.role)] = Number(r.c);
+      const toMap = (rows) => Object.fromEntries(rows.map((r) => [String(r.k ?? 'UNKNOWN'), Number(r.c)]));
+      const provMap = Object.fromEntries(provJobs.map((r) => [String(r.k), Number(r.c)]));
+
+      res.json({
+        data: {
+          staff: {
+            total: Number(staffAgg?.total ?? 0),
+            active: Number(staffAgg?.active ?? 0),
+            inactive: Number(staffAgg?.inactive ?? 0),
+            locked: Number(staffAgg?.locked ?? 0),
+            mustChangePassword: Number(staffAgg?.must_change ?? 0),
+            byRole,
+          },
+          tenantUsers: {
+            total: tuStatus.reduce((a, r) => a + Number(r.c), 0),
+            byStatus: toMap(tuStatus),
+            byProvisioning: toMap(tuProv),
+            byOrigin: toMap(tuOrigin),
+            newLast7Days: Number(tuNew?.c ?? 0),
+          },
+          provisioning: {
+            pending: (provMap.PENDING ?? 0) + (provMap.CLAIMED ?? 0),
+            failed: provMap.FAILED ?? 0,
+          },
+          recentEvents,
+        },
+        requestId: req.requestId,
+      });
+    } catch (err) { next(err); }
+  }
+);
+
+router.get(
+  '/admin/admin-control/users/search',
+  authenticatePlatformUser,
+  requirePlatformPermission(USERS_READ_PERMISSION),
+  async (req, res, next) => {
+    try {
+      const db = getDb();
+      const q = String(req.query.q || '').trim();
+      if (q.length < 2) {
+        return res.json({ data: { staff: [], tenantUsers: [] }, requestId: req.requestId });
+      }
+      const like = `%${q}%`;
+      const scoped = await getScopedTenantIds(req);
+      const scope = tenantScopePredicate('u.tenant_id', scoped);
+      if (scope.deny) {
+        return res.json({ data: { staff: [], tenantUsers: [] }, requestId: req.requestId });
+      }
+
+      const [staffRows, tenantRows] = await Promise.all([
+        db.all(
+          `${STAFF_SELECT}
+            WHERE u.deleted_at IS NULL
+              AND (u.username LIKE ? OR u.full_name LIKE ? OR u.email LIKE ?)
+            ORDER BY u.created_at DESC LIMIT 10`,
+          [like, like, like]
+        ),
+        db.all(
+          `SELECT u.id, u.tenant_id, u.username, u.full_name, u.email, u.phone, u.role, u.status,
+                  u.provisioning_status, u.provisioning_mode, u.identity_user_id, u.origin,
+                  u.is_active, u.created_at, u.updated_at,
+                  t.name AS tenant_name, t.code AS tenant_code
+             FROM platform_tenant_users u
+             JOIN platform_tenants t ON t.id = u.tenant_id
+            WHERE (u.full_name LIKE ? OR u.username LIKE ? OR u.email LIKE ?)${scope.clause}
+            ORDER BY u.created_at DESC LIMIT 20`,
+          [like, like, like, ...scope.params]
+        ),
+      ]);
+
+      res.json({
+        data: {
+          staff: staffRows.map(mapPlatformUserRow),
+          tenantUsers: tenantRows.map((row) => ({
+            id: row.id,
+            tenantId: row.tenant_id,
+            tenantName: row.tenant_name,
+            tenantCode: row.tenant_code,
+            username: row.username ?? null,
+            fullName: row.full_name,
+            email: row.email ?? null,
+            phone: row.phone ?? null,
+            role: row.role,
+            status: row.status,
+            isActive: row.status === 'ACTIVE',
+            provisioningStatus: row.provisioning_status ?? 'NOT_REQUESTED',
+            provisioningMode: row.provisioning_mode ?? null,
+            identityUserId: row.identity_user_id ?? null,
+            origin: row.origin ?? 'PLATFORM',
+            createdAt: row.created_at,
+            updatedAt: row.updated_at,
+          })),
+        },
+        requestId: req.requestId,
+      });
+    } catch (err) { next(err); }
+  }
+);
+
+router.get(
+  '/admin/admin-control/users/tenant/:userId',
+  authenticatePlatformUser,
+  requirePlatformPermission(USERS_READ_PERMISSION),
+  async (req, res, next) => {
+    try {
+      const db = getDb();
+      const user = await db.get('SELECT * FROM platform_tenant_users WHERE id = ?', [req.params.userId]);
+      if (!user) return res.status(404).json({ error: 'Tenant user not found' });
+      if (!(await assertTenantAccess(req, res, user.tenant_id))) return;
+
+      const [tenant, jobs, events] = await Promise.all([
+        db.get('SELECT id, name, code, status FROM platform_tenants WHERE id = ?', [user.tenant_id]),
+        db.all(
+          `SELECT id, event, status, attempts, max_attempts, last_error, claimed_by_device_id,
+                  result_identity_user_id, created_at, updated_at, completed_at
+             FROM platform_tenant_provisioning_jobs
+            WHERE tenant_user_id = ?
+            ORDER BY created_at DESC LIMIT 50`,
+          [user.id]
+        ),
+        db.all(
+          `SELECT id, actor_name, action, resource_type, created_at
+             FROM platform_audit_events
+            WHERE resource_id = ? OR (tenant_id = ? AND resource_type = 'platform_tenant_users')
+            ORDER BY created_at DESC LIMIT 25`,
+          [user.id, user.tenant_id]
+        ),
+      ]);
+
+      res.json({
+        data: {
+          user: {
+            id: user.id,
+            tenantId: user.tenant_id,
+            username: user.username ?? null,
+            fullName: user.full_name,
+            email: user.email ?? null,
+            phone: user.phone ?? null,
+            role: user.role,
+            status: user.status,
+            notes: user.notes ?? null,
+            provisioningStatus: user.provisioning_status ?? 'NOT_REQUESTED',
+            provisioningMode: user.provisioning_mode ?? null,
+            identityUserId: user.identity_user_id ?? null,
+            scope: user.scope ?? null,
+            origin: user.origin ?? 'PLATFORM',
+            isActive: Boolean(user.is_active),
+            inviteExpiresAt: user.invite_expires_at ?? null,
+            provisionedAt: user.provisioned_at ?? null,
+            lastError: user.last_error ?? null,
+            createdAt: user.created_at,
+            updatedAt: user.updated_at,
+          },
+          tenant,
+          jobs,
+          events,
+        },
+        requestId: req.requestId,
+      });
+    } catch (err) { next(err); }
+  }
+);
+
+router.get(
+  '/admin/admin-control/users/staff/:id',
+  authenticatePlatformUser,
+  requirePlatformPermission(USERS_READ_PERMISSION),
+  async (req, res, next) => {
+    try {
+      const db = getDb();
+      const user = await db.get(`${STAFF_SELECT} WHERE u.id = ? AND u.deleted_at IS NULL`, [req.params.id]);
+      if (!user) return res.status(404).json({ error: 'Staff member not found' });
+
+      const [roleRows, grantRows, denyRows, sessions, logins] = await Promise.all([
+        db.all('SELECT role_code FROM platform_user_roles WHERE user_id = ?', [user.id]),
+        db.all(
+          `SELECT p.code, p.module, p.action, p.name
+             FROM platform_user_permissions up
+             JOIN platform_permissions p ON p.code = up.permission_code
+            WHERE up.user_id = ? AND up.effect = 'GRANT'
+            ORDER BY p.module, p.code`,
+          [user.id]
+        ),
+        db.all(
+          `SELECT p.code, p.name
+             FROM platform_user_permissions up
+             JOIN platform_permissions p ON p.code = up.permission_code
+            WHERE up.user_id = ? AND up.effect = 'DENY'
+            ORDER BY p.code`,
+          [user.id]
+        ),
+        db.get('SELECT COUNT(*) AS c FROM platform_sessions WHERE user_id = ?', [user.id]),
+        db.all(
+          `SELECT username, success, failure_reason, ip_address, created_at
+             FROM platform_login_attempts
+            WHERE user_id = ?
+            ORDER BY created_at DESC LIMIT 15`,
+          [user.id]
+        ),
+      ]);
+
+      res.json({
+        data: {
+          staff: mapPlatformUserRow(user),
+          roles: roleRows.map((r) => r.role_code),
+          grants: grantRows,
+          denies: denyRows,
+          activeSessions: Number(sessions?.c ?? 0),
+          recentLogins: logins,
+        },
+        requestId: req.requestId,
+      });
     } catch (err) { next(err); }
   }
 );

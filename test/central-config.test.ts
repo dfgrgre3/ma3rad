@@ -147,6 +147,29 @@ test('central feature permissions are enforced by both UI and service-layer chec
   assert.equal(PermissionService.can(admin, 'sales.create'), true);
 });
 
+test('a permission whose page is fully hidden is denied at the service layer without page context', async () => {
+  await DatabaseManager.getInstance().initialize();
+  PermissionService.seed();
+  // The previous test rotated the admin password; the seeded DB persists
+  // across tests in this file.
+  const admin = AuthService.login('admin', 'AdminTest@2026');
+  CentralFeaturePermissionService.setCurrentPath('');
+  setCentralConfig({ hiddenMenus: ['/sales'] });
+
+  // ui.sales.invoices.* belongs only to /sales → dead while the page is hidden,
+  // even though the service call carries no page context.
+  assert.throws(() => PermissionService.require(admin, 'ui.sales.invoices.create'));
+  assert.equal(CentralFeaturePermissionService.isPermissionPageHidden('ui.sales.invoices.create'), true);
+
+  // 'sales.create' is shared by /sales, /daily/sales, /ceramics… — hiding only
+  // /sales must not break the pages that remain visible.
+  assert.equal(CentralFeaturePermissionService.isPermissionPageHidden('sales.create'), false);
+  assert.doesNotThrow(() => PermissionService.require(admin, 'sales.create'));
+
+  clearCentralConfig();
+  CentralFeaturePermissionService.setCurrentPath('');
+});
+
 test('central config applier maps activity type and allowed modules into settings', async () => {
   await DatabaseManager.getInstance().initialize();
   clearCentralConfig();
