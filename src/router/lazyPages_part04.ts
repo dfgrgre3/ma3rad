@@ -55,7 +55,6 @@ export const SystemHealthPage = lazy(() => import('../pages/settings/system-heal
 
 export const NotFoundPage = lazy(() => import('../pages/common/not-found/NotFoundPage').then(m => ({ default: m.NotFoundPage })));
 
-export const ApartmentEstimatePage = moduleLazy('sales', () => import('../pages/construction/ApartmentEstimatePage').then(m => ({ default: m.ApartmentEstimatePage })));
 
 export const OperationsShiftsPage = moduleLazy('operations', () => import('../pages/operations/shifts/OperationsShiftsPage').then(m => ({ default: m.OperationsShiftsPage })));
 

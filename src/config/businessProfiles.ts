@@ -1,27 +1,6 @@
 import ceramicsProfile from './business-profiles/ceramics.json' with { type: 'json' };
-import buildingMaterialsProfile from './business-profiles/building_materials.json' with { type: 'json' };
-import sanitaryProfile from './business-profiles/sanitary.json' with { type: 'json' };
-import lightingProfile from './business-profiles/lighting.json' with { type: 'json' };
-import furnitureProfile from './business-profiles/furniture.json' with { type: 'json' };
-import electronicsProfile from './business-profiles/electronics.json' with { type: 'json' };
-import clothingProfile from './business-profiles/clothing.json' with { type: 'json' };
-import automotiveProfile from './business-profiles/automotive.json' with { type: 'json' };
-import homeAppliancesProfile from './business-profiles/home_appliances.json' with { type: 'json' };
-import cosmeticsProfile from './business-profiles/cosmetics.json' with { type: 'json' };
-import foodProfile from './business-profiles/food.json' with { type: 'json' };
-import servicesProfile from './business-profiles/services.json' with { type: 'json' };
-import workshopProfile from './business-profiles/workshop.json' with { type: 'json' };
-import generalProfile from './business-profiles/general.json' with { type: 'json' };
 import customProfile from './business-profiles/custom.json' with { type: 'json' };
 import manufacturingProfile from './business-profiles/manufacturing.json' with { type: 'json' };
-import constructionProfile from './business-profiles/construction.json' with { type: 'json' };
-import importExportProfile from './business-profiles/import_export.json' with { type: 'json' };
-import ecommerceProfile from './business-profiles/ecommerce.json' with { type: 'json' };
-import logisticsProfile from './business-profiles/logistics.json' with { type: 'json' };
-import professionalServicesProfile from './business-profiles/professional_services.json' with { type: 'json' };
-import educationProfile from './business-profiles/education.json' with { type: 'json' };
-import healthcareAdminProfile from './business-profiles/healthcare_admin.json' with { type: 'json' };
-import hospitalityProfile from './business-profiles/hospitality.json' with { type: 'json' };
 import {
   MODULE_IDS,
   MODULE_REGISTRY,
@@ -133,13 +112,7 @@ export interface BusinessProfileAttributeDefinition {
 }
 
 const PROFILE_FILES: unknown[] = [
-  ceramicsProfile, buildingMaterialsProfile, sanitaryProfile, lightingProfile,
-  furnitureProfile, electronicsProfile, clothingProfile, automotiveProfile,
-  homeAppliancesProfile, cosmeticsProfile, foodProfile,
-  servicesProfile, workshopProfile, generalProfile, customProfile,
-  manufacturingProfile, constructionProfile, importExportProfile, ecommerceProfile,
-  logisticsProfile, professionalServicesProfile, educationProfile,
-  healthcareAdminProfile, hospitalityProfile,
+  ceramicsProfile, customProfile, manufacturingProfile,
 ];
 
 export const BUSINESS_UNITS = [

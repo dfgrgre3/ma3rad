@@ -22,10 +22,6 @@ export const appRoutes: RouteDef[] = [
   { path: 'sales/orders-deposits', element: <P.SalesOrdersDepositsPage /> },
   { path: 'sales/reservations', element: <Navigate to="/sales/orders-deposits" replace /> },
   { path: 'sales/after-sales', element: <P.AfterSalesPage /> },
-  { path: 'hospitality', element: <P.HotelPage /> },
-  { path: 'workshop', element: <P.WorkshopPage /> },
-  { path: 'education', element: <P.EducationPage /> },
-  { path: 'time-billing', element: <P.TimeBillingPage /> },
   { path: 'ceramics', element: <P.CeramicsPage /> },
   { path: 'retail', element: <P.RetailWorkspacePage /> },
   { path: 'pos', element: <P.PosView /> },
@@ -35,7 +31,6 @@ export const appRoutes: RouteDef[] = [
   { path: 'daily/expenses', element: <P.TodayExpensesPage /> },
   { path: 'daily/debts', element: <P.TodayDebtsPage /> },
   { path: 'quotations', element: <P.QuotationsPage /> },
-  { path: 'construction-estimate', element: <P.ApartmentEstimatePage /> },
   { path: 'orders', element: <P.OrdersPage /> },
   { path: 'returns', element: <P.ReturnsPage /> },
 
@@ -123,9 +118,6 @@ export const appRoutes: RouteDef[] = [
 
   // Projects & Operations
   { path: 'projects', element: <P.ProjectsPage /> },
-  { path: 'projects/execution', element: <P.ProjectExecutionPage /> },
-  { path: 'projects/sites', element: <P.SiteManagementPage /> },
-  { path: 'projects/boq', element: <P.GeneralBoqPage /> },
   { path: 'projects/:id', element: <P.ProjectDetailPage /> },
   { path: 'fleet/dashboard', element: <P.FleetDashboardPage /> },
   { path: 'facility-management', element: <P.FacilityManagementPage /> },

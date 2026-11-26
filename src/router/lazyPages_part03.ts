@@ -67,11 +67,6 @@ export const ProjectsPage = moduleLazy('projects', () => import('../pages/projec
 
 export const ProjectDetailPage = moduleLazy('projects', () => import('../pages/projects/project-detail/ProjectDetailPage').then(m => ({ default: m.ProjectDetailPage })));
 
-export const ProjectExecutionPage = moduleLazy('projects', () => import('../pages/construction/ProjectExecutionPage').then(m => ({ default: m.ProjectExecutionPage })));
-
-export const SiteManagementPage = moduleLazy('projects', () => import('../pages/construction/SiteManagementPage').then(m => ({ default: m.SiteManagementPage })));
-
-export const GeneralBoqPage = moduleLazy('projects', () => import('../pages/construction/GeneralBoqPage').then(m => ({ default: m.GeneralBoqPage })));
 
 export const ReportsView = moduleLazy('reports', () => import('../components/reports/ReportsView').then(m => ({ default: m.ReportsView })));
 
