@@ -338,7 +338,7 @@ test('an encrypted XLSX workbook restores the complete SQLite backup through the
   const manager = await boot();
   const databaseBytes = manager.exportDatabaseBinary();
   const password = 'correct horse battery';
-  const workbookBytes = createXlsxBackupWorkbook(databaseBytes);
+  const workbookBytes = await createXlsxBackupWorkbook(databaseBytes);
   const encryptedWorkbook = officeCrypto.encrypt(new Uint8Array(workbookBytes), { password });
   const { snapshots } = stubDesktopBackupApi();
   (globalThis as any).window.prompt = () => password;

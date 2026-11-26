@@ -13,14 +13,14 @@ export interface TimeEntry {
   id: string; branchId: string | null; customerId: string | null; customerName: string | null;
   projectId: string | null; projectName: string | null; employeeId: string | null;
   employeeName: string | null; entryDate: string; description: string; minutes: number;
-  hours: number; hourlyRate: number; amount: number; billable: number; status: TimeEntryStatus;
+  hours: number; hourlyRate: number | null; amount: number | null; billable: number; status: TimeEntryStatus;
   invoiceId: string | null; createdAt: string;
 }
 
 export interface BillingBatch {
   id: string; batchNumber: string; customerId: string | null; customerName: string | null;
   projectId: string | null; projectName: string | null; periodStart: string | null;
-  periodEnd: string | null; totalAmount: number; invoiceId: string | null;
+  periodEnd: string | null; totalAmount: number | null; invoiceId: string | null;
   status: 'OPEN' | 'INVOICED' | 'CANCELLED'; notes: string | null; createdAt: string;
   itemCount: number;
 }
@@ -62,6 +62,16 @@ export class TimeBillingService {
     return actor;
   }
 
+  private canViewFinancials(): boolean {
+    try {
+      const actor = AuthService.requireAuth();
+      PermissionService.require(actor, 'projects.financials.view');
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   private branchScope(): { clause: string; params: string[] } {
     return this.branchAccess.sqlScope('t.branch_id');
   }
@@ -70,18 +80,22 @@ export class TimeBillingService {
 
   public getProjects(): Array<{ id: string; name: string; customerName: string | null }> {
     this.requireView();
+    const scope = this.branchAccess.sqlScope('p.branch_id');
     return this.db.query<any>(
       `SELECT p.id, p.name, c.name AS customerName
        FROM projects p LEFT JOIN customers c ON c.id = p.customer_id
-       WHERE p.status != 'CANCELLED' ORDER BY p.name`
+       WHERE p.status != 'CANCELLED' AND ${scope.clause} ORDER BY p.name`,
+      scope.params
     );
   }
 
   public getEmployees(): Array<{ id: string; fullName: string; jobTitle: string | null }> {
     this.requireView();
+    const scope = this.branchAccess.sqlScope('branch_id');
     return this.db.query<any>(
       `SELECT id, full_name AS fullName, job_title AS jobTitle
-       FROM employees WHERE COALESCE(is_active,1)=1 ORDER BY full_name`
+       FROM employees WHERE COALESCE(is_active,1)=1 AND ${scope.clause} ORDER BY full_name`,
+      scope.params
     );
   }
 
@@ -92,6 +106,7 @@ export class TimeBillingService {
     employeeId?: string; from?: string; to?: string;
   }): TimeEntry[] {
     this.requireView();
+    const canFinancials = this.canViewFinancials();
     const where: string[] = [];
     const params: unknown[] = [];
     if (filters?.status) { where.push('t.status = ?'); params.push(filters.status); }
@@ -119,8 +134,8 @@ export class TimeBillingService {
     ).map((r) => ({
       ...r,
       hours: round2(Number(r.minutes) / 60),
-      hourlyRate: round2(r.hourlyRate),
-      amount: round2((Number(r.minutes) / 60) * Number(r.hourlyRate)),
+      hourlyRate: canFinancials ? round2(r.hourlyRate) : null,
+      amount: canFinancials ? round2((Number(r.minutes) / 60) * Number(r.hourlyRate)) : null,
     }));
   }
 
@@ -135,13 +150,37 @@ export class TimeBillingService {
     this.requireManage();
     if (!input.description?.trim()) throw new Error('الوصف مطلوب.');
     if (!Number.isFinite(input.minutes) || input.minutes <= 0) throw new Error('عدد الدقائق يجب أن يكون أكبر من صفر.');
+    const targetBranchId = input.branchId || this.currentBranchId() || null;
+    if (targetBranchId && !this.branchAccess.hasBranchAccess(targetBranchId)) {
+      throw new Error('لا تملك صلاحية الوصول إلى هذا الفرع.');
+    }
+    if (input.projectId) {
+      const proj = this.db.query<{ branch_id: string | null }>(`SELECT branch_id FROM projects WHERE id=?`, [input.projectId])[0];
+      if (!proj) throw new Error('المشروع غير موجود.');
+      if (proj.branch_id && !this.branchAccess.hasBranchAccess(proj.branch_id)) {
+        throw new Error('لا تملك صلاحية الوصول إلى فرع المشروع.');
+      }
+      if (targetBranchId && proj.branch_id && proj.branch_id !== targetBranchId) {
+        throw new Error('المشروع لا ينتمي إلى نفس الفرع.');
+      }
+    }
+    if (input.employeeId) {
+      const emp = this.db.query<{ branch_id: string | null }>(`SELECT branch_id FROM employees WHERE id=?`, [input.employeeId])[0];
+      if (!emp) throw new Error('الموظف غير موجود.');
+      if (emp.branch_id && !this.branchAccess.hasBranchAccess(emp.branch_id)) {
+        throw new Error('لا تملك صلاحية الوصول إلى فرع الموظف.');
+      }
+      if (targetBranchId && emp.branch_id && emp.branch_id !== targetBranchId) {
+        throw new Error('الموظف لا ينتمي إلى نفس الفرع.');
+      }
+    }
     const actor = AuthService.requireAuth();
     const id = uuidv4();
     this.db.run(
       `INSERT INTO time_entries (id, branch_id, customer_id, project_id, employee_id, entry_date,
          description, minutes, hourly_rate, billable, status, created_by)
        VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
-      [id, input.branchId || this.currentBranchId() || null, input.customerId || null, input.projectId || null,
+      [id, targetBranchId, input.customerId || null, input.projectId || null,
        input.employeeId || null, input.entryDate ?? localDateString(), input.description.trim(),
        Math.round(input.minutes), input.hourlyRate ?? 0, input.billable === false ? 0 : 1, 'DRAFT', actor.id]
     );
@@ -202,8 +241,16 @@ export class TimeBillingService {
 
   public getBatches(status?: string): BillingBatch[] {
     this.requireView();
-    const whereClause = status ? 'WHERE b.status = ?' : '';
-    const params = status ? [status] : [];
+    const canFinancials = this.canViewFinancials();
+    const branchScope = this.branchScope();
+    const where: string[] = [
+      `EXISTS (SELECT 1 FROM time_billing_batch_items bi JOIN time_entries t ON t.id = bi.time_entry_id WHERE bi.batch_id = b.id AND ${branchScope.clause})`,
+    ];
+    const params: unknown[] = [...branchScope.params];
+    if (status) {
+      where.push('b.status = ?');
+      params.push(status);
+    }
     return this.db.query<any>(
       `SELECT b.id, b.batch_number AS batchNumber, b.customer_id AS customerId,
               c.name AS customerName, b.project_id AS projectId, p.name AS projectName,
@@ -214,10 +261,10 @@ export class TimeBillingService {
        FROM time_billing_batches b
        LEFT JOIN customers c ON c.id = b.customer_id
        LEFT JOIN projects p ON p.id = b.project_id
-       ${whereClause}
+       WHERE ${where.join(' AND ')}
        ORDER BY b.created_at DESC`,
       params
-    ).map((r) => ({ ...r, totalAmount: round2(r.totalAmount) }));
+    ).map((r) => ({ ...r, totalAmount: canFinancials ? round2(r.totalAmount) : null }));
   }
 
   /** Group APPROVED billable entries into a batch ready for invoicing. */
@@ -242,7 +289,13 @@ export class TimeBillingService {
     entries = entries.filter((e) => !alreadyBatched.has(e.id));
     if (!entries.length) throw new Error('كل القيود المحددة مفوترة مسبقاً.');
 
-    const total = round2(entries.reduce((s, e) => s + e.amount, 0));
+    const rawAmounts = new Map(
+      this.db.query<{ id: string; minutes: number; hourlyRate: number }>(
+        `SELECT id, minutes, hourly_rate AS hourlyRate FROM time_entries WHERE id IN (${entries.map(() => '?').join(',')})`,
+        entries.map((e) => e.id)
+      ).map((r) => [r.id, round2((Number(r.minutes) / 60) * Number(r.hourlyRate))])
+    );
+    const total = round2(entries.reduce((s, e) => s + (rawAmounts.get(e.id) ?? 0), 0));
     const number = `TB-${localDateString().replace(/-/g, '')}-${uuidv4().slice(0, 6).toUpperCase()}`;
     const batchId = uuidv4();
     this.db.executeTransaction(() => {
@@ -256,7 +309,7 @@ export class TimeBillingService {
       for (const e of entries) {
         this.db.run(
           `INSERT INTO time_billing_batch_items (id, batch_id, time_entry_id, amount) VALUES (?,?,?,?)`,
-          [uuidv4(), batchId, e.id, e.amount]
+          [uuidv4(), batchId, e.id, rawAmounts.get(e.id) ?? 0]
         );
       }
     });
@@ -266,9 +319,21 @@ export class TimeBillingService {
   /** Mark batch entries as INVOICED and link the sales invoice id. */
   public markBatchInvoiced(batchId: string, invoiceId: string): void {
     this.requireManage();
-    const items = this.db.query<any>(
-      `SELECT time_entry_id AS entryId FROM time_billing_batch_items WHERE batch_id=?`, [batchId]
+    const branchScope = this.branchScope();
+    const items = this.db.query<{ entryId: string }>(
+      `SELECT bi.time_entry_id AS entryId
+       FROM time_billing_batch_items bi
+       JOIN time_entries t ON t.id = bi.time_entry_id
+       WHERE bi.batch_id = ? AND ${branchScope.clause}`,
+      [batchId, ...branchScope.params]
     );
+    const totalItems = this.db.query<{ cnt: number }>(
+      `SELECT COUNT(*) AS cnt FROM time_billing_batch_items WHERE batch_id = ?`,
+      [batchId]
+    )[0]?.cnt ?? 0;
+    if (!totalItems || items.length !== totalItems) {
+      throw new Error('الدفعة غير موجودة أو خارج نطاق الفرع المسموح.');
+    }
     this.db.executeTransaction(() => {
       for (const item of items) {
         this.db.run(`UPDATE time_entries SET status='INVOICED', invoice_id=?, updated_at=CURRENT_TIMESTAMP WHERE id=?`,

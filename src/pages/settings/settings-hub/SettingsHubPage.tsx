@@ -205,6 +205,11 @@ export const SettingsHubPage: React.FC = () => {
 
       <UpdateSettings />
 
+      <Link to="/settings/company" className="erp-card block border border-primary/30 bg-primary/5 hover:bg-primary/10">
+        <span className="font-bold">بيانات الشركة (Company Settings)</span>
+        <span className="mt-1 block text-sm text-[var(--cerami-muted)]">الاسم الرسمي، الشعار، الرقم الضريبي، العنوان، العملة، والسنة المالية.</span>
+      </Link>
+
       <Link to="/settings/approvals" className="erp-card block border border-warning-border bg-warning-soft/60 hover:bg-warning-soft">
         <span className="font-bold">إعدادات الاعتمادات والموافقات</span>
         <span className="mt-1 block text-sm text-[var(--cerami-muted)]">إدارة سياسة إضافة المخزون والأدوار المعتمدة.</span>

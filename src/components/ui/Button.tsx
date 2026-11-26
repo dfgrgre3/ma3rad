@@ -65,7 +65,22 @@ export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
   controlMode?: 'hide' | 'disable';
 }
 
-export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(function Button(
+const ControlledButton = React.forwardRef<HTMLButtonElement, ButtonProps>(function ControlledButton(
+  props,
+  ref,
+) {
+  useCentralConfigVersion();
+  return <BaseButton ref={ref} {...props} />;
+});
+
+export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(function Button(props, ref) {
+  if (props.controlKey || props.controlAction || props.controlPermission) {
+    return <ControlledButton ref={ref} {...props} />;
+  }
+  return <BaseButton ref={ref} {...props} />;
+});
+
+const BaseButton = React.forwardRef<HTMLButtonElement, ButtonProps>(function BaseButton(
   {
     variant = 'secondary',
     size = 'md',
@@ -85,7 +100,6 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(function 
   },
   ref,
 ) {
-  useCentralConfigVersion();
   const hasControl = Boolean(controlKey || controlAction || controlPermission);
   const currentPath =
     CentralFeaturePermissionService.getCurrentPath() ||

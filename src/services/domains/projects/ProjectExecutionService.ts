@@ -426,6 +426,7 @@ export class ProjectExecutionService {
    * * (1+profit%) * (1-discount%).
    */
   public getCertificateSuggestion(estimateId: string, projectId: string, versionId?: string) {
+    this.requireFinancialView();
     const estimate = this.requireApprovedEstimate(estimateId, projectId, versionId);
     const snapshot = JSON.parse(estimate.snapshotJson) as ApartmentEstimateVersion['snapshot'];
     const lines = snapshot.costLines || [];

@@ -21,13 +21,13 @@ test('external backup encryption authenticates and round-trips SQLite bytes', as
   await assert.rejects(decryptExternalBackup(encrypted, 'wrong password'), /كلمة المرور غير صحيحة/);
 });
 
-test('XLSX backup workbook preserves the original database bytes in its hidden payload', () => {
+test('XLSX backup workbook preserves the original database bytes in its hidden payload', async () => {
   const source = new Uint8Array(58_000);
   crypto.getRandomValues(source);
-  const workbook = createXlsxBackupWorkbook(source);
+  const workbook = await createXlsxBackupWorkbook(source);
 
   assert.deepEqual(workbook.subarray(0, 2), new Uint8Array([0x50, 0x4b]));
-  assert.deepEqual(extractDatabaseFromXlsxBackup(workbook), source);
+  assert.deepEqual(await extractDatabaseFromXlsxBackup(workbook), source);
 });
 
 test('legacy SecurityService authentication and backup APIs are real and round-trip', async () => {

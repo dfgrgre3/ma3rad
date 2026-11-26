@@ -35,7 +35,8 @@ export const TimeBillingPage: React.FC = () => {
   const service = useMemo(() => new TimeBillingService(), []);
   const toast = useToast();
   const can = usePermission();
-  const canManage = can('projects.view');
+  const canManage = can('projects.update');
+  const canFinancials = can('projects.financials.view');
 
   const [tab, setTab] = useState<'entries' | 'batches' | 'profitability'>('entries');
   const [loading, setLoading] = useState(true);
@@ -63,17 +64,27 @@ export const TimeBillingPage: React.FC = () => {
     try {
       setEntries(service.getTimeEntries(statusFilter ? { status: statusFilter as TimeEntryStatus } : undefined));
       setBatches(service.getBatches());
-      setProfitability(service.getProfitability());
-      setUnbilled(service.getUnbilledSummary());
       setCustomers(can('customers.view') ? new CustomerService().getAllCustomers() : []);
       setProjects(service.getProjects());
       setEmployees(service.getEmployees());
+      if (canFinancials) {
+        try {
+          setProfitability(service.getProfitability());
+          setUnbilled(service.getUnbilledSummary());
+        } catch {
+          setProfitability([]);
+          setUnbilled({ count: 0, hours: 0, amount: 0 });
+        }
+      } else {
+        setProfitability([]);
+        setUnbilled({ count: 0, hours: 0, amount: 0 });
+      }
     } catch (e: any) {
       toast.error('تعذر تحميل البيانات', e?.message);
     } finally {
       setLoading(false);
     }
-  }, [service, statusFilter, can, toast]);
+  }, [service, statusFilter, can, canFinancials, toast]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -154,7 +165,7 @@ export const TimeBillingPage: React.FC = () => {
                   <td className="p-3 text-xs">{e.employeeName || '—'}</td>
                   <td className="p-3 max-w-[200px] truncate">{e.description}</td>
                   <td className="p-3">{e.hours}</td>
-                  <td className="p-3 font-semibold">{currency.format(e.amount)}</td>
+                  <td className="p-3 font-semibold">{e.amount !== null ? currency.format(e.amount) : '—'}</td>
                   <td className="p-3">{e.billable ? 'نعم' : 'لا'}</td>
                   <td className="p-3"><span className={`px-2 py-0.5 rounded-full text-[11px] ${STATUS_TONE[e.status]}`}>{STATUS_LABEL[e.status]}</span></td>
                 </tr>
@@ -178,7 +189,7 @@ export const TimeBillingPage: React.FC = () => {
                   <div className="text-xs text-[var(--cerami-muted)]">{b.customerName || '—'} {b.projectName ? `• ${b.projectName}` : ''} • {b.itemCount} قيد • {b.periodStart || '—'} → {b.periodEnd || '—'}</div>
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className="font-bold">{currency.format(b.totalAmount)}</span>
+                  <span className="font-bold">{b.totalAmount !== null ? currency.format(b.totalAmount) : '—'}</span>
                   <span className={`px-2 py-0.5 rounded-full text-[11px] ${b.status === 'INVOICED' ? 'bg-accent-soft text-primary' : b.status === 'OPEN' ? 'bg-warning-soft text-warning' : 'bg-surface-sunken text-ink-secondary'}`}>{b.status === 'INVOICED' ? 'مفوترة' : b.status === 'OPEN' ? 'مفتوحة' : 'ملغاة'}</span>
                   {canManage && b.status === 'OPEN' && (
                     <Button size="sm" variant="ghost" onClick={() => {

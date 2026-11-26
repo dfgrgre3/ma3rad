@@ -82,17 +82,26 @@ export class CompanyService {
     const now = new Date().toISOString();
     this.db.run(
       `INSERT INTO companies
-         (id, code, name, legal_name, tax_number, commercial_record, currency, fiscal_year_start_month, time_zone, locale, date_format, payroll_tax_rate, overtime_multiplier, working_days_per_month, parent_company_id, is_active, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`,
+         (id, code, name, english_name, legal_name, logo_path, tax_number, commercial_record, address, country, city, phone, email, currency, fiscal_year_start_month, fiscal_year_start_date, fiscal_year_end_date, time_zone, locale, date_format, payroll_tax_rate, overtime_multiplier, working_days_per_month, parent_company_id, is_active, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`,
       [
         id,
         code,
         name,
+        dto.englishName?.trim() || null,
         dto.legalName?.trim() || null,
+        dto.logoPath?.trim() || null,
         dto.taxNumber?.trim() || null,
         dto.commercialRecord?.trim() || null,
+        dto.address?.trim() || null,
+        dto.country?.trim() || null,
+        dto.city?.trim() || null,
+        dto.phone?.trim() || null,
+        dto.email?.trim() || null,
         dto.currency?.trim() || null,
         dto.fiscalYearStartMonth ?? 1,
+        dto.fiscalYearStartDate?.trim() || null,
+        dto.fiscalYearEndDate?.trim() || null,
         dto.timeZone?.trim() || null,
         dto.locale?.trim() || 'ar',
         dto.dateFormat?.trim() || 'YYYY-MM-DD',
@@ -138,18 +147,29 @@ export class CompanyService {
 
     this.db.run(
       `UPDATE companies SET
-         name = ?, legal_name = ?, tax_number = ?, commercial_record = ?,
-         currency = ?, fiscal_year_start_month = ?, time_zone = ?, locale = ?, date_format = ?,
+         name = ?, english_name = ?, legal_name = ?, logo_path = ?, tax_number = ?, commercial_record = ?,
+         address = ?, country = ?, city = ?, phone = ?, email = ?,
+         currency = ?, fiscal_year_start_month = ?, fiscal_year_start_date = ?, fiscal_year_end_date = ?,
+         time_zone = ?, locale = ?, date_format = ?,
          payroll_tax_rate = ?, overtime_multiplier = ?, working_days_per_month = ?,
          parent_company_id = ?, is_active = ?, updated_at = ?
        WHERE id = ?`,
       [
         nextName,
+        patch.englishName === undefined ? before.englishName || null : (patch.englishName || null),
         patch.legalName === undefined ? before.legalName || null : (patch.legalName || null),
+        patch.logoPath === undefined ? before.logoPath || null : (patch.logoPath || null),
         patch.taxNumber === undefined ? before.taxNumber || null : (patch.taxNumber || null),
         patch.commercialRecord === undefined ? before.commercialRecord || null : (patch.commercialRecord || null),
+        patch.address === undefined ? before.address || null : (patch.address || null),
+        patch.country === undefined ? before.country || null : (patch.country || null),
+        patch.city === undefined ? before.city || null : (patch.city || null),
+        patch.phone === undefined ? before.phone || null : (patch.phone || null),
+        patch.email === undefined ? before.email || null : (patch.email || null),
         patch.currency === undefined ? before.currency || null : (patch.currency || null),
         patch.fiscalYearStartMonth === undefined ? (before.fiscalYearStartMonth ?? 1) : (patch.fiscalYearStartMonth ?? 1),
+        patch.fiscalYearStartDate === undefined ? before.fiscalYearStartDate || null : (patch.fiscalYearStartDate || null),
+        patch.fiscalYearEndDate === undefined ? before.fiscalYearEndDate || null : (patch.fiscalYearEndDate || null),
         patch.timeZone === undefined ? before.timeZone || null : (patch.timeZone || null),
         patch.locale === undefined ? (before.locale || 'ar') : (patch.locale || 'ar'),
         patch.dateFormat === undefined ? (before.dateFormat || 'YYYY-MM-DD') : (patch.dateFormat || 'YYYY-MM-DD'),
@@ -219,6 +239,46 @@ export class CompanyService {
     return this.getCompanyById(id)!;
   }
 
+  public getCompanyAuditLogs(companyId: string, limit = 50): Array<{
+    id: string;
+    userName: string;
+    action: string;
+    oldValues: string | null;
+    newValues: string | null;
+    createdAt: string;
+  }> {
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'ui.companies.list.view');
+    this.access.requireCompanyAccess(companyId, actor);
+    return this.db.query<any>(
+      `SELECT id, user_name AS userName, action, old_values AS oldValues, new_values AS newValues, created_at AS createdAt
+       FROM audit_logs
+       WHERE module = 'COMPANIES' AND record_id = ?
+       ORDER BY created_at DESC
+       LIMIT ?`,
+      [companyId, limit]
+    );
+  }
+
+  public syncCompanyToSystemSettings(company: Company): void {
+    const updates: Array<[string, string]> = [
+      ['showroomName', company.name || ''],
+      ['phone', company.phone || ''],
+      ['address', [company.address, company.city, company.country].filter(Boolean).join(' - ')],
+      ['taxNumber', company.taxNumber || ''],
+      ['commercialRecord', company.commercialRecord || ''],
+      ['currency', company.currency || 'EGP'],
+      ['logoPath', company.logoPath || ''],
+    ];
+    for (const [key, value] of updates) {
+      this.db.run(
+        `INSERT INTO system_settings (key, value) VALUES (?, ?)
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+        [key, value]
+      );
+    }
+  }
+
   private isDescendant(candidateId: string, ancestorId: string): boolean {
     let current: string | null = candidateId;
     const visited = new Set<string>();
@@ -239,11 +299,20 @@ export class CompanyService {
       id: row.id,
       code: row.code,
       name: row.name,
+      englishName: row.englishName ?? row.english_name ?? null,
       legalName: row.legalName ?? row.legal_name ?? null,
+      logoPath: row.logoPath ?? row.logo_path ?? null,
       taxNumber: row.taxNumber ?? row.tax_number ?? null,
       commercialRecord: row.commercialRecord ?? row.commercial_record ?? null,
+      address: row.address ?? null,
+      country: row.country ?? null,
+      city: row.city ?? null,
+      phone: row.phone ?? null,
+      email: row.email ?? null,
       currency: row.currency ?? null,
       fiscalYearStartMonth: row.fiscalYearStartMonth ?? row.fiscal_year_start_month ?? 1,
+      fiscalYearStartDate: row.fiscalYearStartDate ?? row.fiscal_year_start_date ?? null,
+      fiscalYearEndDate: row.fiscalYearEndDate ?? row.fiscal_year_end_date ?? null,
       timeZone: row.timeZone ?? row.time_zone ?? null,
       locale: row.locale ?? 'ar',
       dateFormat: row.dateFormat ?? row.date_format ?? 'YYYY-MM-DD',

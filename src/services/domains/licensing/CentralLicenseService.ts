@@ -455,10 +455,10 @@ export class CentralLicenseService {
         const changed = !previous || previous.configurationVersion !== data.configurationVersion;
         try {
           localStorage.setItem(CONFIG_KEY, JSON.stringify(data));
-          notifyCentralConfigUpdated();
         } catch { /* ignore */ }
         if (changed) {
           CentralLicenseService.configRevision += 1;
+          try { notifyCentralConfigUpdated(); } catch { /* ignore */ }
           try { this.notify(); } catch { /* ignore */ }
         }
       }

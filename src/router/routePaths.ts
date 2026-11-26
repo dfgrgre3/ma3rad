@@ -154,6 +154,7 @@ export const APP_ROUTE_PATHS = [
   "data-import/types",
   "data-import",
   "settings",
+  "settings/company",
   "settings/approvals",
   "settings/license-mode",
   "central-activation",

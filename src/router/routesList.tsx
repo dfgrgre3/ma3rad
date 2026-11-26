@@ -185,6 +185,7 @@ export const appRoutes: RouteDef[] = [
   { path: 'data-import/types', element: <P.DynamicDataPage /> },
   { path: 'data-import', element: <P.DataImportPage /> },
   { path: 'settings', element: <P.SettingsHubPage /> },
+  { path: 'settings/company', element: <P.CompanySettingsPage /> },
   { path: 'settings/approvals', element: <P.ApprovalSettingsPage /> },
   { path: 'settings/license-mode', element: <P.LicenseModeSettingsPage /> },
   { path: 'central-activation', element: <P.CentralActivationView /> },
