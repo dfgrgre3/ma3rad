@@ -23,9 +23,7 @@ export const PLATFORM_MODULE_TO_REGISTRY_IDS: Record<string, string[]> = {
   hr: ['hr'],
   projects: ['projects'],
   manufacturing: ['manufacturing'],
-  documents: ['documents'],
-  restaurant: ['sales'],
-};
+  documents: ['documents'],};
 
 /** Translate platform module codes to tenant registry module ids. */
 export const platformCodesToRegistryIds = (codes: string[]): string[] => {

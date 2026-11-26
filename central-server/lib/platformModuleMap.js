@@ -26,7 +26,6 @@ const PLATFORM_MODULE_TO_REGISTRY_IDS = {
   projects: ['projects'],
   manufacturing: ['manufacturing'],
   documents: ['documents'],
-  restaurant: ['sales'],
 };
 
 /** Registry modules that have no platform catalog counterpart stay untouched. */

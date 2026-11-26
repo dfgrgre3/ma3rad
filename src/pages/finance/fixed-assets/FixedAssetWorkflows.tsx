@@ -212,7 +212,7 @@ export const FixedAssetWorkflows: React.FC<Props> = ({
               {workflowTitles[key]}
             </button>
           ))}
-          {canExport && <div className="mr-auto flex gap-1">
+          {canExport && <div className="ms-auto flex gap-1">
             <button type="button" onClick={() => exportReport(false)} className="inline-flex items-center gap-1 rounded-lg border px-3 py-2 text-xs font-bold"><Download className="h-3 w-3" /> Excel</button>
             <button type="button" onClick={() => exportReport(true)} className="rounded-lg border px-3 py-2 text-xs font-bold">PDF</button>
           </div>}

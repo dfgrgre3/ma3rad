@@ -7,6 +7,7 @@ import {
   invoiceBrandStyles,
   logoHtml,
   orderedInvoiceDetails,
+  itemSerialsHtml,
   paymentTypeLabel,
   printOverride,
   tableFirstColumns,
@@ -39,7 +40,7 @@ export function getTableFirstInvoiceHtml(
     switch (column) {
       case 'number': return String(index + 1);
       case 'product':
-        return `<strong>${esc(item.productName || '-')}</strong>${settings.invoiceShowItemCode || settings.invoiceShowItemSpecs ? `<small>${settings.invoiceShowItemCode && item.productSku ? `كود: ${esc(item.productSku)}` : ''}${settings.invoiceShowItemCode && settings.invoiceShowItemSpecs && item.productSku && item.size ? ' · ' : ''}${settings.invoiceShowItemSpecs && item.size && item.size !== '—' ? `مقاس: ${esc(item.size)}` : ''}${settings.invoiceShowItemSpecs && item.productGrade ? ` · ${item.productGrade === 'GRADE_1' ? 'فرز أول' : 'فرز تجاري'}` : ''}</small>` : ''}`;
+        return `<strong>${esc(item.productName || '-')}</strong>${settings.invoiceShowItemCode || settings.invoiceShowItemSpecs ? `<small>${settings.invoiceShowItemCode && item.productSku ? `كود: ${esc(item.productSku)}` : ''}${settings.invoiceShowItemCode && settings.invoiceShowItemSpecs && item.productSku && item.size ? ' · ' : ''}${settings.invoiceShowItemSpecs && item.size && item.size !== '—' ? `مقاس: ${esc(item.size)}` : ''}${settings.invoiceShowItemSpecs && item.productGrade ? ` · ${item.productGrade === 'GRADE_1' ? 'فرز أول' : 'فرز تجاري'}` : ''}</small>` : ''}${itemSerialsHtml(item)}`;
       case 'unit': return esc(getProductUnitLabel(item));
       case 'quantity': return esc(formatProductQuantity(item.quantityM2, item));
       case 'boxes': return item.productType === 'GENERAL' ? '—' : esc(item.boxesCount ?? '—');

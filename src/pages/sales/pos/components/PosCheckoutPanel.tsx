@@ -11,7 +11,7 @@ import { round2 } from '../../../../types/pos';
 import { usePosActivityCopy } from '../../../../hooks/pages/sales/pos/usePosActivityCopy';
 import { ActivityGate } from '../../../../components/ui/ActivityGate';
 
-const paymentLabel = (type: PaymentType) => ({ CASH: 'نقدي', CARD: 'بطاقة', BANK_TRANSFER: 'تحويل بنكي', CHEQUE: 'شيك', CREDIT: 'آجل', MIXED: 'دفع مختلط' }[type]);
+const paymentLabel = (type: PaymentType) => ({ CASH: 'نقدي', CARD: 'بطاقة', BANK_TRANSFER: 'تحويل بنكي', CHEQUE: 'شيك', CREDIT: 'آجل', MIXED: 'دفع مختلط', WALLET: 'محفظة', ONLINE: 'أونلاين' }[type]);
 
 const numberInputCls = 'mt-1 min-h-10 w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm font-bold tabular-nums text-ink transition focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 ';
 
@@ -79,6 +79,17 @@ export interface PosCheckoutPanelProps {
   salesReps?: Array<{ id: string; name: string; isSalesRep?: boolean; branchNames?: string; servesBranch?: boolean }>;
   salesRepId?: string;
   onSalesRepChange?: (id: string) => void;
+  /** false disables all manual-discount inputs (no sales.discount permission). */
+  canDiscount?: boolean;
+  /** Delivery request captured with the sale (creates a deliveries record on checkout). */
+  deliveryEnabled?: boolean;
+  onDeliveryEnabledChange?: (enabled: boolean) => void;
+  deliveryAddress?: string;
+  setDeliveryAddress?: (value: string) => void;
+  deliveryCity?: string;
+  setDeliveryCity?: (value: string) => void;
+  deliveryScheduledAt?: string;
+  setDeliveryScheduledAt?: (value: string) => void;
 }
 
 export const PosCheckoutPanel: React.FC<PosCheckoutPanelProps> = ({
@@ -144,6 +155,15 @@ export const PosCheckoutPanel: React.FC<PosCheckoutPanelProps> = ({
   salesReps,
   salesRepId,
   onSalesRepChange,
+  canDiscount = true,
+  deliveryEnabled = false,
+  onDeliveryEnabledChange,
+  deliveryAddress = '',
+  setDeliveryAddress,
+  deliveryCity = '',
+  setDeliveryCity,
+  deliveryScheduledAt = '',
+  setDeliveryScheduledAt,
 }) => {
   const copy = usePosActivityCopy();
   return (
@@ -156,21 +176,26 @@ export const PosCheckoutPanel: React.FC<PosCheckoutPanelProps> = ({
       <ActivityGate element="discount">
       <div className="min-w-0">
         <label htmlFor="pos-invoice-discount" className="flex items-center gap-1 text-xs font-bold text-ink-secondary "><Percent className="w-3 h-3 shrink-0" /> {copy.invoiceDiscountLabel}</label>
+        {!canDiscount && (
+          <p className="mt-0.5 text-[10px] font-bold text-warning">لا تملك صلاحية منح خصم — الحقل للعرض فقط.</p>
+        )}
         <div role="group" aria-label="نوع الخصم" className="mt-1 flex w-full items-center overflow-hidden rounded-lg border border-line ">
             <button
               type="button"
               onClick={() => onDiscountModeChange('percent')}
+              disabled={!canDiscount}
               aria-pressed={discountMode === 'percent'}
               title="خصم بنسبة مئوية"
-              className={`min-h-8 min-w-0 flex-1 px-2 py-1 text-xs font-black transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${discountMode === 'percent' ? 'bg-primary text-white' : 'bg-surface text-ink-secondary hover:text-ink dark:bg-primary dark:text-muted'}`}
+              className={`min-h-8 min-w-0 flex-1 px-2 py-1 text-xs font-black transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-50 ${discountMode === 'percent' ? 'bg-primary text-white' : 'bg-surface text-ink-secondary hover:text-ink dark:bg-primary dark:text-muted'}`}
             >%</button>
             <button
               type="button"
               onClick={() => onDiscountModeChange('amount')}
+              disabled={!canDiscount}
               aria-pressed={discountMode === 'amount'}
               title="خصم بمبلغ ثابت"
-              className={`min-h-8 min-w-0 flex-1 px-2 py-1 text-xs font-black transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${discountMode === 'amount' ? 'bg-primary text-white' : 'bg-surface text-ink-secondary hover:text-ink dark:bg-primary dark:text-muted'}`}
-            >ج.م</button>
+              className={`min-h-8 min-w-0 flex-1 px-2 py-1 text-xs font-black transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-50 ${discountMode === 'amount' ? 'bg-primary text-white' : 'bg-surface text-ink-secondary hover:text-ink dark:bg-primary dark:text-muted'}`}
+            >{CeramicMath.getCurrencySymbol()}</button>
         </div>
         {discountMode === 'percent' ? (
           <div className="relative">
@@ -179,10 +204,11 @@ export const PosCheckoutPanel: React.FC<PosCheckoutPanelProps> = ({
               type="number"
               min={0}
               max={100}
+              disabled={!canDiscount}
               value={discountPercent || ''}
               placeholder="0"
               onChange={(e) => onDiscountPercentChange(e.target.value === '' ? 0 : Math.min(100, Math.max(0, Number.parseFloat(e.target.value) || 0)))}
-              className={`${numberInputCls} pl-6`}
+              className={`${numberInputCls} pl-6 disabled:opacity-60`}
             />
             <span className="absolute left-2 top-1/2 -translate-y-1/2 mt-0.5 text-xs font-bold text-muted ">%</span>
           </div>
@@ -191,10 +217,11 @@ export const PosCheckoutPanel: React.FC<PosCheckoutPanelProps> = ({
             id="pos-invoice-discount"
             type="number"
             min={0}
+            disabled={!canDiscount}
             value={discountAmount || ''}
             placeholder="0"
             onChange={(e) => setDiscountAmount(e.target.value === '' ? 0 : Math.max(0, Number.parseFloat(e.target.value) || 0))}
-            className={numberInputCls}
+            className={`${numberInputCls} disabled:opacity-60`}
           />
         )}
         {discountMode === 'percent' && discountPercent > 0 && discountAmount > 0 && (
@@ -206,9 +233,10 @@ export const PosCheckoutPanel: React.FC<PosCheckoutPanelProps> = ({
               <button
                 key={preset}
                 type="button"
+                disabled={!canDiscount}
                 onClick={() => onDiscountPercentChange(preset)}
                 aria-pressed={discountPercent === preset}
-                className={`min-h-7 rounded-md border px-2 text-[11px] font-black transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${discountPercent === preset ? 'border-primary bg-primary text-white' : 'border-line bg-surface text-ink-secondary hover:border-primary hover:text-primary dark:border-line-strong dark:text-muted'}`}
+                className={`min-h-7 rounded-md border px-2 text-[11px] font-black transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-50 ${discountPercent === preset ? 'border-primary bg-primary text-white' : 'border-line bg-surface text-ink-secondary hover:border-primary hover:text-primary dark:border-line-strong dark:text-muted'}`}
               >
                 {preset}%
               </button>
@@ -254,6 +282,51 @@ export const PosCheckoutPanel: React.FC<PosCheckoutPanelProps> = ({
       </div>
     </div>
     </section>
+
+    {/* Delivery request — linked to the deliveries module on checkout */}
+    {selectedCustomer && selectedCustomer.id !== 'cust_cash' && onDeliveryEnabledChange && (
+      <section className="space-y-1.5 rounded-xl border border-line bg-surface-muted/60 p-2">
+        <label className="flex min-h-9 cursor-pointer items-center gap-2 text-xs font-black text-ink">
+          <input
+            type="checkbox"
+            checked={deliveryEnabled}
+            onChange={(e) => onDeliveryEnabledChange(e.target.checked)}
+            className="h-4 w-4 accent-primary"
+          />
+          <Truck className="h-3.5 w-3.5 text-primary" /> طلب توصيل لهذه الفاتورة
+        </label>
+        {deliveryEnabled && (
+          <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+            <input
+              value={deliveryAddress}
+              onChange={(e) => setDeliveryAddress?.(e.target.value)}
+              placeholder="عنوان التسليم *"
+              aria-label="عنوان التسليم"
+              className={`${numberInputCls} sm:col-span-2`}
+            />
+            <input
+              value={deliveryCity}
+              onChange={(e) => setDeliveryCity?.(e.target.value)}
+              placeholder="المدينة / المنطقة"
+              aria-label="مدينة التسليم"
+              className={numberInputCls}
+            />
+            <div>
+              <label className="text-[10px] font-bold text-muted">موعد التوصيل</label>
+              <input
+                type="datetime-local"
+                value={deliveryScheduledAt}
+                onChange={(e) => setDeliveryScheduledAt?.(e.target.value)}
+                className={numberInputCls}
+              />
+            </div>
+            <p className="text-[10px] leading-4 text-muted sm:col-span-2">
+              يُنشأ أمر توصيل مرتبط بالفاتورة عند الاعتماد (يظهر في وحدة التوصيلات). رسوم الشحن المدخلة أعلاه تُسجَّل كرسوم التوصيل.
+            </p>
+          </div>
+        )}
+      </section>
+    )}
 
     {/* Payment type */}
     <section className="space-y-1.5 rounded-xl border-r-4 border-primary border-y border-l border-line bg-accent-soft/70 p-2 dark:bg-primary/30">
@@ -535,7 +608,7 @@ export const PosCheckoutPanel: React.FC<PosCheckoutPanelProps> = ({
     <div className="sticky bottom-0 z-10 shrink-0 space-y-1 border-t border-line bg-surface px-2 pb-2 pt-1.5 shadow-[0_-8px_18px_rgba(15,23,42,0.10)] ">
       <div className="flex items-center justify-between gap-2">
         <span className="text-sm font-black text-ink ">الإجمالي النهائي</span>
-        <span className="text-left text-xl font-black tabular-nums text-primary ">{CeramicMath.formatCurrency(totalAmount)} <span className="text-xs font-bold">ج.م</span></span>
+        <span className="text-left text-xl font-black tabular-nums text-primary ">{CeramicMath.formatCurrency(totalAmount)}</span>
       </div>
       {remainingAmount > 0 && <div className="text-xs font-bold text-warning ">المتبقي (على الحساب): {CeramicMath.formatCurrency(remainingAmount)}</div>}
       {changeDue > 0 && <div className="text-xs font-bold text-success ">الباقي للعميل: {CeramicMath.formatCurrency(changeDue)}</div>}

@@ -374,25 +374,6 @@ export function buildPaymentMethodSpec(access: BranchAccessService): { sql: stri
   };
 }
 
-export function buildSalesByGradeSpec(access: BranchAccessService): { sql: string; params: any[] } {
-  const scope = branchScope(access, 'si.branch_id');
-  return {
-    sql: `
-      SELECT
-        p.grade,
-        SUM(sii.quantity_m2) as quantityM2,
-        SUM(sii.total_price) / 100.0 as totalRevenue
-      FROM sales_invoice_items sii
-      JOIN products p ON sii.product_id = p.id
-      JOIN sales_invoices si ON sii.invoice_id = si.id
-      WHERE si.invoice_status != 'VOID' AND si.date >= date('now', '-30 days') AND ${scope.clause}
-      GROUP BY p.grade
-      ORDER BY totalRevenue DESC
-    `,
-    params: [...scope.params],
-  };
-}
-
 export function buildRecentActivitySpecs(access: BranchAccessService): { sales: { sql: string; params: any[] }; purchases: { sql: string; params: any[] }; stocks: { sql: string; params: any[] } } {
   const salesScope = branchScope(access, 'si.branch_id');
   const purchaseScope = branchScope(access, 'pi.branch_id');

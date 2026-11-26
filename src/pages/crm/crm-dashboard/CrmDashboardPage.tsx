@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { useDashboardRefresh } from '../../../contexts/DashboardRefreshContext';
+import { useDashboardEmbed } from '../../../contexts/DashboardEmbedContext';
 import {
   Users, TrendingUp, Target, Activity, Calendar, Award, AlertCircle,
   ArrowUpRight, MessageSquare, Loader2, RefreshCw, BarChart3,
@@ -324,6 +325,7 @@ function RecentLeadsList({ leads }: { leads: Lead[] }) {
 export const CrmDashboardPage: React.FC = () => {
   const pageCopy = useActivityPageCopy('crm');
   const refreshToken = useDashboardRefresh()?.refreshToken;
+  const embedded = useDashboardEmbed();
   const initialRef = useRef(true);
   const service = useMemo(() => new CrmService(), []);
   const navigate = useNavigate();
@@ -355,6 +357,19 @@ export const CrmDashboardPage: React.FC = () => {
   return (
     <div className="h-full flex flex-col bg-surface-muted text-ink overflow-hidden">
       {/* Header */}
+      {embedded ? (
+        <div className="flex flex-wrap items-center justify-end gap-2 px-4 pt-3 flex-shrink-0">
+          <ActivityGate element="lead"><button onClick={() => navigate('/crm/leads')} className="text-xs font-bold text-white bg-primary hover:bg-primary transition px-3 py-1.5 rounded-lg flex items-center gap-1.5">
+            <Users className="w-3.5 h-3.5" /> العملاء المحتملون
+          </button></ActivityGate>
+          <ActivityGate element="pipeline"><button onClick={() => navigate('/crm/pipeline')} className="text-xs font-bold text-primary bg-accent-soft hover:bg-accent-soft transition px-3 py-1.5 rounded-lg flex items-center gap-1.5 border border-accent-border">
+            <Target className="w-3.5 h-3.5" /> Pipeline
+          </button></ActivityGate>
+          <button onClick={load} className="p-1.5 hover:bg-surface-sunken rounded-lg transition" title="تحديث">
+            <RefreshCw className={`w-4 h-4 text-muted ${loading ? 'animate-spin' : ''}`} />
+          </button>
+        </div>
+      ) : (
       <div className="bg-surface border-b border-line px-6 pt-4 flex-shrink-0">
         <PageHeader
           icon={<Target className="w-5 h-5" />}
@@ -373,6 +388,7 @@ export const CrmDashboardPage: React.FC = () => {
           </>}
         />
       </div>
+      )}
 
       {/* Error */}
       {error && (

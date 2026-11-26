@@ -354,7 +354,7 @@ for (const businessType of ['logistics', 'professional_services', 'education', '
 }
 
 test('a mixed business sells service lines without stock while product lines still require stock', async () => {
-  const db = await boot('restaurant');
+  const db = await boot('hospitality');
   assert.equal(ModuleRegistryService.isInventoryTracked(), true);
 
   // Service line: no stock row exists, yet the sale must succeed.

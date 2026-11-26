@@ -24,6 +24,8 @@ export interface ReturnableItem {
   sourceType?: 'INVOICE' | 'SPECIAL_STOCK_SALE';
   /** Default disposition applied when the caller does not pick one. */
   defaultDisposition?: ReturnDisposition;
+  /** Product tracks per-unit serial/IMEI numbers. */
+  trackSerials?: boolean;
 }
 
 export interface ReturnStats {
@@ -63,4 +65,10 @@ export interface ReturnRequestItem {
    * regular sales restock, special-stock sales go back to their own record.
    */
   disposition?: ReturnDisposition;
+  /**
+   * Specific serial/IMEI numbers being returned. Required count must match the
+   * returned unit quantity for serial-tracked products; when omitted the
+   * service releases the oldest sold serials on the invoice line.
+   */
+  serialNumbers?: string[];
 }

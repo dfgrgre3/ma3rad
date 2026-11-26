@@ -28,6 +28,7 @@ const adminExtraRoutes = require('./adminExtra');
 const provisioningRoutes = require('./provisioning');
 const tenantUserSyncRoutes = require('./tenantUserSync');
 const tenantApiRoutes = require('./tenantApi');
+const deviceNotificationsRoutes = require('./deviceNotifications');
 
 /**
  * Mounts every central API router under /api/v1.
@@ -63,6 +64,7 @@ function createApiRouter() {
   router.use('/device/backups', appBackupsClientRoutes);
   router.use('/device/provisioning', provisioningRoutes);
   router.use('/device/tenant-users', tenantUserSyncRoutes);
+  router.use('/device/notifications', deviceNotificationsRoutes);
   router.use('/tenant/v1', tenantApiRoutes);
   router.use('/', systemRoutes);
   router.use('/', configRoutes);

@@ -5,3 +5,10 @@ export interface ExportColumn {
   type?: string;
   align?: 'start' | 'center' | 'end';
 }
+
+/** Optional extra worksheet appended to the exported workbook. */
+export interface ExportSheet {
+  name: string;
+  columns: ExportColumn[];
+  rows: Array<Record<string, unknown>>;
+}

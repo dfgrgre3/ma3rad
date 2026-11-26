@@ -24,6 +24,7 @@ const expectedSections = [
   'إدارة النظام',
 ];
 
+
 const expectedHrPermissions: Record<string, string> = {
   '/hr/dashboard': 'employees.view',
   '/employees': 'employees.view',
@@ -65,7 +66,7 @@ const expectedOperationsPaths = [
   '/workshop',
 ];
 
-test('navigation has the required 12 sections and no duplicate destinations', () => {
+test('navigation has the required 13 sections and no duplicate destinations', () => {
   const paths = NAV_GROUPS.flatMap((group) => group.items.map((item) => item.to));
 
   assert.deepEqual(NAV_GROUPS.map((group) => group.label), expectedSections);

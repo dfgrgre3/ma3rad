@@ -135,7 +135,9 @@ export interface DailyExpenseRow {
   createdAt: string;
   paymentType: string;
   recipient?: string | null;
+  registerId?: string | null;
   registerName?: string | null;
+  performedBy?: string | null;
   performedByName?: string | null;
 }
 
@@ -307,7 +309,7 @@ export class DailyOperationsService {
     start.setDate(start.getDate() - 6);
     const startDay = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}-${String(start.getDate()).padStart(2, '0')}`;
     const trendRows = this.db.query<{ date: string; count: number; total: number }>(
-      `SELECT date, COUNT(*) AS count, COALESCE(SUM(total_amount), 0) AS total
+      `SELECT date, COUNT(*) AS count, COALESCE(SUM(total_amount), 0) / 100.0 AS total
        FROM purchase_invoices pi
        LEFT JOIN warehouses w ON w.id = pi.warehouse_id
        WHERE pi.date BETWEEN ? AND ? AND ${scope.clause}
@@ -369,13 +371,14 @@ export class DailyOperationsService {
   }
 
   public getExpenses(date = this.today()): DailyExpenseResult {
-    const actor = this.requireView('cashier.view');
+    const actor = AuthService.requireAuth();
+    PermissionService.requireAny(actor, ['cashier.view', 'cashier.expense', 'finance.expenses.view']);
     const day = dateOnly(date);
     const scope = this.branchAccess.sqlScope('e.branch_id', 'r.branch_id', actor);
     const rows = this.db.query<DailyExpenseRow>(
       `SELECT e.id, e.category, e.description, e.amount / 100.0 AS amount, e.date, e.created_at AS createdAt,
-              e.payment_type AS paymentType, e.recipient,
-              r.name AS registerName, u.full_name AS performedByName
+              e.payment_type AS paymentType, e.recipient, e.register_id AS registerId,
+              r.name AS registerName, e.performed_by AS performedBy, u.full_name AS performedByName
        FROM expenses e
        LEFT JOIN cash_registers r ON r.id = e.register_id
        LEFT JOIN users u ON u.id = e.performed_by

@@ -2,6 +2,7 @@ import { DatabaseManager } from '../../../database/repositories/databaseManager'
 import { AuthService } from '../auth/AuthService';
 import { PermissionService } from '../auth/PermissionService';
 import { v4 as uuidv4 } from 'uuid';
+import { notificationBus } from './notificationBus';
 import type { Notification, NotificationType } from '../../../types/notifications';
 
 export abstract class NotificationServicePart01 {
@@ -67,6 +68,7 @@ public getUnreadCount(userId?: string): number {
 
 public markAsRead(notificationId: string): void {
     this.db.run('UPDATE notifications SET is_read = 1 WHERE id = ?', [notificationId]);
+    notificationBus.emitChanged();
   }
 
 public markAllAsRead(userId?: string): void {
@@ -75,6 +77,7 @@ public markAllAsRead(userId?: string): void {
     } else {
       this.db.run('UPDATE notifications SET is_read = 1');
     }
+    notificationBus.emitChanged();
   }
 
 public createNotification(
@@ -91,12 +94,22 @@ public createNotification(
        VALUES (?, ?, ?, ?, ?, 0, ?, ?)`,
       [id, userId || null, type, title, message, referenceType || null, referenceId || null]
     );
+    notificationBus.emitCreated({
+      id,
+      userId: userId || null,
+      type,
+      title,
+      message,
+      referenceType: referenceType || null,
+      referenceId: referenceId || null,
+    });
   }
 
 public deleteNotification(id: string): void {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'ui.notifications.list.manage');
     this.db.run('DELETE FROM notifications WHERE id = ?', [id]);
+    notificationBus.emitChanged();
   }
 
 public deleteAllNotifications(userId?: string): void {
@@ -107,6 +120,7 @@ public deleteAllNotifications(userId?: string): void {
     } else {
       this.db.run('DELETE FROM notifications');
     }
+    notificationBus.emitChanged();
   }
 
 protected notifyOnce(type: NotificationType, title: string, message: string, referenceType: string, referenceId: string): void {

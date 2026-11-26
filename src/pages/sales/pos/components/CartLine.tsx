@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { AlertCircle, Minus, Plus, Trash2, Tag, ChevronDown, Package } from 'lucide-react';
+import { AlertCircle, ArrowLeftRight, CheckSquare, Hash, Minus, Plus, Square, Trash2, Tag, ChevronDown, Package } from 'lucide-react';
 import type { Product } from '../../../../types';
 import { CeramicMath } from '../../../../utils/products/ceramicMath';
 import { formatProductQuantity, getProductUnitLabel } from '../../../../utils/products/productUnits';
@@ -24,6 +24,17 @@ export interface CartLineProps {
   sellingPriceTierNames?: string[];
   isActive?: boolean;
   onSelect?: (index: number) => void;
+  /** false hides/disables the line-discount input (no sales.discount permission). */
+  canDiscount?: boolean;
+  /** cost data for the margin hint; absent when the user can't view costs. */
+  costInfo?: { unitCost: number; lastPurchaseCost: number | null } | null;
+  /** bulk-selection mode */
+  selectable?: boolean;
+  selected?: boolean;
+  onToggleSelect?: (index: number) => void;
+  onRequestSubstitute?: (index: number) => void;
+  /** Opens the serial/IMEI picker for this line (serial-tracked products). */
+  onEditSerials?: (index: number) => void;
 }
 
 export const CartLine: React.FC<CartLineProps> = ({
@@ -41,6 +52,13 @@ export const CartLine: React.FC<CartLineProps> = ({
   sellingPriceTierNames = [],
   isActive = false,
   onSelect,
+  canDiscount = true,
+  costInfo = null,
+  selectable = false,
+  selected = false,
+  onToggleSelect,
+  onRequestSubstitute,
+  onEditSerials,
 }) => {
   const businessType = getEffectiveBusinessType();
   const [isPriceMenuOpen, setIsPriceMenuOpen] = useState(false);
@@ -50,6 +68,13 @@ export const CartLine: React.FC<CartLineProps> = ({
   const sellableUnits = getSellableUnits(item.product);
   const displayPrice = round2(pricePerUnit(item.unitPrice, item.soldBy, item.product));
   const overStock = tracksStock && item.quantityM2 > item.availableStockM2 && !enableNegativeStock;
+  const effectiveUnitCost = costInfo
+    ? (costInfo.unitCost > 0 ? costInfo.unitCost : costInfo.lastPurchaseCost)
+    : null;
+  const marginAmount = effectiveUnitCost != null ? round2(item.unitPrice - effectiveUnitCost) : null;
+  const marginPercent = marginAmount != null && item.unitPrice > 0
+    ? round2((marginAmount / item.unitPrice) * 100)
+    : null;
 
   // Build available price tiers according to sellingPriceTiersCount, names, and product attributes
   const priceTiers = React.useMemo(() => {
@@ -101,6 +126,17 @@ export const CartLine: React.FC<CartLineProps> = ({
     >
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-start gap-2 min-w-0">
+          {selectable && onToggleSelect && (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onToggleSelect(index); }}
+              aria-label={selected ? 'إلغاء تحديد السطر' : 'تحديد السطر'}
+              aria-pressed={selected}
+              className="mt-0.5 shrink-0 text-primary"
+            >
+              {selected ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
+            </button>
+          )}
           {item.product.imagePath ? (
             <img src={item.product.imagePath} alt={item.product.name} className="w-10 h-10 object-cover rounded-lg bg-surface-sunken shrink-0" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
           ) : (
@@ -120,19 +156,71 @@ export const CartLine: React.FC<CartLineProps> = ({
           )}
         </div>
         </div>
-        <button
-          onClick={() => onRemove(index)}
-          aria-label={`حذف ${item.product.name} من السلة`}
-          title="حذف من السلة (Delete)"
-          className="w-8 h-8 flex items-center justify-center text-muted hover:text-danger hover:bg-danger-soft dark:hover:bg-danger/40 rounded-lg transition shrink-0"
-        >
-          <Trash2 className="w-4 h-4" />
-        </button>
+        <div className="flex items-center gap-1 shrink-0">
+          {onRequestSubstitute && (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onRequestSubstitute(index); }}
+              title="استبدال الصنف ببديل داخل نفس الفاتورة"
+              aria-label={`استبدال ${item.product.name}`}
+              className="w-8 h-8 flex items-center justify-center text-muted hover:text-primary hover:bg-accent-soft rounded-lg transition"
+            >
+              <ArrowLeftRight className="w-4 h-4" />
+            </button>
+          )}
+          <button
+            onClick={() => onRemove(index)}
+            aria-label={`حذف ${item.product.name} من السلة`}
+            title="حذف من السلة (Delete)"
+            className="w-8 h-8 flex items-center justify-center text-muted hover:text-danger hover:bg-danger-soft dark:hover:bg-danger/40 rounded-lg transition shrink-0"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
+        </div>
       </div>
 
       {overStock && (
         <div className="text-[10px] text-danger flex items-center gap-1">
           <AlertCircle className="w-3 h-3" /> الكمية تتجاوز الرصيد المتاح
+        </div>
+      )}
+
+      {item.serials?.length ? (
+        <div className="flex items-center gap-1.5 flex-wrap text-[10px]">
+          <span className="inline-flex items-center gap-1 font-bold text-muted"><Hash className="w-3 h-3" />الأرقام التسلسلية ({item.serials.length}):</span>
+          {item.serials.slice(0, 3).map((s) => (
+            <span key={s.id} className="rounded bg-surface-sunken px-1.5 py-0.5 font-mono font-bold text-ink" dir="ltr">{s.serialNumber}</span>
+          ))}
+          {item.serials.length > 3 && <span className="text-muted">+{item.serials.length - 3}</span>}
+          {onEditSerials && (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onEditSerials(index); }}
+              className="rounded border border-line px-1.5 py-0.5 font-black text-primary hover:bg-accent-soft"
+            >
+              تعديل
+            </button>
+          )}
+        </div>
+      ) : item.product.trackSerials ? (
+        <div className="text-[10px] font-bold text-danger flex items-center gap-1">
+          <AlertCircle className="w-3 h-3" /> الصنف يتتبع الأرقام التسلسلية ولم تُحدد بعد — أضفه من جديد لاختيارها
+        </div>
+      ) : null}
+
+      {costInfo && (costInfo.unitCost > 0 || costInfo.lastPurchaseCost != null) && (
+        <div className="text-[10px] flex items-center gap-2 flex-wrap">
+          <span className="text-muted">
+            التكلفة: <strong className="text-ink tabular-nums">{CeramicMath.formatCurrency(costInfo.unitCost > 0 ? costInfo.unitCost : costInfo.lastPurchaseCost || 0)}</strong>
+            {costInfo.lastPurchaseCost != null && costInfo.unitCost > 0 && (
+              <span className="text-muted"> • آخر شراء: {CeramicMath.formatCurrency(costInfo.lastPurchaseCost)}</span>
+            )}
+          </span>
+          {marginAmount != null && marginPercent != null && (
+            <span className={`font-bold tabular-nums ${marginAmount < 0 ? 'text-danger' : marginPercent < 10 ? 'text-warning' : 'text-success'}`}>
+              هامش الربح: {CeramicMath.formatCurrency(marginAmount)} ({marginPercent}%)
+            </span>
+          )}
         </div>
       )}
 
@@ -148,7 +236,7 @@ export const CartLine: React.FC<CartLineProps> = ({
               {getUomLabel(unit, item.product)}
             </button>
           ))}
-          <span className="text-[10px] text-muted mr-auto">
+          <span className="text-[10px] text-muted ms-auto">
             {round2(item.quantityM2)} {getProductUnitLabel(item.product)}
             {item.product?.productType !== 'GENERAL' ? ` • ${item.boxesCount} كرتونة` : ''}
           </span>
@@ -192,7 +280,7 @@ export const CartLine: React.FC<CartLineProps> = ({
             readOnly={Boolean(item.specialStockId)}
             className={`w-16 text-center font-bold bg-surface border border-line rounded-lg p-1 text-xs text-ink ${item.specialStockId ? 'opacity-70 cursor-not-allowed' : ''}`}
           />
-          <span className="text-[10px] text-muted">ج.م</span>
+          <span className="text-[10px] text-muted">{CeramicMath.getCurrencySymbol()}</span>
           <span className="text-[10px] text-muted">/{getCartPriceUnitLabel(item)}</span>
 
           {/* زر تثبيت / اختيار السعر إذا كان مفعلاً أكثر من سعر */}
@@ -244,11 +332,16 @@ export const CartLine: React.FC<CartLineProps> = ({
         <input
           type="number"
           value={item.discountAmount || ''}
-          placeholder="0"
+          placeholder={canDiscount ? '0' : 'بدون صلاحية'}
+          disabled={!canDiscount}
+          title={canDiscount ? undefined : 'لا تملك صلاحية تطبيق خصم على الصنف'}
           onChange={(e) => onUpdateLineDiscount(index, e.target.value === '' ? 0 : Number.parseFloat(e.target.value))}
           aria-label={`خصم الصنف ${item.product.name}`}
-          className="w-20 px-2 py-1 bg-surface border border-line rounded-lg text-[11px] font-bold text-ink "
+          className={`w-20 px-2 py-1 bg-surface border border-line rounded-lg text-[11px] font-bold text-ink ${canDiscount ? '' : 'opacity-50 cursor-not-allowed'}`}
         />
+        {!canDiscount && item.discountAmount > 0 && (
+          <span className="text-[10px] font-bold text-warning">خصم مسجل سابقاً — لا تملك صلاحية تعديله</span>
+        )}
       </div>
     </div>
   );

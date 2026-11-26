@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { useDashboardRefresh } from "../../../contexts/DashboardRefreshContext";
+import { useDashboardEmbed } from "../../../contexts/DashboardEmbedContext";
 import { Banknote, Loader2 } from "lucide-react";
 import { DatabaseManager } from "../../../database/repositories/databaseManager";
 import { DebtService, DebtRow } from "../../../services/domains/finance/DebtService";
@@ -40,6 +41,7 @@ import {
 export const DebtsDashboardPage: React.FC = () => {
   const toast = useToast();
   const refreshToken = useDashboardRefresh()?.refreshToken;
+  const embedded = useDashboardEmbed();
   const initialRef = useRef(true);
   const navigate = useNavigate();
   const debtService = useMemo(() => new DebtService(), []);
@@ -390,13 +392,15 @@ export const DebtsDashboardPage: React.FC = () => {
     <div
       className="h-full flex flex-col bg-surface-muted text-ink overflow-hidden"
     >
-      <div className="bg-surface px-6 pt-4">
-        <PageHeader
-          icon={<Banknote className="h-5 w-5" />}
-          title="الديون والذمم المالية"
-          description="متابعة مديونيات العملاء ومستحقات الموردين"
-        />
-      </div>
+      {!embedded && (
+        <div className="bg-surface px-6 pt-4">
+          <PageHeader
+            icon={<Banknote className="h-5 w-5" />}
+            title="الديون والذمم المالية"
+            description="متابعة مديونيات العملاء ومستحقات الموردين"
+          />
+        </div>
+      )}
 
       <DebtSummaryCards totals={totals} />
 

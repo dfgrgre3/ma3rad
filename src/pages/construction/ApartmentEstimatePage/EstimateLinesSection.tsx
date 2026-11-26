@@ -81,7 +81,7 @@ export const EstimateLinesSection: React.FC<{
                 <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px]">
                   <label className="cursor-pointer rounded-lg border border-line bg-surface px-3 py-2 font-bold text-ink">إرفاق ملف<input type="file" className="hidden" onChange={(event) => { void addLineAttachment(line, event.target.files?.[0]).catch((error) => setDataError(error instanceof Error ? error.message : 'تعذر إرفاق الملف.')); event.currentTarget.value = ''; }} /></label>
                   {(line.attachments || []).map((attachment) => <span key={attachment.id} className="inline-flex items-center gap-1 rounded-lg bg-surface-sunken px-2 py-1"><a href={attachment.dataUrl} download={attachment.name} className="underline">{attachment.name}</a><button type="button" aria-label={`حذف المرفق ${attachment.name}`} onClick={() => patchLine(line.id, { attachments: line.attachments?.filter((item) => item.id !== attachment.id) })} className="font-black text-danger">×</button></span>)}
-                  <button type="button" onClick={() => saveLineTemplate(line)} className="mr-auto rounded-lg border border-accent-border px-3 py-2 font-bold text-primary">حفظ كقالب</button>
+                  <button type="button" onClick={() => saveLineTemplate(line)} className="ms-auto rounded-lg border border-accent-border px-3 py-2 font-bold text-primary">حفظ كقالب</button>
                 </div>
                 <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
                   <NumberInput label={`سعر الخامات / ${line.unit}`} value={line.materialRate} min={0} step={0.01} onChange={(materialRate) => patchLine(line.id, { materialRate })} />

@@ -41,13 +41,13 @@ const NO_MARKETING = ['professional_services', 'healthcare', 'education'];
 export const PAGE_ELEMENT_RULES: Record<string, ActivityPageElementRules> = {
   // ── Daily workspace ────────────────────────────────────────────────
   '/daily/sales': {
-    'quick-sale': { hiddenPath: '/pos', labels: { restaurant: 'طلب صالة سريع', hospitality: 'حجز سريع', education: 'تسجيل قسط', workshop: 'أمر شغل سريع', healthcare: 'موعد كشف', construction: 'مستخلص سريع' } },
-    'new-sale': { labels: { restaurant: 'طلب صالة جديد', hospitality: 'حجز إقامة', education: 'تسجيل قسط', workshop: 'أمر شغل جديد', healthcare: 'موعد كشف', construction: 'مستخلص جديد' } },
+    'quick-sale': { hiddenPath: '/pos', labels: { hospitality: 'حجز سريع', education: 'تسجيل قسط', workshop: 'أمر شغل سريع', healthcare: 'موعد كشف', construction: 'مستخلص سريع' } },
+    'new-sale': { labels: { hospitality: 'حجز إقامة', education: 'تسجيل قسط', workshop: 'أمر شغل جديد', healthcare: 'موعد كشف', construction: 'مستخلص جديد' } },
     'payment': {},
     'void': {},
   },
   '/daily/purchases': {
-    'quick-purchase': { labels: { restaurant: 'توريد خامات', manufacturing: 'فاتورة خامات', construction: 'فاتورة مورد', import_export: 'فاتورة استيراد', logistics: 'فاتورة تشغيل', hospitality: 'توريد مستلزمات', healthcare: 'فاتورة مستلزمات', education: 'فاتورة مشتريات', workshop: 'فاتورة قطع غيار', professional_services: 'فاتورة مكتب' } },
+    'quick-purchase': { labels: { manufacturing: 'فاتورة خامات', construction: 'فاتورة مورد', import_export: 'فاتورة استيراد', logistics: 'فاتورة تشغيل', hospitality: 'توريد مستلزمات', healthcare: 'فاتورة مستلزمات', education: 'فاتورة مشتريات', workshop: 'فاتورة قطع غيار', professional_services: 'فاتورة مكتب' } },
     'payment': {},
     'void': {},
     'print': {},
@@ -57,21 +57,21 @@ export const PAGE_ELEMENT_RULES: Record<string, ActivityPageElementRules> = {
     'new-expense': {},
   },
   '/daily/debts': {
-    'collect': { labels: { hospitality: 'تحصيل نزيل', healthcare: 'تحصيل مريض', education: 'تحصيل ولي أمر', restaurant: 'تحصيل ضيف' } },
+    'collect': { labels: { hospitality: 'تحصيل نزيل', healthcare: 'تحصيل مريض', education: 'تحصيل ولي أمر' } },
     'installments': { hiddenPath: '/finance/installments' },
   },
 
   // ── Sales hub ──────────────────────────────────────────────────────
   '/sales': {
     'pos-checkout': { hiddenPath: '/pos' },
-    'new-invoice': { labels: { restaurant: 'فاتورة طلب جديدة', hospitality: 'فاتورة إقامة', education: 'قسط جديد', workshop: 'فاتورة صيانة', healthcare: 'فاتورة كشف', construction: 'مستخلص جديد', import_export: 'فاتورة تصدير', logistics: 'بوليصة شحن', manufacturing: 'أمر تسليم' } },
-    'new-order': { hiddenPath: '/orders', labels: { restaurant: 'طلب طاولة', workshop: 'أمر شغل', healthcare: 'موعد كشف', education: 'تسجيل طالب', hospitality: 'حجز غرفة', construction: 'أمر تنفيذ' } },
+    'new-invoice': { labels: { hospitality: 'فاتورة إقامة', education: 'قسط جديد', workshop: 'فاتورة صيانة', healthcare: 'فاتورة كشف', construction: 'مستخلص جديد', import_export: 'فاتورة تصدير', logistics: 'بوليصة شحن', manufacturing: 'أمر تسليم' } },
+    'new-order': { hiddenPath: '/orders', labels: { workshop: 'أمر شغل', healthcare: 'موعد كشف', education: 'تسجيل طالب', hospitality: 'حجز غرفة', construction: 'أمر تنفيذ' } },
     'new-quotation': { hiddenPath: '/quotations', labels: { workshop: 'تقدير صيانة', healthcare: 'عرض باقة', education: 'عرض دورة', hospitality: 'عرض إقامة', construction: 'مقايسة' } },
     'new-return': { hiddenPath: '/returns' },
-    'after-sales': { hiddenPath: '/sales/after-sales', labels: { workshop: 'ضمانات الصيانة', home_appliances: 'الضمانات', electronics: 'الضمانات', automotive: 'الضمانات', restaurant: 'شكاوى وجودة' } },
+    'after-sales': { hiddenPath: '/sales/after-sales', labels: { workshop: 'ضمانات الصيانة', home_appliances: 'الضمانات', electronics: 'الضمانات', automotive: 'الضمانات' } },
     'promotions': { hiddenPath: '/promotions' },
     'installments': { hiddenPath: '/finance/installments' },
-    'statement': { hiddenPath: '/sales/statement', labels: { restaurant: 'كشف حساب الضيف', hospitality: 'كشف حساب النزيل', healthcare: 'كشف حساب المريض', education: 'كشف حساب ولي الأمر' } },
+    'statement': { hiddenPath: '/sales/statement', labels: { hospitality: 'كشف حساب النزيل', healthcare: 'كشف حساب المريض', education: 'كشف حساب ولي الأمر' } },
     'electronic-invoicing': { hiddenPath: '/sales/e-invoicing' },
     'export': {},
     'print': {},
@@ -91,23 +91,23 @@ export const PAGE_ELEMENT_RULES: Record<string, ActivityPageElementRules> = {
     'send': {},
   },
   '/sales/orders-deposits': {
-    'new-reservation': { labels: { restaurant: 'حجز طاولة', hospitality: 'حجز غرفة', education: 'حجز مقعد', ceramics: 'حجز مساحة', furniture: 'حجز قطعة' } },
+    'new-reservation': { labels: { hospitality: 'حجز غرفة', education: 'حجز مقعد', ceramics: 'حجز مساحة', furniture: 'حجز قطعة' } },
     'new-order': { hiddenPath: '/orders' },
     'deposit': {},
     'print': {},
   },
   '/sales/after-sales': {
     'new-warranty': {},
-    'new-claim': { labels: { restaurant: 'شكوى جودة', hospitality: 'بلاغ نزيل' } },
+    'new-claim': { labels: { hospitality: 'بلاغ نزيل' } },
   },
   '/quotations': {
-    'new-quotation': { labels: { workshop: 'تقدير صيانة', healthcare: 'عرض باقة', education: 'عرض دورة', hospitality: 'عرض إقامة', construction: 'مقايسة جديدة', restaurant: 'عرض مناسبة' } },
+    'new-quotation': { labels: { workshop: 'تقدير صيانة', healthcare: 'عرض باقة', education: 'عرض دورة', hospitality: 'عرض إقامة', construction: 'مقايسة جديدة' } },
     'convert': {},
     'print': {},
     'export': {},
   },
   '/orders': {
-    'new-order': { labels: { restaurant: 'طلب طاولة', workshop: 'أمر شغل', healthcare: 'موعد كشف', education: 'تسجيل طالب', hospitality: 'حجز', construction: 'أمر تنفيذ', logistics: 'طلب توصيل', manufacturing: 'أمر إنتاج' } },
+    'new-order': { labels: { workshop: 'أمر شغل', healthcare: 'موعد كشف', education: 'تسجيل طالب', hospitality: 'حجز', construction: 'أمر تنفيذ', logistics: 'طلب توصيل', manufacturing: 'أمر إنتاج' } },
     'convert': {},
     'print': {},
     'export': {},
@@ -125,7 +125,7 @@ export const PAGE_ELEMENT_RULES: Record<string, ActivityPageElementRules> = {
     'customer': {},
     'sales-rep': {},
     'split-payment': {},
-    'receipt': { labels: { restaurant: 'فاتورة الطلب', hospitality: 'فاتورة الإقامة' } },
+    'receipt': { labels: { hospitality: 'فاتورة الإقامة' } },
     'receipt-print': {},
   },
   '/ceramics': {
@@ -222,7 +222,7 @@ export const PAGE_ELEMENT_RULES: Record<string, ActivityPageElementRules> = {
 
   // ── Products ───────────────────────────────────────────────────────
   '/products': {
-    'new-product': { labels: { ceramics: 'بلاطة / تصميم جديد', sanitary: 'أداة صحية جديدة', furniture: 'قطعة أثاث', home_appliances: 'جهاز كهربائي', electronics: 'جهاز / إكسسوار', clothing: 'قطعة ملابس', food: 'صنف غذائي', cosmetics: 'منتج تجميل', automotive: 'قطعة غيار', building_materials: 'مادة بناء', lighting: 'منتج إضاءة', ecommerce: 'منتج متجر', restaurant: 'صنف مطبخ', hospitality: 'غرفة / خدمة', healthcare: 'خدمة طبية', education: 'دورة / خدمة', workshop: 'قطعة غيار', manufacturing: 'منتج مصنّع', construction: 'بند تنفيذ', import_export: 'بضاعة', logistics: 'خدمة شحن', professional_services: 'ملف خدمة', services: 'خدمة', custom: 'منتج / خدمة' } },
+    'new-product': { labels: { ceramics: 'بلاطة / تصميم جديد', sanitary: 'أداة صحية جديدة', furniture: 'قطعة أثاث', home_appliances: 'جهاز كهربائي', electronics: 'جهاز / إكسسوار', clothing: 'قطعة ملابس', food: 'صنف غذائي', cosmetics: 'منتج تجميل', automotive: 'قطعة غيار', building_materials: 'مادة بناء', lighting: 'منتج إضاءة', ecommerce: 'منتج متجر', hospitality: 'غرفة / خدمة', healthcare: 'خدمة طبية', education: 'دورة / خدمة', workshop: 'قطعة غيار', manufacturing: 'منتج مصنّع', construction: 'بند تنفيذ', import_export: 'بضاعة', logistics: 'خدمة شحن', professional_services: 'ملف خدمة', services: 'خدمة', custom: 'منتج / خدمة' } },
     'import': {},
     'export': {},
     'print-barcodes': { hiddenPath: '/products/barcodes', hiddenFor: ['professional_services', 'healthcare', 'education', 'construction', 'logistics'] },
@@ -252,13 +252,13 @@ export const PAGE_ELEMENT_RULES: Record<string, ActivityPageElementRules> = {
     'export': {},
   },
   '/promotions': {
-    'new-promotion': { labels: { restaurant: 'عرض / مناسبة', hospitality: 'عرض فندقي', ecommerce: 'كوبون متجر', education: 'عرض تسجيل' } },
+    'new-promotion': { labels: { hospitality: 'عرض فندقي', ecommerce: 'كوبون متجر', education: 'عرض تسجيل' } },
     'export': {},
   },
 
   // ── Purchasing hub ────────────────────────────────────────────────
   '/purchases': {
-    'new-invoice': { labels: { restaurant: 'توريد خامات', manufacturing: 'فاتورة خامات', construction: 'فاتورة مورد', import_export: 'فاتورة استيراد', logistics: 'فاتورة تشغيل', hospitality: 'توريد مستلزمات', healthcare: 'فاتورة مستلزمات', education: 'فاتورة مشتريات', workshop: 'فاتورة قطع غيار', professional_services: 'فاتورة مكتب' } },
+    'new-invoice': { labels: { manufacturing: 'فاتورة خامات', construction: 'فاتورة مورد', import_export: 'فاتورة استيراد', logistics: 'فاتورة تشغيل', hospitality: 'توريد مستلزمات', healthcare: 'فاتورة مستلزمات', education: 'فاتورة مشتريات', workshop: 'فاتورة قطع غيار', professional_services: 'فاتورة مكتب' } },
     'new-request': { hiddenPath: '/purchases/requests' },
     'new-quotation': { hiddenPath: '/purchases/quotations' },
     'new-order': { hiddenPath: '/purchases/orders' },
@@ -313,7 +313,7 @@ export const PAGE_ELEMENT_RULES: Record<string, ActivityPageElementRules> = {
     'export': {},
   },
   '/suppliers': {
-    'new-supplier': { labels: { construction: 'مقاول مواد', import_export: 'مورد / مصدر', logistics: 'شركة شحن', manufacturing: 'مورد خامات', restaurant: 'مورد خامات', hospitality: 'مورد مستلزمات', healthcare: 'مورد مستلزمات', education: 'مورد مؤسسة', workshop: 'مورد قطع غيار', professional_services: 'مكتب / شريك' } },
+    'new-supplier': { labels: { construction: 'مقاول مواد', import_export: 'مورد / مصدر', logistics: 'شركة شحن', manufacturing: 'مورد خامات', hospitality: 'مورد مستلزمات', healthcare: 'مورد مستلزمات', education: 'مورد مؤسسة', workshop: 'مورد قطع غيار', professional_services: 'مكتب / شريك' } },
     'statement': { hiddenPath: '/purchases/statement' },
     'import': {},
     'export': {},
@@ -327,7 +327,7 @@ export const PAGE_ELEMENT_RULES: Record<string, ActivityPageElementRules> = {
     'campaign': { hiddenPath: '/crm/campaigns' },
   },
   '/crm/leads': {
-    'new-lead': { labels: { restaurant: 'ضيف محتمل', hospitality: 'نزيل محتمل', healthcare: 'مريض جديد', education: 'طالب محتمل', workshop: 'سيارة جديدة', construction: 'مشروع محتمل', ecommerce: 'عميل متجر' } },
+    'new-lead': { labels: { hospitality: 'نزيل محتمل', healthcare: 'مريض جديد', education: 'طالب محتمل', workshop: 'سيارة جديدة', construction: 'مشروع محتمل', ecommerce: 'عميل متجر' } },
     'convert': {},
   },
   '/crm/pipeline': {
@@ -340,11 +340,11 @@ export const PAGE_ELEMENT_RULES: Record<string, ActivityPageElementRules> = {
     'complete': {},
   },
   '/crm/campaigns': {
-    'new-campaign': { labels: { hospitality: 'عرض فندقي', education: 'حملة تسجيل', healthcare: 'حملة فحوصات', restaurant: 'عرض / مناسبة', ecommerce: 'حملة متجر' } },
+    'new-campaign': { labels: { hospitality: 'عرض فندقي', education: 'حملة تسجيل', healthcare: 'حملة فحوصات', ecommerce: 'حملة متجر' } },
     'send': {},
   },
   '/customers': {
-    'new-customer': { labels: { restaurant: 'ضيف جديد', hospitality: 'نزيل', healthcare: 'مريض', education: 'طالب / ولي أمر', workshop: 'عميل / سيارة', construction: 'صاحب مشروع', import_export: 'عميل / موزع', logistics: 'عميل شحن' } },
+    'new-customer': { labels: { hospitality: 'نزيل', healthcare: 'مريض', education: 'طالب / ولي أمر', workshop: 'عميل / سيارة', construction: 'صاحب مشروع', import_export: 'عميل / موزع', logistics: 'عميل شحن' } },
     'imported-products': { hiddenPath: '/customers/imported-products' },
     'ready-deliveries': { hiddenPath: '/customers/ready-deliveries' },
     'statement': { hiddenPath: '/sales/statement' },
@@ -354,7 +354,7 @@ export const PAGE_ELEMENT_RULES: Record<string, ActivityPageElementRules> = {
     'import': {},
     'export': {},
     'print': {},
-    'collect-payment': { labels: { hospitality: 'تحصيل نزيل', healthcare: 'تحصيل مريض', education: 'تحصيل ولي أمر', restaurant: 'تحصيل ضيف' } },
+    'collect-payment': { labels: { hospitality: 'تحصيل نزيل', healthcare: 'تحصيل مريض', education: 'تحصيل ولي أمر' } },
   },
   '/customers/imported-products': {
     'new-imported-product': {},
@@ -374,7 +374,7 @@ export const PAGE_ELEMENT_RULES: Record<string, ActivityPageElementRules> = {
 
   // ── Projects / operations ──────────────────────────────────────────
   '/projects': {
-    'new-project': { labels: { construction: 'مشروع جديد', hospitality: 'فعالية', restaurant: 'مناسبة', education: 'دفعة / عام دراسي', manufacturing: 'أمر إنتاج', logistics: 'عقد نقل', import_export: 'صفقة استيراد', healthcare: 'حملة طبية', workshop: 'مشروع صيانة' } },
+    'new-project': { labels: { construction: 'مشروع جديد', hospitality: 'فعالية', education: 'دفعة / عام دراسي', manufacturing: 'أمر إنتاج', logistics: 'عقد نقل', import_export: 'صفقة استيراد', healthcare: 'حملة طبية', workshop: 'مشروع صيانة' } },
     'execution': { hiddenPath: '/projects/execution' },
     'sites': { hiddenPath: '/projects/sites' },
     'boq': { hiddenPath: '/projects/boq' },
@@ -426,7 +426,7 @@ export const PAGE_ELEMENT_RULES: Record<string, ActivityPageElementRules> = {
     'trips': {},
   },
   '/deliveries': {
-    'new-delivery': { labels: { logistics: 'شحنة جديدة', restaurant: 'طلب توصيل', ecommerce: 'طلب متجر', import_export: 'شحنة تصدير' } },
+    'new-delivery': { labels: { logistics: 'شحنة جديدة', ecommerce: 'طلب متجر', import_export: 'شحنة تصدير' } },
     'assign': {},
     'track': {},
     'print': {},
@@ -463,15 +463,7 @@ export const PAGE_ELEMENT_RULES: Record<string, ActivityPageElementRules> = {
     'new-branch': {},
   },
 
-  // ── Restaurant / hospitality ───────────────────────────────────────
-  '/restaurant': {
-    'tables': {},
-    'new-table': {},
-    'reservations': { hiddenPath: '/sales/orders-deposits' },
-    'kitchen-display': {},
-    'menu': {},
-    'delivery': { hiddenPath: '/deliveries' },
-  },
+  // ── Hospitality ────────────────────────────────────────────────
   '/hospitality': {
     'rooms': {},
     'new-room': {},
@@ -499,7 +491,7 @@ export const PAGE_ELEMENT_RULES: Record<string, ActivityPageElementRules> = {
     'count': {},
   },
   '/finance/expenses': {
-    'new-expense': { labels: { construction: 'مصروف موقع', restaurant: 'مصروف مطبخ', hospitality: 'مصروف فندقي', healthcare: 'مصروف عيادة', education: 'مصروف مؤسسة', workshop: 'مصروف ورشة', manufacturing: 'مصروف إنتاج' } },
+    'new-expense': { labels: { construction: 'مصروف موقع', hospitality: 'مصروف فندقي', healthcare: 'مصروف عيادة', education: 'مصروف مؤسسة', workshop: 'مصروف ورشة', manufacturing: 'مصروف إنتاج' } },
     'approve': {},
     'print': {},
     'export': {},
@@ -509,7 +501,7 @@ export const PAGE_ELEMENT_RULES: Record<string, ActivityPageElementRules> = {
     'tree': {},
   },
   '/finance/journal': {
-    'new-entry': { labels: { construction: 'قيد مشروع', restaurant: 'قيد مطعم', hospitality: 'قيد فندقي', healthcare: 'قيد عيادة', education: 'قيد مؤسسي', workshop: 'قيد ورشة', manufacturing: 'قيد إنتاج' } },
+    'new-entry': { labels: { construction: 'قيد مشروع', hospitality: 'قيد فندقي', healthcare: 'قيد عيادة', education: 'قيد مؤسسي', workshop: 'قيد ورشة', manufacturing: 'قيد إنتاج' } },
     'post': {},
     'reverse': {},
     'print': {},
@@ -570,7 +562,7 @@ export const PAGE_ELEMENT_RULES: Record<string, ActivityPageElementRules> = {
   '/hr/dashboard': {},
   '/hr/alerts': {},
   '/employees': {
-    'new-employee': { labels: { construction: 'عامل / مهندس موقع', hospitality: 'موظف فندقي', healthcare: 'موظف عيادة', education: 'موظف مدرسة', workshop: 'فني / موظف', manufacturing: 'عامل إنتاج', restaurant: 'موظف مطعم', logistics: 'موظف تشغيل', import_export: 'موظف', professional_services: 'محاسب / مستشار' } },
+    'new-employee': { labels: { construction: 'عامل / مهندس موقع', hospitality: 'موظف فندقي', healthcare: 'موظف عيادة', education: 'موظف مدرسة', workshop: 'فني / موظف', manufacturing: 'عامل إنتاج', logistics: 'موظف تشغيل', import_export: 'موظف', professional_services: 'محاسب / مستشار' } },
     'contracts': { hiddenPath: '/employees/contracts' },
     'documents': { hiddenPath: '/employees/documents' },
     'attendance': { hiddenPath: '/employees/attendance' },

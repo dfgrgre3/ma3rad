@@ -66,7 +66,7 @@ export const DOC_ELEMENT_RULES: Record<string, DocElementRules> = {
   // ── Quotation ──────────────────────────────────────────────────────
   '/doc/quotation': {
     'print': {},
-    'send': { labels: { restaurant: 'إرسال للضيف', hospitality: 'إرسال للنزيل', healthcare: 'إرسال للمريض', education: 'إرسال لولي الأمر' } },
+    'send': { labels: { hospitality: 'إرسال للنزيل', healthcare: 'إرسال للمريض', education: 'إرسال لولي الأمر' } },
     'follow-up': {},
     'duplicate': {},
     'edit': {},

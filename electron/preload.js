@@ -130,4 +130,7 @@ contextBridge.exposeInMainWorld('ceramisys', {
     encryptDatabaseSecret: (secret) => ipcRenderer.invoke('security:encrypt-db-secret', secret),
     decryptDatabaseSecret: (payload) => ipcRenderer.invoke('security:decrypt-db-secret', payload),
   },
+  notifications: {
+    show: (payload) => ipcRenderer.invoke('notifications:show', payload),
+  },
 });

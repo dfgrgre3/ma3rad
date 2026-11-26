@@ -1,9 +1,9 @@
 import {
-  AlertTriangle, BadgeCheck, Banknote, BarChart3, BookmarkPlus, BookOpen, Boxes, Building2, CalendarDays,
+  AlertTriangle, BadgeCheck, Banknote, BarChart3, BookmarkPlus, BookOpen, Boxes, Building2, CalendarDays, Hash,
   Calculator, ClipboardList, Clock3, CreditCard, FileText, FolderTree, GraduationCap, HardHat, Hotel, Layers, LayoutDashboard, LayoutGrid, Lock,
   MessageCircle, Package, Package2, PackageCheck, Percent, PieChart, Receipt,
   RotateCcw, Scale, ShoppingBag, ShoppingCart, ShieldCheck, Star, Store, Tags, Target,
-  TrendingDown, TrendingUp, Users, UserRound, Utensils, Wallet, Workflow,
+  TrendingDown, TrendingUp, Users, UserRound, Wallet, Workflow,
 } from 'lucide-react';
 import type { NavGroupDef } from '../types/config/navigation';
 
@@ -37,7 +37,6 @@ export const NAV_GROUPS_01: NavGroupDef[] = [
     perm: 'sales.view',
     items: [
       { label: 'نقطة البيع (POS)', to: '/pos', icon: ShoppingCart, highlight: true, perm: 'sales.create' },
-      { label: 'إدارة المطعم', to: '/restaurant', icon: Utensils, perm: 'orders.view' },
       { label: 'إدارة الفندق والغرف', to: '/hospitality', icon: Hotel, perm: 'orders.view' },
       { label: 'مركز المبيعات', to: '/sales', icon: Receipt, perm: 'sales.view' },
       { label: 'تحليلات المبيعات', to: '/sales/analytics', icon: BarChart3, anyPerms: ['sales.analytics.view', 'sales.view'] },
@@ -79,6 +78,7 @@ export const NAV_GROUPS_01: NavGroupDef[] = [
       { label: 'مطابقة المخزون', to: '/inventory/reconciliation', icon: ClipboardList, perm: 'inventory.view' },
       { label: 'تنبيهات المخزون', to: '/inventory/alerts', icon: AlertTriangle, perm: 'inventory.view' },
       { label: 'الصلاحية والدفعات', to: '/inventory/expiry', icon: CalendarDays, perm: 'inventory.view' },
+      { label: 'الأرقام التسلسلية', to: '/inventory/serials', icon: Hash, anyPerms: ['inventory.serials.view', 'inventory.view'] },
       { label: 'المنتجات', to: '/products', icon: Package, perm: 'products.view' },
       { label: 'التصنيفات', to: '/categories', icon: FolderTree, perm: 'categories.view' },
       { label: 'الماركات', to: '/brands', icon: Tags, perm: 'brands.view' },

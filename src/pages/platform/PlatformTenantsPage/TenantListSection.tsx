@@ -262,7 +262,7 @@ export const TenantListSection: React.FC<TenantListSectionProps> = ({
               </span>
             )}
           </button>
-          <span className="mr-auto rounded-full bg-surface-sunken px-3 py-1.5 text-[11px] font-bold text-ink-secondary">
+          <span className="ms-auto rounded-full bg-surface-sunken px-3 py-1.5 text-[11px] font-bold text-ink-secondary">
             {formatNumber(tenants.length)} عميل
           </span>
         </div>

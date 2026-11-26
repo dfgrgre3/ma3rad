@@ -5,22 +5,13 @@ import type { OrderStatus } from '../services/domains/sales/OrderService/types';
  * (PENDING → CONFIRMED → PROCESSING → PARTIAL/READY → COMPLETED / CANCELLED,
  * with ON_HOLD as a shared pause state).
  * The underlying state machine is shared; only the wording adapts to the
- * activity — e.g. PROCESSING reads "في المطبخ" for restaurants and
- * "قيد الإنتاج" for manufacturers.
+ * activity — e.g. PROCESSING reads "قيد الإنتاج" for manufacturers
+ * and "تجهيز الإقامة" for hotels.
  */
 export const ACTIVITY_ORDER_STATUS_LABELS: Record<
   string,
   Partial<Record<OrderStatus, string>>
 > = {
-  restaurant: {
-    PENDING: 'طلب جديد',
-    CONFIRMED: 'مؤكد',
-    PROCESSING: 'في المطبخ',
-    PARTIAL: 'يُقدم جزئيًا',
-    READY: 'جاهز للتقديم',
-    ON_HOLD: 'معلّق',
-    COMPLETED: 'مغلق / مفوتر',
-  },
   hospitality: {
     PENDING: 'حجز وارد',
     CONFIRMED: 'حجز مؤكد',
@@ -244,7 +235,6 @@ export const ACTIVITY_ORDER_ACTION_LABELS: Record<
   string,
   { confirm?: string; start?: string }
 > = {
-  restaurant: { confirm: 'تأكيد الطلب', start: 'إرسال للمطبخ' },
   hospitality: { confirm: 'تأكيد الحجز', start: 'تجهيز الإقامة' },
   logistics: { confirm: 'تأكيد الشحنة', start: 'بدء الشحن' },
   ecommerce: { confirm: 'تأكيد الطلب', start: 'بدء التجهيز' },

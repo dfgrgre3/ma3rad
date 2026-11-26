@@ -223,12 +223,6 @@ export const ACTIVITY_FIELD_PRESETS: Record<string, ActivityFieldPreset[]> = {
     f('orders', 'GUEST_COUNT', 'عدد النزلاء', 'NUMBER'),
     f('sales_invoices', 'NIGHTS_COUNT', 'عدد الليالي', 'NUMBER'),
   ],
-  restaurant: [
-    f('customers', 'ALLERGIES', 'حساسية طعام', 'TEXT'),
-    f('orders', 'TABLE_NUMBER', 'رقم الطاولة', 'TEXT'),
-    f('orders', 'WAITING_MINUTES', 'مدة الانتظار (دقيقة)', 'NUMBER'),
-    f('orders', 'ORDER_CHANNEL', 'قناة الطلب', 'SELECT', { options: ['محلي', 'سفري', 'توصيل', 'عرض'] }),
-  ],
 
   // ── Healthcare, education, professional services ────────────────────
   healthcare_admin: [
@@ -315,11 +309,6 @@ export const ACTIVITY_MASTER_FIELD_PRESETS: Record<string, ActivityFieldPreset[]
   food: [
     f('warehouses', 'COLD_STORAGE', 'تخزين مبرّد', 'BOOLEAN'),
     f('vehicles', 'REFRIGERATED', 'مركبة مبرّدة', 'BOOLEAN'),
-  ],
-  restaurant: [
-    f('branches', 'SEATING_CAPACITY', 'سعة الجلوس', 'NUMBER'),
-    f('employees', 'HEALTH_CARD_EXPIRY', 'انتهاء الكارنيه الصحي', 'DATE'),
-    f('warehouses', 'COLD_STORAGE', 'تخزين مبرّد', 'BOOLEAN'),
   ],
   hospitality: [
     f('branches', 'ROOM_COUNT', 'عدد الغرف', 'NUMBER'),

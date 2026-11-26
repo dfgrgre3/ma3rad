@@ -514,7 +514,7 @@ export const PlatformAuditPage: React.FC = () => {
               إلغاء الفلاتر
             </Button>
           )}
-          <span className="mr-auto font-medium text-muted">
+          <span className="ms-auto font-medium text-muted">
             إجمالي السجلات: <strong className="text-ink">{total}</strong>
           </span>
         </div>

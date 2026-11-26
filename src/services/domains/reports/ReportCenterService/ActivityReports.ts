@@ -10,8 +10,8 @@ const DAY_MS = 86400000;
 
 /**
  * Industry-specific reports for activities that have their own operational
- * tables: hospitality (hotel rooms/reservations/folio), restaurant (tables,
- * orders, kitchen), education (classes/attendance/fees), automotive workshop
+ * tables: hospitality (hotel rooms/reservations/folio), education
+ * (classes/attendance/fees), automotive workshop
  * (work orders) and professional services (time billing).
  * All queries are branch scoped like every other report.
  */
@@ -94,62 +94,6 @@ export function ActivityReports<TBase extends Constructor<ReportCenterContext>>(
         ],
         rows: reservations,
         notes: [`إجمالي الغرف: ${totalRooms} — مشغولة: ${occupied} — محجوزة: ${roomCount('RESERVED')} — تنظيف: ${roomCount('CLEANING')} — صيانة/خارج الخدمة: ${roomCount('MAINTENANCE') + roomCount('OUT_OF_SERVICE')}`],
-      };
-    }
-
-    /** Restaurant: orders in the period with table/mode/kitchen breakdown. */
-    public async restaurantOperations({ from, to }: ReportParams): Promise<ReportResult> {
-      this.actor();
-      const scope = this.tableScope('o.branch_id');
-
-      const openNow = await this.db.queryAsync<any>(`
-        SELECT COUNT(*) AS c FROM restaurant_orders o WHERE o.status='OPEN' AND ${scope.clause}`, scope.params);
-      const kitchen = await this.db.queryAsync<any>(`
-        SELECT i.kitchen_status AS status, COUNT(*) AS c
-        FROM restaurant_order_items i
-        JOIN restaurant_orders o ON o.id = i.order_id
-        WHERE o.status='OPEN' AND ${scope.clause} GROUP BY i.kitchen_status`, scope.params);
-      const kCount = (s: string) => Number(kitchen.find((r) => r.status === s)?.c ?? 0);
-
-      const orders = await this.db.queryAsync<any>(`
-        SELECT o.order_number AS orderNumber, t.table_number AS tableNumber,
-               o.service_mode AS serviceMode, c.name AS customer, o.status,
-               (SELECT COUNT(*) FROM restaurant_order_items i WHERE i.order_id = o.id) AS itemsCount,
-               (SELECT COALESCE(SUM(i.quantity * i.unit_price),0) FROM restaurant_order_items i WHERE i.order_id = o.id) / 1.0 AS total,
-               (SELECT COUNT(*) FROM restaurant_order_items i WHERE i.order_id = o.id AND i.kitchen_status IN ('NEW','PREPARING')) AS kitchenPending,
-               o.created_at AS createdAt
-        FROM restaurant_orders o
-        LEFT JOIN restaurant_tables t ON t.id = o.table_id
-        LEFT JOIN customers c ON c.id = o.customer_id
-        WHERE o.created_at >= ? AND o.created_at <= ? AND ${scope.clause}
-        ORDER BY o.created_at DESC`, [from, to, ...scope.params]);
-
-      const revenue = orders.filter((o) => o.status === 'BILLED').reduce((s, o) => s + num(o.total), 0);
-      const dineIn = orders.filter((o) => o.serviceMode === 'DINE_IN').length;
-      const takeaway = orders.filter((o) => o.serviceMode === 'TAKEAWAY').length;
-      const delivery = orders.filter((o) => o.serviceMode === 'DELIVERY').length;
-
-      return {
-        kpis: [
-          { label: 'طلبات مفتوحة الآن', value: num(openNow[0]?.c), tone: num(openNow[0]?.c) ? 'warning' : 'success' },
-          { label: 'طلبات الفترة', value: orders.length, tone: 'neutral' },
-          { label: 'إيراد المفوتر', value: round2(revenue), tone: 'success' },
-          { label: 'أصناف في المطبخ', value: kCount('NEW') + kCount('PREPARING'), tone: kCount('NEW') + kCount('PREPARING') ? 'info' : 'neutral' },
-          { label: 'جاهزة للتقديم', value: kCount('READY'), tone: kCount('READY') ? 'success' : 'neutral' },
-        ],
-        columns: [
-          { key: 'orderNumber', label: 'رقم الطلب' },
-          { key: 'tableNumber', label: 'الطاولة', type: 'number' },
-          { key: 'serviceMode', label: 'القناة', type: 'badge' },
-          { key: 'customer', label: 'العميل' },
-          { key: 'itemsCount', label: 'الأصناف', type: 'number' },
-          { key: 'kitchenPending', label: 'في المطبخ', type: 'number' },
-          { key: 'total', label: 'الإجمالي', type: 'currency' },
-          { key: 'status', label: 'الحالة', type: 'badge' },
-          { key: 'createdAt', label: 'التاريخ', type: 'date' },
-        ],
-        rows: orders,
-        notes: [`توزيع الطلبات: صالة ${dineIn} — سفري ${takeaway} — توصيل ${delivery}`],
       };
     }
 

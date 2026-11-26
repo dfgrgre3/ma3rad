@@ -2,9 +2,9 @@ import { localDateString } from '../shared/date';
 import { ExportService } from '../../services/shared/ExportService';
 import { SettingsService } from '../../services/domains/config/SettingsService';
 import { createExcelWorkbook } from './excelExportWorkbook';
-import type { ExportColumn } from './exportTypes';
+import type { ExportColumn, ExportSheet } from './exportTypes';
 
-export type { ExportColumn } from './exportTypes';
+export type { ExportColumn, ExportSheet } from './exportTypes';
 
 export interface ExportOptions {
   title: string;
@@ -14,6 +14,8 @@ export interface ExportOptions {
   fileName: string;
   kpis?: Array<{ label: string; value: string | number; hint?: string }>;
   notes?: string[];
+  /** Optional extra worksheets appended to the Excel workbook. */
+  sheets?: ExportSheet[];
   /** Permission code enforced before the document is built or written (for example `sales.export`). */
   permission: string;
 }
@@ -272,7 +274,7 @@ export async function downloadPdf(html: string, fileName: string): Promise<boole
   return true;
 }
 
-export function exportToExcel({ title, subtitle, columns, rows, fileName, kpis, permission }: ExportOptions): void {
+export function exportToExcel({ title, subtitle, columns, rows, fileName, kpis, sheets, permission }: ExportOptions): void {
   assertExportPermission(permission);
 
   let companyName = 'معرض السيراميك والبورسلين';
@@ -313,6 +315,7 @@ export function exportToExcel({ title, subtitle, columns, rows, fileName, kpis, 
         rows,
         companyName,
         kpis,
+        sheets,
       });
       triggerDownload(workbook);
     } catch (error) {
@@ -378,6 +381,7 @@ export function exportToExcel({ title, subtitle, columns, rows, fileName, kpis, 
       rows,
       companyName,
       kpis,
+      sheets,
     });
   } catch (error) {
     finish();

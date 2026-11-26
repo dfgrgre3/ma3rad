@@ -53,6 +53,21 @@ public deleteActivity(id: string): void {
     this.db.run(`DELETE FROM crm_activities WHERE id = ?`, [id]);
   }
 
+public getCustomerActivities(customerId: string, limit = 20): CrmActivity[] {
+    this.requireView();
+    if (typeof customerId !== 'string' || !customerId.trim()) return [];
+    return this.db.query<CrmActivity>(
+      `SELECT a.*, COALESCE(l.name, c.name) AS lead_name
+       FROM crm_activities a
+       LEFT JOIN leads l ON l.id = a.lead_id
+       LEFT JOIN customers c ON c.id = a.customer_id
+       WHERE a.customer_id = ?
+       ORDER BY COALESCE(a.scheduled_at, a.created_at) DESC
+       LIMIT ?`,
+      [customerId, limit]
+    );
+  }
+
 public getPipelineStats(): { stage: LeadStage; count: number; value: number }[] {
     this.requireView();
     return this.db.query<{ stage: LeadStage; count: number; value: number }>(

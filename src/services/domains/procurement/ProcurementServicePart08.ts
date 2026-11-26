@@ -48,4 +48,18 @@ public compareSuppliersForProduct(productId: string): Array<{
       };
     });
   }
+
+  /** Latest purchase unit cost (per base unit, major units) for margin checks in POS. */
+  public getLastPurchaseUnitCost(productId: string): number | null {
+    const rows = this.db.query<{ lastPrice: number | null }>(`
+      SELECT pii.unit_cost / 100.0 AS lastPrice
+      FROM purchase_invoice_items pii
+      JOIN purchase_invoices pi ON pi.id = pii.purchase_id
+      WHERE pii.product_id = ?
+      ORDER BY pi.date DESC, pi.created_at DESC
+      LIMIT 1
+    `, [productId]);
+    const value = Number(rows[0]?.lastPrice);
+    return Number.isFinite(value) && value > 0 ? value : null;
+  }
 }

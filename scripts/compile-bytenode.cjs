@@ -30,6 +30,7 @@ const filesToCompile = [
   'safeStorageCompat.js',
   'moduleDelivery.js',
   'modulePackages.js',
+  'notificationHandlers.js',
   'security/crypto.js',
   'security/licenseValidator.js',
   'security/fileIntegrity.js',

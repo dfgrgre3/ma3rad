@@ -4,6 +4,7 @@ import { formatProductQuantity } from '../../../../utils/products/productUnits';
 import {
   esc,
   invoiceBrandStyles,
+  itemSerialsHtml,
   logoHtml,
   orderedInvoiceDetails,
   printOverride,
@@ -25,6 +26,7 @@ export function getThermalInvoiceHtml(
   const itemsHtml = invoice.items.map((item) => `
       <div style="margin-bottom: 5px;">
         <div style="font-weight: 700;">${esc(item.productName)}</div>
+        ${itemSerialsHtml(item, "8px")}
         <div style="font-size: 10px; color: #444;">${esc(item.productSku)} | ${esc(item.size || '')} | ${item.productGrade === 'GRADE_1' ? 'أول' : 'تجاري'}</div>
         <div style="display: flex; justify-content: space-between;">
           <span>${formatProductQuantity(item.quantityM2, item)}${settings.invoiceShowBoxesCount !== false && item.productType !== 'GENERAL' ? ` (${item.boxesCount} كرتونة)` : ''} × ${item.unitPrice}</span>

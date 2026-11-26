@@ -70,7 +70,7 @@ export const PosToolbarMoreMenu: React.FC<PosToolbarMoreMenuProps> = (props) => 
           {props.activeShift && (
             <button type="button" role="menuitem" onClick={() => { setMoreOpen(false); props.onToggleTouchMode(); }} aria-pressed={props.touchMode} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold text-ink hover:bg-surface-muted transition">
               <MonitorSmartphone className="w-4 h-4 text-muted" /> وضع شاشة اللمس
-              <span className={`mr-auto text-[10px] px-2 py-0.5 rounded-full ${props.touchMode ? 'bg-success-soft text-success' : 'bg-surface-sunken text-muted'}`}>{props.touchMode ? 'مفعل' : 'متوقف'}</span>
+              <span className={`ms-auto text-[10px] px-2 py-0.5 rounded-full ${props.touchMode ? 'bg-success-soft text-success' : 'bg-surface-sunken text-muted'}`}>{props.touchMode ? 'مفعل' : 'متوقف'}</span>
             </button>
           )}
           <button type="button" role="menuitem" onClick={() => { setMoreOpen(false); props.onOpenCashboxes(); }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold text-ink hover:bg-surface-muted transition">

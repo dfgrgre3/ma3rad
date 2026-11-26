@@ -40,7 +40,6 @@ import {
   Truck,
   UserCheck,
   Users,
-  UtensilsCrossed,
   Wallet,
   Wrench,
 } from 'lucide-react';
@@ -781,17 +780,6 @@ export const REPORT_DEFINITIONS: ReportDefinition[] = [
     drilldown: { label: 'فتح صفحة الفندق', route: '/hospitality', note: 'إدارة الغرف والحجوزات من صفحة الضيافة.' },
   },
 
-  // Restaurant
-  {
-    id: 'restaurant-operations',
-    title: 'تشغيل المطعم',
-    description: 'طلبات الفترة حسب القناة والحالة: الصالة والسفري والتوصيل، حالة المطبخ، والإيراد المفوتر.',
-    category: 'operations',
-    icon: UtensilsCrossed,
-    dateMode: 'range',
-    activityOnly: 'restaurant',
-    drilldown: { label: 'فتح صفحة المطعم', route: '/restaurant', note: 'إدارة الطاولات والطلبات من صفحة المطعم.' },
-  },
 
   // Education
   {

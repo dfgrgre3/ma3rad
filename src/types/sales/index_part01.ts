@@ -1,6 +1,6 @@
 import type { SalesInvoiceItem } from './index_part02';
 
-export type PaymentType = 'CASH' | 'CARD' | 'BANK_TRANSFER' | 'CHEQUE' | 'CREDIT' | 'MIXED';
+export type PaymentType = 'CASH' | 'CARD' | 'BANK_TRANSFER' | 'CHEQUE' | 'CREDIT' | 'MIXED' | 'WALLET' | 'ONLINE';
 
 export type InvoiceStatus = 'COMPLETED' | 'HOLD' | 'VOID' | 'DRAFT';
 

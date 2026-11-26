@@ -6,6 +6,7 @@ import { PermissionService } from '../auth/PermissionService';
 import { ModuleRegistryService } from '../config/ModuleRegistryService';
 import type { ApprovalRequest, CreateApprovalRequestInput } from './approvalTypes';
 import { ApprovalPolicyService } from './ApprovalPolicyService';
+import { NotificationService } from '../notifications/NotificationService';
 
 export class ApprovalRequestService {
   private readonly db = DatabaseManager.getInstance();
@@ -28,8 +29,9 @@ export class ApprovalRequestService {
     this.branchAccess.requireBranchAccess(branchId, actor);
 
     const id = `apr_${uuidv4().substring(0, 8)}`;
-    return this.db.executeTransaction((db) => {
-      const requestNumber = db.nextNumber('APR');
+    let requestNumber = '';
+    const request = this.db.executeTransaction((db) => {
+      requestNumber = db.nextNumber('APR');
       db.run(`INSERT INTO approval_requests (
         id, request_number, request_type, reference_type, reference_id, branch_id, title, description,
         requested_value, current_value, priority, requested_by
@@ -45,6 +47,17 @@ export class ApprovalRequestService {
       ]);
       return db.query<ApprovalRequest>('SELECT * FROM approval_requests WHERE id = ?', [id])[0];
     });
+    try {
+      new NotificationService().createNotification(
+        'SYSTEM',
+        'طلب اعتماد جديد',
+        `${requestNumber}: ${input.title.trim()}${input.requestedValue != null ? ` — القيمة ${Number(input.requestedValue).toFixed(2)} ج.م` : ''}`,
+        undefined,
+        'APPROVAL',
+        request.id
+      );
+    } catch { /* notifications must never block the operation */ }
+    return request;
   }
   createInventoryAdjustmentRequest(input: {
     id: string; adjustmentNumber: string; warehouseId: string; productName: string;
@@ -78,6 +91,16 @@ export class ApprovalRequestService {
       VALUES (?, ?, ?, 'إنشاء طلب إضافة مخزون', 'APPROVALS', ?, ?)
     `, [`aud_${uuidv4().substring(0, 8)}`, actor.id, actor.fullName, id,
       JSON.stringify({ requestNumber, operation: 'inventory.adjustment.create', quantity: input.quantity, adjustmentId: input.id })]);
+    try {
+      new NotificationService().createNotification(
+        'SYSTEM',
+        'طلب إضافة مخزون بانتظار الاعتماد',
+        `${requestNumber}: إضافة ${input.quantity} من ${input.productName} إلى ${warehouse.name} — ${input.adjustmentNumber}`,
+        undefined,
+        'APPROVAL',
+        id
+      );
+    } catch { /* notifications must never block the operation */ }
   }
 
   cancel(id: string): void {

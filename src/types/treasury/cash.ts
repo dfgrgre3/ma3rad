@@ -33,6 +33,9 @@ export interface CashShift {
   totalRefunds: number;
   totalPartnerInflows?: number;
   totalPartnerOutflows?: number;
+  cashInTotal?: number;
+  cashOutTotal?: number;
+  denominationCounts?: string | null;
   
   expectedEndingCash: number;
   actualEndingCash?: number;
@@ -40,6 +43,7 @@ export interface CashShift {
   
   status: 'OPEN' | 'CLOSED';
   closingNotes?: string;
+  managerName?: string | null;
   autoClosed?: boolean | number;
 }
 

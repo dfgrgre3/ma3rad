@@ -205,6 +205,7 @@ export class SalesService {
       refundMethod?: 'CASH' | 'CARD' | 'BANK_TRANSFER' | 'BALANCE';
       bankAccountId?: string;
       idempotencyKey?: string;
+      approvalId?: string;
     } = {}
   ): SalesReturn {
     ModuleRegistryService.assertModuleEnabled('sales');

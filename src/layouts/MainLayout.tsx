@@ -3,7 +3,7 @@ import { Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Calculator, NotebookPen, X } from 'lucide-react';
 import { Header } from '../components/shared/Header';
 import { Sidebar } from '../components/shared/Sidebar';
-import { NotificationService } from '../services/domains/notifications/NotificationService';
+import { useUnreadNotificationCount } from '../hooks/domains/notifications/useUnreadNotificationCount';
 import { PermissionService } from '../services/domains/auth/PermissionService';
 import { NavigationService } from '../services/domains/config/NavigationService';
 import { NavigationGroupsProvider, useNavigationGroups } from '../hooks/domains/config/useNavigationGroups';
@@ -45,7 +45,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
   const { settings } = useTheme();
   const navigationLayout = settings.navigationLayout === 'header' ? 'header' : 'sidebar';
   const interfaceDirection = settings.interfaceDirection === 'ltr' ? 'ltr' : 'rtl';
-  const [unreadNotifications, setUnreadNotifications] = useState(0);
+  const unreadNotifications = useUnreadNotificationCount(currentUser?.id);
   const [floatingCalculatorOpen, setFloatingCalculatorOpen] = useState(false);
   const [floatingNotesOpen, setFloatingNotesOpen] = useState(false);
   const [shortcutsHelpOpen, setShortcutsHelpOpen] = useState(false);
@@ -99,15 +99,6 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
       window.removeEventListener('pagehide', savePosition);
     };
   }, [currentUser?.id, isAllowed, location.pathname, persistedLocation]);
-
-  useEffect(() => {
-    const refreshNotifications = () => {
-      try { setUnreadNotifications(new NotificationService().getUnreadCount(currentUser?.id)); } catch { setUnreadNotifications(0); }
-    };
-    refreshNotifications();
-    const timer = window.setInterval(refreshNotifications, 30000);
-    return () => window.clearInterval(timer);
-  }, [currentUser?.id]);
 
   useEffect(() => { setMobileSidebarOpen(false); }, [location.pathname]);
 

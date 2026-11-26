@@ -131,6 +131,7 @@ export const ProductDetailPage: React.FC = () => {
       maxStockLevel: String(product.maxStockLevel || 0),
       piecesPerBox: String(product.piecesPerBox), metersPerBox: String(product.metersPerBox),
       isActive: product.isActive,
+      trackSerials: !!product.trackSerials,
     });
     setEditOpen(true);
   };
@@ -156,6 +157,7 @@ export const ProductDetailPage: React.FC = () => {
         minStockLevel: Number(form.minStockLevel) || 0,
         maxStockLevel: Number(form.maxStockLevel) || 0,
         isActive: form.isActive,
+        trackSerials: form.trackSerials,
       });
       setEditOpen(false);
       load();

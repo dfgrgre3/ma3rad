@@ -5,11 +5,13 @@ import { AppConfigService } from '../../../../services/domains/config/AppConfigS
 import { ApprovalService } from '../../../../services/domains/approvals/ApprovalService';
 import type { CashierService } from '../../../../services/domains/finance/CashierService';
 import type { LoyaltyService } from '../../../../services/domains/sales/LoyaltyService';
+import type { OperationsService } from '../../../../services/domains/operations/OperationsService';
 import type { AppliedPromotion } from '../../../../services/domains/sales/PricingService';
 import { evaluateManualDiscountPolicy } from '../../../../services/domains/sales/discountPolicy';
 import type { SalesService } from '../../../../services/domains/sales/SalesService';
 import type { CashShift, Customer, PaymentType, SystemSettings, ToneMixingConflict } from '../../../../types';
-import { formatProductQuantity } from '../../../../utils/products/productUnits';
+import { formatProductQuantity, isServiceProduct } from '../../../../utils/products/productUnits';
+import { CeramicMath } from '../../../../utils/products/ceramicMath';
 import { pricePerUnit } from '../../../../utils/products/uom';
 import { round2, type CartItem, type Toast } from '../../../../types/pos';
 
@@ -74,6 +76,10 @@ interface UsePosCheckoutOptions {
   cashierService: CashierService;
   batchService: BatchService;
   loyaltyService: LoyaltyService;
+  operationsService?: OperationsService | null;
+  /** Optional delivery request captured at checkout; creates a deliveries record linked to the invoice. */
+  delivery?: { enabled: boolean; address: string; city: string; scheduledAt: string };
+  resetDelivery?: () => void;
   performedBy: string;
   loadStock: (warehouseId: string) => void;
 }
@@ -135,6 +141,9 @@ export const usePosCheckout = ({
   cashierService,
   batchService,
   loyaltyService,
+  operationsService,
+  delivery,
+  resetDelivery,
   performedBy,
   loadStock,
 }: UsePosCheckoutOptions) => {
@@ -206,6 +215,19 @@ export const usePosCheckout = ({
     const plannedByProduct = new Map<string, number>();
     const plannedBySpecialStock = new Map<string, number>();
     for (const item of cart) {
+      // Serial/IMEI lines must carry exactly one serial per sold unit — the
+      // invoice service enforces the same rule server-side.
+      if (item.product.trackSerials) {
+        const serials = item.serials || [];
+        const uniqueIds = new Set(serials.map((s) => s.id));
+        if (!serials.length || uniqueIds.size !== serials.length
+          || serials.length !== Math.round(item.soldQuantity)) {
+          notify(`الصنف «${item.product.name}» يتتبع الأرقام التسلسلية — عدّل الأرقام من زر السيريال ليطابق العدد ${Math.round(item.soldQuantity)}`, 'error');
+          return false;
+        }
+      }
+      // Service lines never move stock — the invoice service skips them too.
+      if (isServiceProduct({ productType: item.product.productType, baseUnit: item.product.baseUnit })) continue;
       if (item.specialStockId) {
         const planned = round2((plannedBySpecialStock.get(item.specialStockId) || 0) + item.quantityM2);
         plannedBySpecialStock.set(item.specialStockId, planned);
@@ -252,7 +274,7 @@ export const usePosCheckout = ({
       notify('إجمالي الخصومات لا يمكن أن يتجاوز قيمة الأصناف', 'error');
       return false;
     }
-    if (totalDiscount > 0 && !can('sales.discount')) {
+    if (totalDiscount > 0 && !(can('sales.discount') || can('sales.pos.discount'))) {
       notify('غير مصرح لك بمنح خصم على الفاتورة', 'error');
       return false;
     }
@@ -283,7 +305,7 @@ export const usePosCheckout = ({
           const request = approvalService.createRequest({
             requestType: 'DISCOUNT',
             title: `اعتماد خصم ${discountPercent.toFixed(1)}% على فاتورة بيع`,
-            description: `العميل: ${selectedCustomer?.name ?? ''} — قيمة الخصم ${approvalDiscount} ج.م من إجمالي ${lineSubtotal} ج.م (الحد المسموح ${threshold}%).`,
+            description: `العميل: ${selectedCustomer?.name ?? ''} — قيمة الخصم ${approvalDiscount} ${CeramicMath.getCurrencySymbol()} من إجمالي ${lineSubtotal} ${CeramicMath.getCurrencySymbol()} (الحد المسموح ${threshold}%).`,
             requestedValue: approvalDiscount,
             currentValue: lineSubtotal,
             priority: 'HIGH',
@@ -403,7 +425,8 @@ export const usePosCheckout = ({
           piecesCount: item.piecesCount,
           unitPrice: round2(pricePerUnit(item.unitPrice, item.soldBy, item.product)),
           pricingSource: 'POS',
-          discountAmount: item.discountAmount
+          discountAmount: item.discountAmount,
+          serialNumbers: item.serials?.map((s) => s.serialNumber),
         })),
         discountAmount: round2(discountAmount + promotionDiscount + loyaltyDiscount),
         discountPercentage: round2(discountPercentage),
@@ -431,6 +454,27 @@ export const usePosCheckout = ({
       });
 
       discountApprovalRef.current = null;
+
+      // Register a delivery order for the invoice when requested at checkout.
+      // Best-effort: the sale is already committed, so a permission/module
+      // failure surfaces as a warning instead of blocking the invoice.
+      if (delivery?.enabled && delivery.address.trim() && operationsService) {
+        try {
+          const deliveryRecord = operationsService.createDelivery({
+            customerId: selectedCustomer.id,
+            address: delivery.address.trim(),
+            city: delivery.city.trim() || undefined,
+            scheduledAt: delivery.scheduledAt ? new Date(delivery.scheduledAt).toISOString() : undefined,
+            deliveryFee: round2(shippingCost),
+            invoiceId: invoice.id,
+            notes: notes.trim() || undefined,
+          });
+          notify(`تم إنشاء أمر التوصيل ${deliveryRecord.deliveryNumber} للفاتورة ${invoice.invoiceNumber}`, 'success');
+        } catch (deliveryError: any) {
+          notify(`تم إصدار الفاتورة لكن تعذر إنشاء أمر التوصيل: ${deliveryError?.message || 'خطأ غير معروف'}`, 'warning');
+        }
+      }
+      resetDelivery?.();
 
       setSuccessInvoice(invoice);
       setCart([]);
@@ -466,6 +510,7 @@ export const usePosCheckout = ({
     isProcessing, validateCheckoutDetails, selectedCustomer, showToneMixingWarning,
     salesService, selectedWarehouseId, activeShift, cart, discountAmount,
     promotionDiscount, loyaltyDiscount, lineDiscountTotal, taxPercentage, taxAmount, shippingCost, extraFees, discountPercentage,
+    operationsService, delivery, resetDelivery,
     paidAmount, paymentType, bankAccountId, splitCash, splitCard, splitBank, splitCheque, notes,
     setSplitCash, setSplitCard, setSplitBank, setSplitCheque, setSplitCredit,
     redeemPoints,

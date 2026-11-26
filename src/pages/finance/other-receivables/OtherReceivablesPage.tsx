@@ -555,7 +555,7 @@ export const OtherReceivablesPage: React.FC = () => {
                 >
                   <Download className="w-3.5 h-3.5" /> المرفقات
                 </button>
-                <span className="text-muted mr-auto">
+                <span className="text-muted ms-auto">
                   {row.notes || ""}
                 </span>
               </div>

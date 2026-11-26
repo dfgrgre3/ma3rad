@@ -103,7 +103,7 @@ export async function printThermalReceipt(invoice: SalesInvoice & { items: any[]
           ${Number(invoice.extraFees || 0) > 0 ? `<div class="totals-row"><span>مصاريف إضافية</span><span>+${CeramicMath.formatCurrency(Number(invoice.extraFees))}</span></div>` : ''}
           <div class="totals-row grand"><span>الإجمالي</span><span>${CeramicMath.formatCurrency(invoice.totalAmount)}</span></div>
           <div class="totals-row"><span>المدفوع</span><span>${CeramicMath.formatCurrency(invoice.paidAmount)}</span></div>
-          <div class="totals-row"><span>طريقة الدفع</span><span>${invoice.paymentType === 'CASH' ? 'نقدي' : invoice.paymentType === 'CARD' ? 'بطاقة' : invoice.paymentType === 'BANK_TRANSFER' ? 'تحويل بنكي' : invoice.paymentType === 'CHEQUE' ? 'شيك' : invoice.paymentType === 'MIXED' ? 'دفع مختلط' : 'آجل'}</span></div>
+          <div class="totals-row"><span>طريقة الدفع</span><span>${invoice.paymentType === 'CASH' ? 'نقدي' : invoice.paymentType === 'CARD' ? 'بطاقة' : invoice.paymentType === 'BANK_TRANSFER' ? 'تحويل بنكي' : invoice.paymentType === 'CHEQUE' ? 'شيك' : invoice.paymentType === 'MIXED' ? 'دفع مختلط' : invoice.paymentType === 'WALLET' ? 'محفظة إلكترونية' : invoice.paymentType === 'ONLINE' ? 'دفع أونلاين' : 'آجل'}</span></div>
           ${invoice.remainingAmount > 0 ? `<div class="totals-row"><span>المتبقي (آجل)</span><span>${CeramicMath.formatCurrency(invoice.remainingAmount)}</span></div>` : ''}
           <div class="footer">${esc(receiptFooter || '')}</div>
         </body>

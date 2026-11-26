@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useDashboardRefresh } from '../../../contexts/DashboardRefreshContext';
+import { useDashboardEmbed } from '../../../contexts/DashboardEmbedContext';
 import {
   Users, Wallet, Calendar, Award, AlertCircle, Loader2, BriefcaseBusiness,
   RefreshCw, UserCheck, BarChart3, HardHat, Clock, UserX, CheckCircle2,
@@ -239,6 +240,7 @@ function LocationChart({ locations }: { locations: { location: string; count: nu
 
 export const HrDashboardPage: React.FC = () => {
   const refreshToken = useDashboardRefresh()?.refreshToken;
+  const embedded = useDashboardEmbed();
   const initialRef = useRef(true);
   const navigate = useNavigate();
   const user = AuthService.getCurrentUser();
@@ -271,6 +273,24 @@ export const HrDashboardPage: React.FC = () => {
   return (
     <div className="h-full flex flex-col bg-surface-muted text-ink overflow-hidden">
       {/* Header */}
+      {embedded ? (
+        <div className="flex flex-wrap items-center justify-end gap-2 px-4 pt-3 flex-shrink-0">
+          <button onClick={() => navigate('/employees')} className="text-xs font-bold text-white bg-success hover:bg-success transition px-3 py-1.5 rounded-lg flex items-center gap-1.5">
+            <Users className="w-3.5 h-3.5" /> إدارة الموظفين
+          </button>
+          <button onClick={() => navigate('/employees/attendance')} className="text-xs font-bold text-primary bg-accent-soft hover:bg-accent-soft transition px-3 py-1.5 rounded-lg flex items-center gap-1.5 border border-accent-border">
+            <Clock className="w-3.5 h-3.5" /> الحضور
+          </button>
+          {canViewRecruitment && (
+            <button onClick={() => navigate('/employees/recruitment')} className="text-xs font-bold text-primary bg-accent-soft hover:bg-accent-soft transition px-3 py-1.5 rounded-lg flex items-center gap-1.5 border border-accent-border">
+              <BriefcaseBusiness className="w-3.5 h-3.5" /> التوظيف
+            </button>
+          )}
+          <button onClick={load} className="p-1.5 hover:bg-surface-sunken rounded-lg transition">
+            <RefreshCw className={`w-4 h-4 text-muted ${loading ? 'animate-spin' : ''}`} />
+          </button>
+        </div>
+      ) : (
       <div className="bg-surface px-6 pt-4 flex-shrink-0">
         <PageHeader
           icon={<HardHat className="h-5 w-5" />}
@@ -294,6 +314,7 @@ export const HrDashboardPage: React.FC = () => {
           </>}
         />
       </div>
+      )}
 
       {error && (
         <div className="mx-6 mt-3 px-4 py-3 bg-danger-soft border border-danger-border rounded-xl text-danger text-xs font-semibold flex items-center gap-2">

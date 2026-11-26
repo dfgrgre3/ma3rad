@@ -46,7 +46,7 @@ export const ElectronicInvoiceReadinessPage: React.FC = () => {
                 <XCircle className="h-4 w-4 text-danger" />
               )}
               <span className="text-ink ">{check.label}</span>
-              <span className={`mr-auto text-xs font-bold ${check.ready ? 'text-success dark:text-success' : 'text-danger dark:text-danger'}`}>
+              <span className={`ms-auto text-xs font-bold ${check.ready ? 'text-success dark:text-success' : 'text-danger dark:text-danger'}`}>
                 {check.ready ? 'مهيأ' : 'غير مهيأ'}
               </span>
             </li>

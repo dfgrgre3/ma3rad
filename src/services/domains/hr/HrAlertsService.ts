@@ -7,6 +7,7 @@ import { EmployeeDepartmentAccessService } from '../auth/EmployeeDepartmentAcces
 import { ModuleRegistryService } from '../config/ModuleRegistryService';
 import { PayrollNotificationSettingsService } from './PayrollNotificationSettingsService';
 import { localDateString, addLocalDays } from '../../../utils/shared/date';
+import { notificationBus } from '../notifications/notificationBus';
 import type { User } from '../../../types/auth/identity';
 import type { NotificationType } from '../../../types/notifications';
 
@@ -419,6 +420,15 @@ export class HrAlertsService {
        VALUES (?, ?, ?, ?, ?, 0, ?, ?, CURRENT_TIMESTAMP)`,
       [id, userId || null, type, title, message, referenceType, referenceId]
     );
+    notificationBus.emitCreated({
+      id,
+      userId: userId || null,
+      type,
+      title,
+      message,
+      referenceType,
+      referenceId,
+    });
   }
 
   /** تشغيل جميع فحوصات التنبيهات الخاصة بالموارد البشرية */

@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useDashboardRefresh } from '../../../contexts/DashboardRefreshContext';
+import { useDashboardEmbed } from '../../../contexts/DashboardEmbedContext';
 import { Link } from 'react-router-dom';
 import { Activity, ArrowDownRight, ArrowUpRight, Banknote, CalendarDays, FileText, Package, ShoppingCart, Users } from 'lucide-react';
 import { PageHeader } from '../../../components/ui/PageHeader';
@@ -20,6 +21,7 @@ const branchAccess = new BranchAccessService();
 
 export const SalesAnalyticsPage: React.FC = () => {
   const refreshCtx = useDashboardRefresh();
+  const embedded = useDashboardEmbed();
   const can = usePermission();
   // الصفحة تُدمج داخل لوحة المعلومات، لذا تفحص صلاحيتها بنفسها لا صلاحية المسار الأب.
   const canView = can('sales.analytics.view') || can('sales.view');
@@ -121,15 +123,22 @@ export const SalesAnalyticsPage: React.FC = () => {
 
   return <main className="erp-page">
     <div className="w-full space-y-6">
-      <PageHeader
-        eyebrow={<span className="flex items-center gap-2"><Activity size={14}/> مركز أداء المبيعات</span>}
-        title="كل حركة البيع في مكان واحد"
-        description="تابع الإيرادات والتحصيل والربحية والعملاء والأصناف الأعلى أداءً."
-        actions={<>
-          {canOpenPos && <ActivityGate element="pos-checkout"><Link to="/pos" className="rounded-xl bg-success px-4 py-2.5 text-sm font-extrabold text-white hover:bg-success">{newInvoiceLabel}</Link></ActivityGate>}
-          <Link to="/sales" className="rounded-xl border border-line bg-surface px-4 py-2.5 text-sm font-bold text-ink hover:bg-surface-muted">الفواتير</Link>
-        </>}
-      />
+      {embedded ? (
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          {canOpenPos && <ActivityGate element="pos-checkout"><Link to="/pos" className="rounded-lg bg-success px-3 py-1.5 text-xs font-extrabold text-white hover:bg-success">{newInvoiceLabel}</Link></ActivityGate>}
+          <Link to="/sales" className="rounded-lg border border-line bg-surface px-3 py-1.5 text-xs font-bold text-ink hover:bg-surface-muted">الفواتير</Link>
+        </div>
+      ) : (
+        <PageHeader
+          eyebrow={<span className="flex items-center gap-2"><Activity size={14}/> مركز أداء المبيعات</span>}
+          title="كل حركة البيع في مكان واحد"
+          description="تابع الإيرادات والتحصيل والربحية والعملاء والأصناف الأعلى أداءً."
+          actions={<>
+            {canOpenPos && <ActivityGate element="pos-checkout"><Link to="/pos" className="rounded-xl bg-success px-4 py-2.5 text-sm font-extrabold text-white hover:bg-success">{newInvoiceLabel}</Link></ActivityGate>}
+            <Link to="/sales" className="rounded-xl border border-line bg-surface px-4 py-2.5 text-sm font-bold text-ink hover:bg-surface-muted">الفواتير</Link>
+          </>}
+        />
+      )}
       <section className="flex flex-wrap items-center justify-between gap-3"><div className="flex items-center gap-2 text-sm font-bold text-ink-secondary"><CalendarDays size={17}/> الفترة الزمنية</div><div className="flex rounded-xl border border-line bg-surface p-1 shadow-sm">{([['today','اليوم'],['7days','7 أيام'],['30days','30 يومًا'],['all','الكل']] as const).map(([key,label])=><button key={key} onClick={()=>setPeriod(key)} className={`rounded-lg px-3 py-2 text-xs font-bold ${period===key?'bg-primary text-white':'text-muted hover:bg-surface-sunken'}`}>{label}</button>)}</div></section>
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{cards.map(({label,value,note,icon:Icon,tone})=><article key={label} className="rounded-2xl border border-line bg-surface p-5 shadow-sm"><div className="flex items-start justify-between"><div><p className="text-sm font-semibold text-muted">{label}</p><p className="mt-3 text-2xl font-black text-ink">{value}</p></div><span className={`rounded-xl p-3 ${toneClasses[tone]}`}><Icon size={21}/></span></div><p className="mt-3 text-xs text-muted">{note}</p></article>)}</section>
       <section className="grid gap-5 xl:grid-cols-5">

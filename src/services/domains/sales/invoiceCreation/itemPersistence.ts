@@ -2,6 +2,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { InventoryCostingService } from '../../inventory/InventoryCostingService';
 import { InventoryLocationStockService } from '../../inventory/InventoryLocationStockService';
 import { BatchService } from '../../inventory/BatchService';
+import { ProductSerialService } from '../../inventory/ProductSerialService';
 import { round2 } from '../../finance/financials';
 import type { CreateSaleDTO } from '../../../../types/sales/serviceTypes';
 import type { PreparedSaleItem } from './types';
@@ -30,6 +31,17 @@ export function insertInvoiceItems(
       item.unitPrice, item.originalUnitPrice, round2(item.unitCost), item.discountAmount,
       item.totalPrice, item.totalCost, item.profit, item.metersPerBox, item.piecesPerBox, item.specialStockId
     ]);
+
+    if (item.serialNumbers?.length) {
+      ProductSerialService.markSoldInTransaction(sqliteDb, {
+        productId: item.productId,
+        serialNumbers: item.serialNumbers,
+        warehouseId: dto.warehouseId,
+        invoiceId,
+        invoiceItemId: item.id,
+        actorId: actor.id,
+      });
+    }
 
     if (!item.tracksStock) continue;
     if (item.specialStockId) {

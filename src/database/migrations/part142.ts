@@ -15,7 +15,6 @@ const MONEY_TABLES: MoneyColumnSpec[] = [
   { table: 'campaigns', columns: ['budget'] },
   { table: 'leads', columns: ['estimated_value'] },
   { table: 'work_centers', columns: ['cost_per_hour'] },
-  { table: 'restaurant_order_items', columns: ['unit_price'] },
   { table: 'payroll_runs', columns: ['paid_total'] },
   { table: 'employees', columns: ['tax_exemption_amount'] },
   { table: 'hr_workforce_plan_jobs', columns: ['estimated_monthly_salary'] },

@@ -42,7 +42,7 @@ export const getStockQuantityLabel = (product?: ProductUnitInfo | null): string 
 
 /**
  * A service line is sold without a stock movement even when the business tracks
- * inventory for its other products (mixed businesses such as restaurants,
+ * inventory for its other products (mixed businesses such as hotels,
  * workshops or contractors).
  */
 export const isServiceProduct = (product: ProductUnitInfo): boolean =>

@@ -251,7 +251,7 @@ const moduleOf = (legacyView: string): string => {
     documents: 'DOCUMENTS',
     contracts: 'CONTRACTS',
     hr: 'HR',
-    restaurant: 'SALES',
+
   };
   return map[head] ?? head.toUpperCase();
 };
@@ -313,9 +313,6 @@ const PAGES: PageSpec[] = [
   { key: 'reservations', label: 'حجوزات المبيعات', module: 'SALES', route: '/sales/reservations', legacyView: 'sales.reservations.view',
     actions: [...WRITE, 'submit', 'approve', 'reject', 'cancel', 'refund', 'convert', 'print', 'timeline'],
     sections: [section('reservations', 'الحجوزات'), section('deposits', 'العربونات')] },
-  { key: 'restaurant', label: 'إدارة المطعم', module: 'SALES', route: '/restaurant', legacyView: 'restaurant.view',
-    actions: [...WRITE, 'kitchen', 'tables', 'menu', 'close_bill', 'split_bill', 'transfer_table', 'print', 'print_receipt'],
-    sections: [section('orders', 'طلبات المطعم'), section('tables', 'الطاولات'), section('menu', 'قائمة الطعام'), section('kitchen', 'شاشة المطبخ')] },
   { key: 'daily_sales', label: 'مبيعات اليوم', module: 'SALES', route: '/daily/sales', legacyView: 'sales.view',
     actions: [...READ, 'export_excel', 'print', 'details'] },
   { key: 'ceramics', label: 'صالة السيراميك والتصميمات', module: 'SALES', route: '/ceramics', legacyView: 'sales.view',
@@ -323,7 +320,7 @@ const PAGES: PageSpec[] = [
   { key: 'retail', label: 'مساحة النشاط', module: 'SALES', route: '/retail', legacyView: 'sales.view',
     actions: [...READ, 'details'] },
   { key: 'hospitality', label: 'إدارة الفندق والغرف', module: 'SALES', route: '/hospitality', legacyView: 'orders.view',
-    legacyAliases: ['restaurant.view'], actions: [...READ, 'details'] },
+    legacyAliases: [], actions: [...READ, 'details'] },
 
   // المنتجات والتسعير
   { key: 'catalog', label: 'كتالوج المنتجات', module: 'PRODUCTS', route: '/products', legacyView: 'products.view',

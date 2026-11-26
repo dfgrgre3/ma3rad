@@ -7,6 +7,7 @@ import { ModuleRegistryService } from '../config/ModuleRegistryService';
 import { localDateString } from '../../../utils/shared/date';
 import type { ApprovalRequest } from './approvalTypes';
 import { ApprovalPolicyService } from './ApprovalPolicyService';
+import { NotificationService } from '../notifications/NotificationService';
 import { applyRegisteredApprovalEffect } from './ApprovalEffectRegistry';
 import { applyRegisteredRejectionEffect } from './ApprovalEffectRegistry';
 import '../inventory/InventoryService';
@@ -100,6 +101,26 @@ export class ApprovalDecisionService {
         ]
       );
     });
+
+    // Notify the requester once the request reaches a terminal state. In
+    // MULTI-approval mode a staged vote leaves the request PENDING, so the
+    // requester is only pinged on the final decision.
+    try {
+      const final = this.db.query<{ status: string; requestNumber: string | null }>(
+        `SELECT status, request_number AS requestNumber FROM approval_requests WHERE id = ?`,
+        [id]
+      )[0];
+      if (final && (final.status === 'APPROVED' || final.status === 'REJECTED')) {
+        new NotificationService().createNotification(
+          'SYSTEM',
+          approved ? 'تم اعتماد طلبك' : 'تم رفض طلبك',
+          `${final.requestNumber || ''}: ${row.title}${notes?.trim() ? ` — ${notes.trim()}` : ''}`.trim(),
+          row.requestedBy,
+          'APPROVAL',
+          id
+        );
+      }
+    } catch { /* notifications must never block the decision */ }
   }
 
   private applyApprovedEffect(row: ApprovalRequest, db: DatabaseManager): string | null {

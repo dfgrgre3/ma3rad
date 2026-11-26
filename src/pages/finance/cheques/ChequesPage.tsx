@@ -372,7 +372,7 @@ export const ChequesPage: React.FC = () => {
                       </button>
                     )}
 
-                    <div className="mr-auto flex items-center gap-1">
+                    <div className="ms-auto flex items-center gap-1">
                       <button
                         onClick={() => openHistory(row)}
                         title="سجل الحركات"

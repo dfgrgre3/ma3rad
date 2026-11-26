@@ -234,6 +234,9 @@ declare global {
         encryptDatabaseSecret?: (secret: string) => Promise<string>;
         decryptDatabaseSecret?: (payload: string) => Promise<string>;
       };
+      notifications?: {
+        show?: (payload: { title: string; body?: string }) => Promise<{ ok: boolean; supported?: boolean }>;
+      };
       updater?: {
         getStatus?: () => Promise<AppUpdateStatus>;
         check?: () => Promise<AppUpdateStatus>;

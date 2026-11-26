@@ -4,12 +4,8 @@ import { moduleLazy } from '../modules/moduleLazy';
 // Dashboard & Tools
 export const DashboardView = lazy(() => import('../components/dashboard/DashboardView').then(m => ({ default: m.DashboardView })));
 
-export const ExecutiveDashboard = lazy(() => import('../pages/dashboard/executive/ExecutiveDashboard').then(m => ({ default: m.ExecutiveDashboard })));
-
 // Sales & POS
 export const PosView = moduleLazy('sales', () => import('../pages/sales/pos/PosPage').then(m => ({ default: m.PosView })));
-
-export const RestaurantPage = moduleLazy('sales', () => import('../pages/restaurant/restaurant/RestaurantPage').then(m => ({ default: m.RestaurantPage })));
 
 export const SalesView = moduleLazy('sales', () => import('../components/sales/SalesView').then(m => ({ default: m.SalesView })));
 

@@ -1,12 +1,13 @@
 import React, { useId, useState } from 'react';
 import {
-  Calculator, ChevronDown, Layers, ListFilter, Package, Search, X,
+  Calculator, Camera, ChevronDown, Layers, ListFilter, Package, Search, X,
 } from 'lucide-react';
 import type { Product, Warehouse } from '../../../../types';
 import type { CategoryWithCount } from '../../../../services/domains/products/CategoryService';
 import type { SortMode } from '../../../../types/pos';
 import type { ProductGradeOption } from '../../../../services/domains/products/OperationalFieldService';
 import { formatProductQuantity } from '../../../../utils/products/productUnits';
+import { CeramicMath } from '../../../../utils/products/ceramicMath';
 
 export interface PosCatalogFiltersProps {
   barcodeInputRef: React.RefObject<HTMLInputElement>;
@@ -44,6 +45,19 @@ export interface PosCatalogFiltersProps {
   searchSuggestions?: Product[];
   onSelectSuggestion?: (product: Product) => void;
   stockOf?: (productId: string) => number;
+  onOpenCameraScanner?: () => void;
+  suppliers?: { id: string; name: string }[];
+  selectedSupplier?: string;
+  onSupplierChange?: (supplierId: string) => void;
+  minPrice?: string;
+  maxPrice?: string;
+  onMinPriceChange?: (value: string) => void;
+  onMaxPriceChange?: (value: string) => void;
+  minStock?: string;
+  maxStock?: string;
+  onMinStockChange?: (value: string) => void;
+  onMaxStockChange?: (value: string) => void;
+  priceBounds?: { min: number; max: number };
 }
 
 const controlCls = 'h-10 px-3 bg-surface-muted border border-line rounded-xl text-xs font-bold text-ink focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition';
@@ -84,6 +98,19 @@ export const PosCatalogFilters: React.FC<PosCatalogFiltersProps> = ({
   searchSuggestions = [],
   onSelectSuggestion,
   stockOf = () => 0,
+  onOpenCameraScanner,
+  suppliers = [],
+  selectedSupplier = 'ALL',
+  onSupplierChange,
+  minPrice = '',
+  maxPrice = '',
+  onMinPriceChange,
+  onMaxPriceChange,
+  minStock = '',
+  maxStock = '',
+  onMinStockChange,
+  onMaxStockChange,
+  priceBounds,
 }) => {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(-1);
@@ -97,6 +124,11 @@ export const PosCatalogFilters: React.FC<PosCatalogFiltersProps> = ({
     selectedGrade !== 'ALL',
     selectedSize !== 'ALL',
     selectedColor !== 'ALL',
+    selectedSupplier !== 'ALL',
+    minPrice !== '',
+    maxPrice !== '',
+    minStock !== '',
+    maxStock !== '',
   ].filter(Boolean).length;
 
   return (
@@ -112,7 +144,7 @@ export const PosCatalogFilters: React.FC<PosCatalogFiltersProps> = ({
               ref={barcodeInputRef}
               type="text"
               aria-label="بحث عن منتج"
-              placeholder="امسح الباركود أو ابحث بالاسم / SKU / الكود الداخلي / المقاس… (F2)"
+              placeholder="امسح الباركود أو ابحث بالاسم / SKU / رقم تسلسلي / IMEI / المقاس… (F2)"
               value={searchQuery}
               onChange={(e) => { onSearchQueryChange(e.target.value); closeSuggestions(); }}
               className="w-full h-11 pl-10 pr-11 bg-accent-soft/60 border-2 border-accent-border rounded-2xl text-sm font-bold placeholder-muted focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition"
@@ -169,7 +201,7 @@ export const PosCatalogFilters: React.FC<PosCatalogFiltersProps> = ({
                   <span className="min-w-0">
                     <span className="block truncate font-bold">{product.name}</span>
                     <span className="mt-1 block text-[10px] text-muted">
-                      {product.sku || product.barcode || 'بدون SKU'} · {Number(product.sellingPriceM2 || 0).toLocaleString('ar-EG')} ج.م
+                      {product.sku || product.barcode || 'بدون SKU'} · {Number(product.sellingPriceM2 || 0).toLocaleString('ar-EG')} {CeramicMath.getCurrencySymbol()}
                     </span>
                     <span className="mt-0.5 block text-[10px] text-muted">المتاح: {formatProductQuantity(stockOf(product.id), product)}</span>
                   </span>
@@ -178,6 +210,18 @@ export const PosCatalogFilters: React.FC<PosCatalogFiltersProps> = ({
             </div>
           )}
         </div>
+
+        {onOpenCameraScanner && (
+          <button
+            type="button"
+            onClick={onOpenCameraScanner}
+            title="مسح الباركود بالكاميرا"
+            aria-label="مسح الباركود بالكاميرا"
+            className="h-11 w-11 shrink-0 flex items-center justify-center rounded-2xl bg-surface-muted border border-line text-primary hover:border-primary hover:bg-accent-soft transition"
+          >
+            <Camera className="w-5 h-5" />
+          </button>
+        )}
 
         <label htmlFor="pos-warehouse-filter" className="sr-only">اختيار المخزن</label>
         <select
@@ -273,6 +317,75 @@ export const PosCatalogFilters: React.FC<PosCatalogFiltersProps> = ({
                 <option value="ALL">كل الألوان</option>{visibleColors.map((color) => <option key={color} value={color}>{color}</option>)}
               </select>
             </>
+          )}
+
+          {suppliers.length > 0 && onSupplierChange && (
+            <>
+              <label htmlFor="pos-supplier-filter" className="sr-only">فلتر المورد</label>
+              <select id="pos-supplier-filter" aria-label="فلتر المورد" value={selectedSupplier} onChange={(e) => onSupplierChange(e.target.value)} className={`${controlCls} h-9`}>
+                <option value="ALL">كل الموردين</option>{suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
+            </>
+          )}
+
+          {(onMinPriceChange || onMaxPriceChange) && (
+            <div className="flex items-center gap-1" dir="ltr">
+              <label htmlFor="pos-min-price" className="sr-only">أقل سعر</label>
+              <input
+                id="pos-min-price"
+                type="number"
+                min={0}
+                inputMode="decimal"
+                placeholder={priceBounds && priceBounds.max > 0 ? `السعر من ${priceBounds.min}` : 'السعر من'}
+                value={minPrice}
+                onChange={(e) => onMinPriceChange?.(e.target.value)}
+                className={`${controlCls} h-9 w-24`}
+                title="أقل سعر بيع"
+              />
+              <span className="text-[10px] text-muted font-bold">–</span>
+              <label htmlFor="pos-max-price" className="sr-only">أعلى سعر</label>
+              <input
+                id="pos-max-price"
+                type="number"
+                min={0}
+                inputMode="decimal"
+                placeholder={priceBounds && priceBounds.max > 0 ? `إلى ${priceBounds.max}` : 'السعر إلى'}
+                value={maxPrice}
+                onChange={(e) => onMaxPriceChange?.(e.target.value)}
+                className={`${controlCls} h-9 w-24`}
+                title="أعلى سعر بيع"
+              />
+            </div>
+          )}
+
+          {(onMinStockChange || onMaxStockChange) && (
+            <div className="flex items-center gap-1" dir="ltr">
+              <label htmlFor="pos-min-stock" className="sr-only">أقل رصيد</label>
+              <input
+                id="pos-min-stock"
+                type="number"
+                min={0}
+                inputMode="decimal"
+                placeholder="الرصيد من"
+                value={minStock}
+                onChange={(e) => onMinStockChange?.(e.target.value)}
+                className={`${controlCls} h-9 w-24`}
+                title="أقل رصيد متاح في المخزن المحدد"
+              />
+              <span className="text-[10px] text-muted font-bold">–</span>
+              <label htmlFor="pos-max-stock" className="sr-only">أعلى رصيد</label>
+              <input
+                id="pos-max-stock"
+                type="number"
+                min={0}
+                inputMode="decimal"
+                placeholder="الرصيد إلى"
+                value={maxStock}
+                onChange={(e) => onMaxStockChange?.(e.target.value)}
+                className={`${controlCls} h-9 w-24`}
+                title="أعلى رصيد متاح في المخزن المحدد"
+              />
+            </div>
           )}
 
           {hasCeramicCatalog && (

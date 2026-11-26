@@ -58,9 +58,7 @@ const ACTIVITY_ROWS: Record<string, ActivityRow[]> = {
     ['workshop', 'مراكز صيانة السيارات', 'workshop'],
   ],
   hospitality: [
-    ['hospitality', 'فنادق ومنتجعات', 'hospitality'],
-    ['restaurant', 'مطاعم وكافيهات', 'restaurant'],
-  ],
+    ['hospitality', 'فنادق ومنتجعات', 'hospitality'],  ],
   healthcare: [
     ['healthcare_admin', 'الإدارة الصحية', 'healthcare_admin'],
   ],

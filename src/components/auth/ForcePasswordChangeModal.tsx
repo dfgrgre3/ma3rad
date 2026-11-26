@@ -198,7 +198,7 @@ export const ForcePasswordChangeModal: React.FC<ForcePasswordChangeModalProps> =
                 value={currentPassword}
                 onChange={(e) => setCurrentPassword(e.target.value)}
                 placeholder="أدخل كلمة المرور الحالية"
-                className="w-full px-3.5 py-2.5 text-sm bg-surface-muted border border-line-strong rounded-xl focus:outline-none focus:ring-2 focus:ring-warning pr-10"
+                className="w-full px-3.5 py-2.5 text-sm bg-surface-muted border border-line-strong rounded-xl focus:outline-none focus:ring-2 focus:ring-warning pl-10"
               />
               <button
                 type="button"
@@ -224,7 +224,7 @@ export const ForcePasswordChangeModal: React.FC<ForcePasswordChangeModalProps> =
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 placeholder="أدخل كلمة مرور قوية"
-                className="w-full px-3.5 py-2.5 text-sm bg-surface-muted border border-line-strong rounded-xl focus:outline-none focus:ring-2 focus:ring-warning pr-10"
+                className="w-full px-3.5 py-2.5 text-sm bg-surface-muted border border-line-strong rounded-xl focus:outline-none focus:ring-2 focus:ring-warning pl-10"
               />
               <button
                 type="button"
@@ -249,7 +249,7 @@ export const ForcePasswordChangeModal: React.FC<ForcePasswordChangeModalProps> =
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               placeholder="أعد إدخال كلمة المرور"
-              className="w-full px-3.5 py-2.5 text-sm bg-surface-muted border border-line-strong rounded-xl focus:outline-none focus:ring-2 focus:ring-warning pr-10"
+              className="w-full px-3.5 py-2.5 text-sm bg-surface-muted border border-line-strong rounded-xl focus:outline-none focus:ring-2 focus:ring-warning"
             />
           </div>
 

@@ -440,7 +440,7 @@ export const FixedAssetsPage: React.FC = () => {
                 مسح التصفية
               </button>
             )}
-            <span className="mr-auto text-xs font-semibold text-muted">{visibleRows.length} من {rows.length} أصل</span>
+            <span className="ms-auto text-xs font-semibold text-muted">{visibleRows.length} من {rows.length} أصل</span>
           </div>
         </div>
       </section>

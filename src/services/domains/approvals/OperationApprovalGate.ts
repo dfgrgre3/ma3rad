@@ -6,6 +6,7 @@ import { PermissionService } from '../auth/PermissionService';
 import { ModuleRegistryService } from '../config/ModuleRegistryService';
 import type { ApprovalType } from './approvalTypes';
 import { ApprovalPolicyService, type ApprovalPolicy } from './ApprovalPolicyService';
+import { NotificationService } from '../notifications/NotificationService';
 
 export interface OperationApprovalEvaluation {
   policy: ApprovalPolicy;
@@ -124,6 +125,16 @@ export class OperationApprovalGate {
       VALUES (?, ?, ?, 'إنشاء طلب اعتماد عملية', 'APPROVALS', ?, ?)
     `, [`aud_${uuidv4().substring(0, 8)}`, actor.id, actor.fullName, id,
       JSON.stringify({ requestNumber, operationCode: input.operationCode, status: 'PENDING' })]);
+    try {
+      new NotificationService().createNotification(
+        'SYSTEM',
+        'طلب اعتماد جديد',
+        `${requestNumber}: ${input.title.trim()}${input.requestedValue != null ? ` — القيمة ${Number(input.requestedValue).toFixed(2)} ج.م` : ''}`,
+        undefined,
+        'APPROVAL',
+        id
+      );
+    } catch { /* notifications must never block the operation */ }
     return id;
   }
 

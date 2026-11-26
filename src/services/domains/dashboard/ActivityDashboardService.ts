@@ -3,7 +3,8 @@ import { getEffectiveBusinessType } from '../config/BusinessTypeService';
 import { AccountingService } from '../finance/AccountingService';
 import { RetailWorkspaceService } from '../retail/RetailWorkspaceService';
 import { CeramicsService, type CeramicTopDesign } from '../ceramics/CeramicsService';
-import { RestaurantService } from '../restaurant/RestaurantService';
+import { AuthService } from '../auth/AuthService';
+import { BranchAccessService } from '../auth/BranchAccessService';
 import { HospitalityService } from '../hospitality/HospitalityService';
 import { EducationService } from '../education/EducationService';
 import { WorkshopService } from '../workshop/WorkshopService';
@@ -39,11 +40,27 @@ export interface ActivityProgress {
   caption: string;
 }
 
+export interface ActivityHourlyPoint {
+  hour: number;
+  revenue: number;
+}
+
 export interface ActivityDashboardData {
   kind: ActivityDashboardKind;
   tiles: ActivityTile[];
   progress: ActivityProgress[];
   sections: ActivityListSection[];
+  /** Optional intraday revenue chart. */
+  hourly?: ActivityHourlyPoint[];
+  /** Optional per-day revenue and profit chart. */
+  daily?: Array<{ label: string; revenue: number; profit?: number }>;
+}
+
+/** Optional date/branch filter for the activity dashboard. */
+export interface ActivityDashboardFilter {
+  from?: string;
+  to?: string;
+  branchId?: string;
 }
 
 type Metrics = Awaited<ReturnType<AccountingService['getDashboardMetricsAsync']>>;
@@ -173,62 +190,6 @@ function buildCeramics(): ActivityDashboardData {
           label: d.name,
           value: money(d.totalAmount),
           meta: `${int(d.totalM2)} م² · ${d.brandName || 'بدون ماركة'}`,
-        })),
-      },
-    ],
-  };
-}
-
-/* ─── Restaurant ────────────────────────────────────────────────────────── */
-
-function buildRestaurant(m: Metrics | null): ActivityDashboardData {
-  const svc = new RestaurantService();
-  const tables = safe(() => svc.getTables(), [] as Awaited<ReturnType<RestaurantService['getTables']>>);
-  const openOrders = safe(() => svc.getOpenOrders(), [] as Awaited<ReturnType<RestaurantService['getOpenOrders']>>);
-  const menuItems = safe(() => svc.getMenuItems(), [] as Awaited<ReturnType<RestaurantService['getMenuItems']>>);
-
-  const activeTables = tables.filter((t) => t.isActive);
-  const occupiedTables = activeTables.filter((t) => t.occupied);
-  const kitchenPending = openOrders.reduce(
-    (sum, o) => sum + o.items.filter((i) => i.kitchenStatus === 'NEW' || i.kitchenStatus === 'PREPARING').length,
-    0
-  );
-  const unavailableItems = menuItems.filter((i) => !i.isAvailable).length;
-
-  const statusCounts = new Map<string, number>();
-  for (const o of openOrders) statusCounts.set(o.serviceMode, (statusCounts.get(o.serviceMode) ?? 0) + 1);
-
-  return {
-    kind: 'restaurant',
-    tiles: [
-      { id: 'tables', label: 'الطاولات المشغولة', value: `${int(occupiedTables.length)} / ${int(activeTables.length)}` },
-      { id: 'open_orders', label: 'طلبات مفتوحة', value: int(openOrders.length) },
-      { id: 'kitchen', label: 'أصناف في المطبخ', value: int(kitchenPending) },
-      { id: 'menu', label: 'أصناف القائمة', value: int(menuItems.length), hint: unavailableItems ? `${int(unavailableItems)} غير متاحة` : undefined },
-      { id: 'today_sales', label: 'مبيعات اليوم', value: m ? money(m.todaySales) : DASH },
-      { id: 'month_sales', label: 'مبيعات الشهر', value: m ? money(m.monthSales) : DASH },
-    ],
-    progress: activeTables.length
-      ? [{ label: 'إشغال الصالة', percent: Math.min(100, (occupiedTables.length / activeTables.length) * 100), caption: `${int(occupiedTables.length)} من ${int(activeTables.length)} طاولة` }]
-      : [],
-    sections: [
-      {
-        id: 'open_orders',
-        title: 'الطلبات المفتوحة الآن',
-        emptyText: 'لا توجد طلبات مفتوحة.',
-        rows: openOrders.slice(0, 8).map((o) => ({
-          label: o.tableNumber != null ? `طاولة ${o.tableNumber}` : o.orderNumber,
-          value: o.customerName || 'عميل',
-          meta: `${o.serviceMode} · ${o.items.length} صنف`,
-        })),
-      },
-      {
-        id: 'service_mix',
-        title: 'توزيع الطلبات المفتوحة',
-        emptyText: 'لا توجد طلبات مفتوحة.',
-        rows: ['DINE_IN', 'TAKEAWAY', 'DELIVERY'].map((mode) => ({
-          label: mode === 'DINE_IN' ? 'صالة' : mode === 'TAKEAWAY' ? 'سفري' : 'توصيل',
-          value: int(statusCounts.get(mode) ?? 0),
         })),
       },
     ],
@@ -528,25 +489,52 @@ async function buildGeneric(m: Metrics | null): Promise<ActivityDashboardData> {
 /* ─── Public API ────────────────────────────────────────────────────────── */
 
 export class ActivityDashboardService {
+  /** Temporarily scopes service reads to the branch chosen in the dashboard filter. */
+  private applyBranchFilter(branchId?: string): (() => void) | null {
+    if (!branchId) return null;
+    try {
+      const user = AuthService.getCurrentUser();
+      if (!user) return null;
+      const access = new BranchAccessService();
+      const currentBranchId = access.getCurrentBranchId(user);
+      if (!currentBranchId || currentBranchId === branchId) return null;
+      access.setCurrentBranchId(branchId, user);
+      return () => {
+        try {
+          access.setCurrentBranchId(currentBranchId, user);
+        } catch {
+          // Best-effort restore; the caller may have already left the page.
+        }
+      };
+    } catch {
+      return null;
+    }
+  }
+
   /** Resolves the dashboard data for the effective (or given) business type. */
   public async getDashboard(
     businessType: string = getEffectiveBusinessType(),
+    filter?: ActivityDashboardFilter,
   ): Promise<ActivityDashboardData> {
-    const kind = getActivityDashboardKind(businessType);
-    const metrics = await loadMetrics();
+    const restoreBranch = this.applyBranchFilter(filter?.branchId);
+    try {
+      const kind = getActivityDashboardKind(businessType);
+      const metrics = await loadMetrics();
 
-    switch (kind) {
-      case 'ceramics': return buildCeramics();
-      case 'restaurant': return buildRestaurant(metrics);
-      case 'hospitality': return buildHospitality(metrics);
-      case 'education': return buildEducation(metrics);
-      case 'workshop': return buildWorkshop(metrics);
-      case 'manufacturing': return buildManufacturing(metrics);
-      case 'construction': return buildConstruction(metrics);
-      case 'professional': return buildProfessional(metrics);
-      case 'distribution': return buildDistribution(metrics);
-      case 'retail': return buildRetail();
-      default: return buildGeneric(metrics);
+      switch (kind) {
+        case 'ceramics': return buildCeramics();
+        case 'hospitality': return buildHospitality(metrics);
+        case 'education': return buildEducation(metrics);
+        case 'workshop': return buildWorkshop(metrics);
+        case 'manufacturing': return buildManufacturing(metrics);
+        case 'construction': return buildConstruction(metrics);
+        case 'professional': return buildProfessional(metrics);
+        case 'distribution': return buildDistribution(metrics);
+        case 'retail': return buildRetail();
+        default: return buildGeneric(metrics);
+      }
+    } finally {
+      restoreBranch?.();
     }
   }
 }

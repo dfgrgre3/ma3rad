@@ -75,7 +75,7 @@ export const IMPACT_REGISTRY: readonly ImpactOperation[] = [
       { target: 'cash.shiftTotals', status: 'wired', files: ['src/services/domains/sales/invoiceCreation.ts'] },
       { target: 'ledger.journal', status: 'wired', note: 'قيد UNIQUE على (reference_type, reference_id) منذ migration 104', files: ['src/database/repositories/ledger.ts', 'src/database/migrations/index.ts'] },
       { target: 'sync.outbox', status: 'wired', files: ['src/sync/BusinessRecordSyncService.ts'] },
-      { target: 'audit.log', status: 'partial', note: 'مساران متوازيان (INSERT داخل المعاملة + AuditService.log صامت بعد COMMIT)', files: ['src/services/domains/sales/invoiceCreation.ts', 'src/services/domains/security/AuditService.ts'] },
+      { target: 'audit.log', status: 'wired', note: 'أثر audit.log داخل المعاملة عبر EffectEngine — مسار واحد ذرّي', files: ['src/services/domains/sales/invoiceCreation.ts', 'src/services/domains/effects/handlers/salesInvoiceHandlers.ts'] },
     ],
   },
   {
@@ -91,7 +91,7 @@ export const IMPACT_REGISTRY: readonly ImpactOperation[] = [
       { target: 'cash.register', status: 'wired', note: 'عبر options.registerId || cr_main — يوصى بحل كاشير البيع الأصلي', files: ['src/services/domains/sales/returns.ts'] },
       { target: 'cash.shiftTotals', status: 'partial', note: 'يُضاف total_refunds لكن لا تُطرح مبيعات الوردية — دلالة صحيحة، تقارير الإقفال تعتمد الفصل', files: ['src/services/domains/sales/returns.ts'] },
       { target: 'ledger.journal', status: 'wired', files: ['src/services/domains/sales/returns.ts'] },
-      { target: 'exchange.atomicity', status: 'missing', note: 'exchangeSale = مرتجع (معاملة) ثم فاتورة (معاملة)؛ فشل الثانية يترك مرتجعًا بدون بديل — يحتاج SAVEPOINT ملفوف/تعويض في Phase 5', files: ['src/services/domains/sales/SalesService.ts'] },
+      { target: 'exchange.atomicity', status: 'wired', note: 'exchangeSale يلف createSaleReturn + createSalesInvoice في executeTransaction واحد؛ التداخل يعمل عبر SAVEPOINT', files: ['src/services/domains/sales/SalesService.ts', 'src/database/repositories/databaseManager/transactions.ts'] },
       { target: 'ui.idempotency', status: 'wired', note: 'Phase 0: الواجهة تمرر idempotencyKey والخدمة/DB تفرضان unique', files: ['src/pages/sales/returns/ReturnsPage.tsx'] },
     ],
   },
@@ -177,7 +177,7 @@ export const IMPACT_REGISTRY: readonly ImpactOperation[] = [
       { target: 'cash.shiftTotals', status: 'wired', files: ['src/services/domains/finance/CashierService.ts'] },
       { target: 'ledger.journal', status: 'wired', files: ['src/services/domains/finance/CashierService.ts'] },
       { target: 'pnl.statement', status: 'wired', note: 'عبر القيد المزدوج', files: ['src/database/repositories/ledger.ts'] },
-      { target: 'sync.outbox', status: 'missing', note: 'المصروف غير ضمن كيانات المزامنة', files: ['src/services/domains/finance/CashierService.ts'] },
+      { target: 'sync.outbox', status: 'wired', note: 'المصروف يُلتقط عبر BusinessRecordSyncService.capture داخل نفس المعاملة', files: ['src/services/domains/finance/CashierService.ts', 'src/sync/BusinessRecordSyncService.ts'] },
     ],
   },
   {
@@ -190,7 +190,7 @@ export const IMPACT_REGISTRY: readonly ImpactOperation[] = [
       { target: 'inventory.stockDestination', status: 'wired', note: 'عند receive (أو INSERT صف جديد)', files: ['src/services/domains/inventory/InventoryServicePart10.ts'] },
       { target: 'inventory.transaction', status: 'wired', files: ['src/services/domains/inventory/InventoryServicePart09.ts', 'src/services/domains/inventory/InventoryServicePart10.ts'] },
       { target: 'ledger.transferLoss', status: 'wired', note: 'قيد TRANSFER_LOSS مالي (5201/1104) مع حركة كمية موثقة تُستبعد من الرصيد التراكمي حتى لا تُخصم مرتين', files: ['src/services/domains/inventory/InventoryServicePart10.ts', 'src/pages/inventory/stock-ledger/StockLedgerPage.tsx'] },
-      { target: 'workflow.compensation', status: 'missing', note: 'خطوات REQUESTED→…→RECEIVED معاملات مستقلة؛ لا تعويض/saga عند التراجع بعد الشحن', files: ['src/services/domains/inventory/InventoryServicePart08.ts'] },
+      { target: 'workflow.compensation', status: 'wired', note: 'rejectTransfer يعكس IN_TRANSIT بالكامل: مخزون + دفعات + طبقات FIFO + قيود TRANSFER_REVERT؛ RECEIVED_PARTIAL حالة نهائية لا تُعكَس (تصميم مقصود)', files: ['src/services/domains/inventory/InventoryServicePart11.ts', 'src/services/domains/inventory/InventoryTransferTrackingService.ts'] },
     ],
   },
   {

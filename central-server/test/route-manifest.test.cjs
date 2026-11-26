@@ -63,6 +63,7 @@ test('permission-guarded routes declare at least one permission code', () => {
     '/api/v1/device/provisioning/pending',
     '/api/v1/device/provisioning/:jobId/result',
     '/api/v1/device/tenant-users/report',
+    '/api/v1/device/notifications',
     '/api/v1/modules/catalog',
     '/api/v1/modules/:moduleId/:version/files/:name',
     // Device licensing endpoints authenticate via the activation-issued

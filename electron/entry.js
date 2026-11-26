@@ -3,7 +3,7 @@ const fs = require('fs');
 const { createHash } = require('node:crypto');
 const { app } = require('electron');
 
-const BYTECODE_INTEGRITY_MANIFEST_SHA256 = '1731f1a4c00070dd1a92e829c84344d3ed98cd8b2d50c8a49dc989f84e50da45';
+const BYTECODE_INTEGRITY_MANIFEST_SHA256 = '2a5d7fe4f1fcbabd79c95aa876ae81adbd1f1a9b1072e999283fb60581fa540f';
 const jscPath = path.join(__dirname, 'main.jsc');
 
 function listBytecodeFiles(directory) {

@@ -91,6 +91,8 @@ export function paymentTypeLabel(paymentType: string): string {
     case 'CHEQUE': return 'شيك';
     case 'MIXED': return 'دفع مختلط';
     case 'CREDIT': return 'آجل';
+    case 'WALLET': return 'محفظة إلكترونية';
+    case 'ONLINE': return 'دفع إلكتروني أونلاين';
     default: return 'آجل / تقسيط';
   }
 }
@@ -313,6 +315,13 @@ export function orderedInvoiceDetails(
     if (!order.includes(section)) order.push(section);
   }
   return order.map((section) => sections[section]).join('');
+}
+
+/** Serial/IMEI numbers sold on an invoice line, for print templates. */
+export function itemSerialsHtml(item: any, fontSize = '9px'): string {
+  const serials = Array.isArray(item?.serialNumbers) ? item.serialNumbers.filter(Boolean) : [];
+  if (!serials.length) return '';
+  return `<div style="font-size:${fontSize};color:#475569;margin-top:2px;font-family:monospace;direction:ltr;text-align:left;">${esc(serials.join(' · '))}</div>`;
 }
 
 export function tableFirstColumns(settings: SystemSettings): InvoiceTableColumnId[] {

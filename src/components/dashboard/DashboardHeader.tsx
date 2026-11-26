@@ -12,6 +12,7 @@ interface DashboardHeaderProps {
   lastSyncedAt: Date | null;
   isRefreshing: boolean;
   onRefresh: () => void;
+  description?: React.ReactNode;
 }
 
 export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
@@ -20,6 +21,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
   lastSyncedAt,
   isRefreshing,
   onRefresh,
+  description,
 }) => {
   const branchAccess = useMemo(() => new BranchAccessService(), []);
   const [branches, setBranches] = useState<Array<{ id: string; name: string; code: string }>>([]);
@@ -75,7 +77,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
         icon={<Activity className="h-5 w-5" />}
         eyebrow="سيراميسيس / مركز المتابعة"
         title="لوحة المعلومات"
-        description={<>ملخص حركة المعرض والمؤشرات الرئيسية <span className="mx-1">·</span>{today}</>}
+        description={description ?? <>ملخص حركة المعرض والمؤشرات الرئيسية <span className="mx-1">·</span>{today}</>}
       />
 
       <section

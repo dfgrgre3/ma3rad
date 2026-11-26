@@ -14,6 +14,7 @@ import type {
 } from '../../../types/dashboard/components';
 import { format, subDays, startOfDay, endOfDay, startOfMonth, endOfMonth } from 'date-fns';
 import type { DailyPurchaseResult } from '../operations/DailyOperationsService';
+import { ExecutiveCommandAggregates } from './ExecutiveCommandService/aggregates';
 
 /**
  * Unified Dashboard Metrics Service
@@ -43,6 +44,26 @@ export interface ExecutiveDashboardData {
   lowStockData: LowStockItem[];
 }
 
+export interface TodayOperationsSummary {
+  purchasesTotal: number;
+  purchasesCount: number;
+  purchasesPaid: number;
+  expensesTotal: number;
+  expensesCount: number;
+  collectionsTotal: number;
+  collectionsCount: number;
+  cashInflow: number;
+  cashOutflow: number;
+  netCashFlow: number;
+  supplierPaymentsTotal: number;
+  newDebtTotal: number | null;
+  newDebtCount: number;
+  dueInstallmentsTotal: number | null;
+  dueInstallmentsCount: number;
+  supplierOutstandingTotal: number | null;
+  operationsCount: number;
+}
+
 export interface OverviewDashboardData {
   metrics: DashboardMetrics | null;
   chartData: SalesTrendPoint[];
@@ -50,7 +71,6 @@ export interface OverviewDashboardData {
   monthlyComparison: MonthlyComparison | null;
   topCustomers: TopCustomerItem[];
   categorySales: CategoryDistributionItem[];
-  gradeSales: { grade: string; quantityM2: number; totalRevenue: number }[];
   paymentDistribution: PaymentDistributionItem[];
   recentActivities: RecentActivityItem[];
   todayPurchases: DailyPurchaseResult | null;
@@ -62,6 +82,7 @@ export interface OverviewDashboardData {
   purchaseTopSuppliers: PurchaseTopSupplier[];
   purchaseTopItems: PurchaseTopItem[];
   purchaseQuantitiesByUnit: [string, number][];
+  todayOps: TodayOperationsSummary | null;
 }
 
 export interface PartialDataError {
@@ -340,7 +361,6 @@ export class DashboardMetricsService {
     let monthlyComparison: MonthlyComparison | null = null;
     let topCustomers: TopCustomerItem[] = [];
     let categorySales: CategoryDistributionItem[] = [];
-    let gradeSales: { grade: string; quantityM2: number; totalRevenue: number }[] = [];
     let paymentDistribution: PaymentDistributionItem[] = [];
     let recentActivities: RecentActivityItem[] = [];
 
@@ -387,12 +407,6 @@ export class DashboardMetricsService {
       categorySales = [...categories.entries()].map(([name, value]) => ({ name, value }));
     } catch (e) {
       this.addPartialError('categorySales', e as Error);
-    }
-
-    try {
-      gradeSales = await this.accountingService.getSalesByGradeAsync();
-    } catch (e) {
-      this.addPartialError('gradeSales', e as Error);
     }
 
     try {
@@ -493,6 +507,56 @@ export class DashboardMetricsService {
       purchaseQuantitiesByUnit = [...quantities.entries()];
     }
 
+    // Today's financial operations: expenses, collections, cash flow, debts & payables.
+    let todayOps: TodayOperationsSummary | null = null;
+    try {
+      const aggregates = new ExecutiveCommandAggregates();
+      const day = format(new Date(), 'yyyy-MM-dd');
+      const salesToday = aggregates.getSalesTotals(day, day);
+      const expensesToday = aggregates.getExpenseTotals(day, day);
+      const collectionsToday = aggregates.getCollections(day, day);
+      const cashFlowToday = aggregates.getCashFlow(day, day, expensesToday.total, collectionsToday.total);
+
+      let newDebtTotal: number | null = null;
+      let newDebtCount = 0;
+      let dueInstallmentsTotal: number | null = null;
+      let dueInstallmentsCount = 0;
+      if (PermissionService.can(AuthService.getCurrentUser(), 'finance.debts.view', '/finance')) {
+        try {
+          const dailyOps = await import('../operations/DailyOperationsService').then((m) => new m.DailyOperationsService());
+          const debts = dailyOps.getDebts(day);
+          newDebtTotal = debts.summary.newDebt;
+          newDebtCount = debts.rows.length;
+          dueInstallmentsTotal = Number(debts.dueInstallments.reduce((sum, row) => sum + (Number(row.remaining) || 0), 0).toFixed(2));
+          dueInstallmentsCount = debts.dueInstallments.length;
+        } catch {
+          // Debts data stays unavailable without finance.debts.view
+        }
+      }
+
+      todayOps = {
+        purchasesTotal: salesToday.purchases,
+        purchasesCount: salesToday.purchaseCount,
+        purchasesPaid: salesToday.purchasesPaid,
+        expensesTotal: expensesToday.total,
+        expensesCount: expensesToday.count,
+        collectionsTotal: collectionsToday.total,
+        collectionsCount: collectionsToday.count,
+        cashInflow: cashFlowToday.inflow,
+        cashOutflow: cashFlowToday.outflow,
+        netCashFlow: cashFlowToday.net,
+        supplierPaymentsTotal: cashFlowToday.supplierPayments,
+        newDebtTotal,
+        newDebtCount,
+        dueInstallmentsTotal,
+        dueInstallmentsCount,
+        supplierOutstandingTotal: todayPurchases ? Number(todayPurchases.summary.supplierOutstanding) || 0 : null,
+        operationsCount: salesToday.invoiceCount + salesToday.purchaseCount + expensesToday.count + collectionsToday.count,
+      };
+    } catch (e) {
+      this.addPartialError('todayOps', e as Error);
+    }
+
     return {
       metrics,
       chartData,
@@ -500,7 +564,6 @@ export class DashboardMetricsService {
       monthlyComparison,
       topCustomers,
       categorySales,
-      gradeSales,
       paymentDistribution,
       recentActivities,
       todayPurchases,
@@ -512,6 +575,7 @@ export class DashboardMetricsService {
       purchaseTopSuppliers,
       purchaseTopItems,
       purchaseQuantitiesByUnit,
+      todayOps,
     };
   }
 

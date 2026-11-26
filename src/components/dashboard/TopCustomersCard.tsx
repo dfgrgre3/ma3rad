@@ -10,7 +10,7 @@ export const TopCustomersCard: React.FC<TopCustomersCardProps> = ({ topCustomers
   return (
     <div className="bg-surface p-3.5 rounded-xl border border-line shadow-xs">
       <h3 className="text-xs font-bold text-ink dark:text-white mb-0.5">أفضل العملاء</h3>
-      <p className="text-[11px] text-muted mb-2">حسب إجمالي المشتريات التراكمية</p>
+      <p className="text-[11px] text-muted mb-2">حسب إجمالي المشتريات التراكمية — كل الفترات</p>
       <div className="space-y-1.5">
         {topCustomers.length === 0 ? (
           <div className="text-center py-8 text-xs text-muted">لا توجد بيانات عملاء بعد</div>

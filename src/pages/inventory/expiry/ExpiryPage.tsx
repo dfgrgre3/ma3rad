@@ -88,7 +88,7 @@ export const ExpiryPage: React.FC = () => {
           <button key={k} onClick={() => setFilter(k)}
             className={`px-3 py-1.5 rounded-full text-xs font-medium ${filter === k ? 'bg-[var(--cerami-primary)] text-white' : 'bg-[var(--cerami-bg)] text-[var(--cerami-muted)]'}`}>{v}</button>
         ))}
-        {canManage && <Button size="sm" variant="ghost" className="mr-auto" onClick={() => { setTrackForm({ productId: '', alertDays: '30' }); setTrackModal(true); }}>تفعيل التتبع لمنتج</Button>}
+        {canManage && <Button size="sm" variant="ghost" className="ms-auto" onClick={() => { setTrackForm({ productId: '', alertDays: '30' }); setTrackModal(true); }}>تفعيل التتبع لمنتج</Button>}
       </div>
 
       {loading ? (

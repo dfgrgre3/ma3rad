@@ -3,7 +3,7 @@
  * Source: central-server/routeManifest.js
  * Regenerate with: node central-server/scripts/generate-routes.mjs
  *
- * 233 allowlisted endpoint pattern(s).
+ * 234 allowlisted endpoint pattern(s).
  */
 
 const ROUTE_DEFINITIONS = [
@@ -1332,6 +1332,12 @@ const ROUTE_DEFINITIONS = [
     "pattern": "/api/v1/device/provisioning/:jobId/result",
     "methods": [
       "POST"
+    ]
+  },
+  {
+    "pattern": "/api/v1/device/notifications",
+    "methods": [
+      "GET"
     ]
   },
   {

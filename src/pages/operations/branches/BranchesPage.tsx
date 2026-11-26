@@ -476,7 +476,7 @@ export const BranchesPage: React.FC = () => {
                         onClick={() => changeStatus(branch)}
                         disabled={branch.isMain || (branch.isActive && !isSelectedBranch)}
                         title={branch.isMain ? 'عيّن فرعًا افتراضيًا آخر قبل تعطيل هذا الفرع' : undefined}
-                        className={`mr-auto inline-flex items-center gap-1 rounded-lg px-2.5 py-2 text-xs font-bold disabled:cursor-not-allowed disabled:opacity-40 ${branch.isActive ? 'text-danger hover:bg-danger-soft' : 'text-success hover:bg-success-soft'}`}
+                        className={`ms-auto inline-flex items-center gap-1 rounded-lg px-2.5 py-2 text-xs font-bold disabled:cursor-not-allowed disabled:opacity-40 ${branch.isActive ? 'text-danger hover:bg-danger-soft' : 'text-success hover:bg-success-soft'}`}
                       >
                         <Power className="h-3.5 w-3.5" /> {branch.isActive ? 'تعطيل' : 'تفعيل'}
                       </button>

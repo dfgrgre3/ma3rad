@@ -30,6 +30,7 @@ import { ToastProvider } from '../components/ui/Toast';
 import { ErrorBoundary } from '../components/ui/ErrorBoundary';
 import { UpdateNotification } from '../components/shared/UpdateNotification';
 import { CentralRestoreNotification } from '../components/shared/CentralRestoreNotification';
+import { NotificationCenter } from '../components/notifications/NotificationCenter';
 import { useAppStartup } from '../hooks/domains/auth/useAppStartup';
 import { useAppSession } from '../hooks/domains/auth/useAppSession';
 import { securityService, auditLogger, performanceMonitor, localCache, systemHealth, CentralTelemetryService } from '../services';
@@ -471,6 +472,7 @@ export const App: React.FC = () => {
           )}
           <UpdateNotification />
           <CentralRestoreNotification />
+          <NotificationCenter currentUser={currentUser} />
           {showSetup ? (
             <React.Suspense fallback={null}>
             <SetupWizard

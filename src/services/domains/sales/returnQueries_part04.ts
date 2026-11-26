@@ -12,7 +12,8 @@ export function fetchReturnableItems(ctx: SalesContext, invoiceId: string): Retu
             sii.special_stock_id,
             iss.special_number,
             p.pieces_per_box AS piecesPerBox,
-            p.product_type AS productType, p.base_unit AS baseUnit, p.custom_unit AS customUnit
+            p.product_type AS productType, p.base_unit AS baseUnit, p.custom_unit AS customUnit,
+            p.track_serials AS trackSerials
      FROM sales_invoice_items sii
      LEFT JOIN products p ON p.id = sii.product_id
      LEFT JOIN inventory_special_stocks iss ON iss.id = sii.special_stock_id
@@ -66,6 +67,7 @@ export function fetchReturnableItems(ctx: SalesContext, invoiceId: string): Retu
       specialNumber: r.specialNumber ? String(r.specialNumber) : null,
       sourceType: specialStockId ? 'SPECIAL_STOCK_SALE' : 'INVOICE',
       defaultDisposition: specialStockId ? 'SPECIAL_STOCK' : 'RESTOCK',
+      trackSerials: Number(r.trackSerials) === 1,
     });
   }
   return items;

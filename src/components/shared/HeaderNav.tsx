@@ -162,7 +162,7 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({ onOpenQuickCommand }) => {
                   >
                     <span className="truncate">{item.label}</span>
                     {item.badge && item.badge > 0 && (
-                      <span className="mr-auto min-w-[18px] rounded-[2px] bg-[#c42b1c] px-1 text-center text-[10px] font-bold leading-[16px] text-white">
+                      <span className="ms-auto min-w-[18px] rounded-[2px] bg-[#c42b1c] px-1 text-center text-[10px] font-bold leading-[16px] text-white">
                         {item.badge > 99 ? '99+' : item.badge}
                       </span>
                     )}

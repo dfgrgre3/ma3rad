@@ -11,7 +11,10 @@ export const CategoryDistributionCard: React.FC<CategoryDistributionCardProps> =
   return (
     <div className="bg-surface p-3.5 rounded-xl border border-line shadow-xs">
       <h3 className="text-xs font-bold text-ink dark:text-white mb-0.5">توزيع المبيعات حسب الفئة</h3>
-      <p className="text-[11px] text-muted mb-2">الحصة النسبية لكل تصنيف</p>
+      <p className="text-[11px] text-muted mb-2">الحصة النسبية لكل تصنيف — كل الفترات</p>
+      {categorySales.length === 0 ? (
+        <p className="py-12 text-center text-[11px] font-semibold text-muted" role="status">لا توجد مبيعات مسجلة بعد</p>
+      ) : (
       <div className="h-44 w-full" dir="ltr">
         <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 800, height: 176 }}>
           <PieChartRecharts>
@@ -36,6 +39,7 @@ export const CategoryDistributionCard: React.FC<CategoryDistributionCardProps> =
           </PieChartRecharts>
         </ResponsiveContainer>
       </div>
+      )}
     </div>
   );
 };

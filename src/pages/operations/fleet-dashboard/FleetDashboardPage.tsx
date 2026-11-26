@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDashboardRefresh } from '../../../contexts/DashboardRefreshContext';
+import { useDashboardEmbed } from '../../../contexts/DashboardEmbedContext';
 import {
   Truck, Users, Car, Clock, CheckCircle2, AlertCircle, XCircle,
   Loader2, RefreshCw, ArrowUpRight, Calendar, Package,
@@ -176,6 +177,7 @@ function DriverLeaderboard({ stats }: { stats: FleetStats['driverStats'] }) {
 
 export const FleetDashboardPage: React.FC = () => {
   const refreshToken = useDashboardRefresh()?.refreshToken;
+  const embedded = useDashboardEmbed();
   const initialRef = useRef(true);
   const service = useMemo(() => new OperationsService(), []);
   const navigate = useNavigate();
@@ -208,6 +210,19 @@ export const FleetDashboardPage: React.FC = () => {
   return (
     <div className="h-full flex flex-col bg-surface-muted text-ink overflow-hidden">
       {/* Header */}
+      {embedded ? (
+        <div className="flex flex-wrap items-center justify-end gap-2 px-4 pt-3 flex-shrink-0">
+          <ActivityGate element="delivery"><button onClick={() => navigate('/deliveries')} className="text-xs font-bold text-white bg-primary hover:bg-primary transition px-3 py-1.5 rounded-lg flex items-center gap-1.5">
+            <Truck className="w-3.5 h-3.5" /> التوصيلات
+          </button></ActivityGate>
+          <ActivityGate element="driver"><button onClick={() => navigate('/drivers')} className="text-xs font-bold text-primary bg-accent-soft hover:bg-accent-soft transition px-3 py-1.5 rounded-lg flex items-center gap-1.5 border border-accent-border">
+            <UserRound className="w-3.5 h-3.5" /> السائقون
+          </button></ActivityGate>
+          <button onClick={load} className="p-1.5 hover:bg-surface-sunken rounded-lg transition">
+            <RefreshCw className={`w-4 h-4 text-muted ${loading ? 'animate-spin' : ''}`} />
+          </button>
+        </div>
+      ) : (
       <div className="bg-surface px-6 pt-4 flex-shrink-0">
         <PageHeader
           icon={<Truck className="h-5 w-5" />}
@@ -226,6 +241,7 @@ export const FleetDashboardPage: React.FC = () => {
           </>}
         />
       </div>
+      )}
 
       {error && (
         <div className="mx-6 mt-3 px-4 py-3 bg-danger-soft border border-danger-border rounded-xl text-danger text-xs font-semibold flex items-center gap-2">

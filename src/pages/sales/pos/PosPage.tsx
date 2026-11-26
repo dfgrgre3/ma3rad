@@ -9,6 +9,9 @@ import { PosProductGrid } from './components/PosProductGrid';
 import { PosCartPanel } from './components/PosCartPanel';
 import { PosCheckoutPanel } from './components/PosCheckoutPanel';
 import { PosPageOverlays } from './components/PosPageOverlays';
+import { PosCameraScanner } from './components/PosCameraScanner';
+import { PosCustomerProfileDialog } from './components/PosCustomerProfileDialog';
+import { PosSerialPickerDialog } from './components/PosSerialPickerDialog';
 import { usePosActivityCopy } from '../../../hooks/pages/sales/pos/usePosActivityCopy';
 
 export const PosView: React.FC = () => {
@@ -35,18 +38,28 @@ export const PosView: React.FC = () => {
     setIsShiftModalOpen, setIsCloseShiftModalOpen,
     shiftRegisterId, setShiftRegisterId, setOpeningBalance,
     barcodeInputRef, paidInputRef,
-    cashierService, customerService, loyaltyService,
+    cashierService, customerService, loyaltyService, operationsService, crmService,
     notify, can, stockOf,
     searchQuery, setSearchQuery, selectedCategory, setSelectedCategory,
     selectedBrand, setSelectedBrand, selectedGrade, setSelectedGrade,
     selectedSize, setSelectedSize, selectedColor, setSelectedColor,
+    selectedSupplier, setSelectedSupplier,
+    minPrice, setMinPrice, maxPrice, setMaxPrice,
+    minStock, setMinStock, maxStock, setMaxStock,
     customerSearch, setCustomerSearch, inStockOnly, setInStockOnly,
     sortMode, setSortMode,
-    filteredProducts, visibleCategories, visibleBrands, hasCeramicCatalog,
+    filteredProducts, visibleCategories, visibleBrands, visibleSuppliers, priceBounds, hasCeramicCatalog,
     visibleSizes, visibleColors, filteredCustomers, hasActiveFilters, clearFilters,
-    cart, applyCustomerPricing, addToCart,
+    isCameraScannerOpen, setIsCameraScannerOpen, handleScanCode,
+    isCustomerProfileOpen, setIsCustomerProfileOpen,
+    deliveryEnabled, setDeliveryEnabled, deliveryAddress, setDeliveryAddress,
+    deliveryCity, setDeliveryCity, deliveryScheduledAt, setDeliveryScheduledAt,
+    cart, applyCustomerPricing, requestAddProduct,
     updateCartQuantity, stepCartQuantity, updateCartUnit, updateCartPrice,
-    updateCartLineDiscount, removeFromCart, recentlyRemoved, undoRemoveFromCart,
+    updateCartLineDiscount, applyLineDiscountToLines, removeCartLines, replaceCartItem,
+    openCartSerialEditor, productSerialService, serialPicker, setSerialPicker, confirmSerialPicker,
+    removeFromCart, recentlyRemoved, undoRemoveFromCart,
+    costInfoByProductId, cartProfitSummary, canApplyDiscount,
     handleSearchSubmit, loadStock,
     loadMoreProducts, loadMoreCustomers,
     lineSubtotal, lineDiscountTotal, taxAmount, totalAmount,
@@ -94,7 +107,7 @@ export const PosView: React.FC = () => {
           onSearchSubmit={handleSearchSubmit}
           searchSuggestions={filteredProducts}
           onSelectSuggestion={(product) => {
-            addToCart(product);
+            requestAddProduct(product);
             setSearchQuery('');
             barcodeInputRef.current?.focus();
           }}
@@ -135,8 +148,22 @@ export const PosView: React.FC = () => {
           resultCount={filteredProducts.length}
           hasActiveFilters={hasActiveFilters}
           onClearFilters={clearFilters}
+          onOpenCameraScanner={() => setIsCameraScannerOpen(true)}
+          suppliers={visibleSuppliers}
+          selectedSupplier={selectedSupplier}
+          onSupplierChange={setSelectedSupplier}
+          minPrice={minPrice}
+          maxPrice={maxPrice}
+          onMinPriceChange={setMinPrice}
+          onMaxPriceChange={setMaxPrice}
+          minStock={minStock}
+          maxStock={maxStock}
+          onMinStockChange={setMinStock}
+          onMaxStockChange={setMaxStock}
+          priceBounds={priceBounds}
         />
 
+        {(hasCeramicCatalog || discountedStocks.length > 0) && (
         <div className="flex items-center justify-between border-b border-line bg-accent-soft/70 px-4 py-2">
           <div className="text-xs font-bold text-primary">مخزون الفرز الثاني والبواقي له سعر وتكلفة منفصلان</div>
           <button
@@ -148,6 +175,7 @@ export const PosView: React.FC = () => {
             البيع المخفض ({discountedStocks.length})
           </button>
         </div>
+        )}
 
         <PosProductGrid
           products={filteredProducts}
@@ -157,10 +185,16 @@ export const PosView: React.FC = () => {
           stockOf={stockOf}
           gradeLabel={gradeLabel}
           allowNegativeStock={settings?.enableNegativeStock ?? false}
-          onAddToCart={addToCart}
+          onAddToCart={requestAddProduct}
           onAddMultipleToCart={(prods) => {
-            prods.forEach((prod) => addToCart(prod));
-            notify(`تمت إضافة ${prods.length} أصناف إلى السلة بنجاح`, 'success');
+            const serialTracked = prods.filter((p) => p.trackSerials);
+            prods.filter((p) => !p.trackSerials).forEach((prod) => requestAddProduct(prod));
+            if (serialTracked.length) {
+              notify(`${serialTracked.length} صنف يتتبع الأرقام التسلسلية — أضفها فردياً لاختيار الأرقام`, 'warning');
+            }
+            if (prods.length - serialTracked.length > 0) {
+              notify(`تمت إضافة ${prods.length - serialTracked.length} أصناف إلى السلة بنجاح`, 'success');
+            }
           }}
           multiSelectEnabled={!!settings?.posMultiSelectSearch}
           viewMode={productViewMode}
@@ -188,7 +222,7 @@ export const PosView: React.FC = () => {
         <div className="flex shrink-0 items-center justify-between border-b border-line px-3 py-2 min-[901px]:hidden">
           <div className="min-w-0">
             <p className="text-sm font-black text-ink ">{posCopy.cartTitle} وإتمام البيع</p>
-            <p className="text-xs text-ink-secondary ">{cart.length} أصناف · {CeramicMath.formatCurrency(totalAmount)} ج.م</p>
+            <p className="text-xs text-ink-secondary ">{cart.length} أصناف · {CeramicMath.formatCurrency(totalAmount)}</p>
           </div>
           <button
             ref={mobileCheckoutCloseRef}
@@ -235,11 +269,19 @@ export const PosView: React.FC = () => {
           onUpdateQuantity={updateCartQuantity}
           onUpdatePrice={updateCartPrice}
           onUpdateLineDiscount={updateCartLineDiscount}
+          canDiscount={canApplyDiscount}
+          onBulkLineDiscount={applyLineDiscountToLines}
+          onRemoveCartLines={removeCartLines}
+          onReplaceCartItem={replaceCartItem}
+          costInfoByProductId={costInfoByProductId}
+          cartProfitSummary={cartProfitSummary}
           sellingPriceTiersCount={settings?.sellingPriceTiersCount ?? 1}
           sellingPriceTierNames={settings?.sellingPriceTierNames}
           customerService={customerService}
           activeCartIndex={activeCartIndex}
           onSelectCartLine={setActiveCartIndex}
+          onOpenCustomerProfile={selectedCustomer && selectedCustomer.id !== 'cust_cash' ? () => setIsCustomerProfileOpen(true) : undefined}
+          onEditSerials={openCartSerialEditor}
         />
 
         <PosCheckoutPanel
@@ -312,7 +354,7 @@ export const PosView: React.FC = () => {
                 return;
               }
               setLoyaltyDiscount(redeemPoints);
-              notify(`تم تطبيق خصم ${redeemPoints} ج.م من النقاط؛ ستُخصم النقاط عند حفظ الفاتورة`, 'success');
+              notify(`تم تطبيق خصم ${redeemPoints} ${CeramicMath.getCurrencySymbol()} من النقاط؛ ستُخصم النقاط عند حفظ الفاتورة`, 'success');
             } catch (e: any) { notify(e?.message || 'تعذر التحقق من رصيد نقاط الولاء', 'error'); }
           }}
           paidAmount={paidAmount}
@@ -332,6 +374,15 @@ export const PosView: React.FC = () => {
           salesReps={salesReps}
           salesRepId={salesRepId}
           onSalesRepChange={setSalesRepId}
+          canDiscount={canApplyDiscount}
+          deliveryEnabled={deliveryEnabled}
+          onDeliveryEnabledChange={setDeliveryEnabled}
+          deliveryAddress={deliveryAddress}
+          setDeliveryAddress={setDeliveryAddress}
+          deliveryCity={deliveryCity}
+          setDeliveryCity={setDeliveryCity}
+          deliveryScheduledAt={deliveryScheduledAt}
+          setDeliveryScheduledAt={setDeliveryScheduledAt}
         />
       </div>
 
@@ -348,11 +399,42 @@ export const PosView: React.FC = () => {
             <ShoppingCart className="h-5 w-5 shrink-0" />
             <span className="truncate text-sm font-bold">{cart.length === 0 ? 'ابدأ البيع' : `السلة · ${cart.length} أصناف`}</span>
           </span>
-          <span className="shrink-0 text-left text-sm font-black tabular-nums">{CeramicMath.formatCurrency(totalAmount)} ج.م</span>
+          <span className="shrink-0 text-left text-sm font-black tabular-nums">{CeramicMath.formatCurrency(totalAmount)}</span>
         </button>
       </div>
 
       <PosToast toast={toast} />
+
+      {isCameraScannerOpen && (
+        <PosCameraScanner
+          onScan={handleScanCode}
+          onClose={() => setIsCameraScannerOpen(false)}
+        />
+      )}
+
+      {isCustomerProfileOpen && selectedCustomer && selectedCustomer.id !== 'cust_cash' && (
+        <PosCustomerProfileDialog
+          customer={selectedCustomer}
+          customerService={customerService}
+          loyaltyService={loyaltyService}
+          operationsService={operationsService}
+          crmService={crmService}
+          onClose={() => setIsCustomerProfileOpen(false)}
+          notify={notify}
+        />
+      )}
+
+      {serialPicker && (
+        <PosSerialPickerDialog
+          product={serialPicker.product}
+          warehouseId={selectedWarehouseId}
+          serialService={productSerialService}
+          preset={serialPicker.preset}
+          onConfirm={confirmSerialPicker}
+          onClose={() => setSerialPicker(null)}
+          notify={notify}
+        />
+      )}
 
       <PosPageOverlays vm={vm} />
     </div>

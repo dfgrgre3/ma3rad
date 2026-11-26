@@ -5,7 +5,6 @@ import { DatabaseManager } from '../src/database/repositories/databaseManager.ts
 import { SettingsService } from '../src/services/domains/config/SettingsService.ts';
 import { BusinessProfileService } from '../src/services/domains/config/BusinessProfileService.ts';
 import { ManufacturingService } from '../src/services/domains/manufacturing/ManufacturingService.ts';
-import { RestaurantService } from '../src/services/domains/restaurant/RestaurantService.ts';
 import { CashierService } from '../src/services/domains/finance/CashierService.ts';
 import { AuthService } from '../src/services/domains/auth/AuthService.ts';
 import { PermissionService } from '../src/services/domains/auth/PermissionService.ts';
@@ -76,8 +75,8 @@ test('activation bypass is disabled unless a local build flavor is injected', ()
 });
 
 test('all catalog activities resolve to validated shared profile templates', () => {
-  assert.equal(BUSINESS_PROFILES.length, 25);
-  assert.equal(BUSINESS_ACTIVITY_CATALOG.length, 25);
+  assert.equal(BUSINESS_PROFILES.length, 24);
+  assert.equal(BUSINESS_ACTIVITY_CATALOG.length, 24);
   assert.equal(new Set(BUSINESS_ACTIVITY_CATALOG.map((activity) => activity.id)).size, BUSINESS_ACTIVITY_CATALOG.length);
   assert.equal(new Set(BUSINESS_TYPES.map((activity) => activity.id)).size, BUSINESS_TYPES.length);
   assert.equal(BUSINESS_ACTIVITY_FAMILY_OPTIONS.length, 9);
@@ -92,7 +91,7 @@ test('all catalog activities resolve to validated shared profile templates', () 
       manufacturing: 1,
       construction: 1,
       transport: 1,
-      hospitality: 2,
+      hospitality: 1,
       healthcare: 1,
       education: 1,
       professional_services: 3,
@@ -170,7 +169,6 @@ test('business activity capability summaries distinguish configured profiles fro
   }
   assert.equal(getBusinessProfileCapabilities('food')[1].status, 'not-implemented');
   assert.equal(getBusinessProfileCapabilities('manufacturing')[1].status, 'partial');
-  assert.equal(getBusinessProfileCapabilities('restaurant')[1].status, 'partial');
 });
 
 test('industry profiles provide useful item attributes where their catalog needs them', () => {
@@ -507,153 +505,6 @@ test('terminology settings drive navigation labels and retain explicit navigatio
     for (const [key, value] of previous) {
       if (value === undefined) manager.run('DELETE FROM system_settings WHERE key = ?', [key]);
       else manager.run('INSERT OR REPLACE INTO system_settings (key, value) VALUES (?, ?)', [key, value]);
-    }
-  }
-});
-
-test('restaurant tickets consume recipe ingredients and issue one linked invoice', async () => {
-  const db = DatabaseManager.getInstance();
-  await db.initialize();
-  PermissionService.seed();
-  AuthService.login('admin', 'admin123');
-  { const __u = AuthService.getCurrentUser(); if (__u) {
-    __u.mustChangePassword = false;
-    const __open = db.query<{ id: string }>(
-      `SELECT id FROM cash_shifts WHERE user_id = ? AND status = 'OPEN' LIMIT 1`, [__u.id]
-    )[0];
-    if (!__open) new CashierService().openShift('cr_main', __u.id, 0);
-  } }
-
-  const settingKeys = ['businessType', 'businessProfileConfig', 'enabledModules'];
-  const previousSettings = new Map(settingKeys.map((key) => [
-    key,
-    db.query<{ value: string }>('SELECT value FROM system_settings WHERE key = ?', [key])[0]?.value,
-  ]));
-  db.run('INSERT OR REPLACE INTO system_settings (key, value) VALUES (?, ?)', ['businessType', 'restaurant']);
-  db.run('INSERT OR REPLACE INTO system_settings (key, value) VALUES (?, ?)', [
-    'businessProfileConfig',
-    JSON.stringify(getDefaultBusinessConfiguration('restaurant')),
-  ]);
-  db.run('INSERT OR REPLACE INTO system_settings (key, value) VALUES (?, ?)', [
-    'enabledModules',
-    JSON.stringify(getProfileModuleIds('restaurant')),
-  ]);
-
-  try {
-    const suffix = Date.now().toString(36);
-    const dishId = `restaurant_dish_${suffix}`;
-    const ingredientId = `restaurant_ingredient_${suffix}`;
-    const insertProduct = (id: string, name: string, cost: number, price: number) => db.run(
-      `INSERT INTO products
-        (id, product_type, custom_unit, sku, barcode, name, category_id, brand_id,
-         grade, size, base_unit, sell_unit, pieces_per_box, meters_per_box,
-         cost_price, selling_price_m2, selling_price_box, wholesale_price_m2,
-         min_selling_price_m2, min_stock_level, is_active)
-       VALUES (?, 'GENERAL', '', ?, ?, ?, 'cat_floor', 'br_cleo', 'GRADE_1', 'standard',
-         'PIECE', 'PIECE', 1, 1, ROUND(?*100), ROUND(?*100), ROUND(?*100), ROUND(?*100), 0, 0, 1)`,
-      [id, `SKU-${id}`, `BAR-${id}`, name, cost, price, price, price]
-    );
-    insertProduct(dishId, 'طبق اختبار', 3, 15);
-    insertProduct(ingredientId, 'مكون اختبار', 2, 15);
-    db.run(
-      `INSERT INTO warehouse_stock (id, warehouse_id, product_id, quantity_m2, reserved_m2)
-       VALUES (?, 'wh_main', ?, 10, 0)`,
-      [`stock_${ingredientId}`, ingredientId]
-    );
-
-    const manufacturing = new ManufacturingService();
-    const recipe = manufacturing.createBom({
-      productId: dishId,
-      name: 'وصفة الاختبار',
-      items: [{ componentProductId: ingredientId, quantity: 2, unit: 'PIECE' }],
-    });
-    manufacturing.activateBom(recipe.id);
-
-    const restaurant = new RestaurantService();
-    const table = restaurant.createTable(7000 + Math.floor(Math.random() * 1000), 4);
-    const emptyMenuOrder = {
-      serviceMode: 'DINE_IN' as const,
-      tableId: table.id,
-      customerId: 'cust_cash',
-      warehouseId: 'wh_main',
-      items: [{ productId: dishId, quantity: 2 }],
-    };
-    assert.throws(() => restaurant.createOrder(emptyMenuOrder), /غير متاح في قائمة المطعم/);
-    const menuItem = restaurant.addMenuItem(dishId, 'wh_main');
-    restaurant.setMenuItemAvailability(menuItem.id, false);
-    assert.throws(() => restaurant.createOrder(emptyMenuOrder), /غير متاح في قائمة المطعم/);
-    restaurant.setMenuItemAvailability(menuItem.id, true);
-    const order = restaurant.createOrder({
-      serviceMode: 'DINE_IN',
-      tableId: table.id,
-      customerId: 'cust_cash',
-      warehouseId: 'wh_main',
-      items: [{ productId: dishId, quantity: 2 }],
-    });
-    assert.equal(order.items[0].kitchenStatus, 'NEW');
-    assert.throws(() => restaurant.createOrder({
-      serviceMode: 'DINE_IN',
-      tableId: table.id,
-      customerId: 'cust_cash',
-      warehouseId: 'wh_main',
-      items: [{ productId: dishId, quantity: 1 }],
-    }), /طلب مفتوح/);
-
-    const preparing = restaurant.updateKitchenStatus(order.items[0].id, 'PREPARING');
-    assert.equal(preparing.items[0].kitchenStatus, 'PREPARING');
-    assert.throws(() => restaurant.updateKitchenStatus(order.items[0].id, 'SERVED'), /لا يمكن نقل الصنف/);
-    assert.throws(() => restaurant.cancelOrder(order.id), /بدأ تحضيره/);
-    assert.throws(() => restaurant.billOrder(order.id, 'CASH'), /تقديم جميع أصناف الطلب/);
-
-    db.run(
-      `UPDATE warehouse_stock SET quantity_m2 = 0, reserved_m2 = 0 WHERE warehouse_id = 'wh_main' AND product_id = ?`,
-      [ingredientId]
-    );
-    assert.throws(() => restaurant.updateKitchenStatus(order.items[0].id, 'READY'), /غير كافٍ/);
-    assert.equal(restaurant.getOpenOrders()[0].items[0].kitchenStatus, 'PREPARING');
-    db.run(
-      `UPDATE warehouse_stock SET quantity_m2 = 10 WHERE warehouse_id = 'wh_main' AND product_id = ?`,
-      [ingredientId]
-    );
-
-    const ready = restaurant.updateKitchenStatus(order.items[0].id, 'READY');
-    assert.equal(ready.items[0].kitchenStatus, 'READY');
-    const ingredientStock = db.query<{ quantity: number }>(
-      `SELECT quantity_m2 AS quantity FROM warehouse_stock WHERE warehouse_id = 'wh_main' AND product_id = ?`,
-      [ingredientId]
-    )[0].quantity;
-    assert.equal(ingredientStock, 6);
-    const preparedDishStock = db.query<{ quantity: number }>(
-      `SELECT quantity_m2 AS quantity FROM warehouse_stock WHERE warehouse_id = 'wh_main' AND product_id = ?`,
-      [dishId]
-    )[0].quantity;
-    assert.equal(preparedDishStock, 2);
-
-    restaurant.updateKitchenStatus(order.items[0].id, 'SERVED');
-    const invoice = restaurant.billOrder(order.id, 'CASH');
-    assert.equal(invoice.totalAmount, 30);
-    assert.equal(invoice.items.length, 1);
-    assert.equal(db.query(
-      `SELECT id FROM sales_invoices WHERE restaurant_order_id = ?`,
-      [order.id]
-    ).length, 1);
-    assert.equal(db.query<{ status: string }>(
-      `SELECT status FROM restaurant_orders WHERE id = ?`,
-      [order.id]
-    )[0].status, 'BILLED');
-    assert.equal(restaurant.billOrder(order.id, 'CASH').id, invoice.id);
-    assert.equal(db.query(
-      `SELECT id FROM sales_invoices WHERE restaurant_order_id = ?`,
-      [order.id]
-    ).length, 1);
-    assert.equal(db.query<{ quantity: number }>(
-      `SELECT quantity_m2 AS quantity FROM warehouse_stock WHERE warehouse_id = 'wh_main' AND product_id = ?`,
-      [dishId]
-    )[0].quantity, 0);
-  } finally {
-    for (const [key, value] of previousSettings) {
-      if (value === undefined) db.run('DELETE FROM system_settings WHERE key = ?', [key]);
-      else db.run('INSERT OR REPLACE INTO system_settings (key, value) VALUES (?, ?)', [key, value]);
     }
   }
 });

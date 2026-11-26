@@ -243,6 +243,27 @@ export const PurchaseInvoiceModal: React.FC<PurchaseInvoiceModalProps> = ({
                   )}
                 </div>;
               })}
+              {dto.items.map((it, idx) => {
+                const selectedProduct = products.find((product) => product.id === it.productId);
+                if (!selectedProduct?.trackSerials) return null;
+                return <div key={`serials-${idx}`} className="pb-2 ps-2">
+                  <label className="block text-[11px] font-bold text-primary mb-1">
+                    الأرقام التسلسلية / IMEI المستلمة (اختياري — رقم واحد لكل وحدة، مفصولة بفاصلة أو سطر):
+                  </label>
+                  <input
+                    type="text"
+                    defaultValue={(it.serialNumbers || []).join('، ')}
+                    onBlur={(e) => {
+                      const serialNumbers = e.target.value.split(/[،,\n]+/).map((s) => s.trim()).filter(Boolean);
+                      const items = [...dto.items];
+                      items[idx].serialNumbers = serialNumbers;
+                      setDto({ ...dto, items });
+                    }}
+                    placeholder="مثال: SN-1001، SN-1002، IMEI-345…"
+                    className="w-full px-2 py-1.5 border border-accent-border rounded-lg text-xs font-mono"
+                  />
+                </div>;
+              })}
             </div>
           </div>
 

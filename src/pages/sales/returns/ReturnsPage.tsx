@@ -8,19 +8,20 @@ import {
   Wallet, TrendingDown, FileText, CheckCircle2, PackageX,
 } from 'lucide-react';
 import { SalesService, ReturnableItem, ReturnStats } from '../../../services/domains/sales/SalesService';
+import { ProductSerialService } from '../../../services/domains/inventory/ProductSerialService';
 import { ProductService } from '../../../services/domains/products/ProductService';
 import { PrintService } from '../../../services/shared/PrintService';
 import { AuthService } from '../../../services/domains/auth/AuthService';
 import { PermissionService } from '../../../services/domains/auth/PermissionService';
 import { CashierService } from '../../../services/domains/finance/CashierService';
 import { FinanceEnterpriseService } from '../../../services/domains/finance/FinanceEnterpriseService';
-import { SalesInvoice, SalesReturn, SalesReturnItem, Product } from '../../../types';
+import { SalesInvoice, SalesReturn, SalesReturnItem, Product, ProductSerial } from '../../../types';
 import type { BankAccount } from '../../../types/finance';
 import { exportToExcel, buildExportHtml } from '../../../utils/export/export';
 import { DocumentPreviewModal } from '../../../components/documents/DocumentPreviewModal';
 import { formatProductQuantity } from '../../../utils/products/productUnits';
 import {
-  convertQuantity, fromBaseQuantity, getSellableUnits, getUomLabel, isWholeUnit, pricePerUnit,
+  convertQuantity, fromBaseQuantity, getSellableUnits, getUomLabel, isWholeUnit, pricePerUnit, toBaseQuantity,
 } from '../../../utils/products/uom';
 import { calculateDiscountedReturnAmount, calculateReturnTax, computeReturnImpact, round2 } from '../../../services/domains/finance/financials';
 import { HistoricalReturnReconciliationPanel } from './HistoricalReturnReconciliationPanel';
@@ -69,6 +70,7 @@ type ReturnLine = ReturnableItem & {
   reason: string;
   entryUnit: string;
   disposition: 'RESTOCK' | 'SPECIAL_STOCK' | 'QUARANTINE' | 'DAMAGED';
+  serialNumbers?: string[];
 };
 
 export const ReturnsPage: React.FC = () => {
@@ -79,6 +81,7 @@ export const ReturnsPage: React.FC = () => {
   const cashierService = useMemo(() => new CashierService(), []);
   const financeService = useMemo(() => new FinanceEnterpriseService(), []);
   const productService = useMemo(() => new ProductService(), []);
+  const serialService = useMemo(() => new ProductSerialService(), []);
   const printService = useMemo(() => new PrintService(), []);
   const fieldService = useMemo(() => new OperationalFieldService(), []);
   const canRefund = PermissionService.can(AuthService.getCurrentUser(), 'ui.returns.returns.create');
@@ -113,6 +116,7 @@ export const ReturnsPage: React.FC = () => {
   const [refundBankAccountId, setRefundBankAccountId] = useState('');
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
   const [lines, setLines] = useState<ReturnLine[]>([]);
+  const [soldSerials, setSoldSerials] = useState<Record<string, ProductSerial[]>>({});
   const [topReasons, setTopReasons] = useState<{ reason: string; count: number; amount: number }[]>([]);
 
   // Exchange (swap) state
@@ -175,19 +179,33 @@ export const ReturnsPage: React.FC = () => {
 
   const pickInvoice = useCallback((id: string) => {
     setInvoiceId(id);
-    if (!id) { setLines([]); setInvoiceInfo(null); return; }
+    if (!id) { setLines([]); setInvoiceInfo(null); setSoldSerials({}); return; }
     const inv = service.getInvoiceById(id);
     setInvoiceInfo(inv);
     if (!inv) { setLines([]); return; }
     const returnable = service.getReturnableItems(id);
-    setLines(returnable.map((r) => ({
+    const mapped = returnable.map((r) => ({
       ...r,
       quantityM2: 0,
       reason: '',
       entryUnit: r.baseUnit || 'M2',
       disposition: r.defaultDisposition || 'RESTOCK',
-    })));
-  }, [service]);
+      serialNumbers: [] as string[],
+    }));
+    setLines(mapped);
+    // Serial-tracked lines: preload the sold-but-not-yet-returned serials so the
+    // cashier picks exactly which units come back.
+    const serialMap: Record<string, ProductSerial[]> = {};
+    for (const l of mapped) {
+      if (!l.trackSerials) continue;
+      try {
+        serialMap[l.invoiceItemId] = serialService.getSoldSerialsForInvoiceItem(l.invoiceItemId);
+      } catch {
+        serialMap[l.invoiceItemId] = [];
+      }
+    }
+    setSoldSerials(serialMap);
+  }, [service, serialService]);
 
   const openModal = useCallback((presetInvoiceId?: string) => {
     try {
@@ -205,7 +223,7 @@ export const ReturnsPage: React.FC = () => {
         if (exists) pickInvoice(presetInvoiceId);
       }
     } catch (e: any) { toast.warning(e?.message); }
-  }, [pickInvoice, service]);
+  }, [pickInvoice, service, toast]);
 
   useEffect(() => {
     if (location.state?.invoiceId) {
@@ -224,6 +242,37 @@ export const ReturnsPage: React.FC = () => {
     } catch {
       return l.quantityM2;
     }
+  };
+
+  /** Unit a serial represents for this line — mirrors POS serialSellUnit. */
+  const serialUnitFor = (l: ReturnLine): string => {
+    const sellable = getSellableUnits(l);
+    if (sellable.includes('PIECE')) return 'PIECE';
+    if (sellable.includes(l.baseUnit || 'M2')) return l.baseUnit || 'M2';
+    return sellable[0] || l.baseUnit || 'M2';
+  };
+
+  /** Base-unit quantity represented by `count` serial units on this line. */
+  const serialsToBaseQty = (l: ReturnLine, count: number): number => {
+    const unit = serialUnitFor(l);
+    try {
+      return round2(count * (toBaseQuantity(1, unit, l).quantity || 1));
+    } catch {
+      return round2(count);
+    }
+  };
+
+  const toggleLineSerial = (idx: number, serialNumber: string) => {
+    const line = lines[idx];
+    if (!line) return;
+    const current = line.serialNumbers || [];
+    const next = current.includes(serialNumber)
+      ? current.filter((n) => n !== serialNumber)
+      : [...current, serialNumber];
+    setLine(idx, {
+      serialNumbers: next,
+      quantityM2: next.length ? serialsToBaseQty(line, next.length) : 0,
+    });
   };
 
   const setEntryQuantity = (idx: number, value: number) => {
@@ -285,6 +334,8 @@ export const ReturnsPage: React.FC = () => {
     if (selected.length === 0) return toast.warning('حدد كمية لصنف واحد على الأقل.');
     const over = selected.find((l) => l.quantityM2 > l.returnableM2 + 1e-6);
     if (over) return toast.warning(`الكمية المرتجعة من "${over.productName}" تتجاوز القابل للإرجاع (${formatProductQuantity(over.returnableM2, over)}).`);
+    const missingSerials = selected.find((l) => l.trackSerials && !(l.serialNumbers || []).length);
+    if (missingSerials) return toast.warning(`الصنف "${missingSerials.productName}" يتتبع الأرقام التسلسلية — حدد الأرقام المُعادة من القائمة.`);
     if (exchangeMode && newItems.length === 0) return toast.warning('في وضع الاستبدال، أضف صنفاً بديلاً واحداً على الأقل.');
     setSaving(true);
     try {
@@ -296,6 +347,7 @@ export const ReturnsPage: React.FC = () => {
             productId: l.productId, invoiceItemId: l.invoiceItemId, quantityM2: l.quantityM2, boxesCount: 0,
             unitPrice: l.unitPrice, unitCost: l.unitCost, reason: l.reason || 'استبدال',
             specialStockId: l.specialStockId ?? null, sourceType: l.specialStockId ? 'SPECIAL' : 'REGULAR', disposition: l.disposition,
+            serialNumbers: l.serialNumbers?.length ? l.serialNumbers : undefined,
           })),
           newItems.map((n) => ({
             productId: n.productId, soldBy: 'PIECE', quantityM2: n.quantityM2, boxesCount: n.boxesCount,
@@ -316,6 +368,7 @@ export const ReturnsPage: React.FC = () => {
             productId: l.productId, invoiceItemId: l.invoiceItemId, quantityM2: l.quantityM2, boxesCount: 0,
             unitPrice: l.unitPrice, unitCost: l.unitCost, reason: l.reason || 'مرتجع سيراميك',
             specialStockId: l.specialStockId ?? null, sourceType: l.specialStockId ? 'SPECIAL' : 'REGULAR', disposition: l.disposition,
+            serialNumbers: l.serialNumbers?.length ? l.serialNumbers : undefined,
           })),
           refundCash && refundMethod !== 'BALANCE',
           AuthService.getCurrentUser()?.id || 'usr_admin',
@@ -558,7 +611,35 @@ export const ReturnsPage: React.FC = () => {
                                   { key: 'price', header: 'سعر الوحدة', render: (l) => <span className="font-mono">{round2(pricePerUnit(l.unitPrice, l.entryUnit, l))} <span className="text-[9px] text-muted">/{getUomLabel(l.entryUnit, l)}</span></span> },
                                   {
                                     key: 'qty', header: 'كمية الإرجاع',
-                                    render: (l, idx) => (
+                                    render: (l, idx) => l.trackSerials ? (
+                                      <div className="min-w-[190px]">
+                                        {(soldSerials[l.invoiceItemId] || []).length === 0 ? (
+                                          <span className="text-[10px] font-bold text-warning">لا توجد أرقام تسلسلية مُباعة غير مُعادة على هذا البند</span>
+                                        ) : (
+                                          <div className="max-h-28 overflow-y-auto rounded-lg border border-line divide-y divide-line">
+                                            {(soldSerials[l.invoiceItemId] || []).map((s) => {
+                                              const checked = (l.serialNumbers || []).includes(s.serialNumber);
+                                              return (
+                                                <label key={s.id} className="flex items-center gap-1.5 px-2 py-1 text-[10px] font-mono cursor-pointer hover:bg-surface-muted">
+                                                  <input
+                                                    type="checkbox"
+                                                    checked={checked}
+                                                    onChange={() => toggleLineSerial(idx, s.serialNumber)}
+                                                    className="accent-danger"
+                                                  />
+                                                  <span dir="ltr">{s.serialNumber}</span>
+                                                </label>
+                                              );
+                                            })}
+                                          </div>
+                                        )}
+                                        {(l.serialNumbers || []).length > 0 && (
+                                          <div className="text-[9px] text-muted mt-1">
+                                            = {formatProductQuantity(l.quantityM2, l)} ({(l.serialNumbers || []).length} وحدة)
+                                          </div>
+                                        )}
+                                      </div>
+                                    ) : (
                                       <div>
                                         <div className="flex items-center gap-1">
                                           <input

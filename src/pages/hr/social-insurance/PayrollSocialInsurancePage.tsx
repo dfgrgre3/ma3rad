@@ -283,7 +283,7 @@ export const PayrollSocialInsurancePage: React.FC = () => {
               {item.icon} {item.label}
             </button>
           ))}
-          <button onClick={load} className="mr-auto flex items-center gap-1 rounded-lg bg-primary px-3 py-2 text-xs font-bold text-white hover:bg-primary">
+          <button onClick={load} className="ms-auto flex items-center gap-1 rounded-lg bg-primary px-3 py-2 text-xs font-bold text-white hover:bg-primary">
             <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} /> تحديث
           </button>
         </div>

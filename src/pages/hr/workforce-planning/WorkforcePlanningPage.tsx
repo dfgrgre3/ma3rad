@@ -305,7 +305,7 @@ export const WorkforcePlanningPage: React.FC = () => {
               {item.icon} {item.label}
             </button>
           ))}
-          <div className="mr-auto flex items-center gap-2">
+          <div className="ms-auto flex items-center gap-2">
             <input
               type="month"
               value={periodFilter}
@@ -570,7 +570,7 @@ export const WorkforcePlanningPage: React.FC = () => {
                   )}
                   <button
                     onClick={() => run(() => WorkforcePlanningService.generateShortageSurplusAlerts(comparisonMonth), 'تم توليد تنبيهات النقص والفائض.')}
-                    className="mr-auto rounded-lg border border-accent-border bg-accent-soft px-3 py-2 text-xs font-bold text-primary hover:bg-accent-soft"
+                    className="ms-auto rounded-lg border border-accent-border bg-accent-soft px-3 py-2 text-xs font-bold text-primary hover:bg-accent-soft"
                   >
                     توليد التنبيهات
                   </button>

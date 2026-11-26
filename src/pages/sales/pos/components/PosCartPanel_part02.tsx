@@ -1,7 +1,9 @@
-import React from 'react';
-import { ShoppingCart } from 'lucide-react';
+import React, { useState } from 'react';
+import { ListChecks, ShoppingCart, Trash2 } from 'lucide-react';
+import { CeramicMath } from '../../../../utils/products/ceramicMath';
 import { CartLine } from './CartLine';
 import { PosCustomerPicker } from './PosCustomerPicker';
+import { PosSubstituteDialog } from './PosSubstituteDialog';
 import type { PosCartPanelProps } from './PosCartPanel_part01';
 import { usePosActivityCopy } from '../../../../hooks/pages/sales/pos/usePosActivityCopy';
 
@@ -28,6 +30,12 @@ export const PosCartPanel: React.FC<PosCartPanelProps> = ({
   onUpdateQuantity,
   onUpdatePrice,
   onUpdateLineDiscount,
+  canDiscount = true,
+  onBulkLineDiscount,
+  onRemoveCartLines,
+  onReplaceCartItem,
+  costInfoByProductId,
+  cartProfitSummary,
   recentlyRemoved,
   onUndoRemove,
   sellingPriceTiersCount = 1,
@@ -36,8 +44,25 @@ export const PosCartPanel: React.FC<PosCartPanelProps> = ({
   onSelectCartLine,
   customerSummary,
   onClearCustomer,
+  onOpenCustomerProfile,
+  onEditSerials,
 }) => {
   const copy = usePosActivityCopy();
+  const [bulkMode, setBulkMode] = useState(false);
+  const [selectedIndexes, setSelectedIndexes] = useState<Set<number>>(new Set());
+  const [substituteIndex, setSubstituteIndex] = useState<number | null>(null);
+  const [bulkDiscountPercent, setBulkDiscountPercent] = useState('');
+
+  const toggleLineSelection = (index: number) => {
+    setSelectedIndexes((prev) => {
+      const next = new Set(prev);
+      if (next.has(index)) next.delete(index); else next.add(index);
+      return next;
+    });
+  };
+  const exitBulkMode = () => { setBulkMode(false); setSelectedIndexes(new Set()); };
+  const effectiveSelected = [...selectedIndexes].filter((i) => i < cart.length);
+
   return (
   <>
     <PosCustomerPicker
@@ -55,6 +80,7 @@ export const PosCartPanel: React.FC<PosCartPanelProps> = ({
       onCreateNewCustomer={onCreateNewCustomer}
       onClearCustomer={onClearCustomer}
       customerSummary={customerSummary}
+      onOpenProfile={onOpenCustomerProfile}
     />
 
     {recentlyRemoved && onUndoRemove && (
@@ -70,8 +96,81 @@ export const PosCartPanel: React.FC<PosCartPanelProps> = ({
     )}
     <div className="flex items-center justify-between border-b border-line px-3 py-2 text-xs ">
       <span className="font-black text-ink ">{copy.cartTitle} <span className="font-semibold text-muted ">({cart.length} أصناف)</span></span>
-      {cart.length > 0 && <span className="text-ink-secondary ">{cart.length} بنود{cartQuantitySummary ? ` · ${cartQuantitySummary}` : ''}</span>}
+      <span className="flex items-center gap-2">
+        {cart.length > 0 && <span className="text-ink-secondary ">{cart.length} بنود{cartQuantitySummary ? ` · ${cartQuantitySummary}` : ''}</span>}
+        {cart.length > 1 && onBulkLineDiscount && (
+          <button
+            type="button"
+            onClick={() => (bulkMode ? exitBulkMode() : setBulkMode(true))}
+            aria-pressed={bulkMode}
+            title="تحديد عدة أصناف وتعديلها دفعة واحدة"
+            className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-black border transition ${
+              bulkMode ? 'bg-primary text-white border-primary' : 'bg-surface-muted border-line text-ink hover:border-primary'
+            }`}
+          >
+            <ListChecks className="w-3.5 h-3.5" /> {bulkMode ? 'إنهاء التحديد' : 'تعديل جماعي'}
+          </button>
+        )}
+      </span>
     </div>
+
+    {cartProfitSummary && (
+      <div className="mx-2.5 mt-2 rounded-xl border border-line bg-surface-muted px-3 py-1.5 text-[10px] flex items-center justify-between gap-2 flex-wrap">
+        <span className="text-muted">
+          الربح التقديري{cartProfitSummary.coveredLines < cartProfitSummary.totalLines ? ` (بيانات تكلفة لـ ${cartProfitSummary.coveredLines}/${cartProfitSummary.totalLines} صنف)` : ''}:
+        </span>
+        <span className={`font-black tabular-nums ${cartProfitSummary.profit < 0 ? 'text-danger' : cartProfitSummary.marginPercent < 10 ? 'text-warning' : 'text-success'}`}>
+          {CeramicMath.formatCurrency(cartProfitSummary.profit)} ({cartProfitSummary.marginPercent}%)
+        </span>
+      </div>
+    )}
+
+    {bulkMode && (
+      <div className="mx-2.5 mt-2 rounded-xl border border-primary/30 bg-accent-soft/60 px-3 py-2 space-y-2">
+        <div className="flex items-center justify-between text-[10px] font-bold text-ink">
+          <span>التعديل الجماعي — المحدد: {effectiveSelected.length} من {cart.length}</span>
+          <button type="button" onClick={() => setSelectedIndexes(new Set(cart.map((_, i) => i)))} className="text-primary hover:underline">تحديد الكل</button>
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          <input
+            type="number"
+            min={0}
+            max={100}
+            inputMode="decimal"
+            value={bulkDiscountPercent}
+            onChange={(e) => setBulkDiscountPercent(e.target.value)}
+            placeholder="نسبة الخصم %"
+            disabled={!canDiscount}
+            aria-label="نسبة الخصم الجماعي"
+            className="w-24 px-2 py-1.5 bg-surface border border-line rounded-lg text-[11px] font-bold text-ink disabled:opacity-50"
+          />
+          <button
+            type="button"
+            disabled={!canDiscount || effectiveSelected.length === 0}
+            onClick={() => {
+              onBulkLineDiscount?.(effectiveSelected, Number(bulkDiscountPercent) || 0);
+              setBulkDiscountPercent('');
+            }}
+            title={canDiscount ? 'تطبيق نسبة الخصم على الأصناف المحددة' : 'لا تملك صلاحية الخصم'}
+            className="px-3 py-1.5 bg-primary text-white rounded-lg text-[11px] font-black disabled:opacity-50"
+          >
+            تطبيق خصم %
+          </button>
+          <button
+            type="button"
+            disabled={effectiveSelected.length === 0}
+            onClick={() => { onRemoveCartLines?.(effectiveSelected); exitBulkMode(); }}
+            className="px-3 py-1.5 bg-danger text-white rounded-lg text-[11px] font-black disabled:opacity-50 flex items-center gap-1"
+          >
+            <Trash2 className="w-3 h-3" /> حذف المحدد
+          </button>
+          <button type="button" onClick={exitBulkMode} className="px-3 py-1.5 bg-surface-muted border border-line rounded-lg text-[11px] font-bold text-ink">
+            إلغاء
+          </button>
+        </div>
+        {!canDiscount && <p className="text-[10px] text-warning font-bold">لا تملك صلاحية تطبيق خصومات — الحذف الجماعي متاح فقط.</p>}
+      </div>
+    )}
     <div className="flex-1 min-h-0 overflow-y-auto px-2.5 py-2 space-y-2">
       {cart.length === 0 ? (
         <div className="h-full flex flex-col items-center justify-center text-center text-ink-secondary">
@@ -104,10 +203,27 @@ export const PosCartPanel: React.FC<PosCartPanelProps> = ({
             sellingPriceTierNames={sellingPriceTierNames}
             isActive={activeCartIndex === index}
             onSelect={onSelectCartLine}
+            canDiscount={canDiscount}
+            costInfo={costInfoByProductId?.[item.product.id] ?? null}
+            selectable={bulkMode}
+            selected={selectedIndexes.has(index)}
+            onToggleSelect={toggleLineSelection}
+            onRequestSubstitute={onReplaceCartItem ? (i) => setSubstituteIndex(i) : undefined}
+            onEditSerials={onEditSerials}
           />
         ))
       )}
     </div>
+    {substituteIndex !== null && onReplaceCartItem && cart[substituteIndex] && (
+      <PosSubstituteDialog
+        productName={cart[substituteIndex].product.name}
+        onClose={() => setSubstituteIndex(null)}
+        onSelect={(product) => {
+          onReplaceCartItem(substituteIndex, product);
+          setSubstituteIndex(null);
+        }}
+      />
+    )}
   </>
   );
 };

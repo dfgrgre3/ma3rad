@@ -211,7 +211,7 @@ export async function launchAuthenticatedApp(): Promise<{
     localStorage.setItem('ceramisys_session_user_id', 'usr_admin');
   });
   await seeded.page.reload();
-  await expect(seeded.page.locator('#sec-pulse')).toBeVisible({ timeout: 90_000 });
+  await expect(seeded.page.locator('nav[aria-label="أقسام لوحة المعلومات"]')).toBeVisible({ timeout: 90_000 });
   const passwordDialog = seeded.page.getByRole('dialog', { name: 'تغيير كلمة المرور الافتراضية' });
   await expect(passwordDialog).toBeVisible();
   await passwordDialog.locator('#current-password').fill('admin123');

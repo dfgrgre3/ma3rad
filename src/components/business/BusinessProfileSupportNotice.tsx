@@ -35,9 +35,6 @@ export const BusinessProfileSupportNotice: React.FC<{ businessType: string }> = 
           </div>
         ))}
       </dl>
-      {businessType === 'restaurant' && (
-        <p className="mt-2 text-[10px] leading-5">المتاح حاليًا للمطاعم هو إدارة الطاولات والمطبخ؛ بقية خصائص الملف موضحة في سجل النشاط.</p>
-      )}
       {businessType === 'manufacturing' && (
         <p className="mt-2 text-[10px] leading-5">التصنيع يوفر وظائف إنتاج أساسية؛ التقارير والقوالب القطاعية غير منفذة.</p>
       )}

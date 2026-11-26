@@ -14,7 +14,7 @@ test('hiddenPath elements follow route visibility per activity', () => {
   assert.equal(isActivityElementHidden('/sales', 'pos-checkout', 'education'), true);
   assert.equal(isActivityElementHidden('/sales', 'pos-checkout', 'healthcare_admin'), true);
   assert.equal(isActivityElementHidden('/sales', 'pos-checkout', 'ceramics'), false);
-  assert.equal(isActivityElementHidden('/sales', 'pos-checkout', 'restaurant'), false);
+  assert.equal(isActivityElementHidden('/sales', 'pos-checkout', 'hospitality'), false);
   // /returns is visible everywhere → sales-return stays.
   assert.equal(isActivityElementHidden('/sales', 'sales-return', 'education'), false);
 });
@@ -25,17 +25,17 @@ test('hiddenFor resolves activity ids and family ids', () => {
   assert.equal(isActivityElementHidden('/pos', 'discount', 'services'), true); // same family
   assert.equal(isActivityElementHidden('/pos', 'discount', 'healthcare_admin'), true);
   assert.equal(isActivityElementHidden('/pos', 'discount', 'ceramics'), false);
-  assert.equal(isActivityElementHidden('/pos', 'discount', 'restaurant'), false);
+  assert.equal(isActivityElementHidden('/pos', 'discount', 'hospitality'), false);
 });
 
 test('onlyFor keeps an element exclusive to listed activities', () => {
   assert.equal(isActivityElementHidden('/ceramics', 'calculator', 'ceramics'), false);
   assert.equal(isActivityElementHidden('/ceramics', 'calculator', 'sanitary'), true);
-  assert.equal(isActivityElementHidden('/ceramics', 'calculator', 'restaurant'), true);
+  assert.equal(isActivityElementHidden('/ceramics', 'calculator', 'hospitality'), true);
 });
 
 test('element labels resolve per activity', () => {
-  assert.equal(getActivityElementLabel('/sales', 'new-invoice', 'restaurant'), 'فاتورة طلب جديدة');
+  assert.equal(getActivityElementLabel('/sales', 'new-invoice', 'hospitality'), 'فاتورة إقامة');
   assert.equal(getActivityElementLabel('/sales', 'new-invoice', 'workshop'), 'فاتورة صيانة');
   assert.equal(getActivityElementLabel('/sales', 'new-invoice', 'ceramics'), undefined);
   assert.equal(getActivityElementLabel('/sales', 'pos-checkout', 'ceramics'), undefined);

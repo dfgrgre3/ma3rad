@@ -2,6 +2,7 @@ import React from 'react';
 import { DocumentPreviewModal } from '../../../../components/documents/DocumentPreviewModal';
 import { CeramicCalculatorModal } from '../../../../components/products/CeramicCalculatorModal';
 import { formatProductQuantity, getProductUnitLabel } from '../../../../utils/products/productUnits';
+import { CeramicMath } from '../../../../utils/products/ceramicMath';
 import {
   CloseShiftModal, HeldOrdersModal, ManagerOverrideModal, NewCustomerModal, OpenShiftModal, PinLoginModal,
   ShortcutsModal, SuccessInvoiceModal, ToneWarningModal,
@@ -16,6 +17,7 @@ export const PosPageOverlays: React.FC<{ vm: PosViewVm }> = ({ vm }) => {
     isPinLoginOpen, handlePinLogin, setIsPinLoginOpen,
     invoicePreview, setInvoicePreview,
     isHeldModalOpen, heldOrders, resumeHeldOrder, deleteHeldOrder, setIsHeldModalOpen,
+    heldOrderTtlHours, heldOrderStaleHours,
     isCustomerModalOpen, newCustName, newCustPhone, newCustType, newCustCredit, customerError,
     setNewCustName, setNewCustPhone, setNewCustType, setNewCustCredit, handleCreateCustomer, setIsCustomerModalOpen,
     isShiftModalOpen, registers, shiftRegisterId, openingBalance, setShiftRegisterId, setOpeningBalance,
@@ -47,7 +49,7 @@ export const PosPageOverlays: React.FC<{ vm: PosViewVm }> = ({ vm }) => {
                     <div className="min-w-0">
                       <div className="text-sm font-black text-ink">{source.productName} <span className="font-mono text-xs text-primary">({source.specialNumber})</span></div>
                       <div className="mt-1 text-xs text-ink-secondary">
-                        المتاح {formatProductQuantity(Number(source.availableQuantityM2), product)} • السعر {Number(source.discountedUnitPrice).toLocaleString('ar-EG')} ج.م / {getProductUnitLabel(product)}
+                        المتاح {formatProductQuantity(Number(source.availableQuantityM2), product)} • السعر {Number(source.discountedUnitPrice).toLocaleString('ar-EG')} {CeramicMath.getCurrencySymbol()} / {getProductUnitLabel(product)}
                       </div>
                     </div>
                     <button
@@ -109,6 +111,8 @@ export const PosPageOverlays: React.FC<{ vm: PosViewVm }> = ({ vm }) => {
       {isHeldModalOpen && (
         <HeldOrdersModal
           orders={heldOrders}
+          ttlHours={heldOrderTtlHours}
+          staleHours={heldOrderStaleHours}
           onResume={resumeHeldOrder}
           onDelete={deleteHeldOrder}
           onClose={() => setIsHeldModalOpen(false)}

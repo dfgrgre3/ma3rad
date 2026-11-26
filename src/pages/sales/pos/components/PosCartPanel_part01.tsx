@@ -25,6 +25,22 @@ export interface PosCartPanelProps {
   onUpdateQuantity: (index: number, value: number) => void;
   onUpdatePrice: (index: number, value: number) => void;
   onUpdateLineDiscount: (index: number, value: number) => void;
+  /** bulk-edit operations */
+  canDiscount?: boolean;
+  onBulkLineDiscount?: (indexes: number[], percent: number) => void;
+  onRemoveCartLines?: (indexes: number[]) => void;
+  /** organized in-invoice product swap */
+  onReplaceCartItem?: (index: number, product: Product) => boolean;
+  /** cost/margin data per product id — absent entries hide the hint. */
+  costInfoByProductId?: Record<string, { unitCost: number; lastPurchaseCost: number | null }>;
+  cartProfitSummary?: {
+    revenue: number;
+    cost: number;
+    profit: number;
+    marginPercent: number;
+    coveredLines: number;
+    totalLines: number;
+  } | null;
   recentlyRemoved?: any;
   onUndoRemove?: () => void;
   sellingPriceTiersCount?: number;
@@ -33,4 +49,8 @@ export interface PosCartPanelProps {
   onSelectCartLine?: (index: number) => void;
   customerSummary?: import('./PosCustomerPicker').CustomerPosSummary | null;
   onClearCustomer?: () => void;
+  /** Opens the integrated customer file dialog. */
+  onOpenCustomerProfile?: () => void;
+  /** Opens the serial/IMEI picker for a cart line (serial-tracked products). */
+  onEditSerials?: (index: number) => void;
 }

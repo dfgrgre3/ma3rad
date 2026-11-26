@@ -130,7 +130,7 @@ export const OperationsPosSection: React.FC<OperationsPosSectionProps> = ({
       checked={!!settings.posAutoSaveInvoice}
       onToggle={() => set('posAutoSaveInvoice', !settings.posAutoSaveInvoice)}
       title="الحفظ التلقائي للفاتورة"
-      description="أول صنف يتضاف بيحفظ الفاتورة فورًا وكل إضافة بتحدّثها — بيأثر في المخزن مباشرة وبيطلب صلاحية تعديل الفواتير"
+      description="يحفظ السلة تلقائياً كمسودة محلية أثناء البيع ويسترجعها عند العودة — مسودة فقط لا تؤثر في المخزن أو الحسابات قبل اعتماد الفاتورة"
       containerClassName="pb-4 border-b border-line "
     />
 

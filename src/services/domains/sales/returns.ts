@@ -5,9 +5,10 @@ import { SettingsService } from '../config/SettingsService';
 import { InventoryCostingService } from '../inventory/InventoryCostingService';
 import { InventoryLocationStockService } from '../inventory/InventoryLocationStockService';
 import { BatchService } from '../inventory/BatchService';
+import { ProductSerialService } from '../inventory/ProductSerialService';
 import { localDateString } from '../../../utils/shared/date';
 import { getProductUnitLabel, isServiceProduct } from '../../../utils/products/productUnits';
-import { convertQuantity } from '../../../utils/products/uom';
+import { convertQuantity, toBaseQuantity } from '../../../utils/products/uom';
 import { paymentAccountCode } from '../../../database/repositories/ledger';
 import { getActiveBankAccount, updateBankBalance } from './paymentAccounts';
 import { calculateDiscountedReturnAmount, calculateReturnTax, computeReturnImpact, round2 } from '../finance/financials';
@@ -55,6 +56,7 @@ interface ReturnProduct {
   piecesPerBox: number;
   productType: string;
   baseUnit: string;
+  trackSerials?: number;
 }
 
 type AuthoritativeReturnItem = ReturnRequestItem & {
@@ -613,10 +615,32 @@ function processReturnItem(
   const { invoiceId, returnId, inv, actor } = params;
   const lineTotal = item.returnAmount;
   const product = sqliteDb.query<ReturnProduct>(
-    `SELECT name, grade, meters_per_box, pieces_per_box, size, product_type, base_unit FROM products WHERE id = ?`,
+    `SELECT name, grade, meters_per_box, pieces_per_box, size, product_type, base_unit, track_serials FROM products WHERE id = ?`,
     [item.productId]
   )[0];
   if (!product) throw new Error(`الصنف ${item.productId} غير موجود.`);
+
+  // Serial/IMEI-tracked lines: when the caller names specific serials they must
+  // match the returned unit count; the service then releases exactly those.
+  const serialNumbers = (item.serialNumbers || []).map((n) => String(n).trim()).filter(Boolean);
+  if (Number(product.trackSerials) === 1 && serialNumbers.length) {
+    const soldLine = sqliteDb.query<{ soldBy: string | null }>(
+      `SELECT sold_by AS soldBy FROM sales_invoice_items WHERE id = ?`,
+      [item.invoiceItemId]
+    )[0];
+    const soldBy = soldLine?.soldBy || product.baseUnit || 'PIECE';
+    let perUnit = 1;
+    try {
+      perUnit = toBaseQuantity(1, soldBy, {
+        productType: product.productType, baseUnit: product.baseUnit,
+        metersPerBox: product.metersPerBox, piecesPerBox: product.piecesPerBox,
+      }).quantity || 1;
+    } catch { perUnit = 1; }
+    const expected = Math.round(item.quantityM2 / perUnit);
+    if (serialNumbers.length !== expected) {
+      throw new Error(`عدد الأرقام التسلسلية المحددة (${serialNumbers.length}) لا يطابق كمية الإرجاع (${expected} وحدة).`);
+    }
+  }
 
   const boxesCount = getReturnedBoxesCount(product, item.quantityM2);
   const serviceLine = isServiceProduct({ productType: product.productType, baseUnit: product.baseUnit });
@@ -673,6 +697,20 @@ function processReturnItem(
           reason: item.reason,
         });
       }
+    }
+
+    // Serial/IMEI units follow the same disposition as the stock itself:
+    // restocked units become sellable again, quarantined/damaged ones are
+    // marked DAMAGED. Special-stock returns keep their serial sold-side link.
+    if (item.invoiceItemId && disposition !== 'SPECIAL_STOCK') {
+      ProductSerialService.releaseForReturnInTransaction(sqliteDb, {
+        invoiceItemId: item.invoiceItemId,
+        count: Math.round(item.quantityM2),
+        returnInvoiceId: returnId,
+        targetStatus: disposition === 'QUARANTINE' || disposition === 'DAMAGED' ? 'DAMAGED' : 'IN_STOCK',
+        serialNumbers: serialNumbers.length ? serialNumbers : undefined,
+        actorId: actor.id,
+      });
     }
   }
   // Service lines posted a direct cost against accrued service costs at sale

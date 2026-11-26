@@ -1,6 +1,18 @@
 // Ceramic & Finishing Materials Math & Unit Conversion Helper
 
 export class CeramicMath {
+  /** رمز العملة المعتمد من إعدادات المنشأة — يُضبط عند تحميل الإعدادات. */
+  private static currencySymbol = 'ج.م';
+
+  static setCurrencySymbol(symbol?: string | null): void {
+    const value = (symbol || '').trim();
+    if (value) CeramicMath.currencySymbol = value;
+  }
+
+  static getCurrencySymbol(): string {
+    return CeramicMath.currencySymbol;
+  }
+
   /**
    * حساب عدد الكراتين اللازمة لمساحة محددة بالمتر المربع
    * @param meters المطلوب بالمتر المربع
@@ -71,12 +83,12 @@ export class CeramicMath {
   /**
    * تنسيق العملة الموحد
    */
-  static formatCurrency(amount: number, symbol = 'ج.م'): string {
+  static formatCurrency(amount: number, symbol?: string): string {
     const formatted = (amount || 0).toLocaleString('ar-EG', {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     });
-    return `${formatted} ${symbol}`;
+    return `${formatted} ${symbol ?? CeramicMath.currencySymbol}`;
   }
 
   /**

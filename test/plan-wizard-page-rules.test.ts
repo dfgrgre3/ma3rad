@@ -6,7 +6,7 @@ import {
   isGranularPermissionCode,
   permissionsForPagePath,
   routePatternMatches,
-} from '../src/pages/platform/PlatformPlanWizardPage/pageRules';
+} from '../src/pages/platform/components/access/pageAccessRules';
 import { GRANULAR_PERMISSIONS } from '../src/config/permissionMatrix';
 
 test('routePatternMatches: exact and parameterized patterns', () => {
@@ -42,11 +42,11 @@ test('featureHiddenPathsForPlan mirrors central feature→page gating', () => {
   // 'multi_branch' statically owns /branches even without a flag row.
   const hidden = featureHiddenPathsForPlan([], new Set());
   assert.ok(hidden.includes('/branches'));
-  assert.ok(hidden.includes('/restaurant'));
+  assert.ok(hidden.includes('/reports/statements'));
   // Including the feature removes its pages.
-  const hidden2 = featureHiddenPathsForPlan([], new Set(['multi_branch', 'restaurant_mode']));
+  const hidden2 = featureHiddenPathsForPlan([], new Set(['multi_branch', 'advanced_reports']));
   assert.ok(!hidden2.includes('/branches'));
-  assert.ok(!hidden2.includes('/restaurant'));
+  assert.ok(!hidden2.includes('/reports/statements'));
   // Admin-managed pagePaths on a flag row are honored for excluded codes.
   const hidden3 = featureHiddenPathsForPlan(
     [{ id: 'f1', code: 'custom_feat', name: 'Custom', isEnabled: true, rolloutPercent: 100, isStagingOnly: false, pagePaths: ['/custom-page'] } as any],

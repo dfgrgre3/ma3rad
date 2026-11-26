@@ -253,7 +253,7 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({
           >
             <Bell className="win-nav-icon" /> الإشعارات
             {unreadNotifications > 0 && (
-              <span className="mr-auto min-w-[18px] rounded-[2px] bg-[#c42b1c] px-1 text-center text-[10px] font-bold leading-[16px] text-white">
+              <span className="ms-auto min-w-[18px] rounded-[2px] bg-[#c42b1c] px-1 text-center text-[10px] font-bold leading-[16px] text-white">
                 {unreadNotifications > 99 ? '99+' : unreadNotifications}
               </span>
             )}

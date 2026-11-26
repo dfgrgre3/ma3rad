@@ -8,7 +8,6 @@ export interface CreateSaleDTO {
   quotationId?: string;
   /** Employee recorded as the sales representative for commissions/reporting. */
   salesRepId?: string;
-  restaurantOrderId?: string;
   projectId?: string;
   items: {
     productId: string;
@@ -31,6 +30,8 @@ export interface CreateSaleDTO {
     pricingSource?: 'POS' | 'ORDER' | 'QUOTATION';
     unitCost?: number;
     discountAmount?: number;
+    /** Serial/IMEI numbers assigned to this line — required when the product tracks serials. */
+    serialNumbers?: string[];
   }[];
   discountPercentage?: number;
   discountAmount?: number;

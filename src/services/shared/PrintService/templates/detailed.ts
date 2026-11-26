@@ -4,6 +4,7 @@ import { formatProductQuantity } from '../../../../utils/products/productUnits';
 import {
   esc,
   invoiceBrandStyles,
+  itemSerialsHtml,
   logoHtml,
   orderedInvoiceDetails,
   paymentBadge,
@@ -25,13 +26,13 @@ export function getDetailedInvoiceHtml(
 ): string {
   const isA5 = size === 'a5';
   const documentFooter = printOverride('sales.invoice.a4.footer', settings.receiptFooter || '');
-  const currency = settings.currency || 'ر.س';
+  const currency = settings.currencySymbol || settings.currency || 'ج.م';
 
   const itemsHtml = invoice.items.map((item, idx) => `
       <tr style="border-bottom: 1px solid #cbd5e1; text-align: center;${idx % 2 === 1 ? ' background:#f0f9ff;' : ''}">
         <td style="padding: ${isA5 ? '4px 2px' : '6px 4px'}; font-weight: bold;">${idx + 1}</td>
         <td style="padding: ${isA5 ? '4px 4px' : '6px 6px'}; text-align: right; font-weight: 700;">
-          ${esc(item.productName)}
+          ${esc(item.productName)}${itemSerialsHtml(item)}
         </td>
         ${settings.invoiceShowItemCode ? `<td style="padding: ${isA5 ? '4px 2px' : '6px 4px'}; font-family: monospace; font-size: ${isA5 ? '9px' : '10px'};">${esc(item.productSku || '-')}</td>` : ''}
         ${settings.invoiceShowItemSpecs ? `<td style="padding: ${isA5 ? '4px 2px' : '6px 4px'};">${esc(item.size || '—')}</td>

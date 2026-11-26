@@ -7,7 +7,7 @@ import { PermissionService } from '../auth/PermissionService';
 import { InventoryCostingService } from '../inventory/InventoryCostingService';
 import { ModuleRegistryService } from '../config/ModuleRegistryService';
 import { SettingsService } from '../config/SettingsService';
-import { unscaleMoneyRow } from '../../../utils/money';
+import { unscaleMoneyRow, toPiastres } from '../../../utils/money';
 
 const PRODUCT_MONEY_FIELDS = ['costPrice','cost_price','sellingPriceM2','selling_price_m2','sellingPriceBox','selling_price_box','wholesalePriceM2','wholesale_price_m2','minSellingPriceM2','min_selling_price_m2'] as const;
 import { localDateString } from '../../../utils/shared/date';
@@ -48,6 +48,30 @@ export interface ProductQueryOptions {
   customFieldFilters?: Record<string, string>;
   /** تصفية حسب قيم الخصائص الديناميكية (attributes) — attributeId → value. */
   attributeFilters?: Record<string, string>;
+  size?: string;
+  color?: string;
+  /** حدود سعر البيع بالمتر بالوحدة الكبرى (جنيه rather than piastres). */
+  minPrice?: number;
+  maxPrice?: number;
+  /** when set, stock bounds apply to this warehouse's available qty; otherwise to branch-aggregated stock. */
+  warehouseId?: string;
+  minStock?: number;
+  maxStock?: number;
+  /** products that have at least one batch purchased from this supplier. */
+  supplierId?: string;
+}
+
+export interface ProductFacets {
+  brands: { id: string; name: string; productCount: number }[];
+  sizes: string[];
+  colors: string[];
+  grades: string[];
+  tones: string[];
+  finishes: string[];
+  suppliers: { id: string; name: string }[];
+  minPrice: number;
+  maxPrice: number;
+  hasCeramicCatalog: boolean;
 }
 
 export interface ProductStats {
@@ -82,7 +106,7 @@ export class ProductService {
       `${alias}.weight_per_box`, ...(canViewCosts ? [`${alias}.cost_price`] : []),
       `${alias}.selling_price_m2`, `${alias}.selling_price_box`, `${alias}.wholesale_price_m2`,
       `${alias}.min_selling_price_m2`, `${alias}.min_stock_level`, `${alias}.max_stock_level`,
-      `${alias}.image_path`, `${alias}.notes`, `${alias}.is_active`, `${alias}.created_at`, `${alias}.updated_at`,
+      `${alias}.image_path`, `${alias}.notes`, `${alias}.is_active`, `${alias}.track_serials`, `${alias}.created_at`, `${alias}.updated_at`,
     ].join(', ');
   }
 
@@ -99,6 +123,26 @@ export class ProductService {
     };
   }
 
+  /**
+   * Unified POS/catalog search clause. Matches name/sku/barcode/size plus
+   * color, tone, finish, category and brand names, variant codes, and any
+   * dynamic attribute or operational-field value — the last two cover
+   * serial numbers and IMEI codes stored as product attributes.
+   * Expects `categories c` and `brands b` aliases to be joined.
+   */
+  private productSearchClause(): { sql: string; paramsPerTerm: number } {
+    const sql = `(p.name LIKE ? OR p.sku LIKE ? OR p.barcode LIKE ? OR p.size LIKE ?
+      OR p.color LIKE ? OR p.tone LIKE ? OR p.finish LIKE ?
+      OR c.name LIKE ? OR b.name LIKE ?
+      OR EXISTS (SELECT 1 FROM product_variants pv
+                 WHERE pv.parent_product_id = p.id AND (pv.sku LIKE ? OR pv.barcode LIKE ? OR pv.variant_name LIKE ?))
+      OR EXISTS (SELECT 1 FROM product_attribute_values pav
+                 WHERE pav.product_id = p.id AND pav.value LIKE ?)
+      OR EXISTS (SELECT 1 FROM operational_field_values opfv
+                 WHERE opfv.entity_type = 'products' AND opfv.record_id = p.id AND opfv.value LIKE ?))`;
+    return { sql, paramsPerTerm: 14 };
+  }
+
   private buildProductListQuery(search?: string, categoryId?: string, brandId?: string): { sql: string; params: any[] } {
     const scope = this.branchAccess.companyScope('p.company_id');
     let sql = `
@@ -111,9 +155,10 @@ export class ProductService {
     const params: any[] = [...scope.params];
 
     if (search && search.trim()) {
-      sql += ` AND (p.name LIKE ? OR p.sku LIKE ? OR p.barcode LIKE ? OR p.size LIKE ?)`;
+      const { sql: clause, paramsPerTerm } = this.productSearchClause();
+      sql += ` AND ${clause}`;
       const term = `%${search.trim()}%`;
-      params.push(term, term, term, term);
+      for (let i = 0; i < paramsPerTerm; i++) params.push(term);
     }
 
     if (categoryId) {
@@ -157,12 +202,43 @@ export class ProductService {
     else if (options.status === 'inactive') filters.push('p.is_active = 0');
     else if (!options.includeInactive) filters.push('p.is_active = 1');
     if (search.trim()) {
-      filters.push('(p.name LIKE ? OR p.sku LIKE ? OR p.barcode LIKE ? OR p.size LIKE ? OR c.name LIKE ? OR b.name LIKE ?)');
+      const { sql: clause, paramsPerTerm } = this.productSearchClause();
+      filters.push(clause);
       const term = `%${search.trim()}%`;
-      params.push(term, term, term, term, term, term);
+      for (let i = 0; i < paramsPerTerm; i++) params.push(term);
     }
     if (categoryId) { filters.push('p.category_id = ?'); params.push(categoryId); }
     if (brandId || options.brandId) { filters.push('p.brand_id = ?'); params.push(brandId || options.brandId); }
+    if (options.size) { filters.push('p.size = ?'); params.push(options.size); }
+    if (options.color) { filters.push("COALESCE(p.color, '') = ?"); params.push(options.color); }
+    if (options.minPrice != null) { filters.push('p.selling_price_m2 >= ?'); params.push(toPiastres(options.minPrice)); }
+    if (options.maxPrice != null) { filters.push('p.selling_price_m2 <= ?'); params.push(toPiastres(options.maxPrice)); }
+    if (options.supplierId) {
+      filters.push(`EXISTS (SELECT 1 FROM product_batches pb
+                          WHERE pb.product_id = p.id AND pb.supplier_id = ?)`);
+      params.push(options.supplierId);
+    }
+    const hasMinStock = options.minStock != null;
+    const hasMaxStock = options.maxStock != null;
+    if (hasMinStock || hasMaxStock) {
+      if (options.warehouseId) {
+        const conditions: string[] = [];
+        if (hasMinStock) conditions.push('(COALESCE(ws.quantity_m2, 0) - COALESCE(ws.reserved_m2, 0)) >= ?');
+        if (hasMaxStock) conditions.push('(COALESCE(ws.quantity_m2, 0) - COALESCE(ws.reserved_m2, 0)) <= ?');
+        // Non-inventory-tracked products (GENERAL/SERVICE) always pass,
+        // matching the client-side filter semantics.
+        filters.push(`(p.product_type = 'GENERAL' OR p.base_unit = 'SERVICE' OR EXISTS (
+          SELECT 1 FROM warehouse_stock ws
+          WHERE ws.warehouse_id = ? AND ws.product_id = p.id AND ${conditions.join(' AND ')}))`);
+        params.push(options.warehouseId);
+        if (hasMinStock) params.push(options.minStock);
+        if (hasMaxStock) params.push(options.maxStock);
+      } else {
+        const trackedOnly = `(p.product_type = 'GENERAL' OR p.base_unit = 'SERVICE' OR COALESCE(st.qty, 0)`;
+        if (hasMinStock) { filters.push(`${trackedOnly} >= ?)`); params.push(options.minStock); }
+        if (hasMaxStock) { filters.push(`${trackedOnly} <= ?)`); params.push(options.maxStock); }
+      }
+    }
     if (options.productIds) {
       if (options.productIds.length) {
         filters.push(`p.id IN (${options.productIds.map(() => '?').join(', ')})`);
@@ -208,7 +284,8 @@ export class ProductService {
       LEFT JOIN brands b ON p.brand_id = b.id
       LEFT JOIN ${stock.sql} st ON st.product_id = p.id
       WHERE ${where}`;
-    const countNeedsStock = ['in', 'low', 'out'].includes(options.stockStatus || '');
+    const countNeedsStock = ['in', 'low', 'out'].includes(options.stockStatus || '')
+      || ((hasMinStock || hasMaxStock) && !options.warehouseId);
     const countJoins = [
       ...(search.trim() ? [
         'LEFT JOIN categories c ON p.category_id = c.id',
@@ -380,6 +457,120 @@ export class ProductService {
     return rows.length > 0 ? unscaleMoneyRow(rows[0], PRODUCT_MONEY_FIELDS) : null;
   }
 
+  /**
+   * Facet options computed over the ENTIRE active product catalog (not just
+   * the page currently loaded in the UI), so POS filters never hide values
+   * that exist deeper in the database.
+   */
+  public getProductFacets(): ProductFacets {
+    PermissionService.require(AuthService.requireAuth(), 'ui.products.catalog.view');
+    const scope = this.branchAccess.companyScope('p.company_id');
+    const base = `FROM products p WHERE p.is_active = 1 AND ${scope.clause}`;
+    const params = [...scope.params];
+
+    const distinct = (column: string): string[] =>
+      this.db.query<{ v: string }>(
+        `SELECT DISTINCT ${column} AS v ${base} AND ${column} IS NOT NULL AND TRIM(${column}) <> '' ORDER BY v COLLATE NOCASE`,
+        params,
+      ).map((r) => r.v);
+
+    const brands = this.db.query<{ id: string; name: string; productCount: number }>(
+      `SELECT p.brand_id AS id, COALESCE(b.name, '') AS name, COUNT(*) AS productCount
+       ${base} GROUP BY p.brand_id ORDER BY name COLLATE NOCASE`,
+      params,
+    );
+
+    const priceRows = this.db.query<{ minPrice: number | null; maxPrice: number | null }>(
+      `SELECT MIN(p.selling_price_m2) / 100.0 AS minPrice, MAX(p.selling_price_m2) / 100.0 AS maxPrice ${base}`,
+      params,
+    )[0];
+
+    const suppliers = this.db.query<{ id: string; name: string }>(
+      `SELECT DISTINCT s.id, s.name
+       FROM product_batches pb
+       JOIN suppliers s ON s.id = pb.supplier_id
+       JOIN products p ON p.id = pb.product_id
+       WHERE p.is_active = 1 AND ${scope.clause} AND s.is_active = 1
+       ORDER BY s.name COLLATE NOCASE`,
+      params,
+    );
+
+    // Sizes are a ceramic-catalog concept — scope them like the old
+    // client-side derivation did (non-GENERAL, non-SERVICE products).
+    const sizes = this.db.query<{ v: string }>(
+      `SELECT DISTINCT p.size AS v ${base}
+       AND p.product_type <> 'GENERAL' AND p.base_unit <> 'SERVICE'
+       AND p.size IS NOT NULL AND TRIM(p.size) <> ''
+       ORDER BY v COLLATE NOCASE`,
+      params,
+    ).map((r) => r.v).sort((a, b) => a.localeCompare(b, 'ar', { numeric: true }));
+
+    const grades = distinct('p.grade');
+    const ceramicRow = this.db.query<{ n: number }>(
+      `SELECT COUNT(*) AS n ${base} AND p.product_type <> 'GENERAL' AND p.base_unit <> 'SERVICE'`,
+      params,
+    )[0];
+    return {
+      hasCeramicCatalog: Number(ceramicRow?.n ?? 0) > 0,
+      brands: brands.map((b) => ({ ...b, productCount: Number(b.productCount) || 0 })),
+      sizes,
+      colors: distinct('p.color').sort((a, b) => a.localeCompare(b, 'ar')),
+      grades,
+      tones: distinct('p.tone'),
+      finishes: distinct('p.finish'),
+      suppliers,
+      minPrice: Number(priceRows?.minPrice ?? 0) || 0,
+      maxPrice: Number(priceRows?.maxPrice ?? 0) || 0,
+    };
+  }
+
+  /**
+   * Exact lookup used by barcode scanners (hardware or camera): matches
+   * barcode, SKU, variant codes, and exact serial/IMEI-style values stored in
+   * product attributes or operational fields.
+   */
+  public getProductByScanCode(code: string): Product | null {
+    PermissionService.require(AuthService.requireAuth(), 'ui.products.catalog.view');
+    const term = String(code || '').trim();
+    if (!term) return null;
+    const scope = this.branchAccess.companyScope('p.company_id');
+    const select = `
+      SELECT ${this.productColumns('p')}, c.name as categoryName, b.name as brandName
+      FROM products p
+      LEFT JOIN categories c ON p.category_id = c.id
+      LEFT JOIN brands b ON p.brand_id = b.id
+    `;
+
+    let rows = this.db.query<Product>(
+      `${select} WHERE (p.barcode = ? OR p.sku = ?) AND p.is_active = 1 AND ${scope.clause}`,
+      [term, term, ...scope.params],
+    );
+
+    if (!rows.length) {
+      rows = this.db.query<Product>(
+        `${select} WHERE p.is_active = 1 AND ${scope.clause} AND (
+          EXISTS (SELECT 1 FROM product_attribute_values pav
+                  WHERE pav.product_id = p.id AND pav.value = ?)
+          OR EXISTS (SELECT 1 FROM operational_field_values opfv
+                     WHERE opfv.entity_type = 'products' AND opfv.record_id = p.id AND opfv.value = ?)
+        )`,
+        [...scope.params, term, term],
+      );
+    }
+
+    if (!rows.length) {
+      const variants = this.db.query<{ parent_product_id: string }>(
+        `SELECT parent_product_id FROM product_variants
+         WHERE (sku = ? OR barcode = ?) AND is_active = 1`,
+        [term, term],
+      );
+      const parentId = variants[0]?.parent_product_id;
+      if (parentId) return this.getProductById(parentId);
+    }
+
+    return rows.length > 0 ? unscaleMoneyRow(rows[0], PRODUCT_MONEY_FIELDS) : null;
+  }
+
   public generateNextBarcode(currentValue = ''): string {
     PermissionService.require(AuthService.requireAuth(), 'ui.products.catalog.create');
     const rows = this.db.query<{ barcode: string; sku: string }>(
@@ -487,8 +678,8 @@ export class ProductService {
             thickness, color, tone, finish, surface_location, base_unit, sell_unit,
           pieces_per_box, meters_per_box, weight_per_box, cost_price,
           selling_price_m2, selling_price_box, wholesale_price_m2, min_selling_price_m2,
-          min_stock_level, max_stock_level, image_path, notes, is_active, company_id
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ROUND(?*100), ROUND(?*100), ROUND(?*100), ROUND(?*100), ROUND(?*100), ?, ?, ?, ?, ?, ?)
+          min_stock_level, max_stock_level, image_path, notes, track_serials, is_active, company_id
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ROUND(?*100), ROUND(?*100), ROUND(?*100), ROUND(?*100), ROUND(?*100), ?, ?, ?, ?, ?, ?, ?)
       `, [
         id, product.productType || defaultProductType, product.customUnit || '', product.sku, product.barcode, product.name, product.categoryId, product.brandId,
           product.grade || 'GRADE_1', product.size || '', product.thickness || 0, product.color || '', product.tone || '', product.finish || '',
@@ -496,7 +687,7 @@ export class ProductService {
         product.piecesPerBox ?? 1, product.metersPerBox ?? 1, product.weightPerBox ?? 0,
         product.costPrice ?? 0, product.sellingPriceM2 ?? 0, product.sellingPriceBox ?? 0,
         product.wholesalePriceM2 ?? 0, product.minSellingPriceM2 ?? 0, product.minStockLevel ?? 10,
-        product.maxStockLevel ?? 1000, product.imagePath || '', product.notes || '', 1,
+        product.maxStockLevel ?? 1000, product.imagePath || '', product.notes || '', product.trackSerials ? 1 : 0, 1,
         (this.branchAccess.getAccessibleCompanyIds(AuthService.requireAuth()) || ['cmp_main'])[0]
       ]);
       this.sync.capture(sqliteDb, 'product', id, 'CREATE');
@@ -694,6 +885,7 @@ export class ProductService {
         max_stock_level = COALESCE(?, max_stock_level),
         notes = COALESCE(?, notes),
         image_path = COALESCE(?, image_path),
+        track_serials = COALESCE(?, track_serials),
         updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
     `;
@@ -706,7 +898,8 @@ export class ProductService {
         updates.piecesPerBox ?? null, updates.metersPerBox ?? null, updates.weightPerBox ?? null,
         updates.costPrice ?? null, updates.sellingPriceM2 ?? null, updates.sellingPriceBox ?? null,
         updates.wholesalePriceM2 ?? null, updates.minSellingPriceM2 ?? null, updates.minStockLevel ?? null,
-        updates.maxStockLevel ?? null, updates.notes ?? null, updates.imagePath ?? null, id
+        updates.maxStockLevel ?? null, updates.notes ?? null, updates.imagePath ?? null,
+        updates.trackSerials == null ? null : (updates.trackSerials ? 1 : 0), id
       ]);
       this.sync.capture(sqliteDb, 'product', id, 'UPDATE');
 
@@ -843,6 +1036,7 @@ export class ProductService {
       maxStockLevel: source.maxStockLevel,
       imagePath: source.imagePath,
       notes: source.notes,
+      trackSerials: source.trackSerials,
       isActive: true,
     }, undefined, performedBy);
   }

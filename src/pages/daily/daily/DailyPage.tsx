@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   Receipt, ShoppingBag, TrendingDown, Banknote, CalendarDays,
   RefreshCw, Download, Loader2, AlertTriangle, Clock, Users,
-  Plus, Search, Eye, Trash2, Pencil, HandCoins, Ban, ExternalLink,
+  Plus, Search, Eye, Trash2, Pencil, HandCoins, Ban, ExternalLink, ChevronLeft,
 } from 'lucide-react';
 import { DailyOperationsService } from '../../../services/domains/operations/DailyOperationsService';
 import { SettingsService } from '../../../services/domains/config/SettingsService';
@@ -281,6 +281,40 @@ const getDailyExportOptions = (kind: DailyKind, date: string, data: any) => {
         { key: 'remaining', label: 'المتبقي' }, { key: 'paymentStatus', label: 'الحالة' },
       ],
       rows: data.rows,
+      sheets: [
+        ...(data.payments?.length ? [{
+          name: 'التحصيلات',
+          columns: [
+            { key: 'receiptNumber', label: 'الإيصال' },
+            { key: 'customerName', label: 'العميل' },
+            { key: 'movementLabel', label: 'البيان' },
+            { key: 'amount', label: 'المبلغ' },
+            { key: 'paymentType', label: 'طريقة الدفع' },
+            { key: 'performedByName', label: 'بواسطة' },
+            { key: 'notes', label: 'ملاحظات' },
+          ],
+          rows: data.payments.map((row: any) => ({
+            ...row,
+            movementLabel: row.movementType === 'ORDER_DEPOSIT_REFUND' ? 'رد عربون' : 'تحصيل',
+            paymentType: PAY_LABEL[row.paymentType] || row.paymentType,
+          })),
+        }] : []),
+        ...(data.dueInstallments?.length ? [{
+          name: 'الأقساط المستحقة',
+          columns: [
+            { key: 'planNumber', label: 'الخطة' },
+            { key: 'customerName', label: 'العميل' },
+            { key: 'customerPhone', label: 'الهاتف' },
+            { key: 'sequenceNumber', label: 'رقم القسط' },
+            { key: 'dueDate', label: 'تاريخ الاستحقاق' },
+            { key: 'amount', label: 'المبلغ' },
+            { key: 'paidAmount', label: 'المدفوع' },
+            { key: 'remaining', label: 'المتبقي' },
+            { key: 'status', label: 'الحالة' },
+          ],
+          rows: data.dueInstallments,
+        }] : []),
+      ],
       fileName: `debts-${date}`,
       permission: 'finance.export',
     },
@@ -313,6 +347,7 @@ const DailyPage: React.FC<{ kind: DailyKind }> = ({ kind }) => {
   const user = useMemo(() => AuthService.getCurrentUser(), []);
   const can = (code: string) => PermissionService.can(user, code);
   const canCustomerPay = can('customers.payment');
+  const canReverseCustomerPayment = can('customers.payment.reverse');
   const canSupplierPay = can('suppliers.payment');
   const canVoidSale = can('sales.void');
   const canDeletePurchase = can('purchases.delete');
@@ -326,6 +361,9 @@ const DailyPage: React.FC<{ kind: DailyKind }> = ({ kind }) => {
   const [data, setData] = useState<any>(null);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('ALL');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+  const [lastSync, setLastSync] = useState<Date | null>(null);
   const [quickSaleOpen, setQuickSaleOpen] = useState(false);
   const [quickPurchaseOpen, setQuickPurchaseOpen] = useState(false);
   const [expenseModal, setExpenseModal] = useState<{ initial?: any } | null>(null);
@@ -345,6 +383,7 @@ const DailyPage: React.FC<{ kind: DailyKind }> = ({ kind }) => {
     setLoading(true);
     try {
       setData(getDailyData(service, kind, date));
+      setLastSync(new Date());
       setError(null);
     } catch (e: any) {
       setError(e?.message || 'تعذر تحميل بيانات اليوم');
@@ -356,6 +395,23 @@ const DailyPage: React.FC<{ kind: DailyKind }> = ({ kind }) => {
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { load(); }, [kind, date]);
+
+  useEffect(() => { setPage(1); }, [kind, date, search, status, pageSize]);
+
+  useEffect(() => {
+    const refreshSilently = () => {
+      try {
+        setData(getDailyData(service, kind, date));
+        setLastSync(new Date());
+        setError(null);
+      } catch {
+        // keep last rendered data on transient refresh failures
+      }
+    };
+    const timer = window.setInterval(refreshSilently, 30000);
+    return () => window.clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [kind, date]);
 
   const filteredRows = useMemo(() => {
     const rows: any[] = data?.rows || [];
@@ -374,6 +430,13 @@ const DailyPage: React.FC<{ kind: DailyKind }> = ({ kind }) => {
     return rows.filter((row) => !row.isOrderDepositRefunded || row.movementType === 'ORDER_DEPOSIT_REFUND')
       .filter((row) => !term || `${row.receiptNumber} ${row.customerName || ''} ${row.performedByName || ''}`.toLowerCase().includes(term));
   }, [data, search]);
+
+  const pageCount = Math.max(1, Math.ceil(filteredRows.length / pageSize));
+  const safePage = Math.min(page, pageCount);
+  const pageRows = useMemo(
+    () => filteredRows.slice((safePage - 1) * pageSize, safePage * pageSize),
+    [filteredRows, safePage, pageSize],
+  );
 
   const deleteExpense = (row: any) => {
     if (!window.confirm(`حذف مصروف «${row.description}» بمبلغ ${fmt(row.amount)} وعكس أثره على الخزينة؟`)) return;
@@ -419,7 +482,7 @@ const DailyPage: React.FC<{ kind: DailyKind }> = ({ kind }) => {
   const handleExport = () => {
     if (!data) return;
     try {
-      exportToExcel(getDailyExportOptions(kind, date, data));
+      exportToExcel(getDailyExportOptions(kind, date, { ...data, rows: filteredRows, payments: filteredPayments, dueInstallments: data.dueInstallments }));
       toast.success('تم تصدير التقرير');
     } catch (e: any) {
       toast.error(e?.message || 'تعذر تصدير التقرير');
@@ -562,7 +625,7 @@ const DailyPage: React.FC<{ kind: DailyKind }> = ({ kind }) => {
           {(search || status !== 'ALL') && (
             <button type="button" onClick={() => { setSearch(''); setStatus('ALL'); }} className="min-h-9 rounded-lg px-2 text-xs font-bold text-ink-secondary underline underline-offset-2 hover:text-success focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-success dark:hover:text-success">مسح الفلاتر</button>
           )}
-          <span className="text-[11px] font-semibold text-muted sm:mr-auto" aria-live="polite">
+          <span className="text-[11px] font-semibold text-muted sm:ms-auto" aria-live="polite">
             {loading ? 'جارٍ التحديث…' : `${plain(filteredRows.length)} من ${plain(data?.rows?.length || 0)} فاتورة`}
           </span>
         </div>
@@ -588,7 +651,7 @@ const DailyPage: React.FC<{ kind: DailyKind }> = ({ kind }) => {
           {(search || status !== 'ALL') && (
             <button onClick={() => { setSearch(''); setStatus('ALL'); }} className="px-3 py-2.5 text-xs font-semibold text-muted hover:text-ink">مسح الفلاتر</button>
           )}
-          <span className="text-[11px] text-muted sm:mr-auto">
+          <span className="text-[11px] text-muted sm:ms-auto">
             {kind === 'debts' ? `${filteredRows.length} فاتورة · ${filteredPayments.length} سند` : `${filteredRows.length} صف`}
           </span>
         </div>
@@ -645,7 +708,7 @@ const DailyPage: React.FC<{ kind: DailyKind }> = ({ kind }) => {
               ) : (
                 <>
                   <div className="divide-y divide-line-strong dark:divide-primary xl:hidden">
-                    {filteredRows.map((row: any) => (
+                    {pageRows.map((row: any) => (
                       <article key={row.id} className="p-4">
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
@@ -668,7 +731,7 @@ const DailyPage: React.FC<{ kind: DailyKind }> = ({ kind }) => {
                   <div className="hidden xl:block">
                   <UiDataTable
                     ariaLabel="مبيعات اليوم"
-                    rows={filteredRows}
+                    rows={pageRows}
                     rowKey={(row: any) => row.id}
                     minWidth={1120}
                     dense
@@ -696,6 +759,28 @@ const DailyPage: React.FC<{ kind: DailyKind }> = ({ kind }) => {
                       { key: 'actions', header: 'إجراءات', render: (row: any) => saleActions(row) },
                     ]}
                   />
+                </div>
+                <div className="flex flex-col gap-2 border-t border-line px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+                  <span className="text-[11px] text-muted ">
+                    عرض {plain(filteredRows.length === 0 ? 0 : (safePage - 1) * pageSize + 1)}–{plain(Math.min(safePage * pageSize, filteredRows.length))} من {plain(filteredRows.length)} فاتورة
+                  </span>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <label className="flex items-center gap-1 text-[10px] font-semibold text-muted ">
+                      لكل صفحة
+                      <select value={pageSize} onChange={(event) => setPageSize(Number(event.target.value))} className="rounded-md border border-line bg-surface px-1.5 py-1 text-[10px] font-bold text-ink ">
+                        {[10, 20, 50, 100].map((size) => <option key={size} value={size}>{size}</option>)}
+                      </select>
+                    </label>
+                    <div className="flex items-center gap-1">
+                      <button type="button" onClick={() => setPage(Math.max(1, safePage - 1))} disabled={safePage <= 1} aria-label="الصفحة السابقة" className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-line text-ink-secondary hover:bg-surface-muted disabled:opacity-40 dark:hover:bg-primary">
+                        <ChevronLeft className="h-4 w-4 rotate-180" />
+                      </button>
+                      <span className="min-w-[70px] text-center text-[11px] font-bold tabular-nums text-ink-secondary ">صفحة {plain(safePage)} من {plain(pageCount)}</span>
+                      <button type="button" onClick={() => setPage(Math.min(pageCount, safePage + 1))} disabled={safePage >= pageCount} aria-label="الصفحة التالية" className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-line text-ink-secondary hover:bg-surface-muted disabled:opacity-40 dark:hover:bg-primary">
+                        <ChevronLeft className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
                 </div>
                 </>
               )}
@@ -805,7 +890,7 @@ const DailyPage: React.FC<{ kind: DailyKind }> = ({ kind }) => {
                 <span className="text-ink-secondary">{PAY_LABEL[row.paymentType] || row.paymentType}</span>,
                 <span className="text-muted">{row.performedByName || '—'}</span>,
                 <span className="text-muted">{row.movementType === 'ORDER_DEPOSIT_REFUND' ? `رد عربون · ${row.notes || ''}` : row.isOrderDepositRefunded ? `تم رد العربون · ${row.notes || ''}` : row.notes || '—'}</span>,
-                canCustomerPay && !row.isOrderDeposit ? (
+                canReverseCustomerPayment && !row.isOrderDeposit ? (
                   <button title="حذف السند" onClick={() => deleteCustomerPayment(row)} className="p-1.5 text-danger hover:bg-danger-soft rounded-lg"><Trash2 className="w-3.5 h-3.5" /></button>
                 ) : <span className="text-muted">—</span>,
               ])}
@@ -830,7 +915,7 @@ const DailyPage: React.FC<{ kind: DailyKind }> = ({ kind }) => {
         )}
 
         <div className="flex items-center gap-2 text-[11px] text-muted justify-end">
-          <Clock className="w-3.5 h-3.5" /> البيانات محدّثة لحظيًا من قاعدة البيانات المحلية
+          <Clock className="w-3.5 h-3.5" /> البيانات محدّثة لحظيًا من قاعدة البيانات المحلية{lastSync ? ` · آخر مزامنة ${lastSync.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}` : ''}
           <Users className="w-3.5 h-3.5 mr-2" /> {date}
         </div>
       </div>

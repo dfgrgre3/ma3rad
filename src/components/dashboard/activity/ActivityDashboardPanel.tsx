@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { AlertTriangle, BarChart3, RefreshCw } from 'lucide-react';
+import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { CeramicMath } from '../../../utils/products/ceramicMath';
 import {
   ActivityDashboardService,
   type ActivityDashboardData,
@@ -48,7 +50,7 @@ function ListBlock({ section }: { section: ActivityListSection }) {
 /**
  * Activity-specific dashboard panel. The data shape is normalized by
  * ActivityDashboardService so each business activity renders its own KPIs,
- * progress bars and lists (hotel occupancy, restaurant tables, school
+ * progress bars and lists (hotel occupancy, workshop bays, school
  * attendance, production orders, etc.).
  */
 export const ActivityDashboardPanel: React.FC = () => {
@@ -100,6 +102,34 @@ export const ActivityDashboardPanel: React.FC = () => {
           {data.tiles.map((tile) => (
             <Tile key={tile.id} label={tile.label} value={tile.value} hint={tile.hint} />
           ))}
+        </div>
+      )}
+
+      {data.hourly && data.hourly.some((point) => point.revenue > 0) && (
+        <div className="rounded-xl border border-line bg-surface p-3 dark:bg-primary/60">
+          <div className="mb-2 text-xs font-bold text-ink-secondary ">المبيعات بالساعة (اليوم)</div>
+          <div className="h-40 w-full" dir="ltr">
+            <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 640, height: 160 }}>
+              <BarChart data={data.hourly} margin={{ top: 4, right: 4, left: -18, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--cerami-chart-grid)" />
+                <XAxis
+                  dataKey="hour"
+                  stroke="var(--cerami-muted)"
+                  fontSize={9}
+                  tickLine={false}
+                  interval={2}
+                  tickFormatter={(value: number) => `${String(value).padStart(2, '0')}:00`}
+                />
+                <YAxis stroke="var(--cerami-muted)" fontSize={9} tickLine={false} width={44} />
+                <Tooltip
+                  contentStyle={{ backgroundColor: 'var(--cerami-tooltip-surface)', borderColor: 'var(--cerami-tooltip-border)', color: 'var(--cerami-text)', borderRadius: '6px', fontSize: '11px', padding: '4px 8px' }}
+                  labelFormatter={(value: unknown) => `${String(value).padStart(2, '0')}:00`}
+                  formatter={(value: unknown) => [CeramicMath.formatCurrency(Number(value)), 'المبيعات']}
+                />
+                <Bar isAnimationActive={false} dataKey="revenue" fill="var(--win-accent)" radius={[3, 3, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
         </div>
       )}
 

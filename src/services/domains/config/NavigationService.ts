@@ -11,7 +11,7 @@ import { AppConfigService } from './AppConfigService';
 import { CentralLicenseService } from '../licensing/CentralLicenseService';
 import { CentralFeaturePermissionService } from '../licensing/CentralFeaturePermissionService';
 import { ROUTE_PERMISSIONS } from '../../../config/routePermissions';
-import { getActivityHiddenPaths } from '../../../config/activityPageVisibility';
+import { isActivityPathHidden } from '../../../config/activityPageVisibility';
 import { getActivityNavLabel } from '../../../config/activityNavLabels';
 import { getActivityPathCopy } from '../../../config/activityPathCopy';
 import { Folder } from 'lucide-react';
@@ -50,10 +50,16 @@ function parseJson<T>(raw: string | undefined, fallback: T): T {
   }
 }
 
-function parseGroupAssignments(raw: string | undefined): Record<string, string> {
+function parseGroupAssignments(
+  raw: string | undefined,
+  customGroups: Array<{ id: string }> = [],
+): Record<string, string> {
   const parsed = parseJson<unknown>(raw, {});
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
-  const knownGroups = new Set(NAV_GROUPS.map((group) => group.id));
+  const knownGroups = new Set([
+    ...NAV_GROUPS.map((group) => group.id),
+    ...customGroups.map((group) => group.id),
+  ]);
   const knownPaths = new Set(NAV_GROUPS.flatMap((group) => group.items.map((item) => item.to)));
 
   return Object.entries(parsed).reduce<Record<string, string>>((assignments, [savedPath, savedGroupId]) => {
@@ -239,7 +245,7 @@ export class NavigationService {
       labels: normalizeLabels(savedLabels),
       groupsOrder: normalizeGroupsOrder(savedGroupsOrder),
       itemsOrder: normalizeItemsOrder(savedItemsOrder),
-      groupAssignments: parseGroupAssignments(SettingsService.getValue(NAV_STORAGE_KEYS.groupAssignments)),
+      groupAssignments: parseGroupAssignments(SettingsService.getValue(NAV_STORAGE_KEYS.groupAssignments), savedCustomGroups),
       customGroups: savedCustomGroups,
     };
   }
@@ -298,7 +304,6 @@ export class NavigationService {
     const hiddenGroupSet = new Set(hiddenGroups ?? []);
     const groupAssignments = source.groupAssignments ?? {};
     const hiddenSet = new Set(hidden);
-    const activityHiddenSet = new Set(getActivityHiddenPaths());
     const businessType = ModuleRegistryService.getBusinessType();
     const termOverrides = TerminologyService.getOverrides();
     const term = (key: BusinessTermKey) => resolveBusinessTerm(key, {
@@ -328,7 +333,7 @@ export class NavigationService {
       const items = assignedItems
         .filter(({ item, groupId }) =>
           groupId === group.id
-          && (options.includeHidden || (!hiddenSet.has(item.to) && !activityHiddenSet.has(item.to)))
+          && (options.includeHidden || (!hiddenSet.has(item.to) && !isActivityPathHidden(item.to, businessType)))
         )
         .map(({ item }) => item)
         .map((item) => {
@@ -368,7 +373,7 @@ export class NavigationService {
       const rank = new Map(order.map((path, index) => [path, index]));
       const items = assignedItems
         .filter(({ item, groupId }) =>
-          groupId === g.id && !activityHiddenSet.has(item.to)
+          groupId === g.id && !isActivityPathHidden(item.to, businessType)
         )
         .map(({ item }) => item)
         .map((item) => {

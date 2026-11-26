@@ -22,7 +22,6 @@ export const appRoutes: RouteDef[] = [
   { path: 'sales/orders-deposits', element: <P.SalesOrdersDepositsPage /> },
   { path: 'sales/reservations', element: <Navigate to="/sales/orders-deposits" replace /> },
   { path: 'sales/after-sales', element: <P.AfterSalesPage /> },
-  { path: 'restaurant', element: <P.RestaurantPage /> },
   { path: 'hospitality', element: <P.HotelPage /> },
   { path: 'workshop', element: <P.WorkshopPage /> },
   { path: 'education', element: <P.EducationPage /> },
@@ -69,6 +68,7 @@ export const appRoutes: RouteDef[] = [
   { path: 'inventory/reconciliation', element: <P.InventoryReconciliationPage /> },
   { path: 'inventory/alerts', element: <P.InventoryAlertsPage /> },
   { path: 'inventory/expiry', element: <P.ExpiryPage /> },
+  { path: 'inventory/serials', element: <P.ProductSerialsPage /> },
 
   // Branches & Warehouses
   { path: 'branches', element: <P.BranchesPage /> },

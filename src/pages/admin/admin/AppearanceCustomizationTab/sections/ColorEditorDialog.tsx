@@ -100,7 +100,7 @@ export const ColorEditorDialog: React.FC<ColorEditorDialogProps> = ({ editor, re
                 <span className="text-xs font-semibold text-[var(--cerami-text)]">{draftColor.toUpperCase()}</span>
                 <button
                   type="button"
-                  className="win-btn win-btn--sm mr-auto"
+                  className="win-btn win-btn--sm ms-auto"
                   onClick={copySelectedHex}
                   disabled={readOnly || !isValidHex(draftColor)}
                 >

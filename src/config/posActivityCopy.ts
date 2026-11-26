@@ -8,6 +8,8 @@
  */
 
 export interface PosActivityCopy {
+  /** عنوان الشاشة العلوي في نقطة البيع */
+  screenTitle: string;
   /** اسم المستند الرئيسي: فاتورة / طلب */
   invoiceLabel: string;
   /** عنوان قسم تعديلات الفاتورة */
@@ -64,6 +66,7 @@ export interface PosActivityCopy {
 }
 
 export const POS_DEFAULT_COPY: PosActivityCopy = {
+  screenTitle: 'نقطة البيع',
   invoiceLabel: 'الفاتورة',
   adjustmentsTitle: 'تعديلات الفاتورة',
   invoiceDiscountLabel: 'خصم الفاتورة',
@@ -106,6 +109,7 @@ export const POS_FAMILY_COPY: Record<string, Partial<PosActivityCopy>> = {
     extraFeesLabel: 'مصاريف شحن',
   },
   hospitality: {
+    screenTitle: 'كاشير الضيافة',
     shippingLabel: 'توصيل',
     shippingTotalLabel: 'التوصيل',
     extraFeesLabel: 'رسوم خدمة',
@@ -150,32 +154,5 @@ export const POS_ACTIVITY_COPY: Record<string, Partial<PosActivityCopy>> = {
   },
   food: {
     extraFeesLabel: 'أكياس ورسوم',
-  },
-  restaurant: {
-    invoiceLabel: 'الطلب',
-    adjustmentsTitle: 'تعديلات الطلب',
-    invoiceDiscountLabel: 'خصم الطلب',
-    shippingLabel: 'توصيل',
-    shippingTotalLabel: 'رسوم التوصيل',
-    extraFeesLabel: 'رسوم خدمة',
-    paymentTitle: 'طريقة الدفع',
-    notesAriaLabel: 'ملاحظات الطلب',
-    notesPlaceholder: 'ملاحظات على الطلب (مثال: بدون بصل)...',
-    checkoutLabel: 'اعتماد الطلب (F9)',
-    checkoutBusyLabel: 'جاري إرسال الطلب...',
-    cartTitle: 'سلة الطلب',
-    heldLabel: 'طلبات معلقة',
-    holdLabel: 'تعليق',
-    walkInLabel: 'زبون نقدي',
-    directSaleBadge: 'طلب مباشر',
-    successTitle: 'تم إصدار الطلب بنجاح',
-    invoiceNumberLabel: 'رقم الطلب',
-    voidInvoiceLabel: 'إلغاء هذا الطلب',
-    displayTitle: 'عرض الطلب',
-    displayWaiting: 'في انتظار طلبك...',
-    displaySubtotal: 'مجموع الأصناف',
-    displayTotal: 'الإجمالي',
-    displayPaid: 'المدفوع',
-    displayChange: 'الباقي للعميل',
   },
 };

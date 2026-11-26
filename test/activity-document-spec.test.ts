@@ -16,7 +16,7 @@ test('sales invoice: offices lose counter-only actions', () => {
   assert.equal(isDocElementHidden('/doc/sales_invoice', 'receipt-thermal', 'education'), true);
   assert.equal(isDocElementHidden('/doc/sales_invoice', 'receipt-thermal', 'construction'), true);
   assert.equal(isDocElementHidden('/doc/sales_invoice', 'receipt-thermal', 'ceramics'), false);
-  assert.equal(isDocElementHidden('/doc/sales_invoice', 'receipt-thermal', 'restaurant'), false);
+  assert.equal(isDocElementHidden('/doc/sales_invoice', 'receipt-thermal', 'hospitality'), false);
 
   // Service activities can't return goods.
   assert.equal(isDocElementHidden('/doc/sales_invoice', 'return', 'professional_services'), true);
@@ -28,7 +28,7 @@ test('sales invoice: offices lose counter-only actions', () => {
 
   // Universal actions stay visible everywhere.
   for (const id of ['preview', 'print-a4', 'statement', 'collect-payment', 'void']) {
-    for (const activity of ['ceramics', 'professional_services', 'healthcare_admin', 'education', 'restaurant']) {
+    for (const activity of ['ceramics', 'professional_services', 'healthcare_admin', 'education', 'hospitality']) {
       assert.equal(isDocElementHidden('/doc/sales_invoice', id, activity), false, `${id}/${activity}`);
     }
   }
@@ -47,7 +47,7 @@ test('quotation: convert-to-order hidden for service offices', () => {
 });
 
 test('quotation send label adapts per activity', () => {
-  assert.equal(getDocElementLabel('/doc/quotation', 'send', 'restaurant'), 'إرسال للضيف');
+  assert.equal(getDocElementLabel('/doc/quotation', 'send', 'hospitality'), 'إرسال للنزيل');
   assert.equal(getDocElementLabel('/doc/quotation', 'send', 'healthcare_admin'), 'إرسال للمريض');
   assert.equal(getDocElementLabel('/doc/quotation', 'send', 'education'), 'إرسال لولي الأمر');
   assert.equal(getDocElementLabel('/doc/quotation', 'send', 'ceramics'), undefined);
@@ -65,7 +65,7 @@ test('purchase invoice: claims only for traders and producers', () => {
   assert.equal(isDocElementHidden('/doc/purchase_invoice', 'claim', 'logistics'), false);
   assert.equal(isDocElementHidden('/doc/purchase_invoice', 'claim', 'manufacturing'), false);
   assert.equal(isDocElementHidden('/doc/purchase_invoice', 'claim', 'ceramics'), true);
-  assert.equal(isDocElementHidden('/doc/purchase_invoice', 'claim', 'restaurant'), true);
+  assert.equal(isDocElementHidden('/doc/purchase_invoice', 'claim', 'hospitality'), true);
   for (const id of ['print', 'export', 'pay-supplier', 'return']) {
     assert.equal(isDocElementHidden('/doc/purchase_invoice', id, 'ceramics'), false, id);
   }

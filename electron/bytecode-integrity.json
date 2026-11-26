@@ -1,5 +1,5 @@
 {
-  "electron/main.jsc": "6c75fd58221567ffee4ce0669b54c2bfdcbe1c9955fb0d4eec2698fc11fe67bb",
+  "electron/main.jsc": "266843e21741eb7c57314f625611d043d4ed8341d67fc48803286cbc19f37c67",
   "electron/licenseGuard.jsc": "58bff341572617dd8111ef2672a870514ef297729c855f2afa2e32acb7b732e1",
   "electron/hardwareId.jsc": "830edb24ce0d9df9c03f52c48a372dab509d5ce2453059ef290c113b3e4d4a17",
   "electron/security.jsc": "900a43c4fad40339c4d03ceef53a1f7a82f55838eab628125d8db7cfb01a2285",
@@ -14,8 +14,9 @@
   "electron/gracefulShutdown.jsc": "93b8e69e9e5f371b9849b65b80a6274de42300f77331d05fed368423fd64671c",
   "electron/autoUpdater.jsc": "5a946c2cb5936b31a20f6d584527e5ae68d3e997388663638a3be9085c17581e",
   "electron/safeStorageCompat.jsc": "7a7014c36847db1fe89e6c874e4b7bfffc5eaadc7f2b6732af7404403e4c9a52",
-  "electron/moduleDelivery.jsc": "0d197312935eaa01218de310ff885428ee2b6689c916d0e7d264bcbf2f7740f3",
-  "electron/modulePackages.jsc": "5a91a2b39a60ffce53a9cb277ec44960a54a65fd128d4c82d916fa8d67970948",
+  "electron/moduleDelivery.jsc": "a543e5dc3b285fec57ae1f7ecb2c336b5724ccb1033d5d08eb12d06bf4e03ab8",
+  "electron/modulePackages.jsc": "3fbbd99a7839b94ae353450e78159fa3f996a4c7922014827b5fe74f4f3955ae",
+  "electron/notificationHandlers.jsc": "d12669abe3e06a6f07f6be00466eac6ad9cadef24a51a6dea45a1aae8e374b54",
   "electron/security/crypto.jsc": "d2fa88bab1bbd2098724578997ce4821378bfce7631f15fd9d610cf30ca97cc5",
   "electron/security/licenseValidator.jsc": "2920a5cc5b64fe9bdba00cf5dd2fb11107c47322e641fd7c54564b3b1ec262ec",
   "electron/security/fileIntegrity.jsc": "871dad2729ecf056b502a9530a9dfa040b5e7312068c3df7b2c110f886262f7f",

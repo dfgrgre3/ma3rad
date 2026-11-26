@@ -625,11 +625,11 @@ export const ReportView: React.FC<{ definition: ReportDefinition; onBack: () => 
             </label>
           );
         })}
-        <span className="mr-auto text-[10px] font-medium text-muted" aria-live="polite">
+        <span className="ms-auto text-[10px] font-medium text-muted" aria-live="polite">
           {lastUpdatedAt ? `آخر تحديث: ${lastUpdatedAt.toLocaleTimeString('ar-EG')}` : ''}
         </span>
 
-        <div className="relative mr-auto w-full sm:w-64">
+        <div className="relative ms-auto w-full sm:w-64">
           <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
           <input
             value={search}

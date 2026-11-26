@@ -113,7 +113,7 @@ export class BomsModule {
     visited.add(productId);
     try {
       const cost = subBom.items.reduce((sum, item) => {
-        const qty = this.itemQtyInBase(item);
+        const qty = this.itemQtyRequired(item);
         return sum + qty * this.rolledUnitCost(item.componentProductId, visited);
       }, 0);
       return cost;
@@ -129,6 +129,11 @@ export class BomsModule {
    */
   private itemQtyInBase(item: BomItem): number {
     return Number(item.quantity) || 0;
+  }
+
+  /** Net quantity inflated by the item's preparation-loss percentage. */
+  private itemQtyRequired(item: BomItem): number {
+    return this.itemQtyInBase(item) * (1 + (Number(item.wastePercent) || 0) / 100);
   }
 
   public getBoms(productId?: string): BillOfMaterials[] {
@@ -167,7 +172,7 @@ export class BomsModule {
     return boms.map((bom) => ({
       ...bom,
       estimatedCost: Math.round(
-        bom.items.reduce((sum, item) => sum + this.itemQtyInBase(item) * this.rolledUnitCost(item.componentProductId), 0) * 100
+        bom.items.reduce((sum, item) => sum + this.itemQtyRequired(item) * this.rolledUnitCost(item.componentProductId), 0) * 100
       ) / 100,
     }));
   }
@@ -177,7 +182,7 @@ export class BomsModule {
     this.ctx.requireAny(['manufacturing.view', 'manufacturing.bom.view', 'manufacturing.orders.view']);
     const bom = this.getBom(bomId);
     const items = bom.items.map((item) => {
-      const qty = this.itemQtyInBase(item);
+      const qty = this.itemQtyRequired(item);
       const unitCost = this.rolledUnitCost(item.componentProductId);
       return {
         componentProductId: item.componentProductId,
@@ -212,7 +217,7 @@ export class BomsModule {
       const bom = this.loadBomWithItems(currentBomId);
       if (!bom) throw new Error('قائمة المواد غير موجودة.');
       for (const item of bom.items) {
-        const needed = this.itemQtyInBase(item) * parentQty;
+        const needed = this.itemQtyRequired(item) * parentQty;
         const subBom = this.findActiveBomForProduct(item.componentProductId);
         if (subBom) {
           visit(subBom.id, needed, trail);
@@ -328,11 +333,12 @@ export class BomsModule {
       );
       for (const item of input.items) {
         db.run(
-          `INSERT INTO bom_items (id, bom_id, component_product_id, quantity, unit, notes, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          `INSERT INTO bom_items (id, bom_id, component_product_id, quantity, unit, waste_percent, notes, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             `bomi_${uuidv4().replace(/-/g, '').slice(0, 12)}`, id, item.componentProductId,
-            item.quantity, item.unit || 'PIECE', item.notes?.trim() || null, now,
+            item.quantity, item.unit || 'PIECE', Math.max(0, Number(item.wastePercent) || 0),
+            item.notes?.trim() || null, now,
           ]
         );
       }
@@ -408,11 +414,12 @@ export class BomsModule {
         db.run(`DELETE FROM bom_items WHERE bom_id = ?`, [id]);
         for (const item of items) {
           db.run(
-            `INSERT INTO bom_items (id, bom_id, component_product_id, quantity, unit, notes, created_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            `INSERT INTO bom_items (id, bom_id, component_product_id, quantity, unit, waste_percent, notes, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
             [
               `bomi_${uuidv4().replace(/-/g, '').slice(0, 12)}`, id, item.componentProductId,
-              item.quantity, item.unit || 'PIECE', item.notes?.trim() || null, now,
+              item.quantity, item.unit || 'PIECE', Math.max(0, Number(item.wastePercent) || 0),
+              item.notes?.trim() || null, now,
             ]
           );
         }

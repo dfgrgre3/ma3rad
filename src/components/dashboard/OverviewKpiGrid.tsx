@@ -1,16 +1,19 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import {
-  Activity, AlertTriangle, ArrowDown, ArrowUp, CreditCard, DollarSign, Package, ShoppingCart, TrendingUp, Wallet,
+  Activity, AlertTriangle, ArrowDown, ArrowLeftRight, ArrowUp, Banknote, CalendarClock, CreditCard, DollarSign,
+  HandCoins, ListChecks, Package, ReceiptText, ShoppingBag, ShoppingCart, TrendingUp, Truck, Wallet,
 } from 'lucide-react';
 import { CeramicMath } from '../../utils/products/ceramicMath';
 import type { DashboardMetrics, MonthlyComparison } from '../../services/domains/finance/AccountingService';
+import type { TodayOperationsSummary } from '../../services/domains/dashboard/DashboardMetricsService';
 
 export interface OverviewKpiGridProps {
   metrics: DashboardMetrics;
   monthlyComparison: MonthlyComparison | null;
   profitMarginPercent: string;
   averageTicket: number;
+  todayOps?: TodayOperationsSummary | null;
 }
 
 export interface KpiTileProps {
@@ -56,7 +59,7 @@ export const KpiTile: React.FC<KpiTileProps> = ({ label, value, hint, icon: Icon
   );
 };
 
-export const OverviewKpiGrid: React.FC<OverviewKpiGridProps> = ({ metrics, monthlyComparison, profitMarginPercent, averageTicket }) => {
+export const OverviewKpiGrid: React.FC<OverviewKpiGridProps> = ({ metrics, monthlyComparison, profitMarginPercent, averageTicket, todayOps }) => {
   const salesGrowth = metrics.previousMonthSales > 0 && Number.isFinite(metrics.salesGrowthRate)
     ? metrics.salesGrowthRate
     : null;
@@ -139,6 +142,78 @@ export const OverviewKpiGrid: React.FC<OverviewKpiGridProps> = ({ metrics, month
           />
         </div>
       </section>
+
+      {todayOps && (
+        <section aria-labelledby="dashboard-today-ops-heading">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <h3 id="dashboard-today-ops-heading" className="text-[12px] font-extrabold text-[#1b1b1b] dark:text-[#f0f0f0]">عمليات اليوم المالية</h3>
+            <span className="text-[10px] font-semibold text-[#767676] dark:text-[#a6a6a6]">مشتريات ومصروفات وتحصيلات وديون</span>
+          </div>
+          <div className="grid min-w-0 grid-cols-1 gap-2 min-[420px]:grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 sm:gap-3">
+            <KpiTile
+              label="مشتريات اليوم"
+              icon={ShoppingBag}
+              tone="warning"
+              value={formatMoney(todayOps.purchasesTotal)}
+              hint={`${formatCount(todayOps.purchasesCount)} فاتورة توريد`}
+              to="/purchases"
+            />
+            <KpiTile
+              label="إجمالي المصروفات اليوم"
+              icon={ReceiptText}
+              tone="warning"
+              value={formatMoney(todayOps.expensesTotal)}
+              hint={`${formatCount(todayOps.expensesCount)} حركة مصروف`}
+              to="/finance/expenses"
+            />
+            <KpiTile
+              label="إجمالي التحصيلات اليوم"
+              icon={Banknote}
+              tone="positive"
+              value={formatMoney(todayOps.collectionsTotal)}
+              hint={`${formatCount(todayOps.collectionsCount)} حركة تحصيل`}
+              to="/finance/debts"
+            />
+            <KpiTile
+              label="صافي الحركة النقدية"
+              icon={ArrowLeftRight}
+              tone={todayOps.netCashFlow < 0 ? 'negative' : 'positive'}
+              value={formatMoney(todayOps.netCashFlow)}
+              hint={`داخل ${formatMoney(todayOps.cashInflow)} · خارج ${formatMoney(todayOps.cashOutflow)}`}
+            />
+            <KpiTile
+              label="إجمالي الديون الجديدة"
+              icon={HandCoins}
+              tone={todayOps.newDebtTotal != null && todayOps.newDebtTotal > 0 ? 'warning' : 'default'}
+              value={todayOps.newDebtTotal == null ? '—' : formatMoney(todayOps.newDebtTotal)}
+              hint={todayOps.newDebtTotal == null ? 'يتطلب صلاحية متابعة الديون' : `${formatCount(todayOps.newDebtCount)} فاتورة آجلة اليوم`}
+              to="/finance/debts"
+            />
+            <KpiTile
+              label="الأقساط المستحقة"
+              icon={CalendarClock}
+              tone={todayOps.dueInstallmentsTotal != null && todayOps.dueInstallmentsTotal > 0 ? 'warning' : 'default'}
+              value={todayOps.dueInstallmentsTotal == null ? '—' : formatMoney(todayOps.dueInstallmentsTotal)}
+              hint={todayOps.dueInstallmentsTotal == null ? 'يتطلب صلاحية متابعة الديون' : `${formatCount(todayOps.dueInstallmentsCount)} قسط مستحق`}
+              to="/finance/installments"
+            />
+            <KpiTile
+              label="المستحق للموردين"
+              icon={Truck}
+              tone={todayOps.supplierOutstandingTotal != null && todayOps.supplierOutstandingTotal > 0 ? 'warning' : 'default'}
+              value={todayOps.supplierOutstandingTotal == null ? '—' : formatMoney(todayOps.supplierOutstandingTotal)}
+              hint="إجمالي المتبقي على فواتير التوريد"
+              to="/purchases"
+            />
+            <KpiTile
+              label="عدد العمليات اليوم"
+              icon={ListChecks}
+              value={formatCount(todayOps.operationsCount)}
+              hint="فواتير بيع وتوريد + مصروفات + تحصيلات"
+            />
+          </div>
+        </section>
+      )}
 
       <section aria-labelledby="dashboard-operations-heading">
         <div className="mb-2 flex items-center justify-between gap-2">

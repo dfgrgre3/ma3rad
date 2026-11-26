@@ -23,6 +23,7 @@ const compiledFiles = [
   'safeStorageCompat',
   'moduleDelivery',
   'modulePackages',
+  'notificationHandlers',
   'security/crypto',
   'security/licenseValidator',
   'security/fileIntegrity',

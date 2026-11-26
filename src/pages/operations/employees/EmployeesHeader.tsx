@@ -62,7 +62,7 @@ export const EmployeesHeader: React.FC<EmployeesHeaderProps> = ({
         <div className="mx-6 mt-3 rounded-xl border border-danger-border bg-danger-soft px-4 py-2.5 text-xs font-bold text-danger flex items-center gap-2">
           <AlertCircle className="w-4 h-4" />
           {dbError}
-          <button onClick={onRetry} className="mr-auto underline">إعادة المحاولة</button>
+          <button onClick={onRetry} className="ms-auto underline">إعادة المحاولة</button>
         </div>
       )}
     </>

@@ -28,6 +28,7 @@ export type PreparedSaleItem = {
   piecesPerBox: number;
   productType: string;
   tracksStock: boolean;
+  serialNumbers: string[];
 };
 
 export type DiscountApprovalRow = {

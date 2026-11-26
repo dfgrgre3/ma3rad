@@ -107,6 +107,21 @@ function buildPreparedItem(
   const baseQuantity = units.baseQuantity;
   validateItemQuantity(baseQuantity);
 
+  // Serial/IMEI tracking: a tracked product must carry exactly one serial per
+  // sold unit; an untracked product must not carry serials at all.
+  const serialNumbers = [...new Set((item.serialNumbers || []).map((n) => String(n).trim()).filter(Boolean))];
+  const tracksSerials = Number(product.trackSerials) === 1;
+  if (tracksSerials) {
+    const required = Math.round(units.sellQuantity);
+    if (!serialNumbers.length || serialNumbers.length !== required) {
+      throw new Error(
+        `الصنف "${product.name}" يتتبع الأرقام التسلسلية — يجب تحديد ${required} رقم تسلسلي مطابق للكمية المباعة.`
+      );
+    }
+  } else if ((item.serialNumbers || []).filter((n) => String(n).trim()).length > 0) {
+    throw new Error(`الصنف "${product.name}" لا يتتبع الأرقام التسلسلية.`);
+  }
+
   const serviceLine = isServiceProduct({ productType: product.productType, baseUnit: product.baseUnit });
   const tracksStock = trackInventory && !serviceLine;
   const unitLabel = getUnitLabel(product);
@@ -201,6 +216,7 @@ function buildPreparedItem(
     piecesPerBox,
     productType: product.productType,
     tracksStock,
+    serialNumbers,
   };
 }
 

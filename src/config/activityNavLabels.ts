@@ -1,12 +1,13 @@
 import { getEffectiveBusinessType } from '../services/domains/config/BusinessTypeService';
 import { getBusinessProfile } from './businessProfiles';
+import { isActivityPathHidden } from './activityPageVisibility';
 
 /**
  * Activity-driven sidebar labels.
  *
  * Page titles/descriptions live in `activityPageCopy_*`; this map covers the
  * navigation items themselves so the sidebar reads in the activity's own
- * vocabulary (e.g. «طلبات الصالة» for a restaurant, «بوالص الشحن» for
+ * vocabulary (e.g. «بوالص الشحن» for
  * logistics). Resolution order in NavigationService:
  *   admin label override → configured page label → activity label → term → default.
  *
@@ -30,7 +31,6 @@ export const ACTIVITY_NAV_PATHS = [
   '/documents',
   '/daily/sales',
   '/daily/purchases',
-  '/restaurant',
   '/manufacturing',
   '/construction-estimate',
   '/retail',
@@ -136,7 +136,6 @@ const FAMILY_NAV_LABELS: Record<string, NavLabelMap> = {
     '/documents': 'فواتير الإقامة',
     '/daily/sales': 'إيرادات اليوم',
     '/daily/purchases': 'مشتريات التشغيل اليوم',
-    '/restaurant': 'الصالة والمطبخ',
     '/crm/dashboard': 'علاقات النزلاء',
   },
   healthcare: {
@@ -433,23 +432,7 @@ const ACTIVITY_NAV_LABELS: Record<string, NavLabelMap> = {
     '/reports': 'تقارير الضيافة',
     '/documents': 'فواتير الإقامة',
     '/daily/sales': 'إيرادات اليوم',
-    '/restaurant': 'الصالة والمطبخ',
     '/crm/dashboard': 'علاقات النزلاء',
-  },
-  restaurant: {
-    '/pos': 'نقطة البيع',
-    '/orders': 'طلبات الصالة',
-    '/quotations': 'عروض أسعار المناسبات',
-    '/returns': 'مرتجعات الطلبات',
-    '/sales/after-sales': 'خدمة الضيوف',
-    '/partners': 'الشركاء',
-    '/projects': 'مناسبات ومطاعم',
-    '/suppliers': 'الموردون',
-    '/reports': 'تقارير الصالة',
-    '/documents': 'مستندات المطعم',
-    '/daily/sales': 'مبيعات اليوم',
-    '/restaurant': 'الصالة والمطبخ',
-    '/crm/dashboard': 'علاقات الضيوف',
   },
   healthcare_admin: {
     '/pos': 'فاتورة سريعة',
@@ -529,6 +512,9 @@ export function getActivityNavLabel(
   businessType: string = getEffectiveBusinessType(),
 ): string | undefined {
   if (!(ACTIVITY_NAV_PATHS as readonly string[]).includes(pathname)) return undefined;
+  // Labels must match availability rules: a hidden page never gets an
+  // activity-specific label (e.g. «فاتورة سريعة» for activities without /pos).
+  if (isActivityPathHidden(pathname, businessType)) return undefined;
   const activity = ACTIVITY_NAV_LABELS[businessType]?.[pathname as ActivityNavPath];
   if (activity) return activity;
   const familyId = getBusinessProfile(businessType).familyId;

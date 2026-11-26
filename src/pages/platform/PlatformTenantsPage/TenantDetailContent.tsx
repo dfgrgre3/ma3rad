@@ -352,7 +352,7 @@ export const TenantDetailContent: React.FC<TenantDetailContentProps> = ({
             الصفحات والمميزات
           </Button>
         )}
-        <Button variant="ghost" size="sm" leadingIcon={<Archive className="h-3.5 w-3.5" />} onClick={() => archive(tenant)} loading={working} disabled={!canManageTenants} className="mr-auto text-danger/80 hover:text-danger">
+        <Button variant="ghost" size="sm" leadingIcon={<Archive className="h-3.5 w-3.5" />} onClick={() => archive(tenant)} loading={working} disabled={!canManageTenants} className="ms-auto text-danger/80 hover:text-danger">
           أرشفة العميل
         </Button>
       </div>

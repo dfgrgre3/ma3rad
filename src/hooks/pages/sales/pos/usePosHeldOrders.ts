@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import type { Customer, PaymentType } from '../../../../types';
 import { HeldOrderService } from '../../../../services/domains/sales/HeldOrderService';
+import { auditLogger } from '../../../../services/domains/security/auditLogger';
 import type { CustomerService } from '../../../../services/domains/customers/CustomerService';
 import { fromBaseQuantity } from '../../../../utils/products/uom';
 import { HELD_STORAGE_KEY, round2, type CartItem, type HeldOrder, type Toast } from '../../../../types/pos';
@@ -47,6 +48,10 @@ interface UsePosHeldOrdersOptions {
   loyaltyDiscount: number;
   setLoyaltyDiscount: Dispatch<SetStateAction<number>>;
   setIsHeldModalOpen: Dispatch<SetStateAction<boolean>>;
+  /** sales.pos.held.manage — allows listing/resuming/deleting other employees' held orders. */
+  canManageHeldOrders?: boolean;
+  /** Company policy: hours before a held order expires (cannot be resumed). Default 72. */
+  heldOrderTtlHours?: number;
   notify: (message: string, type?: Toast['type']) => void;
 }
 
@@ -92,10 +97,19 @@ export const usePosHeldOrders = ({
   loyaltyDiscount,
   setLoyaltyDiscount,
   setIsHeldModalOpen,
+  canManageHeldOrders = false,
+  heldOrderTtlHours = 72,
   notify,
 }: UsePosHeldOrdersOptions) => {
   const [heldOrders, setHeldOrders] = useState<HeldOrder[]>([]);
   const heldOrdersRef = useRef<HeldOrder[]>([]);
+  const heldOrderStaleHours = 24;
+
+  const removeHeldOrderLocal = (id: string) => {
+    const next = heldOrdersRef.current.filter((order) => order.id !== id);
+    heldOrdersRef.current = next;
+    setHeldOrders(next);
+  };
 
   useEffect(() => {
     if (!currentUserId) {
@@ -104,6 +118,21 @@ export const usePosHeldOrders = ({
       return;
     }
     try {
+      // Auto-clean held orders past the facility TTL — they can no longer be
+      // resumed anyway; keeping them is dead weight. LocalStorage copies of
+      // expired orders are dropped below when merging.
+      try {
+        const cutoff = new Date(Date.now() - heldOrderTtlHours * 3600_000)
+          .toISOString().slice(0, 19).replace('T', ' ');
+        const purged = heldOrderService.purgeExpired(cutoff);
+        if (purged > 0) {
+          auditLogger.log(
+            currentUserId || 'system', 'pos', 'pos_held_order_expire_purge', 'held_order', 'batch',
+            `تنظيف تلقائي: حُذف ${purged} طلب معلق منتهٍ الصلاحية (سياسة ${heldOrderTtlHours} ساعة)`,
+            { purged, ttlHours: heldOrderTtlHours },
+          );
+        }
+      } catch { /* cleanup is best-effort — listing still works */ }
       const dbRows = heldOrderService.getAll(currentUserId);
       const restored: HeldOrder[] = dbRows.flatMap((r) => {
         try { return [{ ...JSON.parse(r.data) as HeldOrder, createdBy: r.createdBy || currentUserId }]; }
@@ -114,13 +143,65 @@ export const usePosHeldOrders = ({
         try {
           const parsed: unknown = JSON.parse(raw);
           const localOrders = Array.isArray(parsed) ? parsed as HeldOrder[] : [];
+          const ttlMs = heldOrderTtlHours * 3600_000;
           const merged = new Map(restored.map((order) => [order.id, order]));
-          localOrders.forEach((order) => merged.set(order.id, { ...order, createdBy: currentUserId }));
+          localOrders.forEach((order) => {
+            // Drop expired local snapshots — they must not be resurrected into
+            // the database by the sync-back below.
+            const age = Date.now() - Date.parse(order.createdAt);
+            if (Number.isFinite(age) && age <= ttlMs) {
+              merged.set(order.id, { ...order, createdBy: currentUserId });
+            }
+          });
           restored.splice(0, restored.length, ...merged.values());
           restored.forEach((order) => heldOrderService.save(order.id, JSON.stringify(order), currentUserId));
+          // Rewrite localStorage without the dropped expired snapshots.
+          localStorage.setItem(
+            `${HELD_STORAGE_KEY}:${currentUserId}`,
+            JSON.stringify(restored.filter((order) => !order.managed))
+          );
         } catch (error) {
           notify(error instanceof Error ? `Local held orders are corrupt: ${error.message}` : 'Local held orders are corrupt', 'error');
         }
+      }
+      // Supervisor view: merge other employees' held orders (read-only until resumed).
+      if (canManageHeldOrders) {
+        try {
+          const ownIds = new Set(restored.map((order) => order.id));
+          const managed = heldOrderService.listAll().flatMap((row) => {
+            if (ownIds.has(row.id)) return [];
+            try {
+              const order = JSON.parse(row.data) as HeldOrder;
+              return [{
+                ...order,
+                id: row.id,
+                createdBy: row.createdBy ?? order.createdBy,
+                ownerName: row.userName ?? undefined,
+                branchName: row.branchName,
+                managed: true,
+              }];
+            } catch { return []; }
+          });
+          restored.push(...managed);
+        } catch { /* without sales.pos.held.manage the own-orders view still works */ }
+      }
+      const isExpired = (order: HeldOrder) =>
+        Number.isFinite(Date.parse(order.createdAt))
+        && Date.now() - Date.parse(order.createdAt) > heldOrderTtlHours * 3600_000;
+      const staleCount = restored.filter((order) =>
+        !isExpired(order)
+        && Date.now() - Date.parse(order.createdAt) > heldOrderStaleHours * 3600_000
+      ).length;
+      if (staleCount > 0) {
+        notify(`تنبيه: ${staleCount} طلب معلق بقي معلقاً لأكثر من ${heldOrderStaleHours} ساعة`, 'warning');
+      }
+      const expiryWarnHours = heldOrderTtlHours * 0.75;
+      const nearExpiryCount = restored.filter((order) => {
+        const ageMs = Date.now() - Date.parse(order.createdAt);
+        return Number.isFinite(ageMs) && ageMs > expiryWarnHours * 3600_000 && ageMs <= heldOrderTtlHours * 3600_000;
+      }).length;
+      if (nearExpiryCount > 0) {
+        notify(`تنبيه: ${nearExpiryCount} طلب معلق يقترب من انتهاء صلاحيته (سياسة المنشأة: ${heldOrderTtlHours} ساعة)`, 'warning');
       }
       heldOrdersRef.current = restored;
       setHeldOrders(restored);
@@ -129,16 +210,18 @@ export const usePosHeldOrders = ({
       setHeldOrders([]);
       notify(error instanceof Error ? `تعذر تحميل الطلبات المعلقة: ${error.message}` : 'تعذر تحميل الطلبات المعلقة', 'error');
     }
-  }, [heldOrderService, currentUserId, notify]);
+  }, [heldOrderService, currentUserId, canManageHeldOrders, heldOrderTtlHours, heldOrderStaleHours, notify]);
 
   const persistHeld = (orders: HeldOrder[] | ((current: HeldOrder[]) => HeldOrder[])): boolean => {
-    const next = typeof orders === 'function' ? orders(heldOrdersRef.current) : orders;
+    const merged = typeof orders === 'function' ? orders(heldOrdersRef.current) : orders;
+    // Managed (other employees') orders are read-only here — never rewrite or delete them.
+    const next = merged.filter((order) => !order.managed);
     if (!currentUserId) {
       notify('تعذر حفظ الطلب المعلق: المستخدم غير محدد', 'error');
       return false;
     }
     const owned = next.map((order) => ({ ...order, createdBy: currentUserId }));
-    const previous = heldOrdersRef.current;
+    const previous = heldOrdersRef.current.filter((order) => !order.managed);
     let persisted = false;
     try {
       localStorage.setItem(`${HELD_STORAGE_KEY}:${currentUserId}`, JSON.stringify(owned));
@@ -156,8 +239,8 @@ export const usePosHeldOrders = ({
       notify(error instanceof Error ? `تعذر حفظ الطلبات في قاعدة البيانات: ${error.message}` : 'تعذر حفظ الطلبات في قاعدة البيانات', 'error');
     }
     if (!persisted) return false;
-    heldOrdersRef.current = owned;
-    setHeldOrders(owned);
+    heldOrdersRef.current = [...owned, ...heldOrdersRef.current.filter((order) => order.managed)];
+    setHeldOrders(heldOrdersRef.current);
     return true;
   };
 
@@ -212,7 +295,17 @@ export const usePosHeldOrders = ({
   };
 
   const resumeHeldOrder = (order: HeldOrder) => {
-    if (!currentUserId || order.createdBy !== currentUserId) { notify('لا تملك صلاحية استرجاع هذا الطلب', 'error'); return; }
+    const isManaged = !!order.managed;
+    if (isManaged) {
+      if (!canManageHeldOrders) { notify('لا تملك صلاحية استرجاع طلبات الموظفين الآخرين', 'error'); return; }
+    } else if (!currentUserId || order.createdBy !== currentUserId) {
+      notify('لا تملك صلاحية استرجاع هذا الطلب', 'error'); return;
+    }
+    if (Number.isFinite(Date.parse(order.createdAt))
+      && Date.now() - Date.parse(order.createdAt) > heldOrderTtlHours * 3600_000) {
+      notify('انتهت صلاحية هذا الطلب المعلق وفق سياسة المنشأة — لا يمكن استرجاعه', 'error');
+      return;
+    }
     const customer = order.customerId ? customerService.getCustomerById(order.customerId) : null;
     setSelectedCustomer(customer);
     if (order.warehouseId) setSelectedWarehouseId(order.warehouseId);
@@ -238,17 +331,51 @@ export const usePosHeldOrders = ({
     setCouponCode(order.couponCode || '');
     setRedeemPoints(order.redeemPoints || 0);
     setLoyaltyDiscount(order.loyaltyDiscount || 0);
-    persistHeld((prev) => prev.filter((item) => item.id !== order.id));
+    if (isManaged) {
+      try {
+        heldOrderService.deleteManaged(order.id);
+        auditLogger.log(
+          currentUserId || 'system', 'pos', 'pos_held_order_resume', 'held_order', order.id,
+          `استرجاع طلب معلق لموظف آخر (${order.ownerName ?? order.createdBy ?? 'غير معروف'}) — عميل: ${order.customerName}`,
+          { ownerName: order.ownerName, customerName: order.customerName, itemCount: order.items?.length ?? 0 },
+        );
+      } catch (error) {
+        notify(error instanceof Error ? `تعذر حذف الطلب الأصلي: ${error.message}` : 'تعذر حذف الطلب الأصلي', 'warning');
+      }
+      removeHeldOrderLocal(order.id);
+    } else {
+      persistHeld((prev) => prev.filter((item) => item.id !== order.id));
+    }
     setIsHeldModalOpen(false);
     notify(`تم استرجاع الطلب: ${order.customerName}`, 'success');
   };
 
   const deleteHeldOrder = (id: string) => {
+    const target = heldOrdersRef.current.find((order) => order.id === id);
+    if (target?.managed) {
+      if (!canManageHeldOrders) { notify('لا تملك صلاحية حذف طلبات الموظفين الآخرين', 'error'); return; }
+      try {
+        heldOrderService.deleteManaged(id);
+        const targetOrder = heldOrdersRef.current.find((order) => order.id === id);
+        auditLogger.log(
+          currentUserId || 'system', 'pos', 'pos_held_order_delete', 'held_order', id,
+          `حذف طلب معلق لموظف آخر (${targetOrder?.ownerName ?? targetOrder?.createdBy ?? 'غير معروف'})`,
+          { ownerName: targetOrder?.ownerName, customerName: targetOrder?.customerName },
+        );
+        removeHeldOrderLocal(id);
+      } catch (error) {
+        notify(error instanceof Error ? `تعذر حذف الطلب: ${error.message}` : 'تعذر حذف الطلب', 'error');
+      }
+      return;
+    }
     if (!currentUserId || !heldOrdersRef.current.some((order) => order.id === id && order.createdBy === currentUserId)) {
       notify('لا تملك صلاحية حذف هذا الطلب', 'error'); return;
     }
     persistHeld((prev) => prev.filter((order) => order.id !== id));
   };
 
-  return { heldOrders, holdCurrentOrder, resumeHeldOrder, deleteHeldOrder };
+  return {
+    heldOrders, holdCurrentOrder, resumeHeldOrder, deleteHeldOrder,
+    heldOrderTtlHours, heldOrderStaleHours,
+  };
 };

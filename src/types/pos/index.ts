@@ -21,11 +21,19 @@ export interface CartItem {
   discountAmount: number;
   availableStockM2: number;
   notes?: string;
+  /** الأرقام التسلسلية المحددة لهذا السطر (منتجات trackSerials). */
+  serials?: { id: string; serialNumber: string }[];
 }
 
 export interface HeldOrder {
   id: string;
   createdBy?: string;
+  /** Display name of the employee who held the order (managed view). */
+  ownerName?: string;
+  /** Branch name resolved from the order's warehouse (managed view). */
+  branchName?: string | null;
+  /** True when the order belongs to another employee and is shown via sales.pos.held.manage. */
+  managed?: boolean;
   label: string;
   createdAt: string;
   customerId: string;

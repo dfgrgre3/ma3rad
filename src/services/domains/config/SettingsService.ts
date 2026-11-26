@@ -5,6 +5,7 @@ import { PermissionService } from '../auth/PermissionService';
 import { AuditService } from '../security/AuditService';
 import type { InvoiceSectionId, InvoiceTableColumnId, SystemSettings, User } from '../../../types';
 import { v4 as uuidv4 } from 'uuid';
+import { CeramicMath } from '../../../utils/products/ceramicMath';
 
 export { bool, num, type Listener, type SettingsPatch } from './settingsUtils';
 import { bool, num, subscribeSettings, notifySettings, type Listener, type SettingsPatch } from './settingsUtils';
@@ -46,6 +47,9 @@ export class SettingsService {
 
   public static getSettings(): SystemSettings {
     const map = SettingsService.getAllRaw();
+    // Keep the shared currency formatter in sync wherever settings are read —
+    // POS screens, print templates and reports all funnel through getSettings().
+    CeramicMath.setCurrencySymbol(map.currencySymbol || 'ج.م');
     const invoiceTableColumns = SettingsService.parseInvoiceList<InvoiceTableColumnId>(
       map.invoiceTableColumns,
       ['number', 'product', 'unit', 'quantity', 'boxes', 'pieces', 'unitPrice', 'lineDiscount', 'total'],

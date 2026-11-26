@@ -23,7 +23,7 @@ export const ChecksTab: FC<ChecksTabProps> = ({ checks, canManage, selectedPerio
           <div className="flex flex-wrap items-center gap-2 font-bold">
             <Icon className="h-4 w-4 shrink-0" />
             <span>{check.label}</span>
-            <span className="mr-auto text-xs font-semibold">{style.label}{check.issueCount ? ` · ${check.issueCount} ملاحظة` : ''}</span>
+            <span className="ms-auto text-xs font-semibold">{style.label}{check.issueCount ? ` · ${check.issueCount} ملاحظة` : ''}</span>
           </div>
           {check.details.length > 0 && (
             <ul className="mt-2 space-y-1 text-xs">

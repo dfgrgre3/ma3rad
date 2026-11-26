@@ -431,7 +431,7 @@ export const OrdersTab: React.FC<TabProps> = ({ service, data, reload, canManage
           {['PLANNED', 'RELEASED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'].map((status) => (
             <button key={status} onClick={() => setStatusFilter(status)} className={`rounded-full px-3 py-1 text-xs font-bold ${statusFilter === status ? 'bg-primary text-white' : 'bg-surface-sunken text-ink-secondary'}`}>{statusBadge(status)}</button>
           ))}
-          <button onClick={exportOrders} className="mr-auto flex items-center gap-1 rounded-full bg-success-soft px-3 py-1 text-xs font-bold text-success" title="تصدير Excel">
+          <button onClick={exportOrders} className="ms-auto flex items-center gap-1 rounded-full bg-success-soft px-3 py-1 text-xs font-bold text-success" title="تصدير Excel">
             <Download className="h-3.5 w-3.5" /> تصدير
           </button>
         </div>

@@ -105,7 +105,7 @@ export const ClosePeriodModal: FC<ClosePeriodModalProps> = ({ period, checks, no
               <div className="flex items-center gap-2 font-bold">
                 <Icon className="h-4 w-4 shrink-0" />
                 <span>{check.label}</span>
-                <span className="mr-auto text-xs font-semibold">{style.label}{check.issueCount ? ` · ${check.issueCount}` : ''}</span>
+                <span className="ms-auto text-xs font-semibold">{style.label}{check.issueCount ? ` · ${check.issueCount}` : ''}</span>
               </div>
               {check.details.length > 0 && (
                 <ul className="mt-2 list-inside list-disc space-y-1 text-xs">
@@ -189,7 +189,7 @@ export const CloseYearModal: FC<CloseYearModalProps> = ({ year, readiness, retai
               <div className="flex items-center gap-2 font-bold">
                 <Icon className="h-4 w-4" />
                 <span>{check.label}</span>
-                <span className="mr-auto text-xs">{style.label}</span>
+                <span className="ms-auto text-xs">{style.label}</span>
               </div>
               {check.details.length > 0 && <p className="mt-1 text-xs">{check.details[0].message}</p>}
             </article>

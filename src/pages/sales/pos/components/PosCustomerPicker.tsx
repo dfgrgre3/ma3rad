@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { UserPlus, Wallet, CreditCard, Star, Receipt, X, ListFilter } from 'lucide-react';
+import { UserPlus, Wallet, CreditCard, Star, Receipt, X, ListFilter, FolderOpen } from 'lucide-react';
 import type { Customer } from '../../../../types';
 import { CeramicMath } from '../../../../utils/products/ceramicMath';
 import type { CustomerService } from '../../../../services/domains/customers/CustomerService';
@@ -39,6 +39,8 @@ export interface PosCustomerPickerProps {
   onCreateNewCustomer: () => void;
   onClearCustomer?: () => void;
   customerSummary?: CustomerPosSummary | null;
+  /** Opens the integrated customer file (statement, loyalty, deliveries, follow-ups). */
+  onOpenProfile?: () => void;
 }
 
 const paymentStatusLabel = (status: string) => (
@@ -60,6 +62,7 @@ export const PosCustomerPicker: React.FC<PosCustomerPickerProps> = ({
   onCreateNewCustomer,
   onClearCustomer,
   customerSummary,
+  onOpenProfile,
 }) => {
   const copy = usePosActivityCopy();
   const customerTerm = useBusinessTerm('entities.customers.singular');
@@ -85,6 +88,16 @@ export const PosCustomerPicker: React.FC<PosCustomerPickerProps> = ({
       <div className="flex items-center justify-between text-xs font-black text-ink ">
         <span className="flex items-center gap-1"><UserPlus className="w-3.5 h-3.5" /> {customerTerm}</span>
         <div className="flex items-center gap-2">
+          {selectedCustomer && !isWalkIn && onOpenProfile && (
+            <button
+              type="button"
+              onClick={onOpenProfile}
+              title="فتح ملف العميل: كشف حساب، ولاء، توصيلات، ومتابعة"
+              className="flex min-h-10 items-center gap-1 rounded-lg border border-line bg-surface px-2 text-xs font-bold text-ink-secondary transition hover:border-primary hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary dark:hover:bg-primary"
+            >
+              <FolderOpen className="w-3.5 h-3.5" /> ملف العميل
+            </button>
+          )}
           {selectedCustomer && !isWalkIn && onClearCustomer && (
             <button
               type="button"
@@ -214,8 +227,8 @@ export const PosCustomerPicker: React.FC<PosCustomerPickerProps> = ({
             {(isOverCreditLimit || isNearCreditLimit) && (
               <div role="status" className={`rounded-xl border px-3 py-2 text-xs font-bold ${isOverCreditLimit ? 'border-danger bg-danger-soft text-danger dark:border-danger dark:bg-danger/40 dark:text-danger' : 'border-warning bg-warning-soft text-warning dark:border-warning dark:bg-warning/40 dark:text-warning'}`}>
                 {isOverCreditLimit
-                  ? `تجاوز العميل حد الائتمان بمقدار ${CeramicMath.formatCurrency(balance - selectedCustomer!.creditLimit)} ج.م.`
-                  : `اقترب العميل من حد الائتمان: استُخدم ${Math.round(creditUsage * 100)}٪، والمتاح ${CeramicMath.formatCurrency(availableCredit)} ج.م.`}
+                  ? `تجاوز العميل حد الائتمان بمقدار ${CeramicMath.formatCurrency(balance - selectedCustomer!.creditLimit)} ${CeramicMath.getCurrencySymbol()}.`
+                  : `اقترب العميل من حد الائتمان: استُخدم ${Math.round(creditUsage * 100)}٪، والمتاح ${CeramicMath.formatCurrency(availableCredit)} ${CeramicMath.getCurrencySymbol()}.`}
               </div>
             )}
             </>

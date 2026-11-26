@@ -95,7 +95,7 @@ export const AdminSettingsTab: React.FC<AdminSettingsTabProps> = ({ initialTab, 
             </button>
           );
         })}
-        <div className="mr-auto flex items-center gap-2">
+        <div className="ms-auto flex items-center gap-2">
           <button onClick={resetDefaults} className="flex items-center gap-1.5 rounded-xl border border-line px-3 py-2 text-xs font-bold text-muted hover:bg-surface-sunken dark:hover:bg-primary">
             <RotateCcw className="h-3.5 w-3.5" /> استرجاع
           </button>

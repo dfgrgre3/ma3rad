@@ -544,7 +544,7 @@ export const PlatformSuperAdminDashboard: React.FC = () => {
               <span className="block text-[13px] font-bold text-ink group-hover:text-success">{action.label}</span>
               <span className="block truncate text-[10.5px] text-muted">{action.hint}</span>
             </span>
-            <Plus className="mr-auto h-4 w-4 text-muted transition group-hover:text-success" />
+            <Plus className="ms-auto h-4 w-4 text-muted transition group-hover:text-success" />
           </button>
         ))}
       </section>

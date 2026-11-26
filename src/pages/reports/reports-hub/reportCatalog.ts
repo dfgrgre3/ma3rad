@@ -310,9 +310,6 @@ export async function runReport(id: string, params: ReportParams): Promise<Repor
     case 'hotel-occupancy':
       result = await service.hotelOccupancy(params);
       break;
-    case 'restaurant-operations':
-      result = await service.restaurantOperations(params);
-      break;
     case 'education-attendance':
       result = await service.educationAttendance(params);
       break;

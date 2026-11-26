@@ -4,9 +4,7 @@ import './lazyPages_part02';
 import './lazyPages_part03';
 import './lazyPages_part04';
 export { DashboardView } from './lazyPages_part01';
-export { ExecutiveDashboard } from './lazyPages_part01';
 export { PosView } from './lazyPages_part01';
-export { RestaurantPage } from './lazyPages_part01';
 export { SalesView } from './lazyPages_part01';
 export { SalesAnalyticsPage } from './lazyPages_part01';
 export { SalesHubPage } from './lazyPages_part01';
@@ -161,3 +159,4 @@ export const TimeBillingPage = moduleLazy('projects', () => import('../pages/pro
 export const CeramicsPage = moduleLazy('sales', () => import('../pages/ceramics/showroom/CeramicsPage').then(m => ({ default: m.CeramicsPage })));
 export const RetailWorkspacePage = moduleLazy('sales', () => import('../pages/retail/workspace/RetailWorkspacePage').then(m => ({ default: m.RetailWorkspacePage })));
 export const ExpiryPage = moduleLazy('inventory', () => import('../pages/inventory/expiry/ExpiryPage').then(m => ({ default: m.ExpiryPage })));
+export const ProductSerialsPage = moduleLazy('inventory', () => import('../pages/inventory/product-serials/ProductSerialsPage').then(m => ({ default: m.ProductSerialsPage })));

@@ -14,7 +14,7 @@ export const TopProductsCard: React.FC<TopProductsCardProps> = ({ topProducts })
         <div className="flex items-center justify-between mb-3">
           <div>
             <h3 className="text-xs font-bold text-ink dark:text-white">أكثر الأصناف طلباً</h3>
-            <p className="text-[11px] text-muted">حسب إجمالي الكمية بوحدة كل صنف</p>
+            <p className="text-[11px] text-muted">حسب إجمالي الكمية بوحدة كل صنف — كل الفترات</p>
           </div>
           <span className="text-[11px] font-semibold text-muted">أعلى 5</span>
         </div>

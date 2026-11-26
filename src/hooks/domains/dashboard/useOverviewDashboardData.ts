@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, useTransition } from 'react';
-import { dashboardMetricsService, type OverviewDashboardData as ServiceOverviewData } from '../../../services/domains/dashboard/DashboardMetricsService';
+import { dashboardMetricsService, type OverviewDashboardData as ServiceOverviewData, type TodayOperationsSummary } from '../../../services/domains/dashboard/DashboardMetricsService';
 import { AccountingService, type DashboardMetrics, type MonthlyComparison } from '../../../services/domains/finance/AccountingService';
 import { getProductUnitLabel } from '../../../utils/products/productUnits';
 import type {
@@ -31,7 +31,6 @@ export interface OverviewDashboardData {
   monthlyComparison: MonthlyComparison | null;
   topCustomers: TopCustomerItem[];
   categorySales: CategoryDistributionItem[];
-  gradeSales: { grade: string; quantityM2: number; totalRevenue: number }[];
   paymentDistribution: PaymentDistributionItem[];
   recentActivities: RecentActivityItem[];
   todayPurchases: ServiceOverviewData['todayPurchases'] | null;
@@ -44,6 +43,7 @@ export interface OverviewDashboardData {
   purchaseTopSuppliers: PurchaseTopSupplier[];
   purchaseTopItems: PurchaseTopItem[];
   purchaseQuantitiesByUnit: [string, number][];
+  todayOps: TodayOperationsSummary | null;
 }
 
 export const useOverviewDashboardData = (): OverviewDashboardData => {
@@ -58,12 +58,12 @@ export const useOverviewDashboardData = (): OverviewDashboardData => {
   const [monthlyComparison, setMonthlyComparison] = useState<MonthlyComparison | null>(null);
   const [topCustomers, setTopCustomers] = useState<TopCustomerItem[]>([]);
   const [categorySales, setCategorySales] = useState<CategoryDistributionItem[]>([]);
-  const [gradeSales, setGradeSales] = useState<{ grade: string; quantityM2: number; totalRevenue: number }[]>([]);
   const [paymentDistribution, setPaymentDistribution] = useState<PaymentDistributionItem[]>([]);
   const [recentActivities, setRecentActivities] = useState<RecentActivityItem[]>([]);
   const [todayPurchases, setTodayPurchases] = useState<ServiceOverviewData['todayPurchases'] | null>(null);
   const [purchasesLoading, setPurchasesLoading] = useState(true);
   const [purchasesError, setPurchasesError] = useState<string | null>(null);
+  const [todayOps, setTodayOps] = useState<TodayOperationsSummary | null>(null);
 
   const loadData = useCallback(async () => {
     const dashboardStartedAt = performance.now();
@@ -98,11 +98,11 @@ export const useOverviewDashboardData = (): OverviewDashboardData => {
         setMonthlyComparison(data.monthlyComparison);
         setTopCustomers(data.topCustomers);
         setCategorySales(data.categorySales);
-        setGradeSales(data.gradeSales);
         setPaymentDistribution(data.paymentDistribution);
         setRecentActivities(data.recentActivities);
         setTodayPurchases(data.todayPurchases);
         setPurchasesError(data.purchasesError);
+        setTodayOps(data.todayOps);
       });
     } catch (e) {
       console.error(e);
@@ -197,7 +197,6 @@ export const useOverviewDashboardData = (): OverviewDashboardData => {
     monthlyComparison,
     topCustomers,
     categorySales,
-    gradeSales,
     paymentDistribution,
     recentActivities,
     todayPurchases,
@@ -210,5 +209,6 @@ export const useOverviewDashboardData = (): OverviewDashboardData => {
     purchaseTopSuppliers,
     purchaseTopItems,
     purchaseQuantitiesByUnit,
+    todayOps,
   };
 };

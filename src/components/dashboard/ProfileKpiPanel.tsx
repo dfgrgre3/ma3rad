@@ -1,6 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { getEffectiveBusinessType } from '../../services/domains/config/BusinessTypeService';
-import { getBusinessProfile, getProfileDashboard } from '../../config/businessProfiles';
+import { getBusinessProfile } from '../../config/businessProfiles';
+import { getProfileKpiCatalog } from '../../config/profileDashboardKpis';
+import { useDashboardPrefs } from '../../hooks/domains/dashboard/useDashboardPrefs';
 import { AccountingService } from '../../services/domains/finance/AccountingService';
 import { CeramicMath } from '../../utils/products/ceramicMath';
 import { DashboardMetricsService } from '../../services/domains/dashboard/DashboardMetricsService';
@@ -10,7 +12,7 @@ import { useTheme } from '../../contexts/useTheme';
 interface KpiWithValue {
   id: string;
   label: { ar: string; en: string };
-  source: 'sales' | 'inventory' | 'finance' | 'customers' | 'manufacturing' | 'restaurant' | 'projects';
+  source: 'sales' | 'purchases' | 'inventory' | 'finance' | 'customers' | 'manufacturing' | 'projects';
   format?: 'number' | 'currency' | 'm2' | 'percent';
   value?: number | string;
   loading: boolean;
@@ -23,86 +25,98 @@ interface KpiWithValue {
 export const ProfileKpiPanel: React.FC = () => {
   const businessType = getEffectiveBusinessType();
   const profile = getBusinessProfile(businessType);
-  const dashboardConfig = getProfileDashboard(businessType);
-  const kpis = dashboardConfig?.kpis ?? [];
+  const prefs = useDashboardPrefs();
+  const kpiCatalog = useMemo(() => getProfileKpiCatalog(businessType), [businessType]);
 
-  // Default KPIs if profile doesn't define any
-  const defaultKpis = [
-    { id: 'today_sales', label: { ar: 'مبيعات اليوم', en: 'Today Sales' }, source: 'sales' as const, format: 'currency' as const },
-    { id: 'month_sales', label: { ar: 'مبيعات الشهر', en: 'Month Sales' }, source: 'sales' as const, format: 'currency' as const },
-    { id: 'net_profit', label: { ar: 'صافي الربح', en: 'Net Profit' }, source: 'finance' as const, format: 'currency' as const },
-    { id: 'inventory_value', label: { ar: 'قيمة المخزون', en: 'Inventory Value' }, source: 'inventory' as const, format: 'currency' as const },
-    { id: 'low_stock', label: { ar: 'نواقص المخزون', en: 'Low Stock Items' }, source: 'inventory' as const, format: 'number' as const },
-    { id: 'receivables', label: { ar: 'ديون العملاء', en: 'Customer Receivables' }, source: 'finance' as const, format: 'currency' as const },
-  ];
-
-  const effectiveKpis = kpis.length > 0 ? kpis : defaultKpis;
+  // User-selected KPIs (order matters); falls back to the full catalog.
+  const effectiveKpis = useMemo(() => {
+    if (!prefs.kpis) return kpiCatalog;
+    const byId = new Map(kpiCatalog.map((kpi) => [kpi.id, kpi]));
+    return prefs.kpis.map((id) => byId.get(id)).filter((kpi): kpi is NonNullable<typeof kpi> => Boolean(kpi));
+  }, [kpiCatalog, prefs.kpis]);
   const [kpiValues, setKpiValues] = useState<Map<string, KpiWithValue>>(new Map());
 
   useEffect(() => {
     const fetchKpiValues = async () => {
       const accountingService = new AccountingService();
       const dashboardMetricsService = new DashboardMetricsService();
-      
-      try {
-        // Fetch data for different sources
-        const today = new Date().toISOString().split('T')[0];
-        const monthStart = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-01`;
-        
-        // Get metrics from AccountingService
-        const metrics = await accountingService.getDashboardMetricsAsync();
-        
-        // Get executive data for more KPIs
-        const execData = await dashboardMetricsService.getExecutiveDashboardData(monthStart, today);
 
-        // Project-domain KPIs (construction/contracting profiles)
-        let projectPortfolio: ReturnType<ProjectExecutionService['getPortfolioSummary']> | null = null;
-        if (effectiveKpis.some((k) => k.source === 'projects')) {
-          try {
-            projectPortfolio = new ProjectExecutionService().getPortfolioSummary();
-          } catch {
-            projectPortfolio = null;
-          }
-        }
+      // Each source fails independently so one outage doesn't blank the rest.
+      const settle = <T,>(promise: Promise<T>) =>
+        promise.then((value) => ({ ok: true as const, value })).catch((error) => {
+          console.error('Failed to fetch KPI source:', error);
+          return { ok: false as const };
+        });
 
+      const today = new Date().toISOString().split('T')[0];
+      const monthStart = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-01`;
+
+      const needsExecData = effectiveKpis.some((k) => k.id === 'total_debt' || k.id === 'total_received');
+      const needsProjects = effectiveKpis.some((k) => k.source === 'projects');
+
+      const [metricsResult, execResult, projectResult] = await Promise.all([
+        settle(accountingService.getDashboardMetricsAsync()),
+        needsExecData
+          ? settle(dashboardMetricsService.getExecutiveDashboardData(monthStart, today))
+          : Promise.resolve({ ok: false as const }),
+        needsProjects
+          ? settle(Promise.resolve().then(() => new ProjectExecutionService().getPortfolioSummary()))
+          : Promise.resolve({ ok: false as const }),
+      ]);
+
+      const metrics = metricsResult.ok ? metricsResult.value : null;
+      const execData = execResult.ok ? execResult.value : null;
+      const projectPortfolio = projectResult.ok ? projectResult.value : null;
+
+      {
         const newValues = new Map<string, KpiWithValue>();
-        
+
         for (const kpi of effectiveKpis) {
+          // A KPI shows '—' only when every source that can feed it failed.
+          const hasSource = kpi.source === 'projects'
+            ? projectPortfolio !== null
+            : metrics !== null
+              || ((kpi.id === 'total_debt' || kpi.id === 'total_received') && execData !== null);
+          if (!hasSource) {
+            newValues.set(kpi.id, { ...kpi, value: '—', loading: false });
+            continue;
+          }
+
           let value: number | string = 0;
-          
+
           switch (kpi.id) {
             case 'today_sales':
-              value = metrics.todaySales;
+              value = metrics?.todaySales ?? 0;
               break;
             case 'month_sales':
-              value = metrics.monthSales;
+              value = metrics?.monthSales ?? 0;
               break;
             case 'net_profit':
-              value = metrics.netProfit;
+              value = metrics?.netProfit ?? 0;
               break;
             case 'inventory_value':
-              value = metrics.inventoryValuationCost ?? 0;
+              value = metrics?.inventoryValuationCost ?? 0;
               break;
             case 'low_stock':
-              value = metrics.lowStockCount;
+              value = metrics?.lowStockCount ?? 0;
               break;
             case 'receivables':
-              value = metrics.totalReceivables;
+              value = metrics?.totalReceivables ?? 0;
               break;
             case 'today_purchases':
-              value = metrics.todayPurchases;
+              value = metrics?.todayPurchases ?? 0;
               break;
             case 'gross_profit':
-              value = metrics.grossProfit;
+              value = metrics?.grossProfit ?? 0;
               break;
             case 'profit_margin':
-              value = metrics.profitMargin;
+              value = metrics?.profitMargin ?? 0;
               break;
             case 'avg_order':
-              value = metrics.averageOrderValue;
+              value = metrics?.averageOrderValue ?? 0;
               break;
             case 'total_debt':
-              value = execData?.totalDebt ?? metrics.totalReceivables;
+              value = execData?.totalDebt ?? metrics?.totalReceivables ?? 0;
               break;
             case 'total_received':
               value = execData?.totalReceived ?? 0;
@@ -127,12 +141,14 @@ export const ProfileKpiPanel: React.FC = () => {
               break;
             default:
               // Try to match by source
-              if (kpi.source === 'sales' && metrics.todaySales > 0) {
-                value = metrics.todaySales;
-              } else if (kpi.source === 'finance' && metrics.netProfit !== 0) {
-                value = metrics.netProfit;
+              if (kpi.source === 'sales' && (metrics?.todaySales ?? 0) > 0) {
+                value = metrics?.todaySales ?? 0;
+              } else if (kpi.source === 'purchases' && (metrics?.todayPurchases ?? 0) > 0) {
+                value = metrics?.todayPurchases ?? 0;
+              } else if (kpi.source === 'finance' && (metrics?.netProfit ?? 0) !== 0) {
+                value = metrics?.netProfit ?? 0;
               } else if (kpi.source === 'inventory') {
-                value = metrics.inventoryValuationCost ?? metrics.lowStockCount;
+                value = metrics?.inventoryValuationCost ?? metrics?.lowStockCount ?? 0;
               } else if (kpi.source === 'projects' && projectPortfolio?.length) {
                 value = projectPortfolio.reduce((s, p) => s + (Number(p.contractValue) || 0), 0);
               }
@@ -153,14 +169,6 @@ export const ProfileKpiPanel: React.FC = () => {
           newValues.set(kpi.id, { ...kpi, value: formattedValue, loading: false });
         }
 
-        setKpiValues(newValues);
-      } catch (error) {
-        console.error('Failed to fetch KPI values:', error);
-        // Set all KPIs as loaded with error state
-        const newValues = new Map<string, KpiWithValue>();
-        for (const kpi of effectiveKpis) {
-          newValues.set(kpi.id, { ...kpi, value: '—', loading: false });
-        }
         setKpiValues(newValues);
       }
     };

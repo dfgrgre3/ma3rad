@@ -51,7 +51,7 @@ export const MODULE_REGISTRY: ModuleDefinition[] = [
     description: 'عروض الأسعار والطلبات والفواتير والمرتجعات وتحليلات البيع.',
     dependencies: ['customers'],
     permissions: ['sales.view'],
-    paths: ['/daily/sales', '/pos', '/restaurant', '/hospitality', '/ceramics', '/sales', '/sales/analytics', '/sales/cycle', '/sales/statement', '/sales/orders-deposits', '/sales/reservations', '/sales/after-sales', '/quotations', '/construction-estimate', '/orders', '/returns', '/retail'],
+    paths: ['/daily/sales', '/pos', '/hospitality', '/ceramics', '/sales', '/sales/analytics', '/sales/cycle', '/sales/statement', '/sales/orders-deposits', '/sales/reservations', '/sales/after-sales', '/quotations', '/construction-estimate', '/orders', '/returns', '/retail'],
     businessEvents: ['invoice.posted', 'invoice.voided', 'sales_return.posted', 'receipt.posted'],
     settings: [
       { key: 'allowCreditSales', label: 'السماح بالبيع الآجل', type: 'boolean', defaultValue: true },
@@ -65,7 +65,7 @@ export const MODULE_REGISTRY: ModuleDefinition[] = [
     description: 'الأصناف والوحدات والمخازن والحركات والجرد والتقييم.',
     dependencies: [],
     permissions: ['inventory.view'],
-    paths: ['/inventory', '/inventory/hub', '/inventory/warehouse-stock', '/inventory/showroom-stock', '/inventory/ledger', '/inventory/transfers', '/inventory/counts', '/inventory/valuation', '/inventory/adjustments', '/inventory/alerts', '/inventory/stock-reservations', '/inventory/reservations', '/inventory/reorder-planning', '/inventory/locations', '/inventory/damage-quarantine', '/inventory/reconciliation', '/inventory/expiry', '/products', '/products/catalog', '/categories', '/brands', '/products/attributes', '/pricing', '/promotions', '/products/barcodes'],
+    paths: ['/inventory', '/inventory/hub', '/inventory/warehouse-stock', '/inventory/showroom-stock', '/inventory/ledger', '/inventory/transfers', '/inventory/counts', '/inventory/valuation', '/inventory/adjustments', '/inventory/alerts', '/inventory/stock-reservations', '/inventory/reservations', '/inventory/reorder-planning', '/inventory/locations', '/inventory/damage-quarantine', '/inventory/reconciliation', '/inventory/expiry', '/inventory/serials', '/products', '/products/catalog', '/categories', '/brands', '/products/attributes', '/pricing', '/promotions', '/products/barcodes'],
     businessEvents: ['stock.movement.posted', 'stock.count.posted', 'stock.adjusted'],
     settings: [
       { key: 'allowNegativeStock', label: 'السماح بالمخزون السالب', type: 'boolean', defaultValue: false },

@@ -19,7 +19,7 @@ const formatChipValue = (field: OperationalFieldDefinition, raw: string): string
  * Compact per-record display of activity operational fields for list rows
  * and cards: renders "name: value" chips only for fields that actually have
  * a value, so each activity surfaces exactly its own data (tile area for
- * ceramics, table number for restaurants, plate number for auto-parts...).
+ * ceramics, room number for hotels, plate number for auto-parts...).
  */
 export const OperationalFieldsChips: React.FC<OperationalFieldsChipsProps> = ({ fields, values, max = 3 }) => {
   if (!values) return <span className="text-muted">—</span>;

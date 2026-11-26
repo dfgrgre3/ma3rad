@@ -40,6 +40,39 @@ export class PrintService {
   }
 
   /**
+   * Attaches sold serial/IMEI numbers to each invoice item so templates can
+   * print them. Serials live in product_serials keyed by sale_invoice_item_id.
+   */
+  private withItemSerials(invoice: SalesInvoice & { items: any[] }): SalesInvoice & { items: any[] } {
+    try {
+      if (!invoice?.id || !Array.isArray(invoice.items) || !invoice.items.length) return invoice;
+      const rows = this.db.query<{ itemId: string; serialNumber: string }>(
+        `SELECT sale_invoice_item_id AS itemId, serial_number AS serialNumber
+         FROM product_serials
+         WHERE sale_invoice_id = ? AND sale_invoice_item_id IS NOT NULL
+         ORDER BY sold_at ASC, serial_number ASC`,
+        [invoice.id]
+      );
+      if (!rows.length) return invoice;
+      const byItem = new Map<string, string[]>();
+      for (const row of rows) {
+        const list = byItem.get(row.itemId) || [];
+        list.push(row.serialNumber);
+        byItem.set(row.itemId, list);
+      }
+      return {
+        ...invoice,
+        items: invoice.items.map((item: any) => {
+          const serials = byItem.get(String(item.id));
+          return serials?.length ? { ...item, serialNumbers: serials } : item;
+        }),
+      };
+    } catch {
+      return invoice;
+    }
+  }
+
+  /**
    * Returns invoice document HTML based on the requested template and paper size.
    * Legacy autoPrint options are accepted for compatibility, but generated HTML
    * remains script-free; callers must initiate printing from the parent window.
@@ -53,6 +86,7 @@ export class PrintService {
       : (optionsOrAutoPrint || {});
 
     const settings = { ...this.getSettings(), ...(opts.settingsOverride || {}) };
+    invoice = this.withItemSerials(invoice);
     // Services-based activities never sell by box/grade/m², so the
     // ceramics-oriented invoice columns stay hidden regardless of the
     // tenant's generic print preferences.

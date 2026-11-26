@@ -118,7 +118,7 @@ export const TimeBillingPage: React.FC = () => {
           </button>
         ))}
         {tab === 'entries' && (
-          <div className="mr-auto flex gap-2 items-center">
+          <div className="ms-auto flex gap-2 items-center">
             <select className={`${selectCls} w-40`} value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
               <option value="">كل الحالات</option>
               {Object.entries(STATUS_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}

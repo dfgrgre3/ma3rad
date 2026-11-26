@@ -51,6 +51,9 @@ export interface Product {
   minStockLevel: number; // حد الطلب بالمتر
   maxStockLevel?: number;
   
+  /** عند التفعيل يجب تسجيل رقم تسلسلي/IMEI لكل وحدة مباعة من هذا المنتج. */
+  trackSerials?: boolean;
+
   imagePath?: string;
   notes?: string;
   isActive: boolean;
@@ -61,6 +64,30 @@ export interface Product {
   totalStockM2?: number;
   totalStockBoxes?: number;
   totalStockPieces?: number;
+}
+
+/** رقم تسلسلي / IMEI مسجّل لوحدة منتج واحدة */
+export interface ProductSerial {
+  id: string;
+  productId: string;
+  productName?: string;
+  serialNumber: string;
+  status: 'IN_STOCK' | 'SOLD' | 'DAMAGED' | 'RETURNED';
+  warehouseId?: string | null;
+  warehouseName?: string | null;
+  branchId?: string | null;
+  purchaseInvoiceId?: string | null;
+  saleInvoiceId?: string | null;
+  saleInvoiceNumber?: string | null;
+  saleInvoiceItemId?: string | null;
+  returnInvoiceId?: string | null;
+  receivedAt?: string | null;
+  soldAt?: string | null;
+  returnedAt?: string | null;
+  notes?: string | null;
+  createdBy?: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 /** دفعة / تشغيلة سيراميك مع نغمة لون وعيار محددَين */

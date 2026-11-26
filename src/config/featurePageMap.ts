@@ -7,9 +7,7 @@ export const FEATURE_CODE_TO_PAGE_PATHS: Record<string, string[]> = {
   multi_branch: ['/branches'],
   advanced_reports: ['/reports/statements', '/reports/profit-loss', '/reports/tax'],
   e_invoicing: [],
-  loyalty: [],
-  restaurant_mode: ['/restaurant'],
-  api_access: [],
+  loyalty: [],  api_access: [],
   audit_export: ['/audit'],
 };
 

@@ -10,6 +10,7 @@ import { localDateString } from '../../../utils/shared/date';
 import { paymentAccountCode, postLedgerEntry } from '../../../database/repositories/ledger';
 import { InventoryCostingService } from '../inventory/InventoryCostingService';
 import { InventoryLocationStockService } from '../inventory/InventoryLocationStockService';
+import { ProductSerialService } from '../inventory/ProductSerialService';
 import { SettingsService } from '../config/SettingsService';
 import { ModuleRegistryService } from '../config/ModuleRegistryService';
 import { BusinessRecordSyncService } from '../../../sync/BusinessRecordSyncService';
@@ -37,6 +38,7 @@ export interface CreatePurchaseDTO {
     unitCost: number;
     orderedUnitCost?: number;
     grnAcceptedQty?: number;
+    serialNumbers?: string[];
   }[];
   discountAmount?: number;
   taxAmount?: number;
@@ -182,7 +184,7 @@ export class PurchaseService {
     const preparedItems: any[] = [];
 
     for (const item of items) {
-      const prod = sqliteDb.query(`SELECT name, grade, product_type, base_unit, meters_per_box, pieces_per_box, cost_price FROM products WHERE id = ?`, [item.productId])[0] as any;
+      const prod = sqliteDb.query(`SELECT name, grade, product_type, base_unit, meters_per_box, pieces_per_box, cost_price, track_serials FROM products WHERE id = ?`, [item.productId])[0] as any;
       if (!prod) throw new Error(`المنتج ${item.productId} غير موجود.`);
 
       const lineTotalCost = round2(item.quantityM2 * item.unitCost);
@@ -205,6 +207,8 @@ export class PurchaseService {
         piecesPerBox: prod.piecesPerBox || 4,
         orderedUnitCost: item.orderedUnitCost || item.unitCost,
         grnAcceptedQty: item.grnAcceptedQty || item.quantityM2,
+        serialNumbers: item.serialNumbers || [],
+        trackSerials: Number(prod.trackSerials) === 1,
         landedCostShare: 0,
         effectiveUnitCost: item.unitCost,
       });
@@ -351,6 +355,19 @@ export class PurchaseService {
           sourceTransactionId: inventoryTransactionId, sourceType: 'PURCHASE', sourceId: purchaseId,
           purchaseInvoiceId: purchaseId, supplierId: dto.supplierId,
           date: today, quantity: item.quantityM2, unitCost: item.effectiveUnitCost,
+        });
+      }
+
+      // Serial/IMEI-tracked products: register each received unit inside the
+      // same transaction so a duplicate or invalid serial rolls back the invoice.
+      if (trackInventory && item.trackSerials && item.serialNumbers?.length) {
+        ProductSerialService.registerSerialsInTransaction(sqliteDb, {
+          productId: item.productId,
+          warehouseId: dto.warehouseId,
+          serialNumbers: item.serialNumbers,
+          purchaseInvoiceId: purchaseId,
+          notes: `فاتورة شراء ${invoiceNumber}`,
+          actorId: performedBy,
         });
       }
     }

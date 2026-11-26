@@ -4,7 +4,6 @@ import {
   buildMonthlyComparisonSpec,
   buildPaymentMethodSpec,
   buildRecentActivitySpecs,
-  buildSalesByGradeSpec,
   buildSalesTrendSpec,
   buildTopCustomersSpec,
   buildTopSellingProductsSpec,
@@ -84,18 +83,6 @@ export function getPaymentMethodDistribution(db: DatabaseManager, access: Branch
 export async function getPaymentMethodDistributionAsync(db: DatabaseManager, access: BranchAccessService): Promise<{ method: string; count: number; totalAmount: number }[]> {
   requireDashboardFinanceSalesView();
   const { sql, params } = buildPaymentMethodSpec(access);
-  return db.queryAsync<any>(sql, params);
-}
-
-export function getSalesByGrade(db: DatabaseManager, access: BranchAccessService): { grade: string; quantityM2: number; totalRevenue: number }[] {
-  requireDashboardSalesView();
-  const { sql, params } = buildSalesByGradeSpec(access);
-  return db.query<any>(sql, params);
-}
-
-export async function getSalesByGradeAsync(db: DatabaseManager, access: BranchAccessService): Promise<{ grade: string; quantityM2: number; totalRevenue: number }[]> {
-  requireDashboardSalesView();
-  const { sql, params } = buildSalesByGradeSpec(access);
   return db.queryAsync<any>(sql, params);
 }
 

@@ -110,7 +110,7 @@ export const JournalEntriesPage: React.FC = () => {
           </button>
         ))}
         {tab === 'entries' && (
-          <form onSubmit={(e) => e.preventDefault()} className="relative mr-auto w-64 py-2">
+          <form onSubmit={(e) => e.preventDefault()} className="relative ms-auto w-64 py-2">
             <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted" />
             <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="بحث في القيود..." className="w-full pl-3 pr-9 py-1.5 bg-surface-muted border border-line rounded-lg text-xs focus:outline-none focus:border-primary" />
           </form>

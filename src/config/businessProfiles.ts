@@ -9,7 +9,6 @@ import automotiveProfile from './business-profiles/automotive.json' with { type:
 import homeAppliancesProfile from './business-profiles/home_appliances.json' with { type: 'json' };
 import cosmeticsProfile from './business-profiles/cosmetics.json' with { type: 'json' };
 import foodProfile from './business-profiles/food.json' with { type: 'json' };
-import restaurantProfile from './business-profiles/restaurant.json' with { type: 'json' };
 import servicesProfile from './business-profiles/services.json' with { type: 'json' };
 import workshopProfile from './business-profiles/workshop.json' with { type: 'json' };
 import generalProfile from './business-profiles/general.json' with { type: 'json' };
@@ -39,7 +38,7 @@ import {
 export interface BusinessProfileDashboardKpi {
   id: string;
   label: { ar: string; en: string };
-  source: 'sales' | 'inventory' | 'finance' | 'customers' | 'manufacturing' | 'restaurant' | 'projects';
+  source: 'sales' | 'purchases' | 'inventory' | 'finance' | 'customers' | 'manufacturing' | 'projects';
   format?: 'number' | 'currency' | 'm2' | 'percent';
 }
 
@@ -136,7 +135,7 @@ export interface BusinessProfileAttributeDefinition {
 const PROFILE_FILES: unknown[] = [
   ceramicsProfile, buildingMaterialsProfile, sanitaryProfile, lightingProfile,
   furnitureProfile, electronicsProfile, clothingProfile, automotiveProfile,
-  homeAppliancesProfile, cosmeticsProfile, foodProfile, restaurantProfile,
+  homeAppliancesProfile, cosmeticsProfile, foodProfile,
   servicesProfile, workshopProfile, generalProfile, customProfile,
   manufacturingProfile, constructionProfile, importExportProfile, ecommerceProfile,
   logisticsProfile, professionalServicesProfile, educationProfile,
@@ -293,7 +292,7 @@ function validateBusinessProfile(value: unknown): BusinessProfile {
     for (const kpi of kpis) {
       if (!kpi || typeof kpi.id !== 'string' || !kpi.id.trim()
         || !kpi.label?.ar?.trim() || !kpi.label?.en?.trim()
-        || !['sales', 'inventory', 'finance', 'customers', 'manufacturing', 'restaurant', 'projects'].includes(kpi.source)) {
+        || !['sales', 'purchases', 'inventory', 'finance', 'customers', 'manufacturing', 'projects'].includes(kpi.source)) {
         fail('dashboard KPI is invalid.');
       }
     }

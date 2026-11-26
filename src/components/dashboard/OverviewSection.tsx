@@ -15,6 +15,9 @@ import { TopProductsCard } from './TopProductsCard';
 import { ProfileKpiPanel } from './ProfileKpiPanel';
 import { QuickActions } from './QuickActions';
 import { useOverviewDashboardData } from '../../hooks/domains/dashboard/useOverviewDashboardData';
+import { resolveDashboardLayout, type PulseWidgetId } from '../../config/activityDashboardLayout';
+import { useDashboardPrefs } from '../../hooks/domains/dashboard/useDashboardPrefs';
+import { getEffectiveBusinessType } from '../../services/domains/config/BusinessTypeService';
 
 interface OverviewSectionProps {
   onDataLoaded?: () => void;
@@ -22,6 +25,7 @@ interface OverviewSectionProps {
 
 export const OverviewSection: React.FC<OverviewSectionProps> = ({ onDataLoaded }) => {
   const refreshToken = useDashboardRefresh()?.refreshToken;
+  const prefs = useDashboardPrefs();
   const initialRef = useRef(true);
   const {
     metrics,
@@ -45,6 +49,7 @@ export const OverviewSection: React.FC<OverviewSectionProps> = ({ onDataLoaded }
     purchaseTopSuppliers,
     purchaseTopItems,
     purchaseQuantitiesByUnit,
+    todayOps,
   } = useOverviewDashboardData();
 
   useEffect(() => {
@@ -91,6 +96,12 @@ export const OverviewSection: React.FC<OverviewSectionProps> = ({ onDataLoaded }
   const profitMarginPercent = metrics.profitMargin?.toFixed(1) ?? '0';
   const averageTicket = metrics.averageOrderValue ?? 0;
 
+  // Widgets visible for the current business activity + the user's saved picks.
+  const pulseWidgets = new Set<PulseWidgetId>(
+    resolveDashboardLayout(getEffectiveBusinessType(), prefs).pulseWidgets
+  );
+  const show = (id: PulseWidgetId) => pulseWidgets.has(id);
+
   return (
     <div className="min-w-0 space-y-3 sm:space-y-4">
       {dashboardError && (
@@ -114,43 +125,52 @@ export const OverviewSection: React.FC<OverviewSectionProps> = ({ onDataLoaded }
           {refreshing ? 'جاري التحديث...' : 'تحديث البيانات'}
         </button>
       </div>
-      <AttentionRequiredSection metrics={metrics} />
-      <QuickActions />
-      <ProfileKpiPanel />
+      {show('attention') && <AttentionRequiredSection metrics={metrics} />}
+      {show('quickActions') && <QuickActions />}
+      {show('profileKpis') && <ProfileKpiPanel />}
 
-      <OverviewKpiGrid
-        metrics={metrics}
-        monthlyComparison={monthlyComparison}
-        profitMarginPercent={profitMarginPercent}
-        averageTicket={averageTicket}
-      />
+      {show('kpiGrid') && (
+        <OverviewKpiGrid
+          metrics={metrics}
+          monthlyComparison={monthlyComparison}
+          profitMarginPercent={profitMarginPercent}
+          averageTicket={averageTicket}
+          todayOps={todayOps}
+        />
+      )}
 
-      <TodayPurchasesPanel
-        canViewPurchases={PermissionService.can(AuthService.getCurrentUser(), 'purchases.view')}
-        todayPurchases={todayPurchases}
-        isLoading={purchasesLoading}
-        error={purchasesError}
-        onRetry={loadData}
-        purchaseHourly={purchaseHourly}
-        purchasePeakHour={purchasePeakHour}
-        purchasePaymentMix={purchasePaymentMix}
-        purchaseTopSuppliers={purchaseTopSuppliers}
-        purchaseTopItems={purchaseTopItems}
-        purchaseQuantitiesByUnit={purchaseQuantitiesByUnit}
-      />
+      {show('purchases') && (
+        <TodayPurchasesPanel
+          canViewPurchases={PermissionService.can(AuthService.getCurrentUser(), 'purchases.view')}
+          todayPurchases={todayPurchases}
+          isLoading={purchasesLoading}
+          error={purchasesError}
+          onRetry={loadData}
+          purchaseHourly={purchaseHourly}
+          purchasePeakHour={purchasePeakHour}
+          purchasePaymentMix={purchasePaymentMix}
+          purchaseTopSuppliers={purchaseTopSuppliers}
+          purchaseTopItems={purchaseTopItems}
+          purchaseQuantitiesByUnit={purchaseQuantitiesByUnit}
+        />
+      )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
-        <SalesTrendCard chartData={chartData} />
-        <TopProductsCard topProducts={topProducts} />
-      </div>
+      {(show('salesTrend') || show('topProducts')) && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+          {show('salesTrend') && <SalesTrendCard chartData={chartData} />}
+          {show('topProducts') && <TopProductsCard topProducts={topProducts} />}
+        </div>
+      )}
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        <CategoryDistributionCard categorySales={categorySales} />
-        <PaymentMethodsCard paymentDistribution={paymentDistribution} />
-        <TopCustomersCard topCustomers={topCustomers} />
-      </div>
+      {(show('categoryDist') || show('paymentMix') || show('topCustomers')) && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          {show('categoryDist') && <CategoryDistributionCard categorySales={categorySales} />}
+          {show('paymentMix') && <PaymentMethodsCard paymentDistribution={paymentDistribution} />}
+          {show('topCustomers') && <TopCustomersCard topCustomers={topCustomers} />}
+        </div>
+      )}
 
-      <RecentActivitiesFeed recentActivities={recentActivities} />
+      {show('recentFeed') && <RecentActivitiesFeed recentActivities={recentActivities} />}
     </div>
   );
 };

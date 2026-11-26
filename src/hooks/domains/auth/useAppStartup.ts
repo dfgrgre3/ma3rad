@@ -194,6 +194,24 @@ export function useAppStartup() {
     };
   }, [dbReady]);
 
+  // Central platform notifications → local bell/toast pipeline.
+  useEffect(() => {
+    if (!dbReady) return;
+    let cancelled = false;
+    void import('../../../services/domains/notifications/CentralNotificationSyncService')
+      .then(({ CentralNotificationSyncService }) => {
+        if (cancelled) return;
+        CentralNotificationSyncService.start();
+      })
+      .catch((error) => console.error('Central notification sync could not start:', error));
+    return () => {
+      cancelled = true;
+      void import('../../../services/domains/notifications/CentralNotificationSyncService')
+        .then(({ CentralNotificationSyncService }) => CentralNotificationSyncService.stop())
+        .catch(() => { /* module unavailable during teardown */ });
+    };
+  }, [dbReady]);
+
   useEffect(() => {
     if (typeof window !== 'undefined' && window.ceramisys?.app?.onBeforeClose) {
       return window.ceramisys.app.onBeforeClose(async (requestId) => {

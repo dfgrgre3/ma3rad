@@ -5,8 +5,8 @@ import { getEffectiveBusinessType } from '../services/domains/config/BusinessTyp
  * Activity-driven page visibility.
  *
  * Modules already hide whole feature areas; this layer hides individual pages
- * that are irrelevant for the selected activity/family (e.g. no restaurant
- * tables for an accounting office, no POS for a hospital).
+ * that are irrelevant for the selected activity/family (e.g. no POS
+ * for a hospital).
  *
  * Resolution order: activity override → family default → visible.
  * Rules are additive-only: a path must be listed to be hidden.
@@ -14,10 +14,9 @@ import { getEffectiveBusinessType } from '../services/domains/config/BusinessTyp
 
 /** Pages hidden for every activity in a family. */
 const FAMILY_HIDDEN_PATHS: Record<string, string[]> = {
-  // Retail showrooms: no restaurant floor, hotel, workshop bay, school,
+  // Retail showrooms: no hotel, workshop bay, school,
   // manufacturing, time-billing or fleets.
   retail: [
-    '/restaurant',
     '/hospitality',
     '/workshop',
     '/education',
@@ -28,10 +27,9 @@ const FAMILY_HIDDEN_PATHS: Record<string, string[]> = {
     '/vehicles',
     '/drivers',
   ],
-  // Distribution/import: B2B — no counter POS, no restaurant, hotel, workshop,
+  // Distribution/import: B2B — no counter POS, no hotel, workshop,
   // school, manufacturing, or showroom floor (they run warehouses).
   distribution: [
-    '/restaurant',
     '/hospitality',
     '/workshop',
     '/education',
@@ -44,7 +42,6 @@ const FAMILY_HIDDEN_PATHS: Record<string, string[]> = {
   ],
   // Manufacturing: produces goods — no service-vertical pages.
   manufacturing: [
-    '/restaurant',
     '/hospitality',
     '/workshop',
     '/education',
@@ -57,7 +54,6 @@ const FAMILY_HIDDEN_PATHS: Record<string, string[]> = {
   ],
   // Construction: sites & contracts — no service-vertical pages.
   construction: [
-    '/restaurant',
     '/hospitality',
     '/workshop',
     '/education',
@@ -72,7 +68,6 @@ const FAMILY_HIDDEN_PATHS: Record<string, string[]> = {
   ],
   // Transport (workshop): service bay — keeps /workshop, hides the rest.
   transport: [
-    '/restaurant',
     '/hospitality',
     '/education',
     '/time-billing',
@@ -82,8 +77,7 @@ const FAMILY_HIDDEN_PATHS: Record<string, string[]> = {
     '/customers/imported-products', '/customers/*/imported-products',
     '/retail',
   ],
-  // Hospitality (hotels & restaurants): keeps /hospitality for hotels;
-  // restaurants hide it via ACTIVITY_HIDDEN_PATHS. No workshop/school pages.
+  // Hospitality (hotels): keeps /hospitality. No workshop/school pages.
   hospitality: [
     '/inventory/showroom-stock',
     '/customers/imported-products', '/customers/*/imported-products',
@@ -98,7 +92,6 @@ const FAMILY_HIDDEN_PATHS: Record<string, string[]> = {
   ],
   // Professional services: offices — keeps /time-billing, hides the rest.
   professional_services: [
-    '/restaurant',
     '/manufacturing',
     '/pos',
     '/hospitality',
@@ -117,7 +110,6 @@ const FAMILY_HIDDEN_PATHS: Record<string, string[]> = {
   ],
   // Healthcare: clinics — same office-only surface as professional services.
   healthcare: [
-    '/restaurant',
     '/manufacturing',
     '/pos',
     '/hospitality',
@@ -136,7 +128,6 @@ const FAMILY_HIDDEN_PATHS: Record<string, string[]> = {
   ],
   // Education: schools — keeps /education, hides the rest.
   education: [
-    '/restaurant',
     '/manufacturing',
     '/pos',
     '/hospitality',
@@ -163,13 +154,8 @@ const ACTIVITY_HIDDEN_PATHS: Record<string, string[]> = {
   // Supermarkets & online stores sell from the warehouse — no display floor.
   food: ['/inventory/showroom-stock'],
   ecommerce: ['/inventory/showroom-stock'],
-  // Restaurants keep no display stock — ingredients live in the store room.
-  restaurant: ['/inventory/showroom-stock', '/hospitality'],
   // Import/export traders run no delivery fleet of their own.
   import_export: ['/fleet/dashboard', '/vehicles', '/drivers'],
-  // Hotels run rooms & services — the restaurant floor (tables, kitchen
-  // display) does not apply to them.
-  hospitality: ['/restaurant'],
   // Pure logistics/warehousing: no import-document tracking page.
   logistics: ['/customers/imported-products', '/customers/*/imported-products'],
   // Import/export keeps the import-tracking page — it is core to their workflow.
@@ -178,7 +164,7 @@ const ACTIVITY_HIDDEN_PATHS: Record<string, string[]> = {
 /**
  * Pages that belong to a single activity only — hidden for every other
  * activity regardless of family (e.g. the ceramics showroom page is meaningless
- * for a restaurant or an accounting office).
+ * for a hotel or an accounting office).
  */
 const ACTIVITY_EXCLUSIVE_PATHS: Record<string, string[]> = {
   '/ceramics': ['ceramics'],

@@ -4,6 +4,7 @@ import { formatProductQuantity, getProductUnitLabel } from '../../../../utils/pr
 import {
   esc,
   invoiceBrandStyles,
+  itemSerialsHtml,
   logoHtml,
   orderedInvoiceDetails,
   paymentBadge,
@@ -26,13 +27,14 @@ export function getClassicInvoiceHtml(
   const isA5 = size === 'a5';
   const documentTitle = printOverride('sales.invoice.a4', isA5 ? 'فاتورة مبيعات A5' : 'فاتورة مبيعات');
   const documentFooter = printOverride('sales.invoice.a4.footer', settings.receiptFooter || '');
-  const currency = settings.currency || 'ر.س';
+  const currency = settings.currencySymbol || settings.currency || 'ج.م';
 
   const itemsHtml = invoice.items.map((item, idx) => `
       <tr style="border-bottom: 1px solid #e2e8f0; text-align: center;${idx % 2 === 1 ? ' background:#fafbfc;' : ''}">
         <td style="padding: ${isA5 ? '5px 3px' : '7px 6px'}; color: #64748b; font-weight: 600;">${idx + 1}</td>
         <td style="padding: ${isA5 ? '5px 6px' : '7px 8px'}; text-align: right;">
           <div style="font-weight: 700; color: #0f172a;">${esc(item.productName)}</div>
+          ${itemSerialsHtml(item)}
           ${(settings.invoiceShowItemCode !== false || settings.invoiceShowItemSpecs !== false) ? `
           <div style="font-size: ${isA5 ? '9px' : '10px'}; color: #64748b; margin-top: 1px;">
             ${settings.invoiceShowItemCode !== false ? `كود: <span style="font-family:monospace;background:#f1f5f9;padding:1px 4px;border-radius:3px;">${esc(item.productSku)}</span>` : ''}

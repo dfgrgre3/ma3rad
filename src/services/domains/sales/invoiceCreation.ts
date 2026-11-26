@@ -64,7 +64,7 @@ export function createSalesInvoice(ctx: SalesContext, dto: CreateSaleDTO): Sales
   if (dto.paymentType === 'MIXED' && (!dto.payments || dto.payments.length === 0)) {
     throw new Error('يجب تحديد مكوّنات وسائل الدفع عند اختيار الدفع المختلط.');
   }
-  if (tenderPayments.some((payment) => !['CASH', 'CARD', 'BANK_TRANSFER', 'CHEQUE'].includes(payment.method))) {
+  if (tenderPayments.some((payment) => !['CASH', 'CARD', 'BANK_TRANSFER', 'CHEQUE', 'WALLET', 'ONLINE'].includes(payment.method))) {
     throw new Error('تحتوي الفاتورة على وسيلة دفع لا تمثل تحصيلاً فعلياً مدعوماً.');
   }
   if (Math.abs(tenderSum - round2(dto.paidAmount || 0)) > 0.01) {
@@ -160,14 +160,14 @@ export function createSalesInvoice(ctx: SalesContext, dto: CreateSaleDTO): Sales
 
     sqliteDb.run(`
       INSERT INTO sales_invoices (
-        id, invoice_number, date, due_date, customer_id, warehouse_id, branch_id, company_id, shift_id, order_id, restaurant_order_id, project_id, sales_rep_id,
+        id, invoice_number, date, due_date, customer_id, warehouse_id, branch_id, company_id, shift_id, order_id, project_id, sales_rep_id,
         subtotal, discount_percentage, discount_amount, tax_percentage, tax_amount,
         shipping_cost, extra_fees, total_amount, paid_amount, remaining_amount, payment_type,
         payment_status, invoice_status, total_cost, gross_profit, returned_amount, notes, created_by
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ROUND(? * 100), ?, ROUND(? * 100), ?, ROUND(? * 100), ROUND(? * 100), ROUND(? * 100), ROUND(? * 100), ROUND(? * 100), ROUND(? * 100), ?, ?, 'COMPLETED', ROUND(? * 100), ROUND(? * 100), 0, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ROUND(? * 100), ?, ROUND(? * 100), ?, ROUND(? * 100), ROUND(? * 100), ROUND(? * 100), ROUND(? * 100), ROUND(? * 100), ROUND(? * 100), ?, ?, 'COMPLETED', ROUND(? * 100), ROUND(? * 100), 0, ?, ?)
     `, [
       invoiceId, invoiceNumber, today, dueDate, dto.customerId, dto.warehouseId, branchId, companyId, shiftId || null,
-      dto.orderId || null, dto.restaurantOrderId || null, dto.projectId || null, salesRepId,
+      dto.orderId || null, dto.projectId || null, salesRepId,
       totals.subtotal, dto.discountPercentage || 0, totals.discountAmount, taxPercentage, totals.taxAmount,
       totals.shippingCost, totals.extraFees, totals.totalAmount, totals.paidAmount, totals.remainingAmount, storedPaymentType,
       totals.paymentStatus, financialTotals.totalCost, financialTotals.grossProfit, dto.notes || null, actor.id

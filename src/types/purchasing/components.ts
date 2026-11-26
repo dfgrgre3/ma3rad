@@ -13,6 +13,7 @@ export interface PurchaseInvoiceDto {
     unitCost: number;
     orderedUnitCost?: number;
     grnAcceptedQty?: number;
+    serialNumbers?: string[];
   }>;
   discountAmount: number;
   landedFreight: number;

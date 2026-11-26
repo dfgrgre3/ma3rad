@@ -44,4 +44,5 @@ export interface ProductEditForm {
   piecesPerBox: string;
   metersPerBox: string;
   isActive: boolean;
+  trackSerials: boolean;
 }

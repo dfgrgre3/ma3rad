@@ -38,6 +38,7 @@ export const APPROVAL_OPERATIONS: ApprovalOperationDefinition[] = [
   { code: 'inventory.transfer.create', label: 'نقل المخزون بين المستودعات', category: 'المخزون والمستودعات', permission: 'inventory.transfer', integrated: true },
   { code: 'inventory.count.post', label: 'ترحيل الجرد', category: 'المخزون والمستودعات', permission: 'inventory.count', integrated: false },
   { code: 'inventory.return.create', label: 'إرجاع المنتجات للمخزون', category: 'المخزون والمستودعات', permission: 'inventory.adjust', integrated: false },
+  { code: 'inventory.damage.writeoff', label: 'إعدام تالف أو هدر مخزني', category: 'المخزون والمستودعات', permission: 'inventory.damage.manage', integrated: true },
   { code: 'products.create', label: 'إضافة منتج', category: 'المنتجات', permission: 'ui.products.catalog.create', integrated: true },
   { code: 'products.update', label: 'تعديل بيانات المنتج', category: 'المنتجات', permission: 'ui.products.catalog.update', integrated: true },
   { code: 'products.price.update', label: 'تعديل أسعار المنتج فوق الحد المسموح', category: 'المنتجات', permission: 'ui.products.catalog.update', integrated: true },

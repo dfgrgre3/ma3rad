@@ -636,7 +636,7 @@ export class OperationsService {
   public createDelivery(input: {
     customerId: string; address: string; city?: string; date?: string;
     driverId?: string; vehicleId?: string; scheduledAt?: string; deliveryFee?: number; notes?: string;
-    requiresShipmentQc?: boolean;
+    requiresShipmentQc?: boolean; invoiceId?: string; orderId?: string;
   }): Delivery {
     ModuleRegistryService.assertModuleEnabled('operations');
     this.requireManage('deliveries.manage');
@@ -652,13 +652,15 @@ export class OperationsService {
       const deliveryNumber = db.nextNumber('DLV');
       db.run(
         `INSERT INTO deliveries (id, delivery_number, date, customer_id, warehouse_id, driver_id, vehicle_id,
-          address, city, scheduled_at, delivery_fee, status, notes, created_by, branch_id, requires_shipment_qc)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ROUND(?*100), 'PENDING', ?, ?, ?, ?)`,
+          address, city, scheduled_at, delivery_fee, status, notes, created_by, branch_id, requires_shipment_qc,
+          invoice_id, order_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ROUND(?*100), 'PENDING', ?, ?, ?, ?, ?, ?)`,
         [
           id, deliveryNumber, input.date || localDateString(), input.customerId,
           warehouse.id, input.driverId || null, input.vehicleId || null, input.address.trim(),
           input.city || null, input.scheduledAt || null, input.deliveryFee || 0, input.notes || null, actor.id,
           this.branchAccess.getCurrentBranchId(actor), input.requiresShipmentQc ? 1 : 0,
+          input.invoiceId || null, input.orderId || null,
         ]
       );
       return this.getDeliveries().find((d) => d.id === id)!;

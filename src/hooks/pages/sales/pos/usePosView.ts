@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo, useContext, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ProductService } from '../../../../services/domains/products/ProductService';
+import { ProductService, type ProductFacets } from '../../../../services/domains/products/ProductService';
 import { OperationalFieldService, type ProductGradeOption } from '../../../../services/domains/products/OperationalFieldService';
 import { InventoryService } from '../../../../services/domains/inventory/InventoryService';
 import { CustomerService } from '../../../../services/domains/customers/CustomerService';
@@ -8,8 +8,10 @@ import { CategoryService, CategoryWithCount } from '../../../../services/domains
 import { SalesService } from '../../../../services/domains/sales/SalesService';
 import { AuthService } from '../../../../services/domains/auth/AuthService';
 import { BatchService } from '../../../../services/domains/inventory/BatchService';
+import { ProductSerialService } from '../../../../services/domains/inventory/ProductSerialService';
 import { CashierService } from '../../../../services/domains/finance/CashierService';
 import { HeldOrderService } from '../../../../services/domains/sales/HeldOrderService';
+import { PosDraftInvoiceService } from '../../../../services/domains/sales/PosDraftInvoiceService';
 import { LoyaltyService } from '../../../../services/domains/sales/LoyaltyService';
 import { PrintService } from '../../../../services/shared/PrintService';
 import { PricingService, type AppliedPromotion } from '../../../../services/domains/sales/PricingService';
@@ -19,7 +21,7 @@ import { Product, Customer, Warehouse, CashRegister, CashShift, PaymentType, Sys
 import type { BankAccount } from '../../../../types/finance';
 import { LayoutContext } from '../../../../contexts/LayoutContext';
 import {
-  type InvoicePreview, type Toast, round2,
+  type InvoicePreview, type Toast, type HeldOrder, round2,
 } from '../../../../types/pos';
 import { usePosCart } from './usePosCart';
 import { usePosBarcodeSearch } from './usePosBarcodeSearch';
@@ -34,6 +36,11 @@ import { usePosKeyboardShortcuts } from './usePosKeyboardShortcuts';
 import { usePosTotals } from './usePosTotals';
 import { gradeLabel as configuredGradeLabel, setConfiguredGradeLabels } from '../../../../components/products/productFormModel';
 import { EmployeeService } from '../../../../services/domains/hr/EmployeeService';
+import { ProcurementService } from '../../../../services/domains/procurement/ProcurementService';
+import { OperationsService } from '../../../../services/domains/operations/OperationsService';
+import { CrmService } from '../../../../services/domains/crm/CrmService';
+import { AppConfigService } from '../../../../services/domains/config/AppConfigService';
+import { CeramicMath } from '../../../../utils/products/ceramicMath';
 
 export function usePosView() {
   const navigate = useNavigate();
@@ -56,6 +63,13 @@ export function usePosView() {
   const [stockMap, setStockMap] = useState<Record<string, number>>({});
   const [discountedStocks, setDiscountedStocks] = useState<any[]>([]);
   const [isDiscountedStocksOpen, setIsDiscountedStocksOpen] = useState(false);
+  const [facets, setFacets] = useState<ProductFacets | null>(null);
+  const [isCameraScannerOpen, setIsCameraScannerOpen] = useState(false);
+  const [isCustomerProfileOpen, setIsCustomerProfileOpen] = useState(false);
+  const [deliveryEnabled, setDeliveryEnabled] = useState(false);
+  const [deliveryAddress, setDeliveryAddress] = useState('');
+  const [deliveryCity, setDeliveryCity] = useState('');
+  const [deliveryScheduledAt, setDeliveryScheduledAt] = useState('');
 
   const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>('');
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
@@ -126,10 +140,15 @@ export function usePosView() {
   const batchService  = useMemo(() => new BatchService(), []);
   const cashierService = useMemo(() => new CashierService(), []);
   const heldOrderService = useMemo(() => new HeldOrderService(), []);
+  const draftInvoiceService = useMemo(() => new PosDraftInvoiceService(), []);
   const loyaltyService = useMemo(() => new LoyaltyService(), []);
   const printService = useMemo(() => new PrintService(), []);
   const pricingService = useMemo(() => new PricingService(), []);
   const financeEnterpriseService = useMemo(() => new FinanceEnterpriseService(), []);
+  const procurementService = useMemo(() => new ProcurementService(), []);
+  const operationsService = useMemo(() => new OperationsService(), []);
+  const crmService = useMemo(() => new CrmService(), []);
+  const productSerialService = useMemo(() => new ProductSerialService(), []);
 
   useEffect(() => {
     if (!registers.length) {
@@ -166,32 +185,43 @@ export function usePosView() {
     selectedGrade, setSelectedGrade,
     selectedSize, setSelectedSize,
     selectedColor, setSelectedColor,
+    selectedSupplier, setSelectedSupplier,
+    minPrice, setMinPrice, maxPrice, setMaxPrice,
+    minStock, setMinStock, maxStock, setMaxStock,
     customerSearch, setCustomerSearch,
     inStockOnly, setInStockOnly,
     sortMode, setSortMode,
     filteredProducts, visibleCategories, visibleBrands, hasCeramicCatalog,
-    visibleSizes, visibleColors, filteredCustomers, hasActiveFilters, clearFilters,
-  } = usePosCatalog({ products, categories, customers, stockOf });
+    visibleSizes, visibleColors, visibleGrades, visibleSuppliers, priceBounds,
+    filteredCustomers, hasActiveFilters, clearFilters, productQueryOptions,
+  } = usePosCatalog({ products, categories, customers, stockOf, facets });
+
+  // Server-side catalog query: search + all advanced filters run against the
+  // whole products table, so results aren't limited to already-loaded pages.
+  const catalogQueryOptions = useMemo(() => ({
+    ...productQueryOptions,
+    ...(selectedWarehouseId ? { warehouseId: selectedWarehouseId } : {}),
+  }), [productQueryOptions, selectedWarehouseId]);
 
   useEffect(() => {
     try {
       const result = productService.getProductsPage(searchQuery.trim(), selectedCategory === 'ALL' ? undefined : selectedCategory,
-        selectedBrand === 'ALL' ? undefined : selectedBrand, 1, 48, { status: 'active' });
+        selectedBrand === 'ALL' ? undefined : selectedBrand, 1, 48, catalogQueryOptions);
       setProductPage(1);
       setProducts(result.items);
       setProductsTotal(result.totalItems);
     } catch (error: any) {
       notify(error?.message || 'تعذر البحث عن الأصناف', 'error');
     }
-  }, [productService, searchQuery, selectedCategory, selectedBrand, notify]);
+  }, [productService, searchQuery, selectedCategory, selectedBrand, catalogQueryOptions, notify]);
 
   const loadMoreProducts = useCallback(() => {
     const nextPage = productPage + 1;
     const result = productService.getProductsPage(searchQuery.trim(), selectedCategory === 'ALL' ? undefined : selectedCategory,
-      selectedBrand === 'ALL' ? undefined : selectedBrand, nextPage, 48, { status: 'active' });
+      selectedBrand === 'ALL' ? undefined : selectedBrand, nextPage, 48, catalogQueryOptions);
     setProducts((current) => [...current, ...result.items]);
     setProductPage(nextPage);
-  }, [productPage, productService, searchQuery, selectedCategory, selectedBrand]);
+  }, [productPage, productService, searchQuery, selectedCategory, selectedBrand, catalogQueryOptions]);
 
   useEffect(() => {
     if (!customerSearch.trim()) { setCustomers([]); setCustomersTotal(0); setCustomerPage(1); return; }
@@ -213,11 +243,19 @@ export function usePosView() {
     setCustomersTotal(result.totalItems);
   }, [can, customerPage, customerService, customerSearch]);
 
+  // Discount permission is enforced at the field level (UI) AND again at
+  // checkout — a cashier without it never sees an editable discount input.
+  const canApplyDiscount = can('sales.discount') || can('sales.pos.discount');
+  // Cost visibility follows the same rule ProductService uses for cost_price.
+  const canViewCosts = can('finance.cost.view') || can('ui.finance.overview.view');
+
   const {
     cart,
     setCart,
     applyCustomerPricing,
     addToCart,
+    addSerializedToCart,
+    updateCartSerials,
     addDiscountedToCart,
     addCalculatedToCart,
     updateCartQuantity,
@@ -225,6 +263,9 @@ export function usePosView() {
     updateCartUnit,
     updateCartPrice,
     updateCartLineDiscount,
+    applyLineDiscountToLines,
+    removeCartLines,
+    replaceCartItem,
     removeFromCart,
     recentlyRemoved,
     undoRemoveFromCart,
@@ -235,16 +276,103 @@ export function usePosView() {
     selectedCustomer,
     stockOf,
     allowDuplicateItems: settings?.posAllowDuplicateItems ?? false,
+    canDiscount: canApplyDiscount,
   });
+  // ── Serial/IMEI tracking ──────────────────────────────────────────────────
+  const [serialPicker, setSerialPicker] = useState<{
+    product: Product;
+    preset?: { id: string; serialNumber: string }[];
+    cartIndex?: number | null;
+  } | null>(null);
+
+  const openSerialPicker = useCallback((product: Product, preset?: { id: string; serialNumber: string }[], cartIndex?: number | null) => {
+    try {
+      const available = productSerialService.getAvailableSerials(product.id, selectedWarehouseId);
+      if (!available.length && !preset?.length) {
+        notify(`لا توجد أرقام تسلسلية متاحة لـ «${product.name}» في هذا المخزن — سجّلها من صفحة الأرقام التسلسلية.`, 'error');
+        return;
+      }
+    } catch (error: any) {
+      notify(error?.message || 'تعذر التحقق من الأرقام التسلسلية المتاحة', 'error');
+      return;
+    }
+    setSerialPicker({ product, preset, cartIndex: cartIndex ?? null });
+  }, [productSerialService, selectedWarehouseId, notify]);
+
+  /** Routes product adds: tracked products always go through the serial picker. */
+  const requestAddProduct = useCallback((product: Product, preset?: { id: string; serialNumber: string }[]) => {
+    if (product.trackSerials) { openSerialPicker(product, preset); return; }
+    addToCart(product);
+  }, [addToCart, openSerialPicker]);
+
+  const openCartSerialEditor = useCallback((index: number) => {
+    const item = cart[index];
+    if (!item) return;
+    openSerialPicker(item.product, item.serials, index);
+  }, [cart, openSerialPicker]);
+
+  const confirmSerialPicker = useCallback((serials: { id: string; serialNumber: string }[]) => {
+    if (!serialPicker) return;
+    if (serialPicker.cartIndex != null) updateCartSerials(serialPicker.cartIndex, serials);
+    else addSerializedToCart(serialPicker.product, serials);
+    setSerialPicker(null);
+  }, [serialPicker, updateCartSerials, addSerializedToCart]);
+
+  const lookupSerialProduct = useCallback((term: string): { product: Product; serial: { id: string; serialNumber: string } } | null => {
+    try {
+      const found = productSerialService.findBySerialNumber(term);
+      if (!found) return null;
+      const product = productService.getProductById(found.productId);
+      if (!product) return null;
+      return { product, serial: { id: found.serial.id, serialNumber: found.serial.serialNumber } };
+    } catch {
+      return null;
+    }
+  }, [productSerialService, productService]);
+
+  const lookupScanProduct = useCallback((term: string): Product | null => {
+    try {
+      return productService.getProductByScanCode(term);
+    } catch {
+      return null;
+    }
+  }, [productService]);
   const handleSearchSubmit = usePosBarcodeSearch({
     products,
     filteredProducts,
     searchQuery,
     setSearchQuery,
     barcodeInputRef,
-    addToCart,
+    addToCart: requestAddProduct,
     notify,
+    lookupProduct: lookupScanProduct,
+    lookupSerial: lookupSerialProduct,
+    onSerialMatch: (product, serial) => openSerialPicker(product, [serial]),
   });
+  // Barcode scanned via the device camera: exact DB lookup first, otherwise
+  // drop the code into the search box so suggestions can disambiguate.
+  const handleScanCode = useCallback((code: string) => {
+    const term = code.trim();
+    if (!term) return;
+    const serialMatch = lookupSerialProduct(term);
+    if (serialMatch) {
+      openSerialPicker(serialMatch.product, [serialMatch.serial]);
+      setSearchQuery('');
+      barcodeInputRef.current?.focus();
+      notify(`تم مسح الرقم التسلسلي ${serialMatch.serial.serialNumber} — اختر الوحدات من القائمة`, 'success');
+      return;
+    }
+    const match = lookupScanProduct(term);
+    if (match) {
+      requestAddProduct(match);
+      setSearchQuery('');
+      barcodeInputRef.current?.focus();
+      notify(`تمت إضافة ${match.name} (مسح بالكاميرا)`, 'success');
+      return;
+    }
+    setSearchQuery(term);
+    notify('لم يتم العثور على باركود أو رقم تسلسلي مطابق؛ راجع نتائج البحث', 'warning');
+  }, [lookupSerialProduct, lookupScanProduct, requestAddProduct, openSerialPicker, setSearchQuery, barcodeInputRef, notify]);
   const { handleCreateCustomer } = usePosCustomerCreation({
     can,
     notify,
@@ -296,6 +424,11 @@ export function usePosView() {
       const configuredGrades = operationalFieldService.getProductGradeOptions();
       setGradeOptions(configuredGrades);
       setConfiguredGradeLabels(configuredGrades);
+      try {
+        setFacets(productService.getProductFacets());
+      } catch {
+        setFacets(null);
+      }
       const defaultWarehouse = allWhs[0];
       const shift = cashierService.getActiveShift();
 
@@ -307,6 +440,7 @@ export function usePosView() {
       setRegisters(allRegs);
       setActiveShift(shift);
       setSettings(sysSettings);
+      CeramicMath.setCurrencySymbol(sysSettings.currencySymbol);
       setTaxPercentage(sysSettings.defaultTaxPercentage || 0);
       if (sysSettings.posShowCashButton === false) {
         setPaymentType('CREDIT');
@@ -342,9 +476,12 @@ export function usePosView() {
     }
   }, [financeEnterpriseService]);
 
-  const { heldOrders, holdCurrentOrder, resumeHeldOrder, deleteHeldOrder } = usePosHeldOrders({
+  const heldOrderTtlHours = AppConfigService.getPolicyNumber('pos.heldOrderTtlHours', 72);
+  const { heldOrders, holdCurrentOrder, resumeHeldOrder, deleteHeldOrder, heldOrderStaleHours } = usePosHeldOrders({
     heldOrderService,
     currentUserId: currentUser?.id,
+    canManageHeldOrders: can('sales.pos.held.manage'),
+    heldOrderTtlHours,
     cart,
     setCart,
     selectedCustomer,
@@ -425,6 +562,134 @@ export function usePosView() {
     shippingCost, extraFees, paidAmount, activeShift,
   });
 
+  // ── Auto-save draft (posAutoSaveInvoice) ────────────────────────────────────
+  // Live draft invoice row in pos_invoice_drafts — structured + queryable,
+  // updated on every cart change, never touches stock/invoices/accounting
+  // until the cashier explicitly checks out.
+  const draftOrderId = currentUser?.id ? `draft_${currentUser.id}` : '';
+  const draftExistsRef = useRef(false);
+  const draftRestoredRef = useRef(false);
+
+  // Purge expired drafts once on mount (same TTL policy as held orders).
+  useEffect(() => {
+    try { draftInvoiceService.purgeExpired(); } catch { /* best-effort */ }
+  }, [draftInvoiceService]);
+
+  // Restore a previously auto-saved draft once, only into an empty cart.
+  useEffect(() => {
+    if (draftRestoredRef.current || !settings?.posAutoSaveInvoice || !draftOrderId || cart.length > 0 || !currentUser?.id) return;
+    draftRestoredRef.current = true;
+    try {
+      const row = draftInvoiceService.get(currentUser.id);
+      if (!row) return;
+      const order = JSON.parse(row.payload) as HeldOrder;
+      draftInvoiceService.delete(currentUser.id);
+      draftExistsRef.current = false;
+      resumeHeldOrder({ ...order, id: draftOrderId, createdBy: currentUser.id });
+      notify('تم استرجاع مسودة الفاتورة المحفوظة تلقائياً', 'info');
+    } catch { /* corrupt draft — ignore */ }
+  }, [settings?.posAutoSaveInvoice, draftOrderId, cart.length, currentUser, draftInvoiceService, resumeHeldOrder, notify]);
+
+  // Persist the draft (debounced) whenever the order state changes.
+  useEffect(() => {
+    if (!settings?.posAutoSaveInvoice || !draftOrderId || !currentUser?.id) return;
+    const timer = window.setTimeout(() => {
+      try {
+        if (cart.length === 0) {
+          if (draftExistsRef.current) {
+            draftInvoiceService.delete(currentUser.id);
+            draftExistsRef.current = false;
+          }
+          return;
+        }
+        const draft: HeldOrder = {
+          id: draftOrderId,
+          createdBy: currentUser.id,
+          label: 'مسودة تلقائية',
+          createdAt: new Date().toISOString(),
+          customerId: selectedCustomer?.id || '',
+          customerName: selectedCustomer?.name || 'عميل نقدي',
+          warehouseId: selectedWarehouseId,
+          items: cart,
+          discountAmount,
+          taxPercentage,
+          shippingCost,
+          extraFees,
+          splitCash, splitCard, splitBank, splitCheque, splitCredit,
+          notes,
+          paidAmount,
+          paymentType,
+          couponCode,
+          redeemPoints,
+          loyaltyDiscount,
+        };
+        draftInvoiceService.save(currentUser.id, {
+          customerId: selectedCustomer?.id || null,
+          customerName: selectedCustomer?.name || null,
+          warehouseId: selectedWarehouseId,
+          itemCount: cart.length,
+          totalAmount,
+          payload: JSON.stringify(draft),
+        });
+        draftExistsRef.current = true;
+      } catch { /* draft persistence is best-effort */ }
+    }, 800);
+    return () => window.clearTimeout(timer);
+  }, [
+    settings?.posAutoSaveInvoice, draftOrderId, currentUser?.id, cart,
+    selectedCustomer?.id, selectedCustomer?.name, selectedWarehouseId,
+    discountAmount, taxPercentage, shippingCost, extraFees,
+    splitCash, splitCard, splitBank, splitCheque, splitCredit,
+    notes, paidAmount, paymentType, couponCode, redeemPoints, loyaltyDiscount,
+    totalAmount, draftInvoiceService,
+  ]);
+
+  // Cost & margin visibility: only when the user may see costs. unitCost is
+  // the product's stored cost; lastPurchaseCost is the latest GRN/invoice cost
+  // used as fallback when the stored cost is missing.
+  const costInfoByProductId = useMemo(() => {
+    if (!canViewCosts) return {} as Record<string, { unitCost: number; lastPurchaseCost: number | null }>;
+    const map: Record<string, { unitCost: number; lastPurchaseCost: number | null }> = {};
+    for (const item of cart) {
+      const id = item.product.id;
+      if (map[id]) continue;
+      let lastPurchaseCost: number | null = null;
+      try {
+        lastPurchaseCost = procurementService.getLastPurchaseUnitCost(id);
+      } catch {
+        lastPurchaseCost = null;
+      }
+      map[id] = { unitCost: Number(item.product.costPrice) || 0, lastPurchaseCost };
+    }
+    return map;
+  }, [cart, canViewCosts, procurementService]);
+
+  const cartProfitSummary = useMemo(() => {
+    if (!canViewCosts) return null;
+    let revenue = 0;
+    let cost = 0;
+    let coveredLines = 0;
+    for (const item of cart) {
+      const info = costInfoByProductId[item.product.id];
+      revenue += round2(item.quantityM2 * item.unitPrice - item.discountAmount);
+      const unitCost = info ? (info.unitCost > 0 ? info.unitCost : (info.lastPurchaseCost ?? 0)) : 0;
+      if (unitCost > 0) {
+        cost += round2(item.quantityM2 * unitCost);
+        coveredLines += 1;
+      }
+    }
+    revenue = round2(revenue);
+    const profit = round2(revenue - cost);
+    return {
+      revenue,
+      cost: round2(cost),
+      profit,
+      marginPercent: revenue > 0 ? round2((profit / revenue) * 100) : 0,
+      coveredLines,
+      totalLines: cart.length,
+    };
+  }, [cart, canViewCosts, costInfoByProductId]);
+
   const visiblePaymentTypes = useMemo<PaymentType[]>(() => {
     const types: PaymentType[] = [];
     if (settings?.posShowCashButton !== false) types.push('CASH');
@@ -461,6 +726,21 @@ export function usePosView() {
       return visiblePaymentTypes[(index + 1) % visiblePaymentTypes.length];
     });
   }, [visiblePaymentTypes]);
+  // Prefill delivery details from the selected customer's saved address.
+  useEffect(() => {
+    setDeliveryEnabled(false);
+    setDeliveryAddress(selectedCustomer?.address || '');
+    setDeliveryCity(selectedCustomer?.city || '');
+    setDeliveryScheduledAt('');
+  }, [selectedCustomer?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const resetDelivery = useCallback(() => {
+    setDeliveryEnabled(false);
+    setDeliveryAddress(selectedCustomer?.address || '');
+    setDeliveryCity(selectedCustomer?.city || '');
+    setDeliveryScheduledAt('');
+  }, [selectedCustomer?.address, selectedCustomer?.city]);
+
   const { isProcessing, setIsProcessing, handleCheckout } = usePosCheckout({
     can,
     notify,
@@ -518,6 +798,14 @@ export function usePosView() {
     cashierService,
     batchService,
     loyaltyService,
+    operationsService,
+    delivery: {
+      enabled: deliveryEnabled,
+      address: deliveryAddress,
+      city: deliveryCity,
+      scheduledAt: deliveryScheduledAt,
+    },
+    resetDelivery,
     performedBy: effectiveUser?.id || currentUser?.id || 'usr_admin',
     loadStock,
   });
@@ -769,17 +1057,31 @@ export function usePosView() {
     productService, operationalFieldService, inventoryService, customerService,
     categoryService, salesService, batchService, cashierService, heldOrderService,
     loyaltyService, printService, pricingService, financeEnterpriseService,
+    operationsService, crmService,
     notify, can, stockOf,
     searchQuery, setSearchQuery, selectedCategory, setSelectedCategory,
     selectedBrand, setSelectedBrand, selectedGrade, setSelectedGrade,
     selectedSize, setSelectedSize, selectedColor, setSelectedColor,
+    selectedSupplier, setSelectedSupplier,
+    minPrice, setMinPrice, maxPrice, setMaxPrice,
+    minStock, setMinStock, maxStock, setMaxStock,
     customerSearch, setCustomerSearch, inStockOnly, setInStockOnly,
     sortMode, setSortMode,
     filteredProducts, visibleCategories, visibleBrands, hasCeramicCatalog,
-    visibleSizes, visibleColors, filteredCustomers, hasActiveFilters, clearFilters,
-    cart, setCart, applyCustomerPricing, addToCart, addDiscountedToCart, addCalculatedToCart,
+    visibleSizes, visibleColors, visibleGrades, visibleSuppliers, priceBounds,
+    filteredCustomers, hasActiveFilters, clearFilters,
+    isCameraScannerOpen, setIsCameraScannerOpen, handleScanCode,
+    isCustomerProfileOpen, setIsCustomerProfileOpen,
+    deliveryEnabled, setDeliveryEnabled, deliveryAddress, setDeliveryAddress,
+    deliveryCity, setDeliveryCity, deliveryScheduledAt, setDeliveryScheduledAt,
+    cart, setCart, applyCustomerPricing, addToCart, addSerializedToCart, updateCartSerials,
+    addDiscountedToCart, addCalculatedToCart,
+    requestAddProduct, openCartSerialEditor,
+    productSerialService, serialPicker, setSerialPicker, confirmSerialPicker,
     updateCartQuantity, stepCartQuantity, updateCartUnit, updateCartPrice,
-    updateCartLineDiscount, removeFromCart, recentlyRemoved, undoRemoveFromCart,
+    updateCartLineDiscount, applyLineDiscountToLines, removeCartLines, replaceCartItem,
+    removeFromCart, recentlyRemoved, undoRemoveFromCart,
+    costInfoByProductId, cartProfitSummary, canApplyDiscount, canViewCosts,
     handleSearchSubmit, handleCreateCustomer, loadStock, loadInitialData,
     loadMoreProducts, loadMoreCustomers,
     lineSubtotal, lineDiscountTotal, taxAmount, totalAmount,
@@ -794,6 +1096,7 @@ export function usePosView() {
     mobileCheckoutTriggerRef, mobileCheckoutCloseRef, mobileCheckoutPanelRef,
     handleVoidInvoice, handlePinLogin, handleManagerOverride, gradeLabel,
     heldOrders, holdCurrentOrder, resumeHeldOrder, deleteHeldOrder,
+    heldOrderTtlHours, heldOrderStaleHours,
   };
 }
 

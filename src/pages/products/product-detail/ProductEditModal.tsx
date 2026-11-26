@@ -52,6 +52,10 @@ export const ProductEditModal: React.FC<ProductEditModalProps> = ({ product, for
           <label className="flex items-center gap-2 text-ink font-bold bg-surface-muted border border-line rounded-xl px-3 py-2 cursor-pointer">
             <input type="checkbox" checked={form.isActive} onChange={(e) => onChange({ ...form, isActive: e.target.checked })} className="w-4 h-4 accent-primary" /> {productSingularLabel} نشط
           </label>
+          <label className="flex items-center gap-2 text-ink font-bold bg-surface-muted border border-line rounded-xl px-3 py-2 cursor-pointer">
+            <input type="checkbox" checked={form.trackSerials} onChange={(e) => onChange({ ...form, trackSerials: e.target.checked })} className="w-4 h-4 accent-primary" />
+            تتبع بالأرقام التسلسلية / IMEI — يجب تحديد رقم تسلسلي لكل وحدة عند البيع
+          </label>
           <div className="flex justify-end gap-2 pt-3 border-t border-line">
             <button type="button" onClick={onClose} className="px-4 py-2 bg-surface-sunken text-ink font-bold rounded-xl">إلغاء</button>
             <button type="submit" disabled={saving} className="px-5 py-2 bg-primary hover:bg-primary text-white font-bold rounded-xl flex items-center gap-2">{saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />} حفظ</button>

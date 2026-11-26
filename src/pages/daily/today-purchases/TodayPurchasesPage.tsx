@@ -13,6 +13,7 @@ import type { PaymentTarget } from '../../../components/daily/DailyModals';
 import { useToast } from '../../../components/ui/Toast';
 import { PurchasesHeader } from './PurchasesHeader';
 import { PurchaseAlerts } from './PurchaseAlerts';
+import { PurchaseInsights } from './PurchaseInsights';
 import { PurchaseFiltersSection } from './PurchaseFiltersSection';
 import { PurchasesTabsBar } from './PurchasesTabsBar';
 import { InvoicesPanel } from './InvoicesPanel';
@@ -280,6 +281,8 @@ export const TodayPurchasesPage: React.FC = () => {
                 plain={plain}
                 fmt={fmt}
               />
+
+              <PurchaseInsights data={data} fmt={fmt} plain={plain} date={date} todayDate={todayDate} />
 
               <PurchaseFiltersSection
                 filters={filters}

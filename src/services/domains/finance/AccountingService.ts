@@ -11,8 +11,6 @@ import {
   getPaymentMethodDistributionAsync,
   getRecentActivities,
   getRecentActivitiesAsync,
-  getSalesByGrade,
-  getSalesByGradeAsync,
   getSalesTrendLast7Days,
   getSalesTrendLast7DaysAsync,
   getTopCustomers,
@@ -233,14 +231,6 @@ export class AccountingService {
 
   public async getPaymentMethodDistributionAsync(): Promise<{ method: string; count: number; totalAmount: number }[]> {
     return getPaymentMethodDistributionAsync(this.db, this.branchAccess);
-  }
-
-  public getSalesByGrade(): { grade: string; quantityM2: number; totalRevenue: number }[] {
-    return getSalesByGrade(this.db, this.branchAccess);
-  }
-
-  public async getSalesByGradeAsync(): Promise<{ grade: string; quantityM2: number; totalRevenue: number }[]> {
-    return getSalesByGradeAsync(this.db, this.branchAccess);
   }
 
   public getRecentActivities(limit = 10): RecentDashboardActivity[] {

@@ -17,6 +17,7 @@ export const GRANULAR_PAGE_PERMISSIONS: PermissionDef[] = [
   { code: 'sales.pos.discount', name: 'تطبيق خصم في نقطة البيع', module: 'SALES' },
   { code: 'sales.pos.hold', name: 'تعليق فاتورة في نقطة البيع', module: 'SALES' },
   { code: 'sales.pos.resume', name: 'استئناف فاتورة معلّقة', module: 'SALES' },
+  { code: 'sales.pos.held.manage', name: 'إدارة الطلبات المعلقة لجميع الموظفين', module: 'SALES' },
   { code: 'sales.pos.void', name: 'إلغاء فاتورة من نقطة البيع', module: 'SALES' },
   { code: 'sales.pos.print', name: 'طباعة إيصال نقطة البيع', module: 'SALES' },
   { code: 'sales.invoice.print', name: 'طباعة فاتورة بيع', module: 'SALES' },
@@ -37,10 +38,6 @@ export const GRANULAR_PAGE_PERMISSIONS: PermissionDef[] = [
   { code: 'orders.convert', name: 'تحويل الطلب إلى فاتورة', module: 'ORDERS' },
   { code: 'returns.print', name: 'طباعة مرتجع بيع', module: 'RETURNS' },
   { code: 'returns.delete', name: 'حذف مرتجع بيع', module: 'RETURNS' },
-  { code: 'restaurant.view', name: 'عرض إدارة المطعم', module: 'SALES' },
-  { code: 'restaurant.manage', name: 'إدارة إعدادات المطعم', module: 'SALES' },
-  { code: 'restaurant.orders.create', name: 'إنشاء طلب مطعم', module: 'SALES' },
-  { code: 'restaurant.tables.manage', name: 'إدارة طاولات المطعم', module: 'SALES' },
 
   // Products catalog detail
   { code: 'products.attributes.view', name: 'عرض الخصائص الديناميكية', module: 'PRODUCTS' },
@@ -75,6 +72,8 @@ export const GRANULAR_PAGE_PERMISSIONS: PermissionDef[] = [
   { code: 'inventory.count.finalize', name: 'اعتماد جلسة الجرد', module: 'INVENTORY' },
   { code: 'inventory.transfer.approve', name: 'اعتماد التحويل المخزني', module: 'INVENTORY' },
   { code: 'inventory.print', name: 'طباعة تقارير المخزون', module: 'INVENTORY' },
+  { code: 'inventory.serials.view', name: 'عرض الأرقام التسلسلية والـ IMEI', module: 'INVENTORY' },
+  { code: 'inventory.serials.manage', name: 'إدارة الأرقام التسلسلية والـ IMEI', module: 'INVENTORY' },
 
   // Purchasing cycle
   { code: 'purchases.requests.view', name: 'عرض طلبات الشراء', module: 'PURCHASES' },

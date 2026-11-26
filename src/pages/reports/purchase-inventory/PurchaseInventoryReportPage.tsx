@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { DataTable } from '../../../components/ui/DataTable';
 import { PageHeader } from '../../../components/ui/PageHeader';
 import { useDashboardRefresh } from '../../../contexts/DashboardRefreshContext';
+import { useDashboardEmbed } from '../../../contexts/DashboardEmbedContext';
 import {
   ShoppingBag, TrendingDown, Package, CalendarDays,
   Loader2, AlertCircle, RefreshCw, BarChart3, Handshake,
@@ -74,6 +75,7 @@ function HBar({ rows, color }: { rows: { label: string; value: number; sub?: str
 
 export const PurchaseInventoryReportPage: React.FC = () => {
   const refreshToken = useDashboardRefresh()?.refreshToken;
+  const embedded = useDashboardEmbed();
   const initialRef = useRef(true);
   const navigate = useNavigate();
   const user = AuthService.getCurrentUser();
@@ -136,6 +138,16 @@ export const PurchaseInventoryReportPage: React.FC = () => {
   return (
     <div className="h-full flex flex-col bg-surface-muted text-ink overflow-hidden">
       {/* Header */}
+      {embedded ? (
+        <div className="flex flex-wrap items-center justify-end gap-2 px-4 pt-3 flex-shrink-0">
+          <button onClick={() => navigate('/purchases')} className="text-xs font-bold text-white bg-warning hover:bg-warning transition px-3 py-1.5 rounded-lg flex items-center gap-1.5">
+            <ShoppingBag className="w-3.5 h-3.5" /> المشتريات
+          </button>
+          <button onClick={load} className="p-1.5 hover:bg-surface-sunken rounded-lg transition">
+            <RefreshCw className={`w-4 h-4 text-muted ${loading ? 'animate-spin' : ''}`} />
+          </button>
+        </div>
+      ) : (
       <div className="bg-surface border-b border-line px-6 pt-4 flex-shrink-0">
         <PageHeader
           icon={<ShoppingBag className="w-5 h-5" />}
@@ -151,6 +163,7 @@ export const PurchaseInventoryReportPage: React.FC = () => {
           </>}
         />
       </div>
+      )}
 
       {/* Date filters - hidden for inventory tab */}
       {tab !== 'inventory' && (

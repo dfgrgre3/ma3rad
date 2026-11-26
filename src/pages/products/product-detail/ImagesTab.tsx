@@ -70,7 +70,7 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ productId, canEdit }) => {
                 {canEdit && (
                   <div className="flex items-center gap-1">
                     {!img.isPrimary && <button onClick={() => makePrimary(img.id)} className="text-[10px] font-bold text-primary hover:bg-accent-soft rounded-lg px-2 py-1">تعيين كرئيسية</button>}
-                    <button onClick={() => remove(img.id)} className="p-1.5 rounded-lg text-muted hover:text-danger hover:bg-danger-soft ml-auto"><Trash2 className="w-3.5 h-3.5" /></button>
+                    <button onClick={() => remove(img.id)} className="p-1.5 rounded-lg text-muted hover:text-danger hover:bg-danger-soft me-auto"><Trash2 className="w-3.5 h-3.5" /></button>
                   </div>
                 )}
               </div>

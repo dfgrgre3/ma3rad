@@ -39,8 +39,7 @@ export const ROUTE_PERMISSIONS: RoutePermissionRule[] = [
 
   // المبيعات ونقطة البيع
   { path: '/pos', any: ['sales.pos.view', 'sales.create'] },
-  { path: '/restaurant', any: ['restaurant.view', 'orders.view'] },
-  { path: '/hospitality', any: ['orders.view', 'restaurant.view'] },
+  { path: '/hospitality', any: ['orders.view'] },
   { path: '/workshop', all: ['operations.view'] },
   { path: '/education', all: ['customers.view'] },
   { path: '/ceramics', all: ['sales.view'] },
@@ -85,6 +84,7 @@ export const ROUTE_PERMISSIONS: RoutePermissionRule[] = [
   { path: '/inventory/damage-quarantine', any: ['inventory.damage.view', 'inventory.adjust'] },
   { path: '/inventory/reconciliation', any: ['inventory.reconciliation.view', 'inventory.view'] },
   { path: '/inventory/expiry', any: ['inventory.view', 'inventory.adjust'] },
+  { path: '/inventory/serials', any: ['inventory.serials.view', 'inventory.view'] },
 
   // الفروع والمخازن
   { path: '/branches', all: ['branches.view'] },

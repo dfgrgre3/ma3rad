@@ -16,7 +16,7 @@ import { ACTIVITY_PATH_COPY_PART4 } from './activityPathCopy_part04';
  * Path-level activity page copy.
  *
  * Every workspace route carries a title/description written for each business
- * family, so a restaurant, a factory and an accounting office each read the
+ * family, so a hotel, a factory and an accounting office each read the
  * same screen in their own vocabulary. Resolution order:
  *   semantic page copy (per-activity, richest) → family path copy → undefined.
  *

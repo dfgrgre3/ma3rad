@@ -30,7 +30,7 @@ test('pages fit phone, tablet, laptop and desktop viewports without horizontal o
   await login(page);
 
   try {
-    await expect(page.locator('#sec-pulse')).toBeVisible({ timeout: 90_000 });
+    await expect(page.locator('nav[aria-label="أقسام لوحة المعلومات"]')).toBeVisible({ timeout: 90_000 });
 
     for (const width of VIEWPORTS) {
       await page.setViewportSize({ width, height: 900 });

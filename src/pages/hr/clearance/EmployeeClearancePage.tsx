@@ -277,7 +277,7 @@ export const EmployeeClearancePage: React.FC = () => {
               {item.icon} {item.label}
             </button>
           ))}
-          <div className="mr-auto flex items-center gap-2">
+          <div className="ms-auto flex items-center gap-2">
             <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="rounded-lg border border-line bg-surface px-3 py-2 text-xs">
               <option value="">كل الحالات</option>
               {(Object.keys(statusLabel) as ClearanceStatus[]).map((status) => <option key={status} value={status}>{statusLabel[status]}</option>)}

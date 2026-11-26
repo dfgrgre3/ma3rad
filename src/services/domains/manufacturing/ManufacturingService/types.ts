@@ -40,6 +40,8 @@ export interface BomItem {
   componentName?: string;
   quantity: number;
   unit: string;
+  /** Preparation loss percentage; inflates required quantity and line cost. */
+  wastePercent?: number;
   notes: string | null;
   createdAt: string;
 }
@@ -584,7 +586,7 @@ export interface CreateBomDTO {
   name: string;
   version?: string;
   notes?: string;
-  items: Array<{ componentProductId: string; quantity: number; unit?: string; notes?: string }>;
+  items: Array<{ componentProductId: string; quantity: number; unit?: string; wastePercent?: number; notes?: string }>;
   operations?: Array<{ workCenterId: string; minutesPerUnit: number }>;
   requiresFinalQc?: boolean;
 }

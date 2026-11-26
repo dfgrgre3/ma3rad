@@ -11,7 +11,7 @@ test('should model activity-based UI profile correctly', () => {
     id: 'uip_ceramics',
     code: 'CERAMICS',
     name: 'معارض السيراميك والبورسلين',
-    hiddenPages: ['/manufacturing', '/restaurant-tables'],
+    hiddenPages: ['/manufacturing', '/hotel-rooms'],
     hiddenActions: ['wholesale_bulk_pricing'],
     customLabels: { '/sales': 'فواتير المعرض والمبيعات' },
     navOrder: ['/sales', '/inventory', '/customers'],
@@ -25,7 +25,7 @@ test('should model activity-based UI profile correctly', () => {
   };
 
   assert.strictEqual(profile.code, 'CERAMICS');
-  assert.ok(profile.hiddenPages?.includes('/restaurant-tables'));
+  assert.ok(profile.hiddenPages?.includes('/hotel-rooms'));
   assert.strictEqual((profile.formFieldRules as any).colorTone.visible, true);
   assert.strictEqual((profile.formFieldRules as any).expiryDate.visible, false);
 });
@@ -35,7 +35,7 @@ test('should model per-tenant UI customizations independently', () => {
     id: 'tui_tenant_1',
     tenantId: 'tenant_1',
     profileId: 'uip_ceramics',
-    hiddenPages: ['/manufacturing', '/restaurant-tables', '/installments'],
+    hiddenPages: ['/manufacturing', '/hotel-rooms', '/installments'],
     hiddenActions: ['export_excel'],
     customLabels: { '/customers': 'قائمة المهندسين والعملاء' },
     navOrder: [],

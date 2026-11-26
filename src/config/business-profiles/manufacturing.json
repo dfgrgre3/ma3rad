@@ -71,7 +71,7 @@
         "ar": "مشتريات اليوم",
         "en": "today_purchases"
       },
-      "source": "sales",
+      "source": "purchases",
       "format": "currency"
     },
     {

@@ -31,6 +31,7 @@ const {
 } = require('./syncClientConfig');
 const tailscaleService = require('./tailscaleService');
 const { registerLicenseHandlers } = require('./licenseGuard');
+const { registerNotificationHandlers } = require('./notificationHandlers');
 const { configureAutoUpdater, createRollbackBackup } = require('./autoUpdater');
 // electron-updater is lazily loaded in autoUpdater.js to avoid accessing 'app' before ready
 const { getMaxDatabaseSize, getMaxV8HeapSize } = require('./databaseMemoryPolicy');
@@ -427,6 +428,7 @@ registerDocumentHandlers({
   ipcMain, validateIpcSender, path, fs, fsSync, shell, dialog, app, safeStorage, appDataDir: APP_DATA_DIR,
 });
 registerPrintingHandlers({ ipcMain, validateIpcSender, appDataDir: APP_DATA_DIR, MAX_PRINT_DATA });
+registerNotificationHandlers({ ipcMain, validateIpcSender });
 async function authorizeLicenseModeChange(username, password) {
   if (typeof username !== 'string' || username.trim().length === 0 || username.length > 128 ||
       typeof password !== 'string' || password.length === 0 || password.length > 1024) {
@@ -518,7 +520,7 @@ const licenseGuard = registerLicenseHandlers({
 
 const { FileIntegrityChecker } = require('./security/fileIntegrity');
 const integrityChecker = new FileIntegrityChecker(path.join(__dirname, '..'));
-const PRELOAD_INTEGRITY_SHA256 = '903b1a40d786b6e48c80bc533de4fe9e8eef1b6ac17e32801f5a34061ab98dc8';
+const PRELOAD_INTEGRITY_SHA256 = 'bee82c6d02eaf8480c6d0904ae27f8b8a227671e7228a6460d17f998d24e3887';
 const ENTRY_SOURCE_INTEGRITY_SHA256 = '3b1873352455d5a2d2132b3d677fb41df810410c9467a7e0b5477023148b134e';
 const SECURITY_SOURCE_INTEGRITY_SHA256 = '0010fb4c0e6c72bc45ab67fd8a9e10254720794afcd624643608757bdd795f0b';
 const SECURITY_PACKAGED_LOADER_INTEGRITY_SHA256 = 'a9c3529f826ef81f74b6f8638af4ca9595f18d3663c3c03999e68ad13605c463';
@@ -832,7 +834,8 @@ ipcMain.handle('central:request', async (event, request) => {
   ]).has(targetPathname);
   const isProvisioningChannel = targetPathname === '/api/v1/device/provisioning/pending'
     || targetPathname.startsWith('/api/v1/device/provisioning/')
-    || targetPathname.startsWith('/api/v1/device/tenant-users/');
+    || targetPathname.startsWith('/api/v1/device/tenant-users/')
+    || targetPathname === '/api/v1/device/notifications';
   const usesCredential = requiresCredential || isProvisioningChannel || targetPathname === '/api/v1/releases';
   const credential = usesCredential ? await loadCentralCredential() : null;
   if (requiresCredential && !credential) throw new Error('This device is not activated with the central platform.');

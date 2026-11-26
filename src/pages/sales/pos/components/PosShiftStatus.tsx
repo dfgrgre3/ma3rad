@@ -2,12 +2,14 @@ import React from 'react';
 import { Lock, ShoppingCart, Unlock } from 'lucide-react';
 import type { CashShift } from '../../../../types';
 import { CeramicMath } from '../../../../utils/products/ceramicMath';
+import { usePosActivityCopy } from '../../../../hooks/pages/sales/pos/usePosActivityCopy';
 
 interface PosShiftStatusProps {
   activeShift: CashShift | null;
 }
 
 export const PosShiftStatus: React.FC<PosShiftStatusProps> = ({ activeShift }) => {
+  const copy = usePosActivityCopy();
   const collected = activeShift
     ? activeShift.totalSalesCash + activeShift.totalSalesCard + activeShift.totalSalesTransfer
     : 0;
@@ -18,7 +20,7 @@ export const PosShiftStatus: React.FC<PosShiftStatusProps> = ({ activeShift }) =
         <ShoppingCart className="h-5 w-5 text-white" aria-hidden="true" />
       </div>
       <div className="min-w-0 flex-1">
-        <h1 className="text-sm font-black leading-tight text-ink">نقطة البيع السريعة</h1>
+        <h1 className="text-sm font-black leading-tight text-ink">{copy.screenTitle}</h1>
         {activeShift ? (
           <>
             <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-ink-secondary">
@@ -38,11 +40,11 @@ export const PosShiftStatus: React.FC<PosShiftStatusProps> = ({ activeShift }) =
               </div>
               <div>
                 <dt className="text-muted">الرصيد الافتتاحي</dt>
-                <dd className="font-black tabular-nums text-ink">{CeramicMath.formatCurrency(activeShift.openingBalance)} ج.م</dd>
+                <dd className="font-black tabular-nums text-ink">{CeramicMath.formatCurrency(activeShift.openingBalance)}</dd>
               </div>
               <div>
                 <dt className="text-muted">المتحصل خلال الوردية</dt>
-                <dd className="font-black tabular-nums text-success">{CeramicMath.formatCurrency(collected)} ج.م</dd>
+                <dd className="font-black tabular-nums text-success">{CeramicMath.formatCurrency(collected)}</dd>
               </div>
             </dl>
           </>

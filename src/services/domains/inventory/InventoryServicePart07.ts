@@ -6,13 +6,15 @@ import { postLedgerEntry } from '../../../database/repositories/ledger';
 import { InventoryCostingService } from './InventoryCostingService';
 import { InventoryLocationStockService } from './InventoryLocationStockService';
 import { InventoryServicePart06 } from './InventoryServicePart06';
+import { OperationApprovalGate } from '../approvals/OperationApprovalGate';
 
 export class InventoryServicePart07 extends InventoryServicePart06 {
 public resolveSpecialStock(
     id: string,
     action: 'WRITE_OFF' | 'DOWNGRADE_SALE' | 'RESTORE_TO_STOCK',
     notes: string,
-    discountedUnitPrice?: number
+    discountedUnitPrice?: number,
+    options: { approvalId?: string } = {}
   ): void {
     this.assertInventoryModuleEnabled();
     const actor = AuthService.requireAuth();
@@ -36,6 +38,35 @@ public resolveSpecialStock(
     const unitCost = Number(item.unitCost ?? item.unit_cost ?? 0) / 100;
     const totalCost = Number(item.totalCost ?? item.total_cost ?? (quantityM2 * unitCost * 100)) / 100;
     const specialNumber = item.specialNumber ?? item.special_number ?? item.id;
+
+    // ── Approval gate: إعدام التالف/الهدر يتطلب اعتماد مدير حسب السياسة ──
+    const gate = new OperationApprovalGate(this.db);
+    let resolvedApprovalId: string | null = null;
+    if (action === 'WRITE_OFF') {
+      const { policy: writeOffPolicy, required: writeOffRequired } = gate.evaluate('inventory.damage.writeoff', totalCost);
+      if (writeOffRequired) {
+        const matchDetails = { specialStockId: id, action: 'WRITE_OFF' };
+        resolvedApprovalId = options.approvalId
+          ?? gate.findApproved('inventory.damage.writeoff', 'STOCK_ADJUSTMENT', matchDetails, this.db);
+        if (options.approvalId) {
+          gate.assertApproved(options.approvalId, 'inventory.damage.writeoff', matchDetails, this.db);
+        }
+        if (!resolvedApprovalId) {
+          const approvalId = gate.requestApproval({
+            operationCode: 'inventory.damage.writeoff',
+            requestType: 'STOCK_ADJUSTMENT',
+            title: `إعدام مخزون تالف/هدر — ${specialNumber}`,
+            description: `قيمة الإعدام: ${totalCost} · المبرر: ${notes.trim()}`,
+            branchId: this.db.query<{ branchId: string | null }>(
+              'SELECT branch_id AS branchId FROM warehouses WHERE id = ?', [warehouseId]
+            )[0]?.branchId ?? null,
+            requestedValue: totalCost,
+            details: { ...matchDetails, dedupeKey: `damage-writeoff:${id}`, policy: writeOffPolicy },
+          }, this.db);
+          gate.throwRequested(approvalId);
+        }
+      }
+    }
 
     this.db.executeFinancialTransaction((txDb) => {
       const today = localDateString();
@@ -67,6 +98,9 @@ public resolveSpecialStock(
           SET status = 'WRITTEN_OFF', resolution_notes = ?, resolved_by = ?, resolved_at = CURRENT_TIMESTAMP
           WHERE id = ? AND status = 'INSPECTED'
         `, [notes.trim(), actor.id, id]);
+        if (resolvedApprovalId) {
+          gate.consume(resolvedApprovalId, 'INVENTORY_WRITE_OFF', id, txDb);
+        }
 
       } else if (action === 'RESTORE_TO_STOCK') {
         // Restore back to warehouse stock + create cost layer

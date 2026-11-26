@@ -34,7 +34,9 @@ test('an existing installation logs in straight to the dashboard and can navigat
   const { app, page, closeMockServer } = await launchAuthenticatedApp();
   try {
     // Setup is complete, so the dashboard renders instead of the wizard.
-    await expect(page.locator('#sec-pulse')).toBeVisible();
+    // The default section depends on the activity layout, so assert on the
+    // section navigation which is always present on the dashboard.
+    await expect(page.locator('nav[aria-label="أقسام لوحة المعلومات"]')).toBeVisible();
     await expect(page.getByRole('heading', { name: 'إعداد نظام ERP' })).toHaveCount(0);
 
     // Hash routing works under file:// and loads a real screen.

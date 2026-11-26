@@ -136,7 +136,7 @@ export const Header: React.FC<HeaderProps> = ({
       )}
 
       {/* Actions */}
-      <div className="mr-auto flex shrink-0 flex-wrap items-center gap-1">
+      <div className="ms-auto flex shrink-0 flex-wrap items-center gap-1">
         <button
           type="button"
           onClick={() => setSearchOpen(true)}

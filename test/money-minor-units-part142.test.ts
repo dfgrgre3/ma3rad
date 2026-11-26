@@ -12,7 +12,6 @@ const TABLES: Record<string, string[]> = {
   'campaigns': ['budget'],
   'leads': ['estimated_value'],
   'work_centers': ['cost_per_hour'],
-  'restaurant_order_items': ['unit_price'],
   'payroll_runs': ['paid_total'],
   'employees': ['tax_exemption_amount'],
   'hr_workforce_plan_jobs': ['estimated_monthly_salary'],

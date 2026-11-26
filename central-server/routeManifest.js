@@ -748,6 +748,9 @@ const ROUTE_MANIFEST = [
   // X-Device-Credential; tenant resolved from the registered device).
   route('/api/v1/device/provisioning/pending', ['GET'], null),
   route('/api/v1/device/provisioning/:jobId/result', ['POST'], null),
+  // Device-authenticated tenant notification feed (X-Device-Id +
+  // X-Device-Credential; tenant resolved from the registered device).
+  route('/api/v1/device/notifications', ['GET'], null),
   // Reverse channel: devices report local user mutations to the directory.
   route('/api/v1/device/tenant-users/report', ['POST'], null),
 

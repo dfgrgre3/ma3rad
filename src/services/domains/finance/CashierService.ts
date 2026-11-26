@@ -8,12 +8,13 @@ import { localDateString } from '../../../utils/shared/date';
 import { paymentAccountCode, postLedgerEntry, reverseLedgerEntry } from '../../../database/repositories/ledger';
 import { BusinessRecordSyncService } from '../../../sync/BusinessRecordSyncService';
 import { OperationApprovalGate } from '../approvals/OperationApprovalGate';
+import { NotificationService } from '../notifications/NotificationService';
 import { AppConfigService } from '../config/AppConfigService';
 import { round2 } from './financials';
 import { unscaleMoneyRow } from '../../../utils/money';
 
 const EXPENSE_MONEY_FIELDS = ['amount'] as const;
-const CASH_SHIFT_MONEY_FIELDS = ['opening_balance','expected_ending_cash','actual_ending_cash','cash_difference','total_sales_cash','total_sales_card','total_sales_transfer','total_customer_payments','total_supplier_payments','total_expenses','total_refunds','total_partner_inflows','total_partner_outflows'] as const;
+const CASH_SHIFT_MONEY_FIELDS = ['opening_balance','expected_ending_cash','actual_ending_cash','cash_difference','total_sales_cash','total_sales_card','total_sales_transfer','total_customer_payments','total_supplier_payments','total_expenses','total_refunds','total_partner_inflows','total_partner_outflows','cash_in_total','cash_out_total'] as const;
 
 export class CashierService {
   private db = DatabaseManager.getInstance();
@@ -185,7 +186,7 @@ export class CashierService {
       ORDER BY opened_at ASC
     `).map((row) => unscaleMoneyRow(row, CASH_SHIFT_MONEY_FIELDS));
     const cutoffTimestamp = cutoff.getTime();
-    return shifts
+    const closed = shifts
       .filter((shift) => {
         const openedAtValue = String(shift.openedAt).replace(' ', 'T');
         const openedAt = new Date(
@@ -200,6 +201,22 @@ export class CashierService {
         shift.userId,
         true
       ));
+    if (closed.length) {
+      try {
+        const notifications = new NotificationService();
+        for (const shift of closed) {
+          notifications.createNotification(
+            'SYSTEM',
+            'إغلاق وردية تلقائي',
+            `تم إغلاق وردية ${shift.shiftNumber} تلقائيًا حسب الجدول (${schedule.closeTime}).`,
+            shift.userId || undefined,
+            'CASH_SHIFT',
+            shift.id
+          );
+        }
+      } catch { /* notifications must never block the auto-close */ }
+    }
+    return closed;
   }
 
   public openShift(
@@ -374,11 +391,27 @@ export class CashierService {
     );
   }
 
-  public closeShift(shiftId: string, actualEndingCash: number, closingNotes = '', _performedBy = 'usr_admin'): CashShift {
+  public closeShift(
+    shiftId: string,
+    actualEndingCash: number,
+    closingNotes = '',
+    _performedBy = 'usr_admin',
+    denominations?: Record<number, number> | null,
+    managerName?: string
+  ): CashShift {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'ui.cashier.cashier.close_shift');
     if (!Number.isFinite(actualEndingCash) || actualEndingCash < 0) {
       throw new Error('المبلغ الفعلي يجب أن يكون رقمًا صحيحًا غير سالب.');
+    }
+    if (denominations !== undefined && denominations !== null) {
+      for (const [face, count] of Object.entries(denominations)) {
+        const faceValue = Number(face);
+        const qty = Number(count);
+        if (!Number.isFinite(faceValue) || faceValue <= 0 || !Number.isFinite(qty) || qty < 0) {
+          throw new Error('عدّ فئات النقد غير صالح.');
+        }
+      }
     }
     const shift = this.db.query<{ userId: string; registerId: string }>(
       'SELECT user_id AS userId, register_id AS registerId FROM cash_shifts WHERE id = ? AND status = ?',
@@ -389,7 +422,7 @@ export class CashierService {
     if (actor.id !== shift.userId && actor.role !== 'ADMIN' && actor.role !== 'SUPER_ADMIN') {
       PermissionService.require(actor, 'ui.cashier.cashier.manage');
     }
-    return this.closeShiftInternal(shiftId, actualEndingCash, closingNotes, actor.id, false);
+    return this.closeShiftInternal(shiftId, actualEndingCash, closingNotes, actor.id, false, denominations ?? null, managerName?.trim() || null);
   }
 
   private calculateExpectedEndingCash(shift: CashShift): number {
@@ -401,8 +434,68 @@ export class CashierService {
       shift.totalExpenses -
       shift.totalRefunds +
       Number(shift.totalPartnerInflows || 0) -
-      Number(shift.totalPartnerOutflows || 0)
+      Number(shift.totalPartnerOutflows || 0) +
+      Number(shift.cashInTotal || 0) -
+      Number(shift.cashOutTotal || 0)
     ).toFixed(2));
+  }
+
+  /** Cash deposit (IN) or withdrawal (OUT) recorded against an open shift's drawer. */
+  public recordCashMovement(
+    shiftId: string,
+    direction: 'IN' | 'OUT',
+    amount: number,
+    notes = ''
+  ): { id: string; direction: 'IN' | 'OUT'; amount: number } {
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'ui.cashier.cashier.manage');
+    if (!Number.isFinite(amount) || amount <= 0) throw new Error('مبلغ الحركة النقدية غير صالح.');
+    const shift = this.db.query<{ registerId: string; branchId: string }>(
+      `SELECT register_id AS registerId, branch_id AS branchId FROM cash_shifts WHERE id = ? AND status = 'OPEN'`,
+      [shiftId]
+    )[0];
+    if (!shift) throw new Error('الوردية غير موجودة أو مغلقة.');
+    this.branchAccess.requireShiftAccess(shiftId, actor, shift.registerId);
+    const id = `cm_${uuidv4().substring(0, 8)}`;
+    const signed = direction === 'IN' ? 1 : -1;
+    this.db.executeTransaction((db) => {
+      db.run('UPDATE cash_registers SET current_balance = current_balance + ROUND(?*100) WHERE id = ?',
+        [signed * amount, shift.registerId]);
+      db.run(direction === 'IN'
+        ? 'UPDATE cash_shifts SET cash_in_total = cash_in_total + ROUND(?*100) WHERE id = ?'
+        : 'UPDATE cash_shifts SET cash_out_total = cash_out_total + ROUND(?*100) WHERE id = ?',
+        [amount, shiftId]);
+      db.run(
+        `INSERT INTO cash_movements (id, shift_id, register_id, branch_id, direction, amount, notes, created_by)
+         VALUES (?, ?, ?, ?, ?, ROUND(?*100), ?, ?)`,
+        [id, shiftId, shift.registerId, shift.branchId, direction, amount,
+          notes.trim() || null, actor.id]
+      );
+      db.run(
+        `INSERT INTO audit_logs (id, user_id, user_name, action, module, record_id, new_values)
+         VALUES (?, ?, ?, ?, 'CASHIER', ?, ?)`,
+        [`aud_${uuidv4().substring(0, 8)}`, actor.id, actor.fullName,
+          direction === 'IN' ? 'إيداع نقدي في الوردية' : 'سحب نقدي من الوردية',
+          shiftId, JSON.stringify({ direction, amount, notes })]
+      );
+    }, { immediatePersist: true });
+    return { id, direction, amount: round2(amount) };
+  }
+
+  public getCashMovements(shiftId: string): { id: string; direction: 'IN' | 'OUT'; amount: number; notes: string | null; createdAt: string; userName: string | null }[] {
+    const actor = AuthService.requireAuth();
+    const rows = this.db.query<any>(
+      `SELECT cm.id, cm.direction, cm.amount / 100.0 AS amount, cm.notes, cm.created_at AS createdAt,
+              u.full_name AS userName
+       FROM cash_movements cm
+       LEFT JOIN users u ON u.id = cm.created_by
+       JOIN cash_shifts cs ON cs.id = cm.shift_id
+       JOIN cash_registers cr ON cr.id = cs.register_id
+       WHERE cm.shift_id = ? AND ${this.branchAccess.sqlScope('cs.branch_id', undefined, actor).clause}
+       ORDER BY cm.created_at DESC`,
+      [shiftId, ...this.branchAccess.sqlScope('cs.branch_id', undefined, actor).params]
+    );
+    return rows.map((row) => ({ ...row, amount: round2(Number(row.amount)) }));
   }
 
   private closeShiftInternal(
@@ -410,7 +503,9 @@ export class CashierService {
     actualEndingCash: number | null,
     closingNotes: string,
     performedBy: string,
-    autoClosed: boolean
+    autoClosed: boolean,
+    denominations: Record<number, number> | null = null,
+    managerName: string | null = null
   ): CashShift {
     return this.db.executeTransaction((sqliteDb) => {
       const shift = this.db.query<CashShift>(
@@ -431,9 +526,12 @@ export class CashierService {
           cash_difference = ROUND(?*100),
           status = 'CLOSED',
           closing_notes = ?,
-          auto_closed = ?
+          auto_closed = ?,
+          denomination_counts = ?,
+          manager_name = ?
         WHERE id = ?
-      `, [expected, actualEndingCash, diff, closingNotes, autoClosed ? 1 : 0, shiftId]);
+      `, [expected, actualEndingCash, diff, closingNotes, autoClosed ? 1 : 0,
+        denominations ? JSON.stringify(denominations) : null, managerName, shiftId]);
 
       sqliteDb.run(`
         INSERT INTO audit_logs (id, user_id, user_name, action, module, record_id, new_values)

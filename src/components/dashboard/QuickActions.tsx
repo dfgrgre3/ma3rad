@@ -1,19 +1,16 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Package, ShoppingBag, ShoppingCart, Wallet } from 'lucide-react';
-import type { QuickActionItem } from '../../types/dashboard/components';
+import { resolveDashboardLayout } from '../../config/activityDashboardLayout';
+import { getEffectiveBusinessType } from '../../services/domains/config/BusinessTypeService';
+import { useDashboardPrefs } from '../../hooks/domains/dashboard/useDashboardPrefs';
 import { useActivityPathHidden } from '../../hooks/domains/config/useActivityUi';
-
-const QUICK_ACTIONS: QuickActionItem[] = [
-  { to: '/pos', label: 'فاتورة بيع جديدة', detail: 'ابدأ عملية بيع', icon: ShoppingCart, tone: '' },
-  { to: '/products', label: 'المنتجات', detail: 'الأصناف والأسعار', icon: Package, tone: '' },
-  { to: '/purchases', label: 'المشتريات', detail: 'فواتير الموردين', icon: ShoppingBag, tone: '' },
-  { to: '/finance/debts', label: 'الذمم المدينة', detail: 'متابعة التحصيل', icon: Wallet, tone: '' },
-];
+import { useRouteAccess } from '../../hooks/domains/auth/useRouteAccess';
+import type { QuickActionItem } from '../../types/dashboard/components';
 
 const QuickActionLink: React.FC<{ action: QuickActionItem }> = ({ action }) => {
   const hidden = useActivityPathHidden(action.to);
-  if (hidden) return null;
+  const canAccess = useRouteAccess();
+  if (hidden || !canAccess(action.to)) return null;
   const { to, label, detail, icon: Icon } = action;
   return (
     <Link
@@ -32,9 +29,13 @@ const QuickActionLink: React.FC<{ action: QuickActionItem }> = ({ action }) => {
 };
 
 export const QuickActions: React.FC = () => {
+  const businessType = getEffectiveBusinessType();
+  const prefs = useDashboardPrefs();
+  const actions = resolveDashboardLayout(businessType, prefs).quickActions;
+  if (actions.length === 0) return null;
   return (
     <section aria-label="اختصارات سريعة" className="grid min-w-0 grid-cols-1 gap-2 min-[420px]:grid-cols-2 sm:grid-cols-4 sm:gap-3">
-      {QUICK_ACTIONS.map((action) => (
+      {actions.map((action) => (
         <QuickActionLink key={action.to} action={action} />
       ))}
     </section>

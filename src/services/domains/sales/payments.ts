@@ -25,7 +25,7 @@ export type InvoicePaymentComponent = {
 function assertCollectionPaymentType(paymentType: PaymentType): asserts paymentType is InvoicePaymentComponent['paymentType'] {
   if (paymentType === 'CREDIT') throw new Error('لا يمكن تسجيل الآجل كتحصيل فعلي.');
   if (paymentType === 'MIXED') throw new Error('استخدم مسار مكونات التحصيل المختلط لتسجيل كل وسيلة على حدة.');
-  if (!['CASH', 'CARD', 'BANK_TRANSFER', 'CHEQUE'].includes(paymentType)) {
+  if (!['CASH', 'CARD', 'BANK_TRANSFER', 'CHEQUE', 'WALLET', 'ONLINE'].includes(paymentType)) {
     throw new Error(`وسيلة التحصيل غير مدعومة: ${String(paymentType)}.`);
   }
 }

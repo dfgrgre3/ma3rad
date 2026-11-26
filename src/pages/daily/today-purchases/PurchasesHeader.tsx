@@ -62,7 +62,7 @@ export const PurchasesHeader: React.FC<PurchasesHeaderProps> = ({
                 <ReceiptText className="h-3.5 w-3.5" /> مرتجعات التوريد
               </button>
             </ActivityGate>
-            <span className="mr-auto inline-flex items-center gap-1.5 text-[11px] text-muted">
+            <span className="ms-auto inline-flex items-center gap-1.5 text-[11px] text-muted">
               <span className={`inline-flex h-2 w-2 rounded-full ${loading ? 'animate-pulse bg-warning' : 'bg-success'}`} />
               {loading ? 'جارٍ التحديث…' : 'متصل بقاعدة البيانات المحلية'}
             </span>

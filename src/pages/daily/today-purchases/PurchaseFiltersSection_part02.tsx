@@ -45,7 +45,7 @@ export const PurchaseFiltersSection: React.FC<PurchaseFiltersSectionProps> = ({
           ))}
         </div>
 
-        <span className="text-[11px] font-semibold text-muted lg:mr-auto" aria-live="polite">
+        <span className="text-[11px] font-semibold text-muted lg:ms-auto" aria-live="polite">
           {loading ? 'جارٍ التحديث…' : `${plain(filteredCount)} من ${plain(rowsCount)} فاتورة · ${fmt(filteredTotal)}`}
         </span>
       </div>

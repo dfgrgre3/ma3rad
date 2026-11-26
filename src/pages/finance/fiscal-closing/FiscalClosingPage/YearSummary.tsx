@@ -88,7 +88,7 @@ export const YearSummary: FC<YearSummaryProps> = ({
           إنشاء الأرصدة الافتتاحية
         </button>
       )}
-      <span className="mr-auto text-xs text-muted">
+      <span className="ms-auto text-xs text-muted">
         الأرصدة الافتتاحية تُنشأ من أرصدة إقفال السنة السابقة ولا تُصفّر الأصول والالتزامات.
       </span>
     </section>

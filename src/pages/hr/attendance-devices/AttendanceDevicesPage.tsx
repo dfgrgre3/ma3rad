@@ -350,7 +350,7 @@ export const AttendanceDevicesPage: React.FC = () => {
               {item.icon} {item.label}
             </button>
           ))}
-          <button onClick={() => { load(); if (activeTab === 'records' && canTab('records')) loadRecords(); if (activeTab === 'mobile' && canTab('mobile')) loadMobile(); }} className="mr-auto flex items-center gap-1 rounded-lg bg-primary px-3 py-2 text-xs font-bold text-white hover:bg-primary">
+          <button onClick={() => { load(); if (activeTab === 'records' && canTab('records')) loadRecords(); if (activeTab === 'mobile' && canTab('mobile')) loadMobile(); }} className="ms-auto flex items-center gap-1 rounded-lg bg-primary px-3 py-2 text-xs font-bold text-white hover:bg-primary">
             <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} /> تحديث
           </button>
         </div>
@@ -491,7 +491,7 @@ export const AttendanceDevicesPage: React.FC = () => {
                   </label>
                   <button onClick={loadRecords} className="rounded-lg bg-primary px-3 py-2 text-xs font-bold text-white hover:bg-primary">تطبيق</button>
                   <button onClick={processPending} className="rounded-lg bg-primary px-3 py-2 text-xs font-bold text-white hover:bg-primary">معالجة المعلقة</button>
-                  <span className="mr-auto text-[10px] font-semibold text-muted">{records.length} سجل</span>
+                  <span className="ms-auto text-[10px] font-semibold text-muted">{records.length} سجل</span>
                 </div>
                 <div className="overflow-hidden rounded-xl border border-line bg-surface">
                   <DataTable
@@ -586,7 +586,7 @@ export const AttendanceDevicesPage: React.FC = () => {
                       </select>
                     </label>
                     <button onClick={loadMobile} className="rounded-lg bg-primary px-3 py-2 text-xs font-bold text-white hover:bg-primary">تحديث</button>
-                    <span className="mr-auto text-[10px] font-semibold text-muted">{mobileSessions.length} جلسة</span>
+                    <span className="ms-auto text-[10px] font-semibold text-muted">{mobileSessions.length} جلسة</span>
                   </div>
                   <div className="overflow-hidden rounded-xl border border-line bg-surface">
                     <DataTable

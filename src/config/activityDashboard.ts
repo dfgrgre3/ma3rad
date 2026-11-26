@@ -15,7 +15,6 @@ import { getActivityPageCopy } from './activityPageCopy';
  */
 export type ActivityDashboardKind =
   | 'ceramics'
-  | 'restaurant'
   | 'hospitality'
   | 'education'
   | 'workshop'
@@ -49,7 +48,6 @@ const ACTIVITY_KIND: Record<string, ActivityDashboardKind> = {
   ecommerce: 'retail',
   general: 'retail',
   // Hospitality family.
-  restaurant: 'restaurant',
   hospitality: 'hospitality',
   // Other dedicated verticals.
   education: 'education',
@@ -70,7 +68,7 @@ const FAMILY_KIND: Record<string, ActivityDashboardKind> = {
   manufacturing: 'manufacturing',
   construction: 'construction',
   transport: 'workshop',
-  hospitality: 'restaurant',
+  hospitality: 'hospitality',
   healthcare: 'generic',
   education: 'education',
   professional_services: 'professional',
@@ -78,7 +76,6 @@ const FAMILY_KIND: Record<string, ActivityDashboardKind> = {
 
 const KIND_NAV_LABEL: Record<ActivityDashboardKind, string> = {
   ceramics: 'صالة السيراميك',
-  restaurant: 'الصالة والمطبخ',
   hospitality: 'الفندق',
   education: 'المدرسة',
   workshop: 'الورشة',

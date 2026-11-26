@@ -4,6 +4,7 @@ import { formatProductQuantity, getProductUnitLabel } from '../../../../utils/pr
 import {
   esc,
   invoiceBrandStyles,
+  itemSerialsHtml,
   orderedInvoiceDetails,
   paymentBadge,
   paymentTypeLabel,
@@ -24,13 +25,13 @@ export function getCompactInvoiceHtml(
 ): string {
   const isA5 = size === 'a5';
   const documentFooter = printOverride('sales.invoice.a4.footer', settings.receiptFooter || '');
-  const currency = settings.currency || 'ر.س';
+  const currency = settings.currencySymbol || settings.currency || 'ج.م';
 
   const itemsHtml = invoice.items.map((item, idx) => `
       <tr style="border-bottom: 1px solid #cbd5e1; text-align: center;${idx % 2 === 1 ? ' background:#f8fafc;' : ''}">
         <td style="padding: 3px 2px;">${idx + 1}</td>
         <td style="padding: 3px 5px; text-align: right; font-weight: 600;">
-          ${esc(item.productName)} ${(settings.invoiceShowItemCode || settings.invoiceShowItemSpecs) ? `<span style="font-size: 9px; color: #64748b;">[${settings.invoiceShowItemCode ? esc(item.productSku || '') : ''}${settings.invoiceShowItemCode && settings.invoiceShowItemSpecs ? ' | ' : ''}${settings.invoiceShowItemSpecs ? `${esc(item.size || '')} | ${item.productGrade === 'GRADE_1' ? 'أول' : 'تجاري'}` : ''}]</span>` : ''}
+          ${esc(item.productName)}${itemSerialsHtml(item, "8px")} ${(settings.invoiceShowItemCode || settings.invoiceShowItemSpecs) ? `<span style="font-size: 9px; color: #64748b;">[${settings.invoiceShowItemCode ? esc(item.productSku || '') : ''}${settings.invoiceShowItemCode && settings.invoiceShowItemSpecs ? ' | ' : ''}${settings.invoiceShowItemSpecs ? `${esc(item.size || '')} | ${item.productGrade === 'GRADE_1' ? 'أول' : 'تجاري'}` : ''}]</span>` : ''}
         </td>
         <td style="padding: 3px 2px;">${getProductUnitLabel(item)}</td>
         <td style="padding: 3px 2px; font-weight: 700;">${formatProductQuantity(item.quantityM2, item)}${settings.invoiceShowBoxesCount && item.productType !== 'GENERAL' ? ` <span style="font-size:8px;color:#64748b;">(${item.boxesCount}ك)</span>` : ''}</td>

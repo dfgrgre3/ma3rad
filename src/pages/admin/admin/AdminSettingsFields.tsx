@@ -31,7 +31,7 @@ export const NavigationLayoutPreview: React.FC<{ variant: 'sidebar' | 'header' }
           <div className="h-2 w-4 rounded-[1px] bg-surface-sunken " />
           <div className="h-2 w-4 rounded-[1px] bg-surface-sunken " />
           <div className="h-2 w-4 rounded-[1px] bg-surface-sunken " />
-          <div className="mr-auto h-2 w-3 rounded-[1px] bg-surface-sunken " />
+          <div className="ms-auto h-2 w-3 rounded-[1px] bg-surface-sunken " />
         </div>
         <div className="flex-1 rounded-[1px] bg-surface " />
       </div>

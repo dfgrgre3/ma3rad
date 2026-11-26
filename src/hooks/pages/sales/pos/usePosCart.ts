@@ -21,6 +21,8 @@ interface UsePosCartOptions {
   selectedCustomer: Customer | null;
   stockOf: (productId: string) => number;
   allowDuplicateItems?: boolean;
+  /** whether the acting user may grant line/invoice discounts at all. */
+  canDiscount?: boolean;
 }
 
 const effectiveBaseUnitPrice = (
@@ -45,6 +47,7 @@ export const usePosCart = ({
   selectedCustomer,
   stockOf,
   allowDuplicateItems = false,
+  canDiscount = true,
 }: UsePosCartOptions) => {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [recentlyRemoved, setRecentlyRemoved] = useState<{ item: CartItem; index: number } | null>(null);
@@ -151,6 +154,56 @@ export const usePosCart = ({
     });
   }, [cart, selectedCustomer, pricingService, makeCartItem, allowDuplicateItems, notify]);
 
+  /**
+   * Adds a serial-tracked product line: quantity is defined by the selected
+   * serials (one serial per sold unit), sold in the product's count unit.
+   */
+  const serialSellUnit = useCallback((product: Product): PosUnit => {
+    const sellable = getSellableUnits(product);
+    if (sellable.includes('PIECE')) return 'PIECE';
+    if (sellable.includes(product.baseUnit || 'M2')) return product.baseUnit || 'M2';
+    return sellable[0] || product.baseUnit || 'M2';
+  }, []);
+
+  const serialsToQuantityM2 = useCallback((product: Product, count: number): number => {
+    const unit = serialSellUnit(product);
+    const perUnit = toBaseQuantity(1, unit, product).quantity || 1;
+    return round2(count * perUnit);
+  }, [serialSellUnit]);
+
+  const addSerializedToCart = useCallback((product: Product, serials: { id: string; serialNumber: string }[]) => {
+    if (!serials.length) { notify('حدد رقماً تسلسلياً واحداً على الأقل.', 'warning'); return; }
+    const unit = serialSellUnit(product);
+    const quantityM2 = serialsToQuantityM2(product, serials.length);
+    const item = makeCartItem(product, quantityM2);
+    item.soldBy = unit;
+    item.soldQuantity = round2(fromBaseQuantity(quantityM2, unit, product));
+    item.piecesCount = serials.length;
+    item.serials = serials;
+    setCart((prev) => [...prev, item]);
+    notify(`تمت إضافة ${product.name} — ${serials.length} رقم تسلسلي`, 'success');
+  }, [makeCartItem, notify, serialSellUnit, serialsToQuantityM2]);
+
+  /** Re-assigns the serials of an existing line and resizes it to match. */
+  const updateCartSerials = useCallback((index: number, serials: { id: string; serialNumber: string }[]) => {
+    if (!serials.length) { notify('يجب أن يحتفظ السطر برقم تسلسلي واحد على الأقل.', 'warning'); return; }
+    setCart((prev) => {
+      const updated = [...prev];
+      const item = { ...updated[index] };
+      if (!item) return prev;
+      const quantityM2 = serialsToQuantityM2(item.product, serials.length);
+      item.quantityM2 = quantityM2;
+      item.soldQuantity = round2(fromBaseQuantity(quantityM2, item.soldBy, item.product));
+      item.piecesCount = serials.length;
+      item.serials = serials;
+      try {
+        item.unitPrice = effectiveBaseUnitPrice(pricingService, item.product, selectedCustomer?.id, quantityM2, item.soldBy);
+      } catch { /* keep current price */ }
+      updated[index] = item;
+      return updated;
+    });
+  }, [notify, pricingService, selectedCustomer, serialsToQuantityM2]);
+
   const addDiscountedToCart = useCallback((product: Product, source: {
     id: string;
     specialNumber: string;
@@ -225,6 +278,10 @@ export const usePosCart = ({
 
   const updateCartQuantity = (index: number, value: number) => {
     if (!Number.isFinite(value) || value < 0) return;
+    if (cart[index]?.serials?.length) {
+      notify('كمية هذا السطر تحددها الأرقام التسلسلية — عدّلها من زر السيريال.', 'warning');
+      return;
+    }
     if (value === 0) {
       removeFromCart(index);
       return;
@@ -279,6 +336,10 @@ export const usePosCart = ({
   };
 
   const updateCartUnit = (index: number, unit: PosUnit) => {
+    if (cart[index]?.serials?.length) {
+      notify('لا يمكن تغيير وحدة سطر له أرقام تسلسلية.', 'warning');
+      return;
+    }
     setCart((prev) => {
       const updated = [...prev];
       const item = { ...updated[index] };
@@ -315,14 +376,69 @@ export const usePosCart = ({
   };
 
   const updateCartLineDiscount = (index: number, value: number) => {
+    const next = Math.max(0, round2(Number.isFinite(value) ? value : 0));
+    if (next > 0 && !canDiscount) {
+      notify('لا تملك صلاحية تطبيق خصم على الصنف.', 'error');
+      return;
+    }
     setCart((prev) => {
       const updated = [...prev];
       const item = { ...updated[index] };
-      item.discountAmount = Math.min(item.quantityM2 * item.unitPrice, Math.max(0, round2(Number.isFinite(value) ? value : 0)));
+      item.discountAmount = Math.min(item.quantityM2 * item.unitPrice, next);
       updated[index] = item;
       return updated;
     });
   };
+
+  /** Applies the same discount percentage to several lines at once (bulk edit). */
+  const applyLineDiscountToLines = useCallback((indexes: number[], percent: number) => {
+    if (!canDiscount) {
+      notify('لا تملك صلاحية تطبيق خصم على الأصناف.', 'error');
+      return;
+    }
+    const pct = Math.min(100, Math.max(0, Number(percent) || 0));
+    if (pct <= 0 || !indexes.length) return;
+    setCart((prev) => {
+      const targets = new Set(indexes.filter((i) => i >= 0 && i < prev.length));
+      if (!targets.size) return prev;
+      return prev.map((item, i) => {
+        if (!targets.has(i)) return item;
+        const lineTotal = round2(item.quantityM2 * item.unitPrice);
+        return { ...item, discountAmount: round2(Math.min(lineTotal, lineTotal * pct / 100)) };
+      });
+    });
+  }, [canDiscount, notify]);
+
+  /** Removes several lines in one operation (bulk edit). */
+  const removeCartLines = useCallback((indexes: number[]) => {
+    const targets = new Set(indexes.filter((i) => i >= 0 && i < cart.length));
+    if (!targets.size) return;
+    setCart((prev) => prev.filter((_, i) => !targets.has(i)));
+  }, [cart.length]);
+
+  /**
+   * Organized swap: replaces the line's product while keeping its position
+   * and base quantity — used for substitutes when an item is unavailable.
+   */
+  const replaceCartItem = useCallback((index: number, product: Product): boolean => {
+    const existing = cart[index];
+    if (!existing) return false;
+    if (existing.product.id === product.id) return false;
+    setCart((prev) => {
+      const updated = [...prev];
+      const current = updated[index];
+      if (!current) return prev;
+      const replacement = makeCartItem(product, current.quantityM2);
+      updated[index] = {
+        ...replacement,
+        discountAmount: 0,
+        notes: current.notes || '',
+      };
+      return updated;
+    });
+    notify(`تم استبدال «${existing.product.name}» بـ «${product.name}»`, 'success');
+    return true;
+  }, [cart, makeCartItem, notify]);
 
   const updateCartNotes = (index: number, value: string) => {
     setCart((prev) => {
@@ -339,6 +455,8 @@ export const usePosCart = ({
     setCart,
     applyCustomerPricing,
     addToCart,
+    addSerializedToCart,
+    updateCartSerials,
     addDiscountedToCart,
     addCalculatedToCart,
     updateCartQuantity,
@@ -346,6 +464,9 @@ export const usePosCart = ({
     updateCartUnit,
     updateCartPrice,
     updateCartLineDiscount,
+    applyLineDiscountToLines,
+    removeCartLines,
+    replaceCartItem,
     updateCartNotes,
     removeFromCart,
     recentlyRemoved: recentlyRemoved?.item || null,
