@@ -347,12 +347,11 @@ export class DashboardMetricsService {
     
     const actor = AuthService.requireAuth();
     
-    // Check permissions (match DashboardPage PULSE_ACCESS)
-    PermissionService.require(actor, 'sales.view', '/sales');
-    PermissionService.require(actor, 'purchases.view', '/purchases');
-    PermissionService.require(actor, 'finance.view', '/finance');
-    PermissionService.require(actor, 'customers.view', '/customers');
-    PermissionService.require(actor, 'inventory.view', '/inventory');
+    // Match DashboardPage PULSE_ACCESS: any single domain grant opens the
+    // overview; per-source permission errors are collected as partialErrors
+    // and assembleDashboardMetrics masks fields of domains the actor cannot see.
+    PermissionService.require(actor, 'dashboard.view', '/dashboard');
+    PermissionService.requireAny(actor, ['sales.view', 'purchases.view', 'finance.view', 'customers.view', 'inventory.view'], '/dashboard');
 
     // Use AccountingService for core metrics but handle FIFO errors gracefully
     let metrics: DashboardMetrics | null = null;

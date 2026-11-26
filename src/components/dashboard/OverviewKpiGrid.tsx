@@ -12,7 +12,7 @@ export interface OverviewKpiGridProps {
   metrics: DashboardMetrics;
   monthlyComparison: MonthlyComparison | null;
   profitMarginPercent: string;
-  averageTicket: number;
+  averageTicket: number | null;
   todayOps?: TodayOperationsSummary | null;
 }
 
@@ -60,15 +60,15 @@ export const KpiTile: React.FC<KpiTileProps> = ({ label, value, hint, icon: Icon
 };
 
 export const OverviewKpiGrid: React.FC<OverviewKpiGridProps> = ({ metrics, monthlyComparison, profitMarginPercent, averageTicket, todayOps }) => {
-  const salesGrowth = metrics.previousMonthSales > 0 && Number.isFinite(metrics.salesGrowthRate)
+  const salesGrowth = (metrics.previousMonthSales ?? 0) > 0 && typeof metrics.salesGrowthRate === 'number' && Number.isFinite(metrics.salesGrowthRate)
     ? metrics.salesGrowthRate
     : null;
   const invoiceGrowth = typeof monthlyComparison?.invoiceGrowth === 'number' && Number.isFinite(monthlyComparison.invoiceGrowth)
     ? monthlyComparison.invoiceGrowth
     : null;
-  const hasSales = metrics.salesCount > 0 || metrics.todaySales > 0 || metrics.monthSales > 0;
-  const formatMoney = (value: number) => Number.isFinite(value) ? CeramicMath.formatCurrency(value) : '—';
-  const formatCount = (value: number) => Number.isFinite(value) ? value.toLocaleString('ar-EG') : '—';
+  const hasSales = (metrics.salesCount ?? 0) > 0 || (metrics.todaySales ?? 0) > 0 || (metrics.monthSales ?? 0) > 0;
+  const formatMoney = (value: number | null) => typeof value === 'number' && Number.isFinite(value) ? CeramicMath.formatCurrency(value) : '—';
+  const formatCount = (value: number | null) => typeof value === 'number' && Number.isFinite(value) ? value.toLocaleString('ar-EG') : '—';
   const formatPercent = (value: number) => `${Math.abs(value).toLocaleString('ar-EG', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
   const growthHint = (value: number, label: string) => (
     <span className="flex items-center gap-1">
@@ -123,9 +123,9 @@ export const OverviewKpiGrid: React.FC<OverviewKpiGridProps> = ({ metrics, month
           <KpiTile
             label="ديون العملاء"
             icon={Wallet}
-            tone={metrics.totalReceivables > 0 ? 'warning' : 'default'}
+            tone={(metrics.totalReceivables ?? 0) > 0 ? 'warning' : 'default'}
             value={formatMoney(metrics.totalReceivables)}
-            hint={metrics.totalReceivables > 0 ? 'إجمالي المستحقات القائمة' : 'لا توجد ديون مستحقة'}
+            hint={(metrics.totalReceivables ?? 0) > 0 ? 'إجمالي المستحقات القائمة' : metrics.totalReceivables == null ? 'يتطلب صلاحية عرض الذمم' : 'لا توجد ديون مستحقة'}
             to="/finance/debts"
           />
 
@@ -224,21 +224,23 @@ export const OverviewKpiGrid: React.FC<OverviewKpiGridProps> = ({ metrics, month
           <KpiTile
             label="قيمة المخزون بالتكلفة"
             icon={Package}
-            value={metrics.inventoryValuationUnavailable ? 'غير متاح' : formatMoney(metrics.inventoryValuationCost ?? 0)}
+            value={metrics.inventoryValuationUnavailable ? 'غير متاح' : metrics.inventoryValuationCost == null ? '—' : formatMoney(metrics.inventoryValuationCost)}
             hint={metrics.inventoryValuationUnavailable 
               ? 'تقييم المخزون غير متاح (خطأ FIFO - راجع المخزون)' 
-              : metrics.inventoryValuationCost != null && metrics.inventoryValuationCost > 0 
-                ? 'تقييم المخزون الحالي' 
-                : 'لا توجد قيمة مخزون مسجلة'}
+              : metrics.inventoryValuationCost == null
+                ? 'يتطلب صلاحية عرض المخزون'
+                : metrics.inventoryValuationCost > 0 
+                  ? 'تقييم المخزون الحالي' 
+                  : 'لا توجد قيمة مخزون مسجلة'}
             to="/inventory"
           />
 
           <KpiTile
             label="نواقص المخزون"
             icon={AlertTriangle}
-            tone={metrics.lowStockCount > 0 ? 'negative' : 'positive'}
-            value={`${formatCount(metrics.lowStockCount)} صنف`}
-            hint={metrics.lowStockCount > 0 ? 'أصناف بلغت حد إعادة الطلب' : 'المخزون بمستوى آمن'}
+            tone={(metrics.lowStockCount ?? 0) > 0 ? 'negative' : 'positive'}
+            value={metrics.lowStockCount == null ? '—' : `${formatCount(metrics.lowStockCount)} صنف`}
+            hint={metrics.lowStockCount == null ? 'يتطلب صلاحية عرض المخزون' : metrics.lowStockCount > 0 ? 'أصناف بلغت حد إعادة الطلب' : 'المخزون بمستوى آمن'}
             to="/inventory/reorder-planning"
           />
         </div>

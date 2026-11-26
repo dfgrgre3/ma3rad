@@ -1,4 +1,6 @@
 import { financialFieldVisibility } from '../../auth/sensitiveFields';
+import { AuthService } from '../../auth/AuthService';
+import { PermissionService } from '../../auth/PermissionService';
 import type {
   DashboardActivityRow,
   DashboardContext,
@@ -71,27 +73,41 @@ export function assembleDashboardMetrics(
   const canSeeCost = financialFieldVisibility().cost;
   const canSeeProfit = financialFieldVisibility().profit;
 
+  // Domain-level masking: each metric group is nulled (rendered as "—") when
+  // the actor lacks the matching view permission, so users with partial
+  // permissions see only the indicators they are allowed to see.
+  const actor = AuthService.getCurrentUser();
+  const canSeeSales = PermissionService.can(actor, 'sales.view', '/sales');
+  const canSeePurchases = PermissionService.can(actor, 'purchases.view', '/purchases');
+  const canSeeFinance = PermissionService.can(actor, 'finance.view', '/finance');
+  const canSeeInventory = PermissionService.can(actor, 'inventory.view', '/inventory');
+  const orNull = (value: number | null, allowed: boolean) => (allowed ? value : null);
+
   return {
-    todaySales: Number(todaySales.toFixed(2)),
-    monthSales: Number(monthSales.toFixed(2)),
-    todayPurchases: Number((purchaseStats.todayPurchases || 0).toFixed(2)),
-    todayExpenses: Number((expenseStats.todayExpenses || 0).toFixed(2)),
+    todaySales: orNull(Number(todaySales.toFixed(2)), canSeeSales),
+    monthSales: orNull(Number(monthSales.toFixed(2)), canSeeSales),
+    todayPurchases: orNull(Number((purchaseStats.todayPurchases || 0).toFixed(2)), canSeePurchases),
+    todayExpenses: orNull(Number((expenseStats.todayExpenses || 0).toFixed(2)), canSeeFinance),
     grossProfit: canSeeProfit ? Number(monthGross.toFixed(2)) : 0,
     netProfit: canSeeProfit ? Number(monthNet.toFixed(2)) : 0,
-    totalReceivables: Number(customerDebts.toFixed(2)),
-    totalPayables: Number(supplierPayables.toFixed(2)),
-    inventoryValuationCost: canSeeCost && !invStats.valuationUnavailable ? Number((invStats.valuationCost || 0).toFixed(2)) : (invStats.valuationUnavailable ? null : 0),
-    inventoryValuationSale: Number((invStats.valuationSale || 0).toFixed(2)),
+    totalReceivables: orNull(Number(customerDebts.toFixed(2)), canSeeFinance),
+    totalPayables: orNull(Number(supplierPayables.toFixed(2)), canSeeFinance),
+    inventoryValuationCost: !canSeeInventory
+      ? null
+      : canSeeCost && !invStats.valuationUnavailable
+        ? Number((invStats.valuationCost || 0).toFixed(2))
+        : invStats.valuationUnavailable ? null : 0,
+    inventoryValuationSale: orNull(Number((invStats.valuationSale || 0).toFixed(2)), canSeeInventory),
     inventoryValuationUnavailable: invStats.valuationUnavailable || false,
-    lowStockCount: invStats.lowStock || 0,
-    outOfStockCount: invStats.outOfStock || 0,
-    salesCount: salesStats.todaySalesCount || 0,
-    previousMonthSales: Number(prevMonthSales.toFixed(2)),
-    salesGrowthRate,
+    lowStockCount: orNull(invStats.lowStock || 0, canSeeInventory),
+    outOfStockCount: orNull(invStats.outOfStock || 0, canSeeInventory),
+    salesCount: orNull(salesStats.todaySalesCount || 0, canSeeSales),
+    previousMonthSales: orNull(Number(prevMonthSales.toFixed(2)), canSeeSales),
+    salesGrowthRate: orNull(salesGrowthRate, canSeeSales),
     profitMargin: canSeeProfit ? profitMargin : 0,
-    averageOrderValue,
-    topCustomer: topCustomer ? { name: topCustomer.name, totalPurchases: Number((topCustomer.total_purchases || 0).toFixed(2)) } : null,
-    urgentDebtsCount: urgentDebts
+    averageOrderValue: orNull(averageOrderValue, canSeeSales),
+    topCustomer: canSeeSales && topCustomer ? { name: topCustomer.name, totalPurchases: Number((topCustomer.total_purchases || 0).toFixed(2)) } : null,
+    urgentDebtsCount: orNull(urgentDebts, canSeeFinance)
   };
 }
 

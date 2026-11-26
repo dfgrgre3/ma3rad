@@ -79,13 +79,16 @@ export const PurchaseInventoryReportPage: React.FC = () => {
   const initialRef = useRef(true);
   const navigate = useNavigate();
   const user = AuthService.getCurrentUser();
-  const canView = PermissionService.can(user, 'ui.reports.hub.view');
+  // الصفحة تعرض تبويبين مستقلين: مشتريات/موردون/مرتجعات تتطلب صلاحية مشتريات،
+  // وقيمة المخزون تتطلب صلاحية تقييم المخزون. الدخول مشروط بوجود تبويب واحد
+  // على الأقل — خدمات البيانات تفرض صلاحياتها داخليًا أيضًا.
   const canViewPurchases = PermissionService.canAny(user, [
     'ui.reports.purchases.view',
     'ui.purchases.invoices.view',
   ]);
   const canViewInventory = PermissionService.can(user, 'ui.reports.inventory.view')
     || PermissionService.can(user, 'ui.inventory.valuation.view');
+  const canViewAnyTab = canViewPurchases || canViewInventory;
 
   const [tab, setTab] = useState<Tab>(
     canViewPurchases ? 'purchases' : canViewInventory ? 'inventory' : 'purchases'
@@ -119,14 +122,14 @@ export const PurchaseInventoryReportPage: React.FC = () => {
   }, [canViewInventory, canViewPurchases, from, tab, to]);
 
   useEffect(() => {
-    if (canView && (tab === 'inventory' ? canViewInventory : canViewPurchases)) load();
-  }, [canView, canViewInventory, canViewPurchases, load, tab]);
+    if (canViewAnyTab && (tab === 'inventory' ? canViewInventory : canViewPurchases)) load();
+  }, [canViewAnyTab, canViewInventory, canViewPurchases, load, tab]);
 
   useEffect(() => {
     if (refreshToken === undefined) return;
     if (initialRef.current) { initialRef.current = false; return; }
-    if (canView && (tab === 'inventory' ? canViewInventory : canViewPurchases)) load();
-  }, [refreshToken, canView, canViewInventory, canViewPurchases, load, tab]);
+    if (canViewAnyTab && (tab === 'inventory' ? canViewInventory : canViewPurchases)) load();
+  }, [refreshToken, canViewAnyTab, canViewInventory, canViewPurchases, load, tab]);
 
   const TABS: { id: Tab; label: string; icon: React.ElementType; visible: boolean }[] = [
     { id: 'purchases', label: 'المشتريات', icon: ShoppingBag, visible: canViewPurchases },
@@ -211,11 +214,7 @@ export const PurchaseInventoryReportPage: React.FC = () => {
       )}
 
       <div className="flex-1 overflow-y-auto p-6">
-        {!canView ? (
-          <div role="alert" className="py-16 text-center text-sm font-semibold text-ink-secondary">
-            ليس لديك صلاحية لعرض هذا التقرير.
-          </div>
-        ) : !TABS.some((item) => item.visible) ? (
+        {!canViewAnyTab || !TABS.some((item) => item.visible) ? (
           <div role="alert" className="py-16 text-center text-sm font-semibold text-ink-secondary">
             لا توجد لديك صلاحية لعرض أقسام هذا التقرير.
           </div>

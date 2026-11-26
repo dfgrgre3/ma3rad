@@ -5,27 +5,30 @@ export function isValidDate(value: string): boolean {
 }
 
 export interface DashboardMetrics {
-  todaySales: number;
-  monthSales: number;
-  todayPurchases: number;
-  todayExpenses: number;
+  // Domain-scoped fields are null when the actor lacks the matching view
+  // permission (sales.view / purchases.view / finance.view / inventory.view)
+  // so partial-permission users see "—" instead of hidden zeros.
+  todaySales: number | null;
+  monthSales: number | null;
+  todayPurchases: number | null;
+  todayExpenses: number | null;
   grossProfit: number;
   netProfit: number;
-  totalReceivables: number; // ديون العملاء
-  totalPayables: number; // مستحقات الموردين
+  totalReceivables: number | null; // ديون العملاء
+  totalPayables: number | null; // مستحقات الموردين
   inventoryValuationCost: number | null; // قيمة المخزون بسعر الشراء (null = غير متاح)
   inventoryValuationSale: number | null; // قيمة المخزون بسعر البيع (null = غير متاح)
   inventoryValuationUnavailable: boolean; // true إذا كانت التكلفة غير متاحة بسبب خطأ FIFO
-  lowStockCount: number;
-  outOfStockCount: number;
-  salesCount: number;
+  lowStockCount: number | null;
+  outOfStockCount: number | null;
+  salesCount: number | null;
   // New fields for enhanced analytics
-  previousMonthSales: number;
-  salesGrowthRate: number;
+  previousMonthSales: number | null;
+  salesGrowthRate: number | null;
   profitMargin: number;
-  averageOrderValue: number;
+  averageOrderValue: number | null;
   topCustomer: { name: string; totalPurchases: number } | null;
-  urgentDebtsCount: number;
+  urgentDebtsCount: number | null;
 }
 
 export interface MonthlyComparison {

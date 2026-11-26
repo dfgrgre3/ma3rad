@@ -15,7 +15,7 @@ export const NAV_GROUPS_02: NavGroupDef[] = [
     color: 'text-muted',
     perm: 'operations.view',
     items: [
-      { label: 'لوحة الأسطول والتوصيل', to: '/fleet/dashboard', icon: Truck, perm: 'deliveries.view' },
+      { label: 'لوحة الأسطول والتوصيل', to: '/fleet/dashboard', icon: Truck, anyPerms: ['operations.fleet.view', 'deliveries.view', 'vehicles.view', 'drivers.view'] },
       { label: 'الفروع', to: '/branches', icon: Building2, perm: 'branches.view' },
       { label: 'إدارة المنشأة والصيانة', to: '/facility-management', icon: Building2, perm: 'operations.view' },
       { label: 'المخازن', to: '/warehouses', icon: Warehouse, perm: 'warehouses.view' },

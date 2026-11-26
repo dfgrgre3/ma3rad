@@ -36,17 +36,55 @@ const FleetDashboardPage = moduleLazy('operations', () => import('../../operatio
 const HrDashboardPage = moduleLazy('hr', () => import('../../hr/hr-dashboard/HrDashboardPage').then(m => ({ default: m.HrDashboardPage })));
 
 /**
+ * Defers mounting heavy section content until it approaches the viewport.
+ * The "all" overview tab renders every allowed section at once; without this
+ * each embedded dashboard fires its full query set on page load.
+ */
+const DeferredMount: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const ref = React.useRef<HTMLDivElement>(null);
+  const [nearViewport, setNearViewport] = useState(false);
+  useEffect(() => {
+    if (nearViewport) return;
+    const el = ref.current;
+    if (!el || typeof IntersectionObserver === 'undefined') {
+      setNearViewport(true);
+      return;
+    }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          setNearViewport(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: '600px 0px' },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [nearViewport]);
+  return (
+    <div ref={ref}>
+      {nearViewport
+        ? children
+        : <div className="min-h-[140px] rounded-xl border border-dashed border-[#d9d9d9] dark:border-[#3d3d3d]" aria-hidden="true" />}
+    </div>
+  );
+};
+
+/**
  * كل قسم داخل لوحة المعلومات يخضع لصلاحية مجاله ووحدته، لا لصلاحية المسار
  * الأب (dashboard.view) وحدها. القسم بلا مدخل يبقى على dashboard.view فقط.
  */
 const PULSE_ACCESS = ['sales.view', 'purchases.view', 'finance.view', 'customers.view', 'inventory.view'];
-const SECTION_ACCESS: Partial<Record<SectionId, { permission?: string; permissions?: string[]; scopes?: Record<string, string>; moduleId?: string; path?: string }>> = {
+const SECTION_ACCESS: Partial<Record<SectionId, { permission?: string; permissions?: string[]; anyOf?: string[]; scopes?: Record<string, string>; moduleId?: string; path?: string }>> = {
   executive: { permissions: ['sales.view', 'purchases.view', 'finance.view', 'inventory.view'], scopes: { 'sales.view': '/sales', 'purchases.view': '/purchases', 'finance.view': '/finance', 'inventory.view': '/inventory' }, moduleId: 'finance', path: '/finance' },
   sales: { permission: 'sales.view', moduleId: 'sales', path: '/sales' },
-  purchases: { permission: 'purchases.view', moduleId: 'purchasing', path: '/purchases' },
+  purchases: { anyOf: ['purchases.view', 'inventory.view'], moduleId: 'purchasing', path: '/purchases' },
   debts: { permission: 'finance.debts.view', moduleId: 'finance', path: '/finance' },
   crm: { permission: 'crm.view', moduleId: 'customers', path: '/crm/leads' },
-  fleet: { permission: 'vehicles.view', moduleId: 'operations', path: '/deliveries' },
+  // لوحة الأسطول تتطلب operations.view (طبقة الخدمات) + صلاحية مجال واحدة على الأقل —
+  // نفس شرط FleetDashboardPage وقاعدة المسار /fleet/dashboard.
+  fleet: { permissions: ['operations.view'], anyOf: ['deliveries.view', 'operations.fleet.view', 'vehicles.view', 'drivers.view'], moduleId: 'operations', path: '/fleet/dashboard' },
   hr: { permission: 'employees.view', moduleId: 'hr', path: '/employees' },
 };
 
@@ -81,12 +119,16 @@ export const DashboardPage: React.FC = () => {
   // القسم مسموح فقط إذا تحققت صلاحية مجاله ووحدته الفعّالة وقواعد المنصة المركزية.
   const canViewSection = (id: SectionId) => {
     if (id === 'all') return true;
+    // أي صلاحية مجال واحدة تكفي لفتح «نبض حركة اليوم» — المؤشرات التي لا
+    // يملكها المستخدم تُقنَّع في طبقة الخدمة ( assembleDashboardMetrics )
+    // وتظهر كـ «—» بدل إخفاء القسم كاملًا.
     const pulseScopes = { 'sales.view': '/sales', 'purchases.view': '/purchases', 'finance.view': '/finance', 'customers.view': '/customers', 'inventory.view': '/inventory' };
-    const access: { permission?: string; permissions?: string[]; scopes?: Record<string, string>; moduleId?: string; path?: string } | undefined =
-      id === 'pulse' ? { permissions: PULSE_ACCESS, scopes: pulseScopes } : SECTION_ACCESS[id];
+    const access: { permission?: string; permissions?: string[]; anyOf?: string[]; scopes?: Record<string, string>; moduleId?: string; path?: string } | undefined =
+      id === 'pulse' ? { anyOf: PULSE_ACCESS, scopes: pulseScopes } : SECTION_ACCESS[id];
     if (!access) return true;
     if (access.permission && !PermissionService.can(currentUser, access.permission, access.path)) return false;
     if (access.permissions?.some((permission) => !PermissionService.can(currentUser, permission, access.scopes?.[permission] ?? access.path))) return false;
+    if (access.anyOf && !access.anyOf.some((permission) => PermissionService.can(currentUser, permission, access.scopes?.[permission] ?? access.path))) return false;
     if (access.moduleId && !ModuleRegistryService.isModuleEnabled(access.moduleId)) return false;
     if (access.path && !CentralFeaturePermissionService.isPageVisible(access.path)) return false;
     // قواعد ظهور الصفحات حسب النشاط (activityPageVisibility) تمنع القسم أيضًا.
@@ -264,7 +306,7 @@ export const DashboardPage: React.FC = () => {
             : showSection(section.id);
           return visible ? (
             <DashboardEmbedContext.Provider key={section.id} value={true}>
-              {card}
+              {isOverview ? <DeferredMount>{card}</DeferredMount> : card}
             </DashboardEmbedContext.Provider>
           ) : null;
         })}

@@ -97,6 +97,11 @@ export const ActivityDashboardPanel: React.FC = () => {
 
   return (
     <div className="min-w-0 space-y-3">
+      {data.warnings && data.warnings.length > 0 && (
+        <div className="rounded-xl border border-warning-border bg-warning-soft px-3 py-2 text-[11px] font-semibold text-warning dark:bg-warning/20" role="status">
+          تعذر تحميل بعض المؤشرات: {data.warnings.join(' · ')}
+        </div>
+      )}
       {data.tiles.length > 0 && (
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
           {data.tiles.map((tile) => (

@@ -139,7 +139,9 @@ export const ROUTE_PERMISSIONS: RoutePermissionRule[] = [
   { path: '/projects/sites', all: ['projects.view'] },
   { path: '/projects/boq', all: ['projects.view'] },
   { path: '/projects', all: ['projects.view'] },
-  { path: '/fleet/dashboard', any: ['operations.fleet.view', 'deliveries.view'] },
+  // لوحة الأسطول: طبقة الخدمات تتطلب operations.view، والمحتوى يحتاج صلاحية
+  // مجال واحدة على الأقل — مطابق لشرط FleetDashboardPage وقسم لوحة المعلومات.
+  { path: '/fleet/dashboard', all: ['operations.view'], any: ['operations.fleet.view', 'deliveries.view', 'vehicles.view', 'drivers.view'] },
   { path: '/facility-management', any: ['operations.view'] },
   { path: '/deliveries', all: ['deliveries.view'] },
   { path: '/drivers', all: ['drivers.view'] },

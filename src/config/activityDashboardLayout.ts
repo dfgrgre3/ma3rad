@@ -5,6 +5,8 @@ import {
 } from 'lucide-react';
 import type { SectionId, QuickActionItem } from '../types/dashboard/components';
 import { getActivityDashboardKind, type ActivityDashboardKind } from './activityDashboard';
+import { getProfileDashboard } from './businessProfiles';
+import { getEffectiveBusinessType } from '../services/domains/config/BusinessTypeService';
 
 /**
  * Activity-driven dashboard layout.
@@ -290,7 +292,14 @@ export function resolveDashboardLayout(
   prefs?: DashboardPrefsLike | null,
 ): ActivityDashboardLayout {
   const base = getActivityDashboardLayout(businessType);
-  if (!prefs) return base;
+  // Default widgets only: when the profile declares no custom dashboard KPIs,
+  // ProfileKpiPanel falls back to DEFAULT_PROFILE_KPIS which repeats the same
+  // numbers kpiGrid already shows — drop it to avoid duplicated values. An
+  // explicit user pick in prefs.pulseWidgets is always respected.
+  const profileHasOwnKpis = (getProfileDashboard(businessType ?? getEffectiveBusinessType())?.kpis?.length ?? 0) > 0;
+  const defaultPulseWidgets = () =>
+    base.pulseWidgets.filter((id) => id !== 'profileKpis' || profileHasOwnKpis);
+  if (!prefs) return { ...base, pulseWidgets: defaultPulseWidgets() };
 
   const hiddenSections = [...new Set([...base.hiddenSections, ...(prefs.hiddenSections ?? [])])];
 
@@ -303,11 +312,13 @@ export function resolveDashboardLayout(
 
   const pulseWidgets = prefs.pulseWidgets !== undefined
     ? prefs.pulseWidgets.filter((id) => PULSE_WIDGET_IDS.has(id))
-    : base.pulseWidgets;
+    : defaultPulseWidgets();
 
   let quickActions = base.quickActions;
   if (prefs.quickActions !== undefined) {
-    const catalog = new Map(getQuickActionCatalog().map((item) => [item.to, item]));
+    // Restrict saved picks to this activity's own actions — links belonging
+    // to other activities are dropped instead of leaking into the dashboard.
+    const catalog = new Map(base.quickActions.map((item) => [item.to, item]));
     quickActions = prefs.quickActions
       .map((to) => catalog.get(to))
       .filter((item): item is QuickActionItem => Boolean(item));

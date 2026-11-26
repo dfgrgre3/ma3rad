@@ -4,7 +4,7 @@ import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import {
   PULSE_WIDGETS_META,
-  getQuickActionCatalog,
+  getActivityDashboardQuickActions,
   type PulseWidgetId,
 } from '../../config/activityDashboardLayout';
 import { getProfileKpiCatalog } from '../../config/profileDashboardKpis';
@@ -99,7 +99,7 @@ export const DashboardCustomizeDialog: React.FC<DashboardCustomizeDialogProps> =
 
   const businessType = getEffectiveBusinessType();
   const kpiCatalog = useMemo(() => getProfileKpiCatalog(businessType), [businessType]);
-  const actionCatalog = useMemo(() => getQuickActionCatalog(), []);
+  const actionCatalog = useMemo(() => getActivityDashboardQuickActions(businessType), [businessType]);
 
   // Re-initialize the draft every time the dialog opens.
   useEffect(() => {

@@ -13,6 +13,7 @@ import { PermissionService } from '../../../services/domains/auth/PermissionServ
 import { StatCard as UiStatCard } from '../../../components/ui/Card';
 import { PageHeader } from '../../../components/ui/PageHeader';
 import { ActivityGate } from '../../../components/ui/ActivityGate';
+import { localDateString } from '../../../utils/shared/date';
 
 
 const statTone = (cls: string): 'default' | 'success' | 'danger' | 'warning' =>
@@ -34,6 +35,14 @@ function StatCard({ label, value, sub, icon: Icon, color, bg }: {
 }
 const fmt = (n: number) => new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 0 }).format(n || 0);
 const fmtM = (n: number) => n >= 1000 ? (n / 1000).toFixed(1) + 'ك' : fmt(n);
+
+function safe<T>(fn: () => T, fallback: T): T {
+  try {
+    return fn();
+  } catch {
+    return fallback;
+  }
+}
 
 interface FleetStats {
   totalDeliveries: number;
@@ -60,10 +69,12 @@ const DELIVERY_STATUS: Record<string, { label: string; color: string; icon: Reac
 };
 
 function buildFleetStats(service: OperationsService): FleetStats {
-  const deliveries = service.getDeliveries();
-  const drivers = service.getDrivers();
-  const vehicles = service.getVehicles();
-  const today = new Date().toISOString().split('T')[0];
+  // كل مجموعة بيانات تتطلب صلاحية مجالها إضافة إلى operations.view؛ عند غيابها
+  // تُعرض فارغة بدل إفشال اللوحة كاملة.
+  const deliveries = safe(() => service.getDeliveries(), [] as Delivery[]);
+  const drivers = safe(() => service.getDrivers(), [] as ReturnType<OperationsService['getDrivers']>);
+  const vehicles = safe(() => service.getVehicles(), [] as ReturnType<OperationsService['getVehicles']>);
+  const today = localDateString();
 
   const deliveredToday = deliveries.filter(d => d.status === 'DELIVERED' && d.date === today).length;
   const totalFees = deliveries.filter(d => d.status === 'DELIVERED').reduce((s, d) => s + (d.deliveryFee || 0), 0);
@@ -182,12 +193,21 @@ export const FleetDashboardPage: React.FC = () => {
   const service = useMemo(() => new OperationsService(), []);
   const navigate = useNavigate();
   const user = AuthService.getCurrentUser();
-  const canView = PermissionService.can(user, 'deliveries.view');
+  // محتوى اللوحة يتطلب operations.view (طبقة الخدمات) إضافة إلى صلاحية عرض
+  // واحدة على الأقل من مجالات الأسطول — نفس شرط قسم لوحة المعلومات والمسار.
+  const canView = PermissionService.can(user, 'operations.view')
+    && PermissionService.canAny(user, [
+      'deliveries.view', 'operations.fleet.view', 'vehicles.view', 'drivers.view',
+    ]);
   const [stats, setStats] = useState<FleetStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(() => {
+    if (!canView) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       setStats(buildFleetStats(service));
@@ -197,7 +217,7 @@ export const FleetDashboardPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [service]);
+  }, [canView, service]);
 
   useEffect(() => { if (canView) load(); }, [canView, load]);
 
@@ -249,7 +269,11 @@ export const FleetDashboardPage: React.FC = () => {
         </div>
       )}
 
-      {loading ? (
+      {!canView ? (
+        <div className="flex-1 flex items-center justify-center p-6">
+          <p className="text-sm font-semibold text-ink-secondary">ليس لديك صلاحية لعرض لوحة الأسطول.</p>
+        </div>
+      ) : loading ? (
         <div className="flex-1 flex items-center justify-center">
           <Loader2 className="w-8 h-8 animate-spin text-primary" />
         </div>

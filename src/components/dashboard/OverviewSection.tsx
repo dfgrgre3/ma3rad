@@ -94,7 +94,7 @@ export const OverviewSection: React.FC<OverviewSectionProps> = ({ onDataLoaded }
 
   // Use metrics from AccountingService to avoid duplicate calculations
   const profitMarginPercent = metrics.profitMargin?.toFixed(1) ?? '0';
-  const averageTicket = metrics.averageOrderValue ?? 0;
+  const averageTicket = metrics.averageOrderValue;
 
   // Widgets visible for the current business activity + the user's saved picks.
   const pulseWidgets = new Set<PulseWidgetId>(

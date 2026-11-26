@@ -13,6 +13,7 @@ import { DatabaseManager } from '../../../database/repositories/databaseManager'
 import { AuthService } from '../../../services/domains/auth/AuthService';
 import { PermissionService } from '../../../services/domains/auth/PermissionService';
 import { BranchAccessService } from '../../../services/domains/auth/BranchAccessService';
+import { EmployeeDepartmentAccessService } from '../../../services/domains/auth/EmployeeDepartmentAccessService';
 import { localDateString } from '../../../utils/shared/date';
 import { StatCard as UiStatCard } from '../../../components/ui/Card';
 
@@ -36,6 +37,7 @@ function StatCard({ label, value, sub, icon: Icon, color, bg }: {
 }
 const db = DatabaseManager.getInstance();
 const branchAccess = new BranchAccessService();
+const departmentAccess = new EmployeeDepartmentAccessService();
 const fmt = (n: number) => new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 0 }).format(n);
 const fmtK = (n: number) => n >= 1_000_000 ? (n / 1_000_000).toFixed(1) + 'م' : n >= 1000 ? (n / 1000).toFixed(1) + 'ك' : fmt(n);
 
@@ -44,7 +46,7 @@ interface HrStats {
   active: number;
   onLeave: number;
   suspended: number;
-  totalMonthlySalary: number;
+  totalMonthlySalary: number | null;
   todayPresent: number;
   todayAbsent: number;
   todayLate: number;
@@ -52,20 +54,23 @@ interface HrStats {
   byLocation: { location: string; count: number }[];
   byRole: { role: string; count: number; salary: number }[];
   recentEmployees: Employee[];
-  advancesPending: number;
+  advancesPending: number | null;
   salaryDue: number;
 }
 
-async function buildHrStats(): Promise<HrStats> {
+async function buildHrStats(canViewFinancials: boolean): Promise<HrStats> {
   const employees = await EmployeeService.getAllAsync();
   const active = employees.filter(e => e.status === 'ACTIVE');
   const today = localDateString();
 
   const scope = branchAccess.sqlScope('e.branch_id');
+  const departmentScope = departmentAccess.sqlScope('e.department_id');
+  const employeeScopeClause = `${scope.clause} AND ${departmentScope.clause}`;
+  const employeeScopeParams = [...scope.params, ...departmentScope.params];
   const todayAttendance = db.query<{ status: AttendanceStatus; count: number }>(
     `SELECT a.status, COUNT(*) AS count
      FROM attendance a JOIN employees e ON e.id = a.employee_id
-     WHERE a.date = ? AND ${scope.clause} GROUP BY a.status`, [today, ...scope.params]
+     WHERE a.date = ? AND ${employeeScopeClause} GROUP BY a.status`, [today, ...employeeScopeParams]
   );
   const todayPresent = todayAttendance.find(r => r.status === 'PRESENT')?.count || 0;
   const todayAbsent = todayAttendance.find(r => r.status === 'ABSENT')?.count || 0;
@@ -73,20 +78,27 @@ async function buildHrStats(): Promise<HrStats> {
   const totalTracked = todayPresent + todayAbsent + todayLate;
   const attendanceRate = totalTracked > 0 ? Math.round(((todayPresent + todayLate) / totalTracked) * 100) : 0;
 
-  const totalMonthlySalary = active.reduce((s, e) => s + (e.baseSalary || 0), 0);
+  // مؤشرات الرواتب والبيانات المالية لا تُحسب ولا تُعرض بدون صلاحية مالية/رواتب.
+  let totalMonthlySalary: number | null = null;
+  let advancesPending: number | null = null;
+  let salaryDue = 0;
+  if (canViewFinancials) {
+    totalMonthlySalary = active.reduce((s, e) => s + (e.baseSalary || 0), 0);
 
-  // Advances pending
-  const advanceRow = db.query<{ total: number }>(
-    `SELECT COALESCE(SUM(pt.amount), 0) / 100.0 AS total
-     FROM payroll_transactions pt JOIN employees e ON e.id = pt.employee_id
-     WHERE pt.type = 'ADVANCE' AND ${scope.clause}`, scope.params
-  )[0];
-  const payoutRow = db.query<{ total: number }>(
-    `SELECT COALESCE(SUM(pt.amount), 0) / 100.0 AS total
-     FROM payroll_transactions pt JOIN employees e ON e.id = pt.employee_id
-     WHERE pt.type = 'SALARY_PAYOUT' AND ${scope.clause}`, scope.params
-  )[0];
-  const advancesPending = (advanceRow?.total || 0);
+    // Advances pending
+    const advanceRow = db.query<{ total: number }>(
+      `SELECT COALESCE(SUM(pt.amount), 0) / 100.0 AS total
+       FROM payroll_transactions pt JOIN employees e ON e.id = pt.employee_id
+       WHERE pt.type = 'ADVANCE' AND ${employeeScopeClause}`, employeeScopeParams
+    )[0];
+    const payoutRow = db.query<{ total: number }>(
+      `SELECT COALESCE(SUM(pt.amount), 0) / 100.0 AS total
+       FROM payroll_transactions pt JOIN employees e ON e.id = pt.employee_id
+       WHERE pt.type = 'SALARY_PAYOUT' AND ${employeeScopeClause}`, employeeScopeParams
+    )[0];
+    advancesPending = (advanceRow?.total || 0);
+    salaryDue = payoutRow?.total || 0;
+  }
 
   // By location
   const locMap: Record<string, number> = {};
@@ -120,7 +132,7 @@ async function buildHrStats(): Promise<HrStats> {
     byRole,
     recentEmployees: employees.slice(0, 6),
     advancesPending,
-    salaryDue: payoutRow?.total || 0,
+    salaryDue,
   };
 }
 
@@ -169,7 +181,7 @@ function AttendanceMeter({ present, late, absent }: { present: number; late: num
   );
 }
 
-function RoleBreakdown({ roles }: { roles: { role: string; count: number; salary: number }[] }) {
+function RoleBreakdown({ roles, showSalary = true }: { roles: { role: string; count: number; salary: number }[]; showSalary?: boolean }) {
   const max = Math.max(...roles.map(r => r.count), 1);
   const colors = ['bg-primary', 'bg-primary', 'bg-success', 'bg-warning', 'bg-warning', 'bg-primary'];
 
@@ -193,7 +205,7 @@ function RoleBreakdown({ roles }: { roles: { role: string; count: number; salary
                     style={{ width: `${Math.max(pct, 5)}%` }} />
                 </div>
                 <span className="text-xs font-bold text-ink w-6 text-center">{r.count}</span>
-                <span className="text-xs text-muted w-20 text-left">{fmtK(r.salary)} ج/ش</span>
+                <span className="text-xs text-muted w-20 text-left">{showSalary ? `${fmtK(r.salary)} ج/ش` : '—'}</span>
               </div>
             );
           })}
@@ -246,6 +258,14 @@ export const HrDashboardPage: React.FC = () => {
   const user = AuthService.getCurrentUser();
   const _canManage = PermissionService.can(user, 'ui.employees.employees.manage');
   const canViewRecruitment = PermissionService.can(user, 'ui.hr.recruitment.view');
+  const canViewFinancials = PermissionService.canAny(user, [
+    'employees.financials.view', 'employees.payroll.view',
+    'employees.payroll.manage', 'employees.payroll.approve',
+  ]);
+  const canViewPayroll = PermissionService.canAny(user, [
+    'employees.payroll.view', 'employees.payroll.manage', 'employees.payroll.approve',
+  ]);
+  const canViewCommissions = canViewPayroll || PermissionService.can(user, 'employees.commissions.view');
   const [stats, setStats] = useState<HrStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -253,14 +273,14 @@ export const HrDashboardPage: React.FC = () => {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      setStats(await buildHrStats());
+      setStats(await buildHrStats(canViewFinancials));
       setError(null);
     } catch (e: any) {
       setError(e?.message || 'تعذر تحميل إحصاءات الموارد البشرية.');
     } finally {
       setLoading(false);
     }
-  }, [setLoading, setStats, setError]);
+  }, [canViewFinancials, setLoading, setStats, setError]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -337,24 +357,28 @@ export const HrDashboardPage: React.FC = () => {
               sub={`${stats.active} نشط • ${stats.onLeave} إجازة`}
               icon={Users} color="text-success" bg="bg-success-soft"
             />
-            <StatCard
-              label="إجمالي الرواتب الشهرية"
-              value={fmtK(stats.totalMonthlySalary) + ' ج'}
-              sub={`للموظفين النشطين`}
-              icon={Wallet} color="text-success" bg="bg-success-soft"
-            />
+            {stats.totalMonthlySalary != null && (
+              <StatCard
+                label="إجمالي الرواتب الشهرية"
+                value={fmtK(stats.totalMonthlySalary) + ' ج'}
+                sub={`للموظفين النشطين`}
+                icon={Wallet} color="text-success" bg="bg-success-soft"
+              />
+            )}
             <StatCard
               label="معدل الحضور اليوم"
               value={stats.attendanceRate + '%'}
               sub={`${stats.todayPresent} حضر • ${stats.todayAbsent} غائب`}
               icon={CheckCircle2} color="text-primary" bg="bg-accent-soft"
             />
-            <StatCard
-              label="سلف مُسجَّلة"
-              value={fmtK(stats.advancesPending) + ' ج'}
-              sub={`إجمالي السلف`}
-              icon={DollarSign} color="text-warning" bg="bg-warning-soft"
-            />
+            {stats.advancesPending != null && (
+              <StatCard
+                label="سلف مُسجَّلة"
+                value={fmtK(stats.advancesPending) + ' ج'}
+                sub={`إجمالي السلف`}
+                icon={DollarSign} color="text-warning" bg="bg-warning-soft"
+              />
+            )}
           </div>
 
           {/* Status Row */}
@@ -382,7 +406,7 @@ export const HrDashboardPage: React.FC = () => {
           {/* Middle Charts */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <AttendanceMeter present={stats.todayPresent} late={stats.todayLate} absent={stats.todayAbsent} />
-            <RoleBreakdown roles={stats.byRole} />
+            <RoleBreakdown roles={stats.byRole} showSalary={canViewFinancials} />
           </div>
 
           <LocationChart locations={stats.byLocation} />
@@ -392,8 +416,8 @@ export const HrDashboardPage: React.FC = () => {
             {[
               { label: 'الموظفون', desc: 'إضافة وإدارة بيانات الموظفين', icon: Users, to: '/employees', color: 'from-success to-success' },
               { label: 'الحضور والانصراف', desc: 'تسجيل ومتابعة الحضور', icon: Clock, to: '/employees/attendance', color: 'from-primary to-primary' },
-              { label: 'الرواتب والمسحوبات', desc: 'صرف الرواتب والسلف والحسومات', icon: Wallet, to: '/employees/payroll', color: 'from-success to-success' },
-              { label: 'عمولات المبيعات', desc: 'حساب وتوزيع العمولات', icon: Award, to: '/employees/commissions', color: 'from-warning to-warning' },
+              ...(canViewPayroll ? [{ label: 'الرواتب والمسحوبات', desc: 'صرف الرواتب والسلف والحسومات', icon: Wallet, to: '/employees/payroll', color: 'from-success to-success' }] : []),
+              ...(canViewCommissions ? [{ label: 'عمولات المبيعات', desc: 'حساب وتوزيع العمولات', icon: Award, to: '/employees/commissions', color: 'from-warning to-warning' }] : []),
               ...(canViewRecruitment ? [{ label: 'التوظيف والمرشحون', desc: 'الوظائف الشاغرة حتى ربط الموظف الجديد', icon: BriefcaseBusiness, to: '/employees/recruitment', color: 'from-primary to-primary' }] : []),
             ].map(card => (
               <button

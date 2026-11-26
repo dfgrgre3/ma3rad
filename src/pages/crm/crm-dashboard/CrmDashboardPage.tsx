@@ -336,7 +336,7 @@ export const CrmDashboardPage: React.FC = () => {
   const load = useCallback(() => {
     setLoading(true);
     try {
-      PermissionService.require(AuthService.requireAuth(), 'crm.view', '/crm/dashboard');
+      PermissionService.requireAny(AuthService.requireAuth(), ['crm.view', 'crm.dashboard.view'], '/crm/dashboard');
       setStats(buildStats(service));
       setError(null);
     } catch (e: any) {

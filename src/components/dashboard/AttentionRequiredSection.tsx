@@ -8,7 +8,10 @@ interface AttentionRequiredSectionProps {
 }
 
 export const AttentionRequiredSection: React.FC<AttentionRequiredSectionProps> = ({ metrics }) => {
-  if (!(metrics.lowStockCount > 0 || metrics.outOfStockCount > 0 || metrics.urgentDebtsCount > 0)) return null;
+  const lowStock = metrics.lowStockCount ?? 0;
+  const outOfStock = metrics.outOfStockCount ?? 0;
+  const urgentDebts = metrics.urgentDebtsCount ?? 0;
+  if (!(lowStock > 0 || outOfStock > 0 || urgentDebts > 0)) return null;
 
   return (
     <section aria-label="يتطلب انتباهك" className="relative overflow-hidden rounded-xl border border-warning-border bg-[#fffdf5] p-3.5 dark:border-warning/70 dark:bg-warning/20">
@@ -18,9 +21,9 @@ export const AttentionRequiredSection: React.FC<AttentionRequiredSectionProps> =
       </div>
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
         {[
-          { label: 'أصناف عند حد إعادة الطلب', value: metrics.lowStockCount, to: '/inventory/reorder-planning', tone: 'text-warning ', icon: Package },
-          { label: 'أصناف نفد مخزونها', value: metrics.outOfStockCount, to: '/inventory', tone: 'text-danger ', icon: AlertTriangle },
-          { label: 'ديون متأخرة لأكثر من 30 يوماً', value: metrics.urgentDebtsCount, to: '/finance/debts', tone: 'text-warning ', icon: Clock },
+          { label: 'أصناف عند حد إعادة الطلب', value: lowStock, to: '/inventory/reorder-planning', tone: 'text-warning ', icon: Package },
+          { label: 'أصناف نفد مخزونها', value: outOfStock, to: '/inventory', tone: 'text-danger ', icon: AlertTriangle },
+          { label: 'ديون متأخرة لأكثر من 30 يوماً', value: urgentDebts, to: '/finance/debts', tone: 'text-warning ', icon: Clock },
         ].filter(({ value }) => value > 0).map(({ label, value, to, tone, icon: Icon }) => (
           <Link key={label} to={to} className="flex items-center gap-2.5 rounded-lg border border-line/80 bg-surface/80 px-3 py-2.5 transition hover:border-warning hover:bg-surface dark:border-line-strong dark:bg-primary/70 dark:hover:border-warning">
             <Icon className={`h-4 w-4 shrink-0 ${tone}`} />

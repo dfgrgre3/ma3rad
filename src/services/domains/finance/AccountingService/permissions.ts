@@ -9,13 +9,11 @@ export function requireView(permission: string): void {
 export function requireDashboardView(): void {
   requireView('dashboard.view');
   const actor = AuthService.requireAuth();
-  // Use domain permissions (matching DashboardPage PULSE_ACCESS) instead of ui.* permissions
-  // This allows users with domain-level access to view the dashboard summary
-  PermissionService.require(actor, 'sales.view', '/sales');
-  PermissionService.require(actor, 'purchases.view', '/purchases');
-  PermissionService.require(actor, 'finance.view', '/finance');
-  PermissionService.require(actor, 'customers.view', '/customers');
-  PermissionService.require(actor, 'inventory.view', '/inventory');
+  // Use domain permissions (matching DashboardPage PULSE_ACCESS) instead of ui.* permissions.
+  // Any single domain grant is enough to enter; assembleDashboardMetrics masks the
+  // fields of domains the actor cannot see, so partial-permission users get only
+  // the indicators they are allowed to view instead of a fully blocked summary.
+  PermissionService.requireAny(actor, ['sales.view', 'purchases.view', 'finance.view', 'customers.view', 'inventory.view'], '/dashboard');
 }
 
 export function requireDashboardSalesView(): void {

@@ -8,6 +8,7 @@ import { CeramicMath } from '../../utils/products/ceramicMath';
 import { DashboardMetricsService } from '../../services/domains/dashboard/DashboardMetricsService';
 import { ProjectExecutionService } from '../../services/domains/projects/ProjectExecutionService';
 import { useTheme } from '../../contexts/useTheme';
+import { localDateString } from '../../utils/shared/date';
 
 interface KpiWithValue {
   id: string;
@@ -48,7 +49,7 @@ export const ProfileKpiPanel: React.FC = () => {
           return { ok: false as const };
         });
 
-      const today = new Date().toISOString().split('T')[0];
+      const today = localDateString();
       const monthStart = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-01`;
 
       const needsExecData = effectiveKpis.some((k) => k.id === 'total_debt' || k.id === 'total_received');
@@ -82,44 +83,44 @@ export const ProfileKpiPanel: React.FC = () => {
             continue;
           }
 
-          let value: number | string = 0;
+          let value: number | string | null = 0;
 
           switch (kpi.id) {
             case 'today_sales':
-              value = metrics?.todaySales ?? 0;
+              value = metrics?.todaySales ?? null;
               break;
             case 'month_sales':
-              value = metrics?.monthSales ?? 0;
+              value = metrics?.monthSales ?? null;
               break;
             case 'net_profit':
-              value = metrics?.netProfit ?? 0;
+              value = metrics?.netProfit ?? null;
               break;
             case 'inventory_value':
-              value = metrics?.inventoryValuationCost ?? 0;
+              value = metrics?.inventoryValuationCost ?? null;
               break;
             case 'low_stock':
-              value = metrics?.lowStockCount ?? 0;
+              value = metrics?.lowStockCount ?? null;
               break;
             case 'receivables':
-              value = metrics?.totalReceivables ?? 0;
+              value = metrics?.totalReceivables ?? null;
               break;
             case 'today_purchases':
-              value = metrics?.todayPurchases ?? 0;
+              value = metrics?.todayPurchases ?? null;
               break;
             case 'gross_profit':
-              value = metrics?.grossProfit ?? 0;
+              value = metrics?.grossProfit ?? null;
               break;
             case 'profit_margin':
-              value = metrics?.profitMargin ?? 0;
+              value = metrics?.profitMargin ?? null;
               break;
             case 'avg_order':
-              value = metrics?.averageOrderValue ?? 0;
+              value = metrics?.averageOrderValue ?? null;
               break;
             case 'total_debt':
-              value = execData?.totalDebt ?? metrics?.totalReceivables ?? 0;
+              value = execData?.totalDebt ?? metrics?.totalReceivables ?? null;
               break;
             case 'total_received':
-              value = execData?.totalReceived ?? 0;
+              value = execData?.totalReceived ?? null;
               break;
             case 'active_projects':
               value = projectPortfolio?.filter((p) => p.status === 'ACTIVE').length ?? 0;
@@ -156,7 +157,9 @@ export const ProfileKpiPanel: React.FC = () => {
 
           // Format the value based on format type
           let formattedValue: string;
-          if (kpi.format === 'currency') {
+          if (value === null) {
+            formattedValue = '—';
+          } else if (kpi.format === 'currency') {
             formattedValue = CeramicMath.formatCurrency(Number(value));
           } else if (kpi.format === 'percent') {
             formattedValue = `${Number(value).toFixed(1)}%`;
