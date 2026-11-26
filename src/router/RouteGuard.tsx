@@ -12,6 +12,7 @@ import { isActivityPathHidden } from '../config/activityPageVisibility';
 import { CentralLicenseService } from '../services/domains/licensing/CentralLicenseService';
 import { CentralFeaturePermissionService } from '../services/domains/licensing/CentralFeaturePermissionService';
 import { PermissionService } from '../services/domains/auth/PermissionService';
+import { useCentralConfigVersion } from '../hooks/useCentralConfig';
 import type { User } from '../types';
 
 export const PageLoader: React.FC = () => (
@@ -31,6 +32,7 @@ interface ModuleGuardProps {
 }
 
 export const ModuleGuard: React.FC<ModuleGuardProps> = ({ currentUser, children }) => {
+  useCentralConfigVersion();
   const { pathname } = useLocation();
   const businessType = getEffectiveBusinessType();
   const modules = withModuleDependencies(parseEnabledModules(SettingsService.getValue('enabledModules'), businessType));

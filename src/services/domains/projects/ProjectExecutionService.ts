@@ -37,7 +37,7 @@ export class ProjectExecutionService {
 
   private requireWrite(projectId: string) {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'ui.projects.list.edit');
+    PermissionService.require(actor, 'ui.projects.list.update');
     const project = this.projects.getProjectById(projectId);
     if (!project) throw new Error('المشروع غير موجود أو خارج نطاق صلاحيتك.');
     return actor;
@@ -150,11 +150,12 @@ export class ProjectExecutionService {
 
   public getContracts(projectId: string) {
     this.requireView(projectId);
+    const canFinancials = this.canViewFinancials();
     return this.db.query<any>(
       `SELECT c.*, v.version_number AS versionNumber, q.quotation_number AS quotationNumber
        FROM project_estimate_contracts c JOIN project_apartment_estimate_versions v ON v.id = c.estimate_version_id
        LEFT JOIN quotations q ON q.id = c.quotation_id WHERE c.project_id = ? ORDER BY c.created_at DESC`, [projectId]
-    ).map((row) => unscaleMoneyRow(row, CONTRACT_MONEY_FIELDS));
+    ).map((row) => canFinancials ? unscaleMoneyRow(row, CONTRACT_MONEY_FIELDS) : { ...row, contract_value: null });
   }
 
   public updateContractStatus(contractId: string, status: 'SIGNED' | 'CANCELLED') {
@@ -169,11 +170,14 @@ export class ProjectExecutionService {
 
   public getCertificates(projectId: string) {
     this.requireView(projectId);
+    const canFinancials = this.canViewFinancials();
     return this.db.query<any>(
       `SELECT c.*, v.version_number AS versionNumber FROM project_payment_certificates c
        JOIN project_apartment_estimate_versions v ON v.id = c.estimate_version_id
        WHERE c.project_id = ? ORDER BY c.certificate_date DESC, c.created_at DESC`, [projectId]
-    ).map((row) => unscaleMoneyRow(row, CERTIFICATE_MONEY_FIELDS));
+    ).map((row) => canFinancials
+      ? unscaleMoneyRow(row, CERTIFICATE_MONEY_FIELDS)
+      : { ...row, requested_amount: null, approved_amount: null, paid_amount: null });
   }
 
   public createCertificate(input: { projectId: string; estimateId: string; versionId?: string; contractId?: string; date: string; periodStart?: string; periodEnd?: string; description: string; progressPercent: number; amount: number }) {
@@ -248,11 +252,12 @@ export class ProjectExecutionService {
 
   public getActualCosts(projectId: string) {
     this.requireView(projectId);
+    const canFinancials = this.canViewFinancials();
     return this.db.query<any>(
       `SELECT c.*, v.version_number AS versionNumber FROM project_actual_cost_entries c
        LEFT JOIN project_apartment_estimate_versions v ON v.id = c.estimate_version_id
        WHERE c.project_id = ? ORDER BY c.cost_date DESC, c.created_at DESC`, [projectId]
-    ).map((row) => unscaleMoneyRow(row, COST_ENTRY_MONEY_FIELDS));
+    ).map((row) => canFinancials ? unscaleMoneyRow(row, COST_ENTRY_MONEY_FIELDS) : { ...row, amount: null });
   }
 
   public addActualCost(input: { projectId: string; versionId?: string; budgetLineId?: string; date: string; category: string; description: string; amount: number; sourceType?: 'MANUAL' | 'PURCHASE' | 'LABOR' | 'OTHER'; referenceId?: string }) {
@@ -293,6 +298,7 @@ export class ProjectExecutionService {
     const ids = this.scopedProjectIds();
     if (!ids.length) return [];
     const placeholders = ids.map(() => '?').join(',');
+    const canFinancials = this.canViewFinancials();
     return this.db.query<any>(
       `SELECT c.*, p.name AS projectName, p.code AS projectCode, v.version_number AS versionNumber,
               q.quotation_number AS quotationNumber
@@ -302,7 +308,7 @@ export class ProjectExecutionService {
        LEFT JOIN quotations q ON q.id = c.quotation_id
        WHERE c.project_id IN (${placeholders})
        ORDER BY c.created_at DESC`, ids
-    ).map((row) => unscaleMoneyRow(row, CONTRACT_MONEY_FIELDS));
+    ).map((row) => canFinancials ? unscaleMoneyRow(row, CONTRACT_MONEY_FIELDS) : { ...row, contract_value: null });
   }
 
   public getCertificatesAcrossProjects() {
@@ -332,6 +338,7 @@ export class ProjectExecutionService {
     const ids = this.scopedProjectIds();
     if (!ids.length) return [];
     const placeholders = ids.map(() => '?').join(',');
+    const canFinancials = this.canViewFinancials();
     return this.db.query<any>(
       `SELECT c.*, p.name AS projectName, p.code AS projectCode, v.version_number AS versionNumber
        FROM project_actual_cost_entries c
@@ -339,7 +346,7 @@ export class ProjectExecutionService {
        LEFT JOIN project_apartment_estimate_versions v ON v.id = c.estimate_version_id
        WHERE c.project_id IN (${placeholders})
        ORDER BY c.cost_date DESC, c.created_at DESC`, ids
-    ).map((row) => unscaleMoneyRow(row, COST_ENTRY_MONEY_FIELDS));
+    ).map((row) => canFinancials ? unscaleMoneyRow(row, COST_ENTRY_MONEY_FIELDS) : { ...row, amount: null });
   }
 
   /** Latest APPROVED estimate version per estimate — the only inputs createContract/createCertificate accept. */
@@ -506,6 +513,7 @@ export class ProjectExecutionService {
 
   public getSummary(projectId: string): ProjectExecutionSummary {
     this.requireView(projectId);
+    const canFinancials = this.canViewFinancials();
     const budget = this.projects.getBudgetLines(projectId);
     const costs = this.db.query<{ category: string; amount: number }>(`SELECT category, SUM(amount) / 100.0 AS amount FROM project_actual_cost_entries WHERE project_id = ? GROUP BY category`, [projectId]);
     const costByCategory = new Map(costs.map((row) => [row.category, Number(row.amount) || 0]));
@@ -521,6 +529,19 @@ export class ProjectExecutionService {
       return sum + Number(item.plannedAmount || 0) * Math.min(1, actual / Math.max(Number(item.plannedAmount) || 1, 1));
     }, 0);
     const categories = new Set([...budget.map((item) => item.category), ...costByCategory.keys()]);
+    if (!canFinancials) {
+      return {
+        contractValue: null as any,
+        plannedCost: null as any,
+        actualCost: null as any,
+        costVariance: null as any,
+        certifiedAmount: null as any,
+        paidAmount: null as any,
+        remainingContract: null as any,
+        completionPercent: null as any,
+        schedule: [...categories].map((category) => ({ title: category, plannedAmount: null as any, actualAmount: null as any })),
+      };
+    }
     return {
       contractValue: Number(project?.contractValue) || 0,
       plannedCost, actualCost, costVariance: plannedCost - actualCost,

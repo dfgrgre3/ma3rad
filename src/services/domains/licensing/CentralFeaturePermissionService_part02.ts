@@ -144,3 +144,38 @@ export function allowsPermission(permissionCode: string, pathname?: string): boo
   const path = pathname ?? getCurrentPath();
   return isActionAllowed(path, actionOf(code));
 }
+
+function normalizeButtonPath(pathname: string): string {
+  return String(pathname || '').split('?')[0].toLowerCase().replace(/\/+$/, '') || '/';
+}
+
+/**
+ * Canonical permission code for a named button on a specific page.
+ * Stored in `disabledPermissions` so it is signed, merged, and synced
+ * without requiring a separate database schema change.
+ */
+export function buttonPermissionCode(pathname: string, buttonKey: string): string {
+  const normPath = normalizeButtonPath(pathname);
+  const normKey = String(buttonKey || '').trim().toLowerCase();
+  return `btn:${normPath}:${normKey}`;
+}
+
+/**
+ * Check whether a specific named button on `pathname` is allowed by the
+ * central platform configuration (page visibility, action category,
+ * optional permission code, and per-button disablement).
+ */
+export function isButtonAllowed(
+  pathname: string,
+  buttonKey?: string,
+  action?: CentralAction,
+  permissionCode?: string
+): boolean {
+  const path = pathname || getCurrentPath();
+  if (!isPageVisible(path)) return false;
+  if (action && !isActionAllowed(path, action)) return false;
+  if (permissionCode && !allowsPermission(permissionCode, path)) return false;
+  const key = String(buttonKey || '').trim();
+  if (key && isPermissionDisabled(buttonPermissionCode(path, key))) return false;
+  return true;
+}

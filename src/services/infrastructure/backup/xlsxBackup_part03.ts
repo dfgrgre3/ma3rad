@@ -1,8 +1,9 @@
-import * as XLSX from 'xlsx';
+import type * as XLSXTypes from 'xlsx';
 import { MAX_BASE64_CELL_LENGTH, PAYLOAD_MARKER, PAYLOAD_SHEET, PAYLOAD_START_ROW, PAYLOAD_VERSION, RAW_CHUNK_SIZE, decodeBase64 } from './xlsxBackup_part01';
 
-export function extractDatabaseFromXlsxBackup(workbookBytes: Uint8Array): Uint8Array {
-  let workbook: XLSX.WorkBook;
+export async function extractDatabaseFromXlsxBackup(workbookBytes: Uint8Array): Promise<Uint8Array> {
+  const XLSX = await import('xlsx');
+  let workbook: XLSXTypes.WorkBook;
   try {
     workbook = XLSX.read(workbookBytes, { type: 'array' });
   } catch {

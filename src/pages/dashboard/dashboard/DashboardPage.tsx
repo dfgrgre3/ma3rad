@@ -66,7 +66,7 @@ const DeferredMount: React.FC<{ children: React.ReactNode }> = ({ children }) =>
     <div ref={ref}>
       {nearViewport
         ? children
-        : <div className="min-h-[140px] rounded-xl border border-dashed border-[#d9d9d9] dark:border-[#3d3d3d]" aria-hidden="true" />}
+        : <div className="min-h-[420px] rounded-xl border border-dashed border-[#d9d9d9] dark:border-[#3d3d3d]" aria-hidden="true" />}
     </div>
   );
 };

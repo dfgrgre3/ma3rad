@@ -40,7 +40,7 @@ const FAMILY_HIDDEN_PATHS: Record<string, string[]> = {
     '/inventory/showroom-stock',
     '/retail',
   ],
-  // Manufacturing: produces goods — no service-vertical pages.
+  // Manufacturing: produces goods — no service-vertical pages, no showroom, no promotions.
   manufacturing: [
     '/hospitality',
     '/workshop',
@@ -51,6 +51,9 @@ const FAMILY_HIDDEN_PATHS: Record<string, string[]> = {
     '/inventory/showroom-stock',
     '/customers/imported-products', '/customers/*/imported-products',
     '/retail',
+    '/promotions',
+    '/ceramics',
+    '/products/barcodes',
   ],
   // Construction: sites & contracts — no service-vertical pages.
   construction: [

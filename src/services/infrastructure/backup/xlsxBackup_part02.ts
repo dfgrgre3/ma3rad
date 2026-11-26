@@ -1,7 +1,7 @@
-import * as XLSX from 'xlsx';
 import { INFO_SHEET, PAYLOAD_MARKER, PAYLOAD_SHEET, PAYLOAD_START_ROW, PAYLOAD_VERSION, RAW_CHUNK_SIZE, encodeBase64 } from './xlsxBackup_part01';
 
-export function createXlsxBackupWorkbook(databaseBytes: Uint8Array): Uint8Array {
+export async function createXlsxBackupWorkbook(databaseBytes: Uint8Array): Promise<Uint8Array> {
+  const XLSX = await import('xlsx');
   if (databaseBytes.length === 0) throw new Error('قاعدة البيانات فارغة ولا يمكن تصديرها.');
   const chunkCount = Math.ceil(databaseBytes.length / RAW_CHUNK_SIZE);
   if (chunkCount + PAYLOAD_START_ROW - 1 > 1_048_576) {

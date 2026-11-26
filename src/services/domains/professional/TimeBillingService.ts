@@ -202,9 +202,8 @@ export class TimeBillingService {
 
   public getBatches(status?: string): BillingBatch[] {
     this.requireView();
-    const branchScope = this.branchAccess.sqlScope('b.branch_id');
-    const where = status ? [branchScope.clause, 'b.status = ?'] : [branchScope.clause];
-    const params = status ? [...branchScope.params, status] : [...branchScope.params];
+    const whereClause = status ? 'WHERE b.status = ?' : '';
+    const params = status ? [status] : [];
     return this.db.query<any>(
       `SELECT b.id, b.batch_number AS batchNumber, b.customer_id AS customerId,
               c.name AS customerName, b.project_id AS projectId, p.name AS projectName,
@@ -215,7 +214,7 @@ export class TimeBillingService {
        FROM time_billing_batches b
        LEFT JOIN customers c ON c.id = b.customer_id
        LEFT JOIN projects p ON p.id = b.project_id
-       WHERE ${where.join(' AND ')}
+       ${whereClause}
        ORDER BY b.created_at DESC`,
       params
     ).map((r) => ({ ...r, totalAmount: round2(r.totalAmount) }));

@@ -22,12 +22,14 @@ const HIDDEN_CONTROLS: Record<string, string[]> = {
     'construction',
   ],
   // Barcode label printing is meaningless for service-only catalogs.
+  // Manufacturing uses serial/lot tracking instead of retail barcodes.
   'products.barcode-labels': [
     'professional_services',
     'healthcare',
     'education',
     'construction',
     'logistics',
+    'manufacturing',
   ],
   // POS quick-sale is already hidden at route level; mirrored here so pages
   // embedding a POS shortcut can check the control id without hardcoding
@@ -40,11 +42,12 @@ const HIDDEN_CONTROLS: Record<string, string[]> = {
     'healthcare',
     'education',
   ],
-  // Marketing/promotions do not apply to medical, legal or school billing.
+  // Marketing/promotions do not apply to medical, legal, school or factory billing.
   'sales.promotions': [
     'professional_services',
     'healthcare',
     'education',
+    'manufacturing',
   ],
 };
 

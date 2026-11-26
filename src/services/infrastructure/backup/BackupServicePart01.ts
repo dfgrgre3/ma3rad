@@ -59,7 +59,7 @@ public async exportBackupFile(password?: string): Promise<void> {
     const binary = this.db.exportDatabaseBinary();
     const inspection = this.verifyBackupFile(binary);
     if (!inspection.valid) throw new Error(`تعذر التحقق من النسخة الحالية: ${inspection.error || inspection.integrity}`);
-    const workbook = createXlsxBackupWorkbook(binary);
+    const workbook = await createXlsxBackupWorkbook(binary);
     const encryptXlsx = window.ceramisys?.db?.encryptXlsxBackup;
     if (!encryptXlsx) throw new Error('تشفير ملف XLSX يتطلب تشغيل التطبيق من نسخة سطح المكتب.');
     const encrypted = await encryptXlsx(workbook, pwd);
@@ -148,7 +148,7 @@ private async readBackupBytes(
       if (!pwd) throw new Error('كلمة مرور ملف النسخة الاحتياطية XLSX مطلوبة.');
       const decryptXlsx = window.ceramisys?.db?.decryptXlsxBackup;
       if (!decryptXlsx) throw new Error('فك تشفير نسخة XLSX يتطلب تشغيل التطبيق من نسخة سطح المكتب.');
-      return extractDatabaseFromXlsxBackup(await decryptXlsx(fileBytes, pwd));
+      return await extractDatabaseFromXlsxBackup(await decryptXlsx(fileBytes, pwd));
     }
     if (isEncryptedBackup(fileBytes)) {
       let pwd: string | undefined = password;
@@ -294,7 +294,7 @@ public async restoreBackupFromFile(
         if (!pwd) throw new Error('كلمة مرور ملف النسخة الاحتياطية XLSX مطلوبة.');
         const decryptXlsx = window.ceramisys?.db?.decryptXlsxBackup;
         if (!decryptXlsx) throw new Error('فك تشفير نسخة XLSX يتطلب تشغيل التطبيق من نسخة سطح المكتب.');
-        const bytes = extractDatabaseFromXlsxBackup(await decryptXlsx(encryptedBytes, pwd));
+        const bytes = await extractDatabaseFromXlsxBackup(await decryptXlsx(encryptedBytes, pwd));
         const inspection = this.verifyBackupFile(bytes);
         if (!inspection.valid) {
           throw new Error(`الملف تالف أو غير صالح للاستيراد: ${inspection.error || inspection.integrity}`);

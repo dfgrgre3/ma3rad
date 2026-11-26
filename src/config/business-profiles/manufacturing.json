@@ -68,8 +68,8 @@
     {
       "id": "today_purchases",
       "label": {
-        "ar": "مشتريات اليوم",
-        "en": "today_purchases"
+        "ar": "مشتريات المواد اليوم",
+        "en": "Raw Materials Purchased Today"
       },
       "source": "purchases",
       "format": "currency"
@@ -77,8 +77,8 @@
     {
       "id": "inventory_value",
       "label": {
-        "ar": "قيمة المخزون",
-        "en": "inventory_value"
+        "ar": "قيمة مخزون المواد",
+        "en": "Materials Inventory Value"
       },
       "source": "inventory",
       "format": "currency"
@@ -86,8 +86,8 @@
     {
       "id": "low_stock",
       "label": {
-        "ar": "نواقص المواد",
-        "en": "low_stock"
+        "ar": "نواقص المواد الخام",
+        "en": "Raw Material Shortages"
       },
       "source": "inventory",
       "format": "number"
@@ -95,10 +95,28 @@
     {
       "id": "gross_profit",
       "label": {
-        "ar": "مجمل الربح",
-        "en": "gross_profit"
+        "ar": "هامش ربح الإنتاج",
+        "en": "Production Gross Profit"
       },
       "source": "sales",
+      "format": "currency"
+    },
+    {
+      "id": "month_sales",
+      "label": {
+        "ar": "مبيعات المنتجات الشهر",
+        "en": "Monthly Product Sales"
+      },
+      "source": "sales",
+      "format": "currency"
+    },
+    {
+      "id": "receivables",
+      "label": {
+        "ar": "ذمم العملاء",
+        "en": "Customer Receivables"
+      },
+      "source": "finance",
       "format": "currency"
     }
   ],

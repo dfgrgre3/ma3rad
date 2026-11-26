@@ -11,6 +11,7 @@ import {
   getCachedFeaturePermissions,
   getCachedDisabledPermissions,
   getCachedUsageLimits,
+  notifyCentralConfigUpdated,
 } from './centralConfigStore';
 
 const CONFIG_KEY = 'central_cached_config';
@@ -452,7 +453,10 @@ export class CentralLicenseService {
         // لا نُشعر الواجهة إلا عند تغيّر فعلي، حتى لا تُعاد التقييمات بلا داعٍ
         // عند الاستقصاء القصير للتحديث الفوري.
         const changed = !previous || previous.configurationVersion !== data.configurationVersion;
-        try { localStorage.setItem(CONFIG_KEY, JSON.stringify(data)); } catch { /* ignore */ }
+        try {
+          localStorage.setItem(CONFIG_KEY, JSON.stringify(data));
+          notifyCentralConfigUpdated();
+        } catch { /* ignore */ }
         if (changed) {
           CentralLicenseService.configRevision += 1;
           try { this.notify(); } catch { /* ignore */ }

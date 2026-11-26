@@ -87,6 +87,18 @@ const ALL_PULSE_WIDGETS: PulseWidgetId[] = [
 /** Product businesses keep every generic widget. */
 const PRODUCT_PULSE = ALL_PULSE_WIDGETS;
 
+/**
+ * Manufacturing businesses: show production-relevant widgets.
+ * - Hides: topProducts (irrelevant — they track orders not POS items),
+ *   categoryDist (retail metric), topCustomers (B2B not volume-driven).
+ * - Keeps: attention, quickActions, profileKpis, kpiGrid, purchases (raw materials),
+ *   salesTrend (output volume), paymentMix (B2B payments), recentFeed.
+ */
+const MANUFACTURING_PULSE: PulseWidgetId[] = [
+  'attention', 'quickActions', 'profileKpis', 'kpiGrid', 'purchases',
+  'salesTrend', 'paymentMix', 'recentFeed',
+];
+
 /** Service/ops businesses: no product-mix or purchase-invoice widgets. */
 const OPS_PULSE: PulseWidgetId[] = [
   'attention', 'quickActions', 'profileKpis', 'kpiGrid',
@@ -219,7 +231,7 @@ const KIND_LAYOUT: Record<ActivityDashboardKind, ActivityDashboardLayout> = {
     defaultSection: 'activity',
     sectionOrder: DEDICATED_ORDER,
     hiddenSections: ['fleet'],
-    pulseWidgets: PRODUCT_PULSE,
+    pulseWidgets: MANUFACTURING_PULSE,
     quickActions: QUICK_ACTIONS.manufacturing,
   },
   construction: {

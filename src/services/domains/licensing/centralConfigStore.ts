@@ -66,3 +66,39 @@ export function getCachedPermissionLimits(): CachedPermissionLimit[] {
   const value = readCachedCentralConfig()?.config?.permissionLimits;
   return Array.isArray(value) ? (value as CachedPermissionLimit[]) : [];
 }
+
+const CENTRAL_CONFIG_EVENT = 'central-config-updated';
+
+/**
+ * Notify all mounted listeners in the current window that `central_cached_config`
+ * has been updated so UI guards, sidebars, and buttons re-evaluate immediately.
+ */
+export function notifyCentralConfigUpdated(): void {
+  cachedRaw = null;
+  cachedConfig = null;
+  if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+    window.dispatchEvent(new CustomEvent(CENTRAL_CONFIG_EVENT));
+  }
+}
+
+/**
+ * Subscribe to central config updates (both same-window dispatches and
+ * cross-tab/cross-window `storage` events).
+ */
+export function subscribeCentralConfig(listener: () => void): () => void {
+  if (typeof window === 'undefined') return () => {};
+  const onCustom = () => listener();
+  const onStorage = (e: StorageEvent) => {
+    if (e.key === CONFIG_KEY || e.key === null) {
+      cachedRaw = null;
+      cachedConfig = null;
+      listener();
+    }
+  };
+  window.addEventListener(CENTRAL_CONFIG_EVENT, onCustom);
+  window.addEventListener('storage', onStorage);
+  return () => {
+    window.removeEventListener(CENTRAL_CONFIG_EVENT, onCustom);
+    window.removeEventListener('storage', onStorage);
+  };
+}

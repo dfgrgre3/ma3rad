@@ -67,11 +67,24 @@ export const OverviewSection: React.FC<OverviewSectionProps> = ({ onDataLoaded }
 
   if (!metrics && loading) {
     return (
-      <div className="flex flex-col items-center justify-center py-12 text-center text-muted">
-        <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-lg bg-accent-soft ">
-          <Activity className="h-4 w-4 text-primary " />
+      <div className="min-w-0 min-h-[900px] space-y-3 sm:space-y-4" aria-busy="true" aria-label="جاري استرجاع بيانات لوحة المؤشرات">
+        <div className="flex items-center justify-end">
+          <div className="h-9 w-full rounded-lg border border-line bg-surface-muted/60 sm:h-8 sm:w-32" />
         </div>
-        <p className="text-xs font-bold text-ink-secondary ">جاري استرجاع بيانات لوحة المؤشرات...</p>
+        <div className="h-20 rounded-xl border border-line bg-surface-muted/40" />
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, idx) => (
+            <div key={idx} className="h-28 rounded-xl border border-line bg-surface-muted/40" />
+          ))}
+        </div>
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+          <div className="h-72 rounded-xl border border-line bg-surface-muted/40" />
+          <div className="h-72 rounded-xl border border-line bg-surface-muted/40" />
+        </div>
+        <div className="flex items-center justify-center gap-2 py-4 text-xs font-bold text-ink-secondary">
+          <Activity className="h-4 w-4 animate-pulse text-primary" />
+          <span>جاري استرجاع بيانات لوحة المؤشرات...</span>
+        </div>
       </div>
     );
   }
@@ -103,7 +116,7 @@ export const OverviewSection: React.FC<OverviewSectionProps> = ({ onDataLoaded }
   const show = (id: PulseWidgetId) => pulseWidgets.has(id);
 
   return (
-    <div className="min-w-0 space-y-3 sm:space-y-4">
+    <div className="min-w-0 min-h-[900px] space-y-3 sm:space-y-4">
       {dashboardError && (
         <div role="alert" className="flex min-w-0 items-center justify-between gap-3 rounded-lg border border-danger-border bg-danger-soft p-2.5 text-xs font-semibold text-danger dark:bg-danger/40 ">
           <span className="flex min-w-0 items-center gap-1.5">

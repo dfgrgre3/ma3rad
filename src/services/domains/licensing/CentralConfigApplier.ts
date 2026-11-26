@@ -52,6 +52,17 @@ export class CentralConfigApplier {
         patch.enabledModules = JSON.stringify(enabled);
       }
 
+      const branding = cfg.config?.branding;
+      if (branding && typeof branding === 'object') {
+        if (branding.company_name) patch.companyName = String(branding.company_name);
+        if (branding.logo_url) patch.logoUrl = String(branding.logo_url);
+        if (branding.primary_color) patch.primaryColor = String(branding.primary_color);
+        if (branding.secondary_color) patch.secondaryColor = String(branding.secondary_color);
+        if (branding.accent_color) patch.accentColor = String(branding.accent_color);
+        if (branding.font_family) patch.fontFamily = String(branding.font_family);
+        if (branding.invoice_template) patch.invoiceTemplate = String(branding.invoice_template);
+      }
+
       if (Object.keys(patch).length === 0) return;
 
       SettingsService.applyCentral(patch);

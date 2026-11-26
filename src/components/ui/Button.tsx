@@ -1,5 +1,7 @@
 import React from 'react';
 import { Loader2 } from 'lucide-react';
+import { CentralFeaturePermissionService, type CentralAction } from '../../services/domains/licensing/CentralFeaturePermissionService';
+import { useCentralConfigVersion } from '../../hooks/useCentralConfig';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'success';
 export type ButtonSize = 'sm' | 'md' | 'lg';
@@ -53,6 +55,14 @@ export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
   block?: boolean;
   loading?: boolean;
   leadingIcon?: React.ReactNode;
+  /** Optional named button key for central platform control (btn:<path>:<key>). */
+  controlKey?: string;
+  /** Optional central action category ('view' | 'create' | 'edit' | 'delete' | 'export'). */
+  controlAction?: CentralAction;
+  /** Optional permission code checked against CentralFeaturePermissionService. */
+  controlPermission?: string;
+  /** Whether to hide (default) or disable the button when blocked by central config. */
+  controlMode?: 'hide' | 'disable';
 }
 
 export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(function Button(
@@ -63,6 +73,10 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(function 
     block = false,
     loading = false,
     leadingIcon,
+    controlKey,
+    controlAction,
+    controlPermission,
+    controlMode = 'hide',
     className,
     children,
     disabled,
@@ -71,11 +85,27 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(function 
   },
   ref,
 ) {
+  useCentralConfigVersion();
+  const hasControl = Boolean(controlKey || controlAction || controlPermission);
+  const currentPath =
+    CentralFeaturePermissionService.getCurrentPath() ||
+    (typeof window !== 'undefined' ? window.location.pathname : '');
+  const isAllowed = !hasControl || CentralFeaturePermissionService.isButtonAllowed(
+    currentPath,
+    controlKey,
+    controlAction,
+    controlPermission,
+  );
+
+  if (!isAllowed && controlMode === 'hide') {
+    return null;
+  }
+
   return (
     <button
       ref={ref}
       type={type}
-      disabled={disabled || loading}
+      disabled={disabled || loading || !isAllowed}
       aria-busy={loading || undefined}
       className={buttonClass({ variant, size, iconOnly, block, className })}
       {...rest}

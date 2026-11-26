@@ -16,6 +16,8 @@ import {
   isPermissionDisabled as _isPermissionDisabled,
   isPermissionPageHidden as _isPermissionPageHidden,
   allowsPermission as _allowsPermission,
+  buttonPermissionCode as _buttonPermissionCode,
+  isButtonAllowed as _isButtonAllowed,
 } from './CentralFeaturePermissionService_part02';
 
 export interface CentralFeaturePermission {
@@ -50,4 +52,8 @@ export class CentralFeaturePermissionService {
   static isPermissionDisabled(permissionCode: string): boolean { return _isPermissionDisabled(permissionCode); }
   static isPermissionPageHidden(permissionCode: string): boolean { return _isPermissionPageHidden(permissionCode); }
   static allowsPermission(permissionCode: string, pathname?: string): boolean { return _allowsPermission(permissionCode, pathname); }
+  static buttonPermissionCode(pathname: string, buttonKey: string): string { return _buttonPermissionCode(pathname, buttonKey); }
+  static isButtonAllowed(pathname: string, buttonKey?: string, action?: CentralAction, permissionCode?: string): boolean {
+    return _isButtonAllowed(pathname, buttonKey, action, permissionCode);
+  }
 }

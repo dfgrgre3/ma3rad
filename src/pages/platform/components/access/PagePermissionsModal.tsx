@@ -238,6 +238,78 @@ export const PagePermissionsModal: React.FC<PagePermissionsModalProps> = ({
               تعطيل صلاحية دقيقة يضيف كودها وأكوادها القديمة المكافئة إلى disabledPermissions في التكوين الموقّع — وهذا قيد مفروض على كل أدوار المشتركين.
             </p>
           </div>
+
+          <div className="rounded-xl border border-line p-3">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <p className="text-[12px] font-black text-ink">
+                التحكم في الأزرار المحددة داخل الصفحة
+              </p>
+              <span className="rounded-full bg-surface-sunken px-2 py-0.5 text-[10px] font-bold text-ink-secondary">
+                {[...disabled].filter((c) => c.startsWith(`btn:${page.path.toLowerCase()}:`)).length} زر معطل
+              </span>
+            </div>
+            {canManage && (
+              <form
+                className="mb-2 flex items-center gap-2"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const form = e.currentTarget;
+                  const input = form.elements.namedItem('buttonKey') as HTMLInputElement | null;
+                  const rawKey = String(input?.value || '').trim().toLowerCase();
+                  if (!rawKey) return;
+                  const code = `btn:${page.path.toLowerCase().replace(/\/+$/, '') || '/'}:${rawKey}`;
+                  setDisabled((current) => {
+                    const next = new Set(current);
+                    next.add(code);
+                    return next;
+                  });
+                  if (input) input.value = '';
+                }}
+              >
+                <input
+                  name="buttonKey"
+                  className={`${inputClass} flex-1 py-1.5 text-[11.5px]`}
+                  placeholder="مفتاح الزر (مثال: create-invoice أو export-excel أو delete-row)"
+                  dir="ltr"
+                />
+                <Button type="submit" size="sm" variant="secondary">
+                  تعطيل الزر
+                </Button>
+              </form>
+            )}
+            <div className="flex flex-wrap gap-1.5">
+              {[...disabled]
+                .filter((c) => c.startsWith(`btn:${page.path.toLowerCase().replace(/\/+$/, '') || '/'}:`))
+                .map((code) => {
+                  const key = code.split(':').slice(2).join(':');
+                  return (
+                    <span
+                      key={code}
+                      className="inline-flex items-center gap-1.5 rounded-full border border-danger-border bg-danger-soft/50 px-2.5 py-0.5 font-mono text-[10px] text-danger"
+                      dir="ltr"
+                    >
+                      {key}
+                      {canManage && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setDisabled((current) => {
+                              const next = new Set(current);
+                              next.delete(code);
+                              return next;
+                            })
+                          }
+                          className="font-bold hover:text-ink"
+                          aria-label={`إعادة تفعيل ${key}`}
+                        >
+                          ×
+                        </button>
+                      )}
+                    </span>
+                  );
+                })}
+            </div>
+          </div>
         </div>
       )}
     </Modal>

@@ -438,11 +438,30 @@ export const PAGE_ELEMENT_RULES: Record<string, ActivityPageElementRules> = {
     'print': {},
   },
   '/manufacturing': {
+    // Core production actions
     'new-production-order': {},
     'bom': {},
     'wip': {},
     'quality': {},
     'print': {},
+    // Tab visibility — only the manufacturing activity sees all tabs
+    'tab-overview': { onlyFor: ['manufacturing'] },
+    'tab-orders': { onlyFor: ['manufacturing'] },
+    'tab-floor': { onlyFor: ['manufacturing'] },
+    'tab-sales': { onlyFor: ['manufacturing'] },
+    'tab-mrp': { onlyFor: ['manufacturing'] },
+    'tab-workCenters': { onlyFor: ['manufacturing'] },
+    'tab-boms': { onlyFor: ['manufacturing'] },
+    'tab-traceability': { onlyFor: ['manufacturing'] },
+    'tab-quality': { onlyFor: ['manufacturing'] },
+    'tab-maintenance': { onlyFor: ['manufacturing'] },
+    'tab-hse': { onlyFor: ['manufacturing'] },
+    'tab-costing': { onlyFor: ['manufacturing'] },
+    // Extra actions hidden for non-manufacturing
+    'new-work-center': { onlyFor: ['manufacturing'] },
+    'schedule': { onlyFor: ['manufacturing'] },
+    'cost-analysis': { onlyFor: ['manufacturing'] },
+    'hse-incident': { onlyFor: ['manufacturing'] },
   },
   '/operations/shifts': {
     'new-shift': {},

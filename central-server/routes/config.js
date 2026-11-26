@@ -41,6 +41,16 @@ router.get('/configuration/current', authenticateDevice, async (req, res, next) 
     const visibility = await resolveTenantVisibility(db, device);
     const { tenantId, planId, allowedModuleIds, configurationVersion } = visibility;
 
+    let branding = null;
+    try {
+      branding = await db.get(
+        'SELECT company_name, logo_url, logo_dark_url, favicon_url, primary_color, secondary_color, accent_color, font_family, invoice_template, login_welcome_title, login_welcome_subtitle FROM platform_tenant_branding WHERE tenant_id = ? ORDER BY version DESC LIMIT 1',
+        [tenantId]
+      );
+    } catch {
+      branding = null;
+    }
+
     const inner = {
       hiddenMenus: visibility.hiddenMenus,
       disabledPermissions: visibility.disabledPermissions,
@@ -48,6 +58,7 @@ router.get('/configuration/current', authenticateDevice, async (req, res, next) 
       permissionLimits: visibility.permissionLimits,
       allowedModules: allowedModuleIds,
       usageLimits: {},
+      ...(branding ? { branding } : {}),
     };
     const configJson = JSON.stringify(inner);
     const { signature } = signString(configJson);
