@@ -23,6 +23,8 @@ export type ActivityDashboardKind =
   | 'professional'
   | 'retail'
   | 'distribution'
+  | 'import_export'
+  | 'logistics'
   | 'generic';
 
 export interface ActivityDashboardSpec {
@@ -58,8 +60,8 @@ const ACTIVITY_KIND: Record<string, ActivityDashboardKind> = {
   services: 'professional',
   custom: 'generic',
   healthcare_admin: 'generic',
-  import_export: 'distribution',
-  logistics: 'distribution',
+  import_export: 'import_export',
+  logistics: 'logistics',
 };
 
 const FAMILY_KIND: Record<string, ActivityDashboardKind> = {
@@ -84,6 +86,8 @@ const KIND_NAV_LABEL: Record<ActivityDashboardKind, string> = {
   professional: 'الأعمال',
   retail: 'المعرض',
   distribution: 'التوزيع',
+  import_export: 'الاستيراد والتصدير',
+  logistics: 'اللوجستيات',
   generic: 'نشاطي',
 };
 

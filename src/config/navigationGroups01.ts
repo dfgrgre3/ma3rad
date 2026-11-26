@@ -114,7 +114,7 @@ export const NAV_GROUPS_01: NavGroupDef[] = [
     color: 'text-primary',
     perm: 'customers.view',
     items: [
-      { label: 'لوحة علاقات العملاء', to: '/crm/dashboard', icon: Target, anyPerms: ['crm.view', 'customers.view'] },
+      { label: 'لوحة علاقات العملاء', to: '/crm/dashboard', icon: Target, anyPerms: ['crm.view', 'crm.dashboard.view', 'customers.view'] },
       { label: 'العملاء', to: '/customers', icon: Users, perm: 'customers.view' },
       { label: 'إدارة المشاريع', to: '/projects', icon: Boxes, perm: 'projects.view' },
       { label: 'تنفيذ المشاريع والمستخلصات', to: '/projects/execution', icon: BadgeCheck, perm: 'projects.view' },

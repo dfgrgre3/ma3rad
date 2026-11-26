@@ -27,6 +27,34 @@ export class ProjectExecutionService {
   private db = DatabaseManager.getInstance();
   private projects = new ProjectService();
 
+  private requireView(projectId: string) {
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'ui.projects.list.view');
+    const project = this.projects.getProjectById(projectId);
+    if (!project) throw new Error('المشروع غير موجود أو خارج نطاق صلاحيتك.');
+    return actor;
+  }
+
+  private requireWrite(projectId: string) {
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'ui.projects.list.edit');
+    const project = this.projects.getProjectById(projectId);
+    if (!project) throw new Error('المشروع غير موجود أو خارج نطاق صلاحيتك.');
+    return actor;
+  }
+
+  private requireFinancialView() {
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'projects.financials.view');
+    return actor;
+  }
+
+  private canViewFinancials(): boolean {
+    const actor = AuthService.getCurrentUser();
+    if (!actor) return false;
+    return PermissionService.can(actor, 'projects.financials.view');
+  }
+
   public initializeFromApprovedEstimate(estimateId: string, projectId: string, versionId?: string) {
     this.requireWrite(projectId);
     const estimate = this.requireApprovedEstimate(estimateId, projectId, versionId);
@@ -281,14 +309,23 @@ export class ProjectExecutionService {
     const ids = this.scopedProjectIds();
     if (!ids.length) return [];
     const placeholders = ids.map(() => '?').join(',');
-    return this.db.query<any>(
-      `SELECT c.*, p.name AS projectName, p.code AS projectCode, v.version_number AS versionNumber
+    const canFinancials = this.canViewFinancials();
+    const rows = this.db.query<any>(
+      `SELECT c.id, c.project_id, c.estimate_id, c.estimate_version_id, c.contract_id,
+              c.certificate_number, c.certificate_date, c.period_start, c.period_end,
+              c.description, c.progress_percent, c.status, c.review_notes, c.reviewed_by, c.reviewed_at,
+              c.created_by, c.created_at, c.payment_reference, c.paid_at${canFinancials ? `,
+              c.requested_amount / 100.0 AS requested_amount,
+              c.approved_amount / 100.0 AS approved_amount,
+              c.paid_amount / 100.0 AS paid_amount` : ''},
+              p.name AS projectName, p.code AS projectCode, v.version_number AS versionNumber
        FROM project_payment_certificates c
        JOIN projects p ON p.id = c.project_id
        JOIN project_apartment_estimate_versions v ON v.id = c.estimate_version_id
        WHERE c.project_id IN (${placeholders})
        ORDER BY c.certificate_date DESC, c.created_at DESC`, ids
-    ).map((row) => unscaleMoneyRow(row, CERTIFICATE_MONEY_FIELDS));
+    );
+    return rows.map((row) => canFinancials ? unscaleMoneyRow(row, CERTIFICATE_MONEY_FIELDS) : row);
   }
 
   public getActualCostsAcrossProjects() {
@@ -427,10 +464,11 @@ export class ProjectExecutionService {
     const ids = this.scopedProjectIds();
     if (!ids.length) return [];
     const placeholders = ids.map(() => '?').join(',');
+    const canFinancials = this.canViewFinancials();
     const rows = this.db.query<any>(
       `SELECT p.id, p.name, p.code, p.status, p.project_type AS projectType,
               p.start_date AS startDate, p.expected_end_date AS expectedEndDate,
-              c.name AS customerName,
+              c.name AS customerName${canFinancials ? `,
               p.contract_value / 100.0 AS contractValue,
               (SELECT COALESCE(SUM(b.planned_amount),0) / 100.0 FROM project_budget_lines b WHERE b.project_id = p.id) AS plannedCost,
               (SELECT COALESCE(SUM(b.actual_amount),0) / 100.0 FROM project_budget_lines b WHERE b.project_id = p.id) AS budgetActual,
@@ -440,7 +478,7 @@ export class ProjectExecutionService {
               (SELECT COALESCE(SUM(ct.approved_amount),0) / 100.0 FROM project_payment_certificates ct
                  WHERE ct.project_id = p.id AND ct.status IN ('APPROVED','PAID')) AS certifiedAmount,
               (SELECT COALESCE(SUM(ct.paid_amount),0) / 100.0 FROM project_payment_certificates ct
-                 WHERE ct.project_id = p.id) AS paidAmount,
+                 WHERE ct.project_id = p.id) AS paidAmount` : ''},
               (SELECT COUNT(*) FROM project_payment_certificates ct
                  WHERE ct.project_id = p.id AND ct.status = 'SUBMITTED') AS pendingCertificates,
               (SELECT COUNT(*) FROM project_site_daily_reports r
@@ -452,11 +490,16 @@ export class ProjectExecutionService {
     );
     return rows.map((row: any) => ({
       ...row,
-      costVariance: Number(row.plannedCost || 0) - Number(row.actualCost || 0),
-      completionPercent: Number(row.plannedCost) > 0
+      contractValue: canFinancials ? Number(row.contractValue || 0) : null,
+      plannedCost: canFinancials ? Number(row.plannedCost || 0) : null,
+      actualCost: canFinancials ? Number(row.actualCost || 0) : null,
+      costVariance: canFinancials ? Number(row.plannedCost || 0) - Number(row.actualCost || 0) : null,
+      completionPercent: canFinancials && Number(row.plannedCost) > 0
         ? Math.min(100, (Number(row.actualCost || 0) / Number(row.plannedCost)) * 100)
-        : 0,
-      collectionGap: Number(row.certifiedAmount || 0) - Number(row.paidAmount || 0),
+        : null,
+      certifiedAmount: canFinancials ? Number(row.certifiedAmount || 0) : null,
+      paidAmount: canFinancials ? Number(row.paidAmount || 0) : null,
+      collectionGap: canFinancials ? Number(row.certifiedAmount || 0) - Number(row.paidAmount || 0) : null,
       isOverdue: row.status === 'ACTIVE' && row.expectedEndDate && String(row.expectedEndDate).slice(0, 10) < new Date().toISOString().slice(0, 10),
     }));
   }
@@ -502,20 +545,12 @@ export class ProjectExecutionService {
     return row;
   }
 
-  private requireWrite(projectId: string) {
-    const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'ui.projects.list.update');
-    if (!this.projects.getProjectById(projectId)) throw new Error('المشروع غير موجود أو خارج نطاق صلاحيتك.');
-    return actor;
-  }
-  private requireView(projectId: string) {
-    if (!this.projects.getProjectById(projectId)) throw new Error('المشروع غير موجود أو خارج نطاق صلاحيتك.');
-  }
   private requireWriteForRecord(table: 'project_payment_certificates', id: string) {
     const row = this.db.query<{ project_id: string }>(`SELECT project_id FROM ${table} WHERE id = ?`, [id])[0];
     if (!row) throw new Error('السجل غير موجود.');
     return this.requireWrite(row.project_id);
   }
+
   private audit(action: string, recordId: string, values: object) {
     const actor = AuthService.requireAuth();
     this.db.run(

@@ -11,7 +11,7 @@ import { WorkshopService } from '../workshop/WorkshopService';
 import { ManufacturingService } from '../manufacturing/ManufacturingService';
 import { ProjectExecutionService } from '../projects/ProjectExecutionService';
 import { TimeBillingService } from '../professional/TimeBillingService';
-import { OperationsService, type Delivery } from '../operations/OperationsService';
+import { OperationsService, type Delivery, type Driver, type Vehicle } from '../operations/OperationsService';
 import { DebtService, type DebtRow } from '../finance/DebtService';
 import { PermissionService } from '../auth/PermissionService';
 import { getProductUnitLabel } from '../../../utils/products/productUnits';
@@ -421,14 +421,13 @@ function buildEducation(m: Metrics | null, ctx: BuildContext): ActivityDashboard
   const activeEnrollments = enrollments.filter((e) => e.status === 'ENROLLED' || e.status === 'ACTIVE');
   const today = localDateString();
   const attendance = ctxSafe(ctx, 'حضور اليوم', () => {
+    const allAttendance = svc.getAttendanceForAllClasses(today);
     let present = 0; let total = 0; let absent = 0; let late = 0;
-    for (const c of classes.slice(0, 30)) {
-      for (const r of svc.getAttendance(c.id, today)) {
-        total += 1;
-        if (r.status === 'PRESENT') present += 1;
-        else if (r.status === 'ABSENT') absent += 1;
-        else if (r.status === 'LATE') late += 1;
-      }
+    for (const r of allAttendance) {
+      total += 1;
+      if (r.status === 'PRESENT') present += 1;
+      else if (r.status === 'ABSENT') absent += 1;
+      else if (r.status === 'LATE') late += 1;
     }
     return { present, total, absent, late, rate: total ? (present / total) * 100 : 0 };
   }, { present: 0, total: 0, absent: 0, late: 0, rate: 0 });
@@ -748,6 +747,8 @@ const PROJECT_STATUS_LABEL: Record<string, string> = {
 
 function buildConstruction(m: Metrics | null, ctx: BuildContext): ActivityDashboardData {
   const exec = new ProjectExecutionService();
+  const actor = AuthService.getCurrentUser();
+  const canFinancials = actor ? PermissionService.can(actor, 'projects.financials.view') : false;
   const portfolio = ctxSafe(ctx, 'ملخص المشاريع', () => exec.getPortfolioSummary(), [] as ReturnType<ProjectExecutionService['getPortfolioSummary']>);
   const certificates = ctxSafe(ctx, 'مستخلصات المشاريع', () => exec.getCertificatesAcrossProjects(), [] as ReturnType<ProjectExecutionService['getCertificatesAcrossProjects']>);
   const active = portfolio.filter((p) => p.status === 'ACTIVE');
@@ -759,18 +760,22 @@ function buildConstruction(m: Metrics | null, ctx: BuildContext): ActivityDashbo
   const tiles: ActivityTile[] = [
     { id: 'active', label: 'مشاريع نشطة', value: int(active.length) },
     { id: 'overdue', label: 'مشاريع متأخرة', value: int(overdue.length) },
-    { id: 'contract', label: 'إجمالي قيمة العقود', value: money(sum(portfolio, 'contractValue')) },
-    { id: 'certified', label: 'إجمالي المستخلصات', value: money(sum(portfolio, 'certifiedAmount')) },
-    { id: 'gap', label: 'فجوة التحصيل', value: money(sum(portfolio, 'collectionGap')) },
-    { id: 'cost', label: 'التكلفة الفعلية', value: money(sum(portfolio, 'actualCost')) },
     { id: 'receivables', label: 'ديون العملاء', value: m ? money(m.totalReceivables) : DASH },
   ];
+  if (canFinancials) {
+    tiles.push(
+      { id: 'contract', label: 'إجمالي قيمة العقود', value: money(sum(portfolio, 'contractValue')) },
+      { id: 'certified', label: 'إجمالي المستخلصات', value: money(sum(portfolio, 'certifiedAmount')) },
+      { id: 'gap', label: 'فجوة التحصيل', value: money(sum(portfolio, 'collectionGap')) },
+      { id: 'cost', label: 'التكلفة الفعلية', value: money(sum(portfolio, 'actualCost')) },
+    );
+  }
   if (pendingCertificates.length) {
     tiles.push({
       id: 'pending_certificates',
       label: 'مستخلصات بانتظار المراجعة',
       value: int(pendingCertificates.length),
-      hint: money(pendingCertificates.reduce((s, c) => s + num(c.requested_amount), 0)),
+      hint: canFinancials ? money(pendingCertificates.reduce((s, c) => s + num(c.requested_amount || 0), 0)) : undefined,
     });
   }
 
@@ -785,7 +790,7 @@ function buildConstruction(m: Metrics | null, ctx: BuildContext): ActivityDashbo
         emptyText: 'لا توجد مشاريع.',
         rows: portfolio.slice(0, 8).map((p) => ({
           label: p.name,
-          value: money(p.contractValue),
+          value: canFinancials && p.contractValue != null ? money(p.contractValue) : '—',
           meta: `${PROJECT_STATUS_LABEL[p.status] ?? p.status}${p.isOverdue ? ' · متأخر' : ''}`,
         })),
       },
@@ -797,7 +802,7 @@ function buildConstruction(m: Metrics | null, ctx: BuildContext): ActivityDashbo
             rows: pendingCertificates.slice(0, 6).map((c) => ({
               label: c.certificate_number ?? 'مستخلص',
               value: c.projectName ?? 'مشروع',
-              meta: `${money(num(c.requested_amount))}${c.certificate_date ? ` · ${c.certificate_date}` : ''}`,
+              meta: canFinancials ? `${money(num(c.requested_amount || 0))}${c.certificate_date ? ` · ${c.certificate_date}` : ''}` : (c.certificate_date || ''),
             })),
           }
         : null,
@@ -809,8 +814,12 @@ function buildConstruction(m: Metrics | null, ctx: BuildContext): ActivityDashbo
 
 function buildProfessional(m: Metrics | null, ctx: BuildContext): ActivityDashboardData {
   const svc = new TimeBillingService();
-  const unbilled = ctxSafe(ctx, 'السجلات غير المفوترة', () => svc.getUnbilledSummary(), null);
-  const profitability = ctxSafe(ctx, 'ربحية العملاء', () => svc.getProfitability().slice(0, 5), [] as Awaited<ReturnType<TimeBillingService['getProfitability']>>);
+  const actor = AuthService.getCurrentUser();
+  const canFinancials = actor ? PermissionService.can(actor, 'projects.financials.view') : false;
+  const unbilled = ctxSafe(ctx, 'السجلات غير المفوترة', () => canFinancials ? svc.getUnbilledSummary() : svc.getUnbilledSummaryNonFinancial(), null);
+  const profitability = canFinancials
+    ? ctxSafe(ctx, 'ربحية العملاء', () => svc.getProfitability().slice(0, 5), [] as Awaited<ReturnType<TimeBillingService['getProfitability']>>)
+    : [];
   const entries = ctxSafe(ctx, 'سجلات الوقت', () => svc.getTimeEntries(), [] as Awaited<ReturnType<TimeBillingService['getTimeEntries']>>);
   const batches = ctxSafe(ctx, 'دفعات الفوترة', () => svc.getBatches(), [] as Awaited<ReturnType<TimeBillingService['getBatches']>>);
 
@@ -822,11 +831,13 @@ function buildProfessional(m: Metrics | null, ctx: BuildContext): ActivityDashbo
 
   const tiles: ActivityTile[] = [
     { id: 'unbilled', label: 'سجلات غير مفوترة', value: unbilled ? int(unbilled.count) : DASH, hint: unbilled ? `${num(unbilled.hours).toFixed(1)} ساعة` : undefined },
-    { id: 'unbilled_amount', label: 'قيمة غير مفوترة', value: unbilled ? money(unbilled.amount) : DASH },
-    { id: 'month_sales', label: 'إيراد الشهر', value: m ? money(m.monthSales) : DASH },
+  { id: 'month_sales', label: 'إيراد الشهر', value: m ? money(m.monthSales) : DASH },
     { id: 'net_profit', label: 'صافي الربح', value: m ? money(m.netProfit) : DASH },
     { id: 'receivables', label: 'ديون العملاء', value: m ? money(m.totalReceivables) : DASH },
   ];
+  if (canFinancials && unbilled && 'amount' in unbilled) {
+    tiles.push({ id: 'unbilled_amount', label: 'قيمة غير مفوترة', value: money(unbilled.amount) });
+  }
   if (pendingApproval.length) {
     tiles.push({
       id: 'pending_approval',
@@ -840,7 +851,7 @@ function buildProfessional(m: Metrics | null, ctx: BuildContext): ActivityDashbo
       id: 'open_batches',
       label: 'دفعات فوترة مفتوحة',
       value: int(openBatches.length),
-      hint: money(batchesValue),
+      hint: canFinancials ? money(batchesValue) : undefined,
     });
   }
 
@@ -849,16 +860,18 @@ function buildProfessional(m: Metrics | null, ctx: BuildContext): ActivityDashbo
     tiles,
     progress: [],
     sections: ([
-      {
-        id: 'profitability',
-        title: 'أكثر العملاء ربحية (الشهر)',
-        emptyText: 'لا توجد ساعات معتمدة بعد.',
-        rows: profitability.map((r) => ({
-          label: r.customerName,
-          value: money(r.billableAmount),
-          meta: `${num(r.billableHours).toFixed(1)} ساعة · ${int(r.entryCount)} سجل`,
-        })),
-      },
+      canFinancials && profitability.length
+        ? {
+            id: 'profitability',
+            title: 'أكثر العملاء ربحية (الشهر)',
+            emptyText: 'لا توجد ساعات معتمدة بعد.',
+            rows: profitability.map((r) => ({
+              label: r.customerName,
+              value: money(r.billableAmount),
+              meta: `${num(r.billableHours).toFixed(1)} ساعة · ${int(r.entryCount)} سجل`,
+            })),
+          }
+        : null,
       pendingApproval.length
         ? {
             id: 'pending_approval',
@@ -867,7 +880,7 @@ function buildProfessional(m: Metrics | null, ctx: BuildContext): ActivityDashbo
             rows: pendingApproval.slice(0, 6).map((e) => ({
               label: e.customerName || e.projectName || 'عميل',
               value: `${num(e.hours).toFixed(1)} ساعة`,
-              meta: `${e.employeeName || '—'} · ${money(e.amount)} · ${e.entryDate}`,
+              meta: `${e.employeeName || '—'}${canFinancials ? ` · ${money(e.amount)}` : ''} · ${e.entryDate}`,
             })),
           }
         : null,
@@ -879,7 +892,7 @@ function buildProfessional(m: Metrics | null, ctx: BuildContext): ActivityDashbo
             rows: openBatches.slice(0, 6).map((b) => ({
               label: b.batchNumber,
               value: b.customerName || 'عميل',
-              meta: `${money(b.totalAmount)} · ${int(b.itemCount)} سجل${b.periodStart ? ` · ${b.periodStart} ← ${b.periodEnd}` : ''}`,
+              meta: `${canFinancials ? money(b.totalAmount) : ''} · ${int(b.itemCount)} سجل${b.periodStart ? ` · ${b.periodStart} ← ${b.periodEnd}` : ''}`,
             })),
           }
         : null,
@@ -953,6 +966,244 @@ function recentActivitySection(activities: RecentActivity[]): ActivityListSectio
   };
 }
 
+/* ─── Import/Export ─────────────────────────────────────────────────────── */
+
+async function buildImportExport(m: Metrics | null, ctx: BuildContext): Promise<ActivityDashboardData> {
+  const [analytics, extras] = await Promise.all([loadSalesAnalytics(ctx), loadGenericExtras(ctx)]);
+  const { debts, expenses, payments } = extras;
+  const ops = new OperationsService();
+
+  const deliveries = ctxSafe(ctx, 'التوصيلات', () => ops.getDeliveries(), [] as Delivery[]);
+  const vehicles = ctxSafe(ctx, 'المركبات', () => ops.getVehicles(), [] as Vehicle[]);
+
+  const today = localDateString();
+  const pendingDeliveries = deliveries.filter((d) => ['PENDING', 'SCHEDULED', 'IN_TRANSIT'].includes(d.status));
+  const deliveredToday = deliveries.filter((d) => d.status === 'DELIVERED' && d.date === today).length;
+  const deliveredTotal = deliveries.filter((d) => d.status === 'DELIVERED').length;
+  const failedTotal = deliveries.filter((d) => d.status === 'FAILED').length;
+  const deliverySuccessRate = deliveredTotal + failedTotal > 0
+    ? (deliveredTotal / (deliveredTotal + failedTotal)) * 100
+    : null;
+
+  const monthPrefix = today.slice(0, 7);
+  const shippingFeesMonth = deliveries
+    .filter((d) => d.status === 'DELIVERED' && (d.date || '').startsWith(monthPrefix))
+    .reduce((s, d) => s + num(d.deliveryFee), 0);
+
+  const receivableDebts = debts.filter((d) => d.type === 'CUSTOMER_RECEIVABLE');
+  const overdueDebts = receivableDebts.filter((d) => d.overdue || (d.daysOverdue ?? 0) > 0);
+  const overdueAmount = overdueDebts.reduce((s, d) => s + num(d.amount), 0);
+  const totalReceivable = receivableDebts.reduce((s, d) => s + num(d.amount), 0);
+
+  const tiles: ActivityTile[] = [
+    { id: 'month_sales', label: 'مبيعات الشهر', value: m ? money(m.monthSales) : DASH },
+    { id: 'today_sales', label: 'مبيعات اليوم', value: m ? money(m.todaySales) : DASH },
+    { id: 'today_purchases', label: 'مشتريات اليوم', value: m ? money(m.todayPurchases) : DASH },
+    { id: 'inventory', label: 'قيمة المخزون (تكلفة)', value: m?.inventoryValuationCost != null ? money(m.inventoryValuationCost) : DASH,
+      hint: m?.inventoryValuationSale != null ? `بالبيع: ${money(m.inventoryValuationSale)}` : undefined },
+    { id: 'low_stock', label: 'أصناف منخفضة', value: m ? int(m.lowStockCount) : DASH },
+    { id: 'out_of_stock', label: 'أصناف نافدة', value: m ? int(m.outOfStockCount) : DASH },
+    { id: 'receivables', label: 'ديون العملاء', value: m ? money(m.totalReceivables) : DASH },
+    { id: 'payables', label: 'مستحقات الموردين', value: m ? money(m.totalPayables) : DASH },
+    { id: 'net_profit', label: 'صافي الربح', value: m ? money(m.netProfit) : DASH },
+  ];
+  if (deliveries.length) {
+    tiles.push(
+      { id: 'deliveries_pending', label: 'توصيلات جارية', value: int(pendingDeliveries.length) },
+      { id: 'deliveries_today', label: 'سُلّمت اليوم', value: int(deliveredToday) },
+    );
+  }
+  if (deliverySuccessRate != null) {
+    tiles.push({
+      id: 'delivery_success',
+      label: 'نسبة نجاح التوصيل',
+      value: pct(deliverySuccessRate),
+      hint: `${int(deliveredTotal)} ناجحة · ${int(failedTotal)} فاشلة`,
+    });
+  }
+  if (shippingFeesMonth > 0) {
+    tiles.push({ id: 'shipping_fees', label: 'إيراد التوصيل (الشهر)', value: money(shippingFeesMonth) });
+  }
+  if (vehicles.length) {
+    tiles.push({
+      id: 'vehicles_available',
+      label: 'مركبات متاحة',
+      value: int(vehicles.filter((v) => v.status === 'AVAILABLE' && v.isActive).length),
+      hint: `${int(vehicles.filter((v) => v.status === 'ON_DELIVERY').length)} في توصيل · ${int(vehicles.filter((v) => v.status === 'MAINTENANCE').length)} صيانة`,
+    });
+  }
+  if (debts.length) {
+    tiles.push({
+      id: 'overdue_debts',
+      label: 'ديون متأخرة',
+      value: int(overdueDebts.length),
+      hint: overdueAmount > 0 ? money(overdueAmount) : undefined,
+    });
+  }
+  if (expenses) {
+    tiles.push({ id: 'month_expenses', label: 'مصروفات الشهر', value: money(expenses.totalExpenses) });
+  }
+
+  const progress: ActivityProgress[] = [];
+  if (m && m.profitMargin != null && m.profitMargin > 0) {
+    progress.push({ label: 'هامش الربح', percent: m.profitMargin, caption: `صافي ربح ${money(m.netProfit)}` });
+  }
+  if (m && m.salesGrowthRate != null && m.salesGrowthRate !== 0) {
+    progress.push({
+      label: 'نمو المبيعات عن الشهر السابق',
+      percent: Math.max(0, m.salesGrowthRate),
+      caption: `الشهر السابق: ${money(m.previousMonthSales)}`,
+    });
+  }
+  if (deliverySuccessRate != null) {
+    progress.push({
+      label: 'نجاح التوصيل',
+      percent: deliverySuccessRate,
+      caption: `${int(deliveredTotal)} مسلّمة · ${int(failedTotal)} فاشلة من ${int(deliveredTotal + failedTotal)}`,
+    });
+  }
+  if (totalReceivable > 0 && overdueAmount > 0) {
+    progress.push({
+      label: 'نسبة الديون المتأخرة',
+      percent: (overdueAmount / totalReceivable) * 100,
+      caption: `${int(overdueDebts.length)} عميل متأخر · ${money(overdueAmount)}`,
+    });
+  }
+
+  const sections: ActivityListSection[] = [
+    topProductsSection(analytics.topProducts),
+    topCustomersSection(analytics.topCustomers),
+    recentActivitySection(analytics.recent),
+    deliveries.length
+      ? {
+          id: 'deliveries',
+          title: 'أحدث التوصيلات',
+          emptyText: 'لا توجد توصيلات مسجلة.',
+          rows: deliveries.slice(0, 8).map((d) => ({
+            label: d.deliveryNumber,
+            value: (d as { customer_name?: string }).customer_name || d.customerName || 'عميل',
+            meta: `${DELIVERY_STATUS_LABEL[d.status] ?? d.status}${d.deliveryFee ? ` · ${money(d.deliveryFee)}` : ''}`,
+          })),
+        }
+      : null,
+    debtAgingRows(receivableDebts),
+    topDebtorsSection(receivableDebts),
+    expenseCategoriesSection(expenses),
+    paymentMethodsSection(payments),
+  ].filter((s): s is ActivityListSection => s !== null);
+
+  return { kind: 'import_export', tiles, progress, sections };
+}
+
+/* ─── Logistics ───────────────────────────────────────────────────────── */
+
+async function buildLogistics(m: Metrics | null, ctx: BuildContext): Promise<ActivityDashboardData> {
+  const ops = new OperationsService();
+  const canDeliveries = PermissionService.can(AuthService.getCurrentUser(), 'deliveries.view');
+  const canVehicles = PermissionService.can(AuthService.getCurrentUser(), 'vehicles.view');
+  const canDrivers = PermissionService.can(AuthService.getCurrentUser(), 'drivers.view');
+
+  const deliveries = canDeliveries
+    ? ctxSafe(ctx, 'التوصيلات', () => ops.getDeliveries(), [] as Delivery[])
+    : [];
+  const drivers = canDrivers
+    ? ctxSafe(ctx, 'السائقون', () => ops.getDrivers(), [] as Driver[])
+    : [];
+  const vehicles = canVehicles
+    ? ctxSafe(ctx, 'المركبات', () => ops.getVehicles(), [] as Vehicle[])
+    : [];
+
+  const today = localDateString();
+  const pendingDeliveries = deliveries.filter((d) => ['PENDING', 'SCHEDULED', 'IN_TRANSIT'].includes(d.status));
+  const inTransit = deliveries.filter((d) => d.status === 'IN_TRANSIT');
+  const deliveredToday = deliveries.filter((d) => d.status === 'DELIVERED' && d.date === today).length;
+  const deliveredTotal = deliveries.filter((d) => d.status === 'DELIVERED').length;
+  const failedTotal = deliveries.filter((d) => d.status === 'FAILED').length;
+  const deliverySuccessRate = deliveredTotal + failedTotal > 0
+    ? (deliveredTotal / (deliveredTotal + failedTotal)) * 100
+    : null;
+
+  const monthPrefix = today.slice(0, 7);
+  const shippingFeesMonth = deliveries
+    .filter((d) => d.status === 'DELIVERED' && (d.date || '').startsWith(monthPrefix))
+    .reduce((s, d) => s + num(d.deliveryFee), 0);
+
+  const driverMap = new Map<string, { name: string; trips: number; delivered: number; failed: number }>();
+  deliveries.forEach((d) => {
+    if (!d.driverId) return;
+    const name = (d as any).driver_name || d.driverId;
+    if (!driverMap.has(d.driverId)) driverMap.set(d.driverId, { name, trips: 0, delivered: 0, failed: 0 });
+    const driver = driverMap.get(d.driverId)!;
+    driver.trips++;
+    if (d.status === 'DELIVERED') driver.delivered++;
+    if (d.status === 'FAILED') driver.failed++;
+  });
+
+  const tiles: ActivityTile[] = [
+    { id: 'pending', label: 'توصيلات معلقة', value: canDeliveries ? int(pendingDeliveries.length) : '—', hint: canDeliveries ? undefined : 'لا تملك صلاحية' },
+    { id: 'in_transit', label: 'في الطريق', value: canDeliveries ? int(inTransit.length) : '—', hint: canDeliveries ? undefined : 'لا تملك صلاحية' },
+    { id: 'delivered_today', label: 'سُلّمت اليوم', value: canDeliveries ? int(deliveredToday) : '—', hint: canDeliveries ? undefined : 'لا تملك صلاحية' },
+    { id: 'success_rate', label: 'نسبة النجاح', value: canDeliveries && deliverySuccessRate != null ? pct(deliverySuccessRate) : '—', hint: canDeliveries ? undefined : 'لا تملك صلاحية' },
+    { id: 'shipping_fees', label: 'إيراد الشحن', value: canDeliveries ? money(shippingFeesMonth) : '—', hint: canDeliveries ? undefined : 'لا تملك صلاحية' },
+    { id: 'active_drivers', label: 'سائقون نشطون', value: canDrivers ? int(drivers.filter((d) => d.isActive).length) : '—', hint: canDrivers ? undefined : 'لا تملك صلاحية' },
+    { id: 'available_vehicles', label: 'مركبات متاحة', value: canVehicles ? int(vehicles.filter((v) => v.status === 'AVAILABLE' && v.isActive).length) : '—', hint: canVehicles ? undefined : 'لا تملك صلاحية' },
+    { id: 'maintenance', label: 'مركبات صيانة', value: canVehicles ? int(vehicles.filter((v) => v.status === 'MAINTENANCE').length) : '—', hint: canVehicles ? undefined : 'لا تملك صلاحية' },
+  ];
+
+  const progress: ActivityProgress[] = [];
+  if (deliverySuccessRate != null) {
+    progress.push({
+      label: 'معدل نجاح التوصيل',
+      percent: deliverySuccessRate,
+      caption: `${int(deliveredTotal)} ناجحة · ${int(failedTotal)} فاشلة`,
+    });
+  }
+
+  const driverRows = Array.from(driverMap.values()).sort((a, b) => b.trips - a.trips).slice(0, 6);
+
+  const sections: ActivityListSection[] = [
+    deliveries.length
+      ? {
+          id: 'deliveries',
+          title: 'أحدث التوصيلات',
+          emptyText: 'لا توجد توصيلات مسجلة.',
+          rows: deliveries.slice(0, 8).map((d) => ({
+            label: d.deliveryNumber,
+            value: (d as { customer_name?: string }).customer_name || d.customerName || 'عميل',
+            meta: `${DELIVERY_STATUS_LABEL[d.status] ?? d.status}${d.deliveryFee ? ` · ${money(d.deliveryFee)}` : ''}`,
+          })),
+        }
+      : null,
+    driverRows.length
+      ? {
+          id: 'driver_performance',
+          title: 'أداء السائقين',
+          emptyText: 'لا توجد بيانات.',
+          rows: driverRows.map((dr) => ({
+            label: dr.name,
+            value: `${int(dr.trips)} رحلة`,
+            meta: `${int(dr.delivered)} ناجحة · ${int(dr.failed)} فاشلة`,
+          })),
+        }
+      : null,
+    vehicles.length
+      ? {
+          id: 'vehicle_status',
+          title: 'حالة المركبات',
+          emptyText: 'لا توجد مركبات مسجلة.',
+          rows: [
+            { label: 'متاحة', value: int(vehicles.filter((v) => v.status === 'AVAILABLE' && v.isActive).length) },
+            { label: 'في توصيل', value: int(vehicles.filter((v) => v.status === 'ON_DELIVERY').length) },
+            { label: 'صيانة', value: int(vehicles.filter((v) => v.status === 'MAINTENANCE').length) },
+            { label: 'خارج الخدمة', value: int(vehicles.filter((v) => v.status === 'OUT_OF_SERVICE' || !v.isActive).length) },
+          ],
+        }
+      : null,
+  ].filter((s): s is ActivityListSection => s !== null);
+
+  return { kind: 'logistics', tiles, progress, sections };
+}
+
 /* ─── Distribution ──────────────────────────────────────────────────────── */
 
 const DELIVERY_STATUS_LABEL: Record<string, string> = {
@@ -971,9 +1222,14 @@ async function buildDistribution(m: Metrics | null, ctx: BuildContext): Promise<
   const retail = new RetailWorkspaceService();
 
   const deliveries = ctxSafe(ctx, 'التوصيلات', () => ops.getDeliveries(), [] as Delivery[]);
-  const retailStats = ctxSafe(ctx, 'إحصائيات المبيعات', () => retail.getStats(), null);
-  const lowStock = ctxSafe(ctx, 'نواقص المخزون', () => retail.getLowStockRows(6), null as Awaited<ReturnType<RetailWorkspaceService['getLowStockRows']>> | null);
-  const openOrders = ctxSafe(ctx, 'الطلبات المفتوحة', () => retail.getOpenOrders(6), null as Awaited<ReturnType<RetailWorkspaceService['getOpenOrders']>> | null);
+  const drivers = ctxSafe(ctx, 'السائقون', () => ops.getDrivers(), [] as Driver[]);
+  const vehicles = ctxSafe(ctx, 'المركبات', () => ops.getVehicles(), [] as Vehicle[]);
+  // RetailWorkspaceService يتطلب sales.view — نقيّد النداءات حتى لا تتحول
+  // صلاحية ناقصة إلى تحذيرات «تعذر التحميل» في لوحة التوزيع.
+  const canSales = PermissionService.can(AuthService.getCurrentUser(), 'sales.view', '/sales');
+  const retailStats = canSales ? ctxSafe(ctx, 'إحصائيات المبيعات', () => retail.getStats(), null) : null;
+  const lowStock = canSales ? ctxSafe(ctx, 'نواقص المخزون', () => retail.getLowStockRows(6), [] as Awaited<ReturnType<RetailWorkspaceService['getLowStockRows']>>) : [];
+  const openOrders = canSales ? ctxSafe(ctx, 'الطلبات المفتوحة', () => retail.getOpenOrders(6), [] as Awaited<ReturnType<RetailWorkspaceService['getOpenOrders']>>) : [];
 
   const today = localDateString();
   const pendingDeliveries = deliveries.filter((d) => ['PENDING', 'SCHEDULED', 'IN_TRANSIT'].includes(d.status));
@@ -983,6 +1239,42 @@ async function buildDistribution(m: Metrics | null, ctx: BuildContext): Promise<
   const deliverySuccessRate = deliveredTotal + failedTotal > 0
     ? (deliveredTotal / (deliveredTotal + failedTotal)) * 100
     : null;
+
+  // مؤشرات تشغيلية أعمق: زمن التوصيل، إيراد الشحن، التأخير عن الموعد، وأداء الأسطول.
+  const deliveryHours = deliveries
+    .filter((d) => d.status === 'DELIVERED')
+    .map((d) => {
+      const start = d.scheduledAt || d.createdAt;
+      const end = d.deliveredAt;
+      if (!start || !end) return null;
+      const hours = (new Date(end).getTime() - new Date(start).getTime()) / 3_600_000;
+      return Number.isFinite(hours) && hours >= 0 && hours <= 24 * 30 ? hours : null;
+    })
+    .filter((h): h is number => h != null);
+  const avgDeliveryHours = deliveryHours.length
+    ? deliveryHours.reduce((s, h) => s + h, 0) / deliveryHours.length
+    : null;
+  const monthPrefix = today.slice(0, 7);
+  const shippingFeesMonth = deliveries
+    .filter((d) => d.status === 'DELIVERED' && (d.date || '').startsWith(monthPrefix))
+    .reduce((s, d) => s + num(d.deliveryFee), 0);
+  const overdueDeliveries = deliveries.filter(
+    (d) => ['PENDING', 'SCHEDULED', 'IN_TRANSIT'].includes(d.status)
+      && d.scheduledAt && String(d.scheduledAt).slice(0, 10) < today,
+  );
+  const driverName = (d: Delivery) =>
+    d.driverName || drivers.find((dr) => dr.id === d.driverId)?.fullName || 'سائق';
+  const driverMap = new Map<string, { name: string; trips: number; delivered: number; failed: number }>();
+  for (const d of deliveries) {
+    const key = d.driverId || d.driverName;
+    if (!key) continue;
+    const entry = driverMap.get(key) ?? { name: driverName(d), trips: 0, delivered: 0, failed: 0 };
+    entry.trips += 1;
+    if (d.status === 'DELIVERED') entry.delivered += 1;
+    if (d.status === 'FAILED') entry.failed += 1;
+    driverMap.set(key, entry);
+  }
+  const driverRows = Array.from(driverMap.values()).sort((a, b) => b.trips - a.trips).slice(0, 6);
 
   const receivableDebts = debts.filter((d) => d.type === 'CUSTOMER_RECEIVABLE');
   const overdueDebts = receivableDebts.filter((d) => d.overdue || (d.daysOverdue ?? 0) > 0);
@@ -1021,6 +1313,32 @@ async function buildDistribution(m: Metrics | null, ctx: BuildContext): Promise<
       hint: `${int(deliveredTotal)} ناجحة · ${int(failedTotal)} فاشلة`,
     });
   }
+  if (avgDeliveryHours != null) {
+    tiles.push({
+      id: 'avg_delivery_time',
+      label: 'متوسط زمن التوصيل',
+      value: `${avgDeliveryHours.toFixed(1)} ساعة`,
+      hint: `من ${int(deliveryHours.length)} توصيل مكتمل`,
+    });
+  }
+  if (shippingFeesMonth > 0) {
+    tiles.push({ id: 'shipping_fees', label: 'إيراد التوصيل (الشهر)', value: money(shippingFeesMonth) });
+  }
+  if (overdueDeliveries.length) {
+    tiles.push({
+      id: 'overdue_deliveries',
+      label: 'توصيلات متأخرة عن موعدها',
+      value: int(overdueDeliveries.length),
+    });
+  }
+  if (vehicles.length) {
+    tiles.push({
+      id: 'vehicles_available',
+      label: 'مركبات متاحة',
+      value: int(vehicles.filter((v) => v.status === 'AVAILABLE' && v.isActive).length),
+      hint: `${int(vehicles.filter((v) => v.status === 'ON_DELIVERY').length)} في توصيل · ${int(vehicles.filter((v) => v.status === 'MAINTENANCE').length)} صيانة`,
+    });
+  }
   if (debts.length) {
     tiles.push({
       id: 'overdue_debts',
@@ -1034,7 +1352,7 @@ async function buildDistribution(m: Metrics | null, ctx: BuildContext): Promise<
   }
 
   const progress: ActivityProgress[] = [];
-  if (m && m.profitMargin > 0) {
+  if (m && m.profitMargin != null && m.profitMargin > 0) {
     progress.push({ label: 'هامش الربح', percent: m.profitMargin, caption: `صافي ربح ${money(m.netProfit)}` });
   }
   if (m && m.salesGrowthRate != null && m.salesGrowthRate !== 0) {
@@ -1086,9 +1404,46 @@ async function buildDistribution(m: Metrics | null, ctx: BuildContext): Promise<
           emptyText: 'لا توجد توصيلات مسجلة.',
           rows: deliveries.slice(0, 8).map((d) => ({
             label: d.deliveryNumber,
-            value: (d as { customer_name?: string }).customer_name || 'عميل',
+            value: (d as { customer_name?: string }).customer_name || d.customerName || 'عميل',
             meta: `${DELIVERY_STATUS_LABEL[d.status] ?? d.status}${d.deliveryFee ? ` · ${money(d.deliveryFee)}` : ''}`,
           })),
+        }
+      : null,
+    overdueDeliveries.length
+      ? {
+          id: 'delayed_deliveries',
+          title: 'توصيلات متأخرة عن موعدها',
+          emptyText: 'كل التوصيلات ضمن مواعيدها.',
+          rows: overdueDeliveries.slice(0, 6).map((d) => ({
+            label: d.deliveryNumber,
+            value: d.customerName || 'عميل',
+            meta: `${DELIVERY_STATUS_LABEL[d.status] ?? d.status} · الموعد ${String(d.scheduledAt).slice(0, 10)}`,
+          })),
+        }
+      : null,
+    driverRows.length
+      ? {
+          id: 'driver_performance',
+          title: 'أداء السائقين',
+          emptyText: 'لا توجد رحلات مسندة بعد.',
+          rows: driverRows.map((dr) => ({
+            label: dr.name,
+            value: `${int(dr.trips)} رحلة`,
+            meta: `${int(dr.delivered)} ناجحة · ${int(dr.failed)} فاشلة`,
+          })),
+        }
+      : null,
+    vehicles.length
+      ? {
+          id: 'vehicle_status',
+          title: 'حالة المركبات',
+          emptyText: 'لا توجد مركبات مسجلة.',
+          rows: [
+            { label: 'متاحة', value: int(vehicles.filter((v) => v.status === 'AVAILABLE' && v.isActive).length) },
+            { label: 'في توصيل', value: int(vehicles.filter((v) => v.status === 'ON_DELIVERY').length) },
+            { label: 'صيانة', value: int(vehicles.filter((v) => v.status === 'MAINTENANCE').length) },
+            { label: 'خارج الخدمة', value: int(vehicles.filter((v) => v.status === 'OUT_OF_SERVICE' || !v.isActive).length) },
+          ],
         }
       : null,
     debtAgingRows(receivableDebts),
@@ -1199,9 +1554,31 @@ function debtAgingRows(debts: DebtRow[]): ActivityListSection | null {
 
 /* ─── Generic ───────────────────────────────────────────────────────────── */
 
-async function buildGeneric(m: Metrics | null, ctx: BuildContext): Promise<ActivityDashboardData> {
+async function buildGeneric(m: Metrics | null, ctx: BuildContext, businessType: string): Promise<ActivityDashboardData> {
   const [analytics, extras] = await Promise.all([loadSalesAnalytics(ctx), loadGenericExtras(ctx)]);
   const { debts, expenses, payments } = extras;
+
+  // ملخص المشاريع/الحالات — مفعّل افتراضيًا في custom وhealthcare_admin.
+  const canProjects = PermissionService.can(AuthService.getCurrentUser(), 'projects.view', '/projects');
+  const portfolio = canProjects
+    ? ctxSafe(ctx, 'ملخص المشاريع', () => new ProjectExecutionService().getPortfolioSummary(), [] as ReturnType<ProjectExecutionService['getPortfolioSummary']>)
+    : [];
+  const activeProjects = portfolio.filter((p) => p.status === 'ACTIVE');
+  const contractTotal = portfolio.reduce((s, p) => s + num((p as Record<string, unknown>).contractValue), 0);
+
+  // مؤشرات تشغيلية عامة (مخزون/طلبات) — مشروطة بصلاحية المبيعات حتى لا تظهر
+  // لوحات «لا توجد بيانات» لمجرد غياب الصلاحية.
+  const canSales = PermissionService.can(AuthService.getCurrentUser(), 'sales.view', '/sales');
+  const retail = new RetailWorkspaceService();
+  const retailStats = canSales
+    ? ctxSafe(ctx, 'إحصائيات التشغيل', () => retail.getStats(), null)
+    : null;
+  const lowStock = canSales
+    ? ctxSafe(ctx, 'نواقص المخزون', () => retail.getLowStockRows(6), [] as Awaited<ReturnType<RetailWorkspaceService['getLowStockRows']>>)
+    : [];
+  const openOrders = canSales
+    ? ctxSafe(ctx, 'الطلبات المفتوحة', () => retail.getOpenOrders(6), [] as Awaited<ReturnType<RetailWorkspaceService['getOpenOrders']>>)
+    : [];
 
   const receivableDebts = debts.filter((d) => d.type === 'CUSTOMER_RECEIVABLE');
   const overdueDebts = receivableDebts.filter((d) => d.overdue || (d.daysOverdue ?? 0) > 0);
@@ -1238,9 +1615,30 @@ async function buildGeneric(m: Metrics | null, ctx: BuildContext): Promise<Activ
   if (expenses) {
     tiles.push({ id: 'month_expenses', label: 'مصروفات الشهر', value: money(expenses.totalExpenses) });
   }
+  if (retailStats) {
+    tiles.push(
+      { id: 'open_orders', label: 'طلبات مفتوحة', value: int(retailStats.openOrders) },
+      { id: 'open_quotes', label: 'عروض أسعار مفتوحة', value: int(retailStats.openQuotes) },
+      { id: 'low_stock_ops', label: 'أصناف تحت الحد الأدنى', value: int(retailStats.lowStockCount) },
+    );
+  }
+  if (portfolio.length) {
+    tiles.push(
+      { id: 'active_projects', label: 'مشاريع نشطة', value: int(activeProjects.length) },
+      { id: 'contract_total', label: 'قيمة العقود', value: money(contractTotal) },
+    );
+  }
+
+  // الأنشطة الخدمية/الإدارية تعرض «إيراد» بدل «مبيعات» في التسميات.
+  if (businessType === 'healthcare_admin' || businessType === 'services') {
+    for (const tile of tiles) {
+      if (tile.id === 'today_sales') tile.label = 'إيراد اليوم';
+      if (tile.id === 'month_sales') tile.label = 'إيراد الشهر';
+    }
+  }
 
   const progress: ActivityProgress[] = [];
-  if (m && m.profitMargin > 0) {
+  if (m && m.profitMargin != null && m.profitMargin > 0) {
     progress.push({ label: 'هامش الربح', percent: m.profitMargin, caption: `صافي ربح ${money(m.netProfit)}` });
   }
   if (analytics.monthly?.salesGrowth != null && analytics.monthly.salesGrowth !== 0) {
@@ -1262,6 +1660,34 @@ async function buildGeneric(m: Metrics | null, ctx: BuildContext): Promise<Activ
     topProductsSection(analytics.topProducts),
     topCustomersSection(analytics.topCustomers),
     recentActivitySection(analytics.recent),
+    openOrders.length
+      ? {
+          id: 'open_orders',
+          title: 'أحدث الطلبات المفتوحة',
+          emptyText: 'لا توجد طلبات مفتوحة.',
+          rows: openOrders.map((o) => ({ label: o.orderNumber, value: o.customerName || 'عميل نقدي', meta: o.status })),
+        }
+      : null,
+    lowStock.length
+      ? {
+          id: 'low_stock',
+          title: 'نواقص المخزون',
+          emptyText: 'المخزون في مستوى آمن.',
+          rows: lowStock.map((r) => ({ label: r.name, value: `${int(r.stockQty)} متاح`, meta: `الحد الأدنى ${int(r.minStockLevel)}` })),
+        }
+      : null,
+    portfolio.length
+      ? {
+          id: 'projects',
+          title: 'المشاريع والحالات الجارية',
+          emptyText: 'لا توجد مشاريع مسجلة.',
+          rows: portfolio.slice(0, 6).map((p) => ({
+            label: p.name,
+            value: money((p as Record<string, unknown>).contractValue),
+            meta: `${PROJECT_STATUS_LABEL[p.status] ?? p.status}${p.isOverdue ? ' · متأخر' : ''}`,
+          })),
+        }
+      : null,
     debtAgingRows(receivableDebts),
     topDebtorsSection(receivableDebts),
     expenseCategoriesSection(expenses),
@@ -1274,7 +1700,37 @@ async function buildGeneric(m: Metrics | null, ctx: BuildContext): Promise<Activ
 /* ─── Public API ────────────────────────────────────────────────────────── */
 
 export class ActivityDashboardService {
-  /** Temporarily scopes service reads to the branch chosen in the dashboard filter. */
+  /**
+   * ⚠️ DEPRECATED PATTERN: Temporarily scopes service reads by changing session state.
+   *
+   * This method changes the user's current branch context during the dashboard load,
+   * then restores it. This approach has critical limitations:
+   *
+   * 1. **Race Condition Risk**: If two concurrent requests use different branch filters,
+   *    they will interfere with each other's session state. Example:
+   *    - Request A starts with branch filter "branch-1"
+   *    - Request B starts with branch filter "branch-2" before A completes
+   *    - Request A's services now see branch-2 data instead of branch-1
+   *
+   * 2. **No Date Range Support**: Only branch filtering is implemented; date ranges
+   *    (e.g., "last 7 days", "this month") are not supported.
+   *
+   * 3. **Session Pollution**: Changing session state affects all other components that
+   *    rely on the current branch context during the dashboard load.
+   *
+   * Current Status:
+   * - The UI does NOT pass branchId to getDashboard() yet, so this issue is theoretical.
+   * - When branch filtering is enabled in the UI, this MUST be refactored first.
+   *
+   * Required Refactor:
+   * Instead of changing session state, pass branchId directly to individual service
+   * methods. Each service should accept an optional branchId parameter and use it in
+   * its queries via BranchAccessService.sqlScope() without touching session state.
+   *
+   * Example refactor:
+   * Before: service.getStats() // uses getCurrentBranchId() from session
+   * After:  service.getStats({ branchId }) // uses passed branchId or falls back to session
+   */
   private applyBranchFilter(branchId?: string): (() => void) | null {
     if (!branchId) return null;
     try {
@@ -1296,7 +1752,11 @@ export class ActivityDashboardService {
     }
   }
 
-  /** Resolves the dashboard data for the effective (or given) business type. */
+  /**
+   * Resolves the dashboard data for the effective (or given) business type.
+   * TODO: Add date range filter support for historical views (e.g., "last 7 days", "this month").
+   * Currently, date filters are not implemented in the activity dashboard.
+   */
   public async getDashboard(
     businessType: string = getEffectiveBusinessType(),
     filter?: ActivityDashboardFilter,
@@ -1317,8 +1777,10 @@ export class ActivityDashboardService {
           case 'construction': return buildConstruction(metrics, ctx);
           case 'professional': return buildProfessional(metrics, ctx);
           case 'distribution': return buildDistribution(metrics, ctx);
+          case 'import_export': return buildImportExport(metrics, ctx);
+          case 'logistics': return buildLogistics(metrics, ctx);
           case 'retail': return buildRetail(metrics, ctx, businessType);
-          default: return buildGeneric(metrics, ctx);
+          default: return buildGeneric(metrics, ctx, businessType);
         }
       })();
 

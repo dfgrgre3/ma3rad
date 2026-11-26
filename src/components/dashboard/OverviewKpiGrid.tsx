@@ -106,7 +106,7 @@ export const OverviewKpiGrid: React.FC<OverviewKpiGridProps> = ({ metrics, month
           <KpiTile
             label="الأرباح الصافية"
             icon={DollarSign}
-            tone={metrics.netProfit < 0 ? 'negative' : 'positive'}
+            tone={(metrics.netProfit ?? 0) < 0 ? 'negative' : 'positive'}
             value={formatMoney(metrics.netProfit)}
             hint={hasSales ? `من بداية الشهر · هامش الربح ${profitMarginPercent}%` : 'لا توجد أرباح مسجلة بعد'}
             to="/finance"

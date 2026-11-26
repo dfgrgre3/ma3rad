@@ -161,6 +161,18 @@ const QUICK_ACTIONS: Record<ActivityDashboardKind, QuickActionItem[]> = {
     action('/inventory', 'المخزون', 'أرصدة المستودع', Package),
     action('/finance/receivables', 'الذمم', 'تحصيل الموردين والعملاء', Wallet),
   ],
+  import_export: [
+    action('/purchases', 'مستندات الشراء والاستيراد', 'فواتير الموردين الأجانب', ShoppingBag),
+    action('/deliveries', 'شحنات التصدير', 'أوامر الشحن والتوصيل', Truck),
+    action('/inventory', 'المخزون', 'أرصدة المستودع', Package),
+    action('/finance/receivables', 'الذمم', 'مستحقات العملاء والموردين', Wallet),
+  ],
+  logistics: [
+    action('/deliveries', 'أوامر التوصيل', 'متابعة الشحنات', Truck),
+    action('/fleet/dashboard', 'لوحة الأسطول', 'المركبات والسائقون', Truck),
+    action('/purchases', 'المشتريات', 'مستلزمات التشغيل', ShoppingBag),
+    action('/finance/receivables', 'الذمم', 'مستحقات العملاء', Wallet),
+  ],
   generic: [
     action('/pos', 'فاتورة بيع جديدة', 'ابدأ عملية بيع', ShoppingCart),
     action('/products', 'المنتجات', 'الأصناف والأسعار', Package),
@@ -238,6 +250,22 @@ const KIND_LAYOUT: Record<ActivityDashboardKind, ActivityDashboardLayout> = {
     hiddenSections: [],
     pulseWidgets: PRODUCT_PULSE,
     quickActions: QUICK_ACTIONS.distribution,
+  },
+  // Import/export and logistics share the distribution family layout —
+  // they ship goods and run fleets, so no sections are hidden.
+  import_export: {
+    defaultSection: 'pulse',
+    sectionOrder: ['pulse', 'activity', 'executive', 'sales', 'purchases', 'debts', 'crm', 'fleet', 'hr', 'all'],
+    hiddenSections: [],
+    pulseWidgets: PRODUCT_PULSE,
+    quickActions: QUICK_ACTIONS.import_export,
+  },
+  logistics: {
+    defaultSection: 'pulse',
+    sectionOrder: ['pulse', 'activity', 'executive', 'sales', 'purchases', 'debts', 'crm', 'fleet', 'hr', 'all'],
+    hiddenSections: [],
+    pulseWidgets: PRODUCT_PULSE,
+    quickActions: QUICK_ACTIONS.logistics,
   },
   generic: {
     defaultSection: 'executive',

@@ -88,8 +88,8 @@ export function assembleDashboardMetrics(
     monthSales: orNull(Number(monthSales.toFixed(2)), canSeeSales),
     todayPurchases: orNull(Number((purchaseStats.todayPurchases || 0).toFixed(2)), canSeePurchases),
     todayExpenses: orNull(Number((expenseStats.todayExpenses || 0).toFixed(2)), canSeeFinance),
-    grossProfit: canSeeProfit ? Number(monthGross.toFixed(2)) : 0,
-    netProfit: canSeeProfit ? Number(monthNet.toFixed(2)) : 0,
+    grossProfit: orNull(Number(monthGross.toFixed(2)), canSeeProfit),
+    netProfit: orNull(Number(monthNet.toFixed(2)), canSeeProfit),
     totalReceivables: orNull(Number(customerDebts.toFixed(2)), canSeeFinance),
     totalPayables: orNull(Number(supplierPayables.toFixed(2)), canSeeFinance),
     inventoryValuationCost: !canSeeInventory
@@ -104,14 +104,14 @@ export function assembleDashboardMetrics(
     salesCount: orNull(salesStats.todaySalesCount || 0, canSeeSales),
     previousMonthSales: orNull(Number(prevMonthSales.toFixed(2)), canSeeSales),
     salesGrowthRate: orNull(salesGrowthRate, canSeeSales),
-    profitMargin: canSeeProfit ? profitMargin : 0,
+    profitMargin: orNull(profitMargin, canSeeProfit),
     averageOrderValue: orNull(averageOrderValue, canSeeSales),
     topCustomer: canSeeSales && topCustomer ? { name: topCustomer.name, totalPurchases: Number((topCustomer.total_purchases || 0).toFixed(2)) } : null,
     urgentDebtsCount: orNull(urgentDebts, canSeeFinance)
   };
 }
 
-export function mapSalesTrendRows(rows: any[], dates: string[]): { date: string; sales: number; profit: number }[] {
+export function mapSalesTrendRows(rows: any[], dates: string[]): { date: string; sales: number; profit: number | null }[] {
   const byDate = new Map(rows.map((row) => [row.date, row]));
   const canSeeProfit = financialFieldVisibility().profit;
   return dates.map((date) => {
@@ -119,7 +119,7 @@ export function mapSalesTrendRows(rows: any[], dates: string[]): { date: string;
     return {
       date,
       sales: Number((row?.sales || 0).toFixed(2)),
-      profit: canSeeProfit ? Number((row?.profit || 0).toFixed(2)) : 0,
+      profit: canSeeProfit ? Number((row?.profit || 0).toFixed(2)) : null,
     };
   });
 }
@@ -234,12 +234,12 @@ export function mapMonthlyComparison(summaries: any): MonthlyComparison {
   const canSeeProfit = financialFieldVisibility().profit;
   const currentMonth = {
     sales: Number((current.sales || 0).toFixed(2)),
-    profit: canSeeProfit ? Number((current.profit || 0).toFixed(2)) : 0,
+    profit: canSeeProfit ? Number((current.profit || 0).toFixed(2)) : null,
     invoices: current.invoices || 0,
   };
   const previousMonth = {
     sales: Number((previous.sales || 0).toFixed(2)),
-    profit: canSeeProfit ? Number((previous.profit || 0).toFixed(2)) : 0,
+    profit: canSeeProfit ? Number((previous.profit || 0).toFixed(2)) : null,
     invoices: previous.invoices || 0,
   };
 
@@ -256,9 +256,9 @@ export function mapMonthlyComparison(summaries: any): MonthlyComparison {
   };
 }
 
-export function maskReportProfit<T extends { profit: number }>(rows: T[]): T[] {
+export function maskReportProfit<T extends { profit: number | null }>(rows: T[]): T[] {
   const canSee = financialFieldVisibility().profit;
-  return rows.map((row) => ({ ...row, profit: canSee ? Number(row.profit || 0) : 0 }));
+  return rows.map((row) => ({ ...row, profit: canSee ? Number(row.profit || 0) : null }));
 }
 
 export function mapInventoryValuation(byWarehouse: any[], totals: any): {

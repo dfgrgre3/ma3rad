@@ -81,11 +81,13 @@ const SECTION_ACCESS: Partial<Record<SectionId, { permission?: string; permissio
   sales: { permission: 'sales.view', moduleId: 'sales', path: '/sales' },
   purchases: { anyOf: ['purchases.view', 'inventory.view'], moduleId: 'purchasing', path: '/purchases' },
   debts: { permission: 'finance.debts.view', moduleId: 'finance', path: '/finance' },
-  crm: { permission: 'crm.view', moduleId: 'customers', path: '/crm/leads' },
+  // قسم CRM يتبع قاعدة المسار /crm/dashboard نفسها: crm.view أو crm.dashboard.view.
+  crm: { anyOf: ['crm.view', 'crm.dashboard.view'], moduleId: 'customers', path: '/crm/dashboard' },
   // لوحة الأسطول تتطلب operations.view (طبقة الخدمات) + صلاحية مجال واحدة على الأقل —
   // نفس شرط FleetDashboardPage وقاعدة المسار /fleet/dashboard.
   fleet: { permissions: ['operations.view'], anyOf: ['deliveries.view', 'operations.fleet.view', 'vehicles.view', 'drivers.view'], moduleId: 'operations', path: '/fleet/dashboard' },
-  hr: { permission: 'employees.view', moduleId: 'hr', path: '/employees' },
+  // قسم الموارد البشرية يتبع قاعدة المسار /hr/dashboard: employees.view أو hr.dashboard.view.
+  hr: { anyOf: ['employees.view', 'hr.dashboard.view'], moduleId: 'hr', path: '/hr/dashboard' },
 };
 
 export const DashboardPage: React.FC = () => {

@@ -37,7 +37,7 @@ export const NAV_GROUPS_02: NavGroupDef[] = [
       { label: 'كشوف المرتبات', to: '/employees/payroll/payslips', icon: FileText, perm: 'employees.payroll.view' },
       { label: 'تقويم الرواتب والصرف', to: '/employees/payroll/calendar', icon: Calendar, perm: 'employees.payroll.view' },
       { label: 'إعدادات إشعارات الرواتب', to: '/employees/payroll/notification-settings', icon: Settings, perm: 'employees.payroll.manage' },
-      { label: 'لوحة الموارد البشرية', to: '/hr/dashboard', icon: HardHat, perm: 'employees.view' },
+      { label: 'لوحة الموارد البشرية', to: '/hr/dashboard', icon: HardHat, anyPerms: ['employees.view', 'hr.dashboard.view'] },
       { label: 'الموظفون', to: '/employees', icon: HardHat, perm: 'employees.view' },
       { label: 'الحضور والانصراف', to: '/employees/attendance', icon: CheckSquare, perm: 'employees.view' },
       { label: 'الرواتب والمسحوبات', to: '/employees/payroll', icon: Wallet, perm: 'employees.payroll.view' },

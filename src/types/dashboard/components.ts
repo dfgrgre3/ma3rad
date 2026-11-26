@@ -30,7 +30,7 @@ export const CHART_COLORS = ['#0284c7', '#10b981', '#f59e0b', '#ef4444', '#8b5cf
 export interface SalesTrendPoint {
   date: string;
   sales: number;
-  profit: number;
+  profit: number | null;
 }
 
 export interface TopSellingProduct {

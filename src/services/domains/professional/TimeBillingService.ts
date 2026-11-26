@@ -55,6 +55,17 @@ export class TimeBillingService {
     return actor;
   }
 
+  private requireFinancialView() {
+    ModuleRegistryService.assertModuleEnabled('projects');
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'projects.financials.view');
+    return actor;
+  }
+
+  private branchScope(): { clause: string; params: string[] } {
+    return this.branchAccess.sqlScope('t.branch_id');
+  }
+
   // ── Lookups ─────────────────────────────────────────────────────────────
 
   public getProjects(): Array<{ id: string; name: string; customerName: string | null }> {
@@ -89,6 +100,9 @@ export class TimeBillingService {
     if (filters?.employeeId) { where.push('t.employee_id = ?'); params.push(filters.employeeId); }
     if (filters?.from) { where.push('t.entry_date >= ?'); params.push(filters.from); }
     if (filters?.to) { where.push('t.entry_date <= ?'); params.push(filters.to); }
+    const branchScope = this.branchScope();
+    where.push(branchScope.clause);
+    params.push(...branchScope.params);
     return this.db.query<any>(
       `SELECT t.id, t.branch_id AS branchId, t.customer_id AS customerId, c.name AS customerName,
               t.project_id AS projectId, p.name AS projectName, t.employee_id AS employeeId,
@@ -99,7 +113,7 @@ export class TimeBillingService {
        LEFT JOIN customers c ON c.id = t.customer_id
        LEFT JOIN projects p ON p.id = t.project_id
        LEFT JOIN employees e ON e.id = t.employee_id
-       ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
+       WHERE ${where.join(' AND ')}
        ORDER BY t.entry_date DESC, t.created_at DESC`,
       params
     ).map((r) => ({
@@ -188,6 +202,9 @@ export class TimeBillingService {
 
   public getBatches(status?: string): BillingBatch[] {
     this.requireView();
+    const branchScope = this.branchAccess.sqlScope('b.branch_id');
+    const where = status ? [branchScope.clause, 'b.status = ?'] : [branchScope.clause];
+    const params = status ? [...branchScope.params, status] : [...branchScope.params];
     return this.db.query<any>(
       `SELECT b.id, b.batch_number AS batchNumber, b.customer_id AS customerId,
               c.name AS customerName, b.project_id AS projectId, p.name AS projectName,
@@ -198,9 +215,9 @@ export class TimeBillingService {
        FROM time_billing_batches b
        LEFT JOIN customers c ON c.id = b.customer_id
        LEFT JOIN projects p ON p.id = b.project_id
-       ${status ? 'WHERE b.status = ?' : ''}
+       WHERE ${where.join(' AND ')}
        ORDER BY b.created_at DESC`,
-      status ? [status] : []
+      params
     ).map((r) => ({ ...r, totalAmount: round2(r.totalAmount) }));
   }
 
@@ -268,11 +285,14 @@ export class TimeBillingService {
     customerId: string | null; customerName: string; billableHours: number;
     billableAmount: number; entryCount: number;
   }> {
-    this.requireView();
+    this.requireFinancialView();
     const where = [`t.status IN ('APPROVED','INVOICED')`, 't.billable = 1'];
     const params: unknown[] = [];
     if (filters?.from) { where.push('t.entry_date>=?'); params.push(filters.from); }
     if (filters?.to) { where.push('t.entry_date<=?'); params.push(filters.to); }
+    const branchScope = this.branchScope();
+    where.push(branchScope.clause);
+    params.push(...branchScope.params);
     return this.db.query<any>(
       `SELECT t.customer_id AS customerId, COALESCE(c.name,'غير محدد') AS customerName,
               SUM(t.minutes)/60.0 AS billableHours, COUNT(*) AS entryCount,
@@ -285,10 +305,24 @@ export class TimeBillingService {
   }
 
   public getUnbilledSummary(): { count: number; hours: number; amount: number } {
+    this.requireFinancialView();
+    const branchScope = this.branchScope();
     const rows = this.db.query<any>(
       `SELECT COUNT(*) c, COALESCE(SUM(minutes),0) m, COALESCE(SUM(minutes/60.0*hourly_rate),0) a
-       FROM time_entries WHERE status='APPROVED' AND billable=1`
+       FROM time_entries t WHERE t.status='APPROVED' AND t.billable=1 AND ${branchScope.clause}`,
+      branchScope.params
     )[0];
     return { count: Number(rows?.c ?? 0), hours: round2(Number(rows?.m ?? 0) / 60), amount: round2(rows?.a ?? 0) };
+  }
+
+  public getUnbilledSummaryNonFinancial(): { count: number; hours: number } {
+    this.requireView();
+    const branchScope = this.branchScope();
+    const rows = this.db.query<any>(
+      `SELECT COUNT(*) c, COALESCE(SUM(minutes),0) m
+       FROM time_entries t WHERE t.status='APPROVED' AND t.billable=1 AND ${branchScope.clause}`,
+      branchScope.params
+    )[0];
+    return { count: Number(rows?.c ?? 0), hours: round2(Number(rows?.m ?? 0) / 60) };
   }
 }

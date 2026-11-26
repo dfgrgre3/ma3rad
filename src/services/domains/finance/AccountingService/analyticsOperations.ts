@@ -26,13 +26,13 @@ import type {
   RecentDashboardActivity,
 } from './types';
 
-export function getSalesTrendLast7Days(db: DatabaseManager, access: BranchAccessService): { date: string; sales: number; profit: number }[] {
+export function getSalesTrendLast7Days(db: DatabaseManager, access: BranchAccessService): { date: string; sales: number; profit: number | null }[] {
   requireDashboardSalesView();
   const { sql, params, dates } = buildSalesTrendSpec(access);
   return mapSalesTrendRows(db.query<any>(sql, params), dates);
 }
 
-export async function getSalesTrendLast7DaysAsync(db: DatabaseManager, access: BranchAccessService): Promise<{ date: string; sales: number; profit: number }[]> {
+export async function getSalesTrendLast7DaysAsync(db: DatabaseManager, access: BranchAccessService): Promise<{ date: string; sales: number; profit: number | null }[]> {
   requireDashboardSalesView();
   const { sql, params, dates } = buildSalesTrendSpec(access);
   return mapSalesTrendRows(await db.queryAsync<any>(sql, params), dates);

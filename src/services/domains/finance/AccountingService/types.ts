@@ -12,8 +12,8 @@ export interface DashboardMetrics {
   monthSales: number | null;
   todayPurchases: number | null;
   todayExpenses: number | null;
-  grossProfit: number;
-  netProfit: number;
+  grossProfit: number | null;
+  netProfit: number | null;
   totalReceivables: number | null; // ديون العملاء
   totalPayables: number | null; // مستحقات الموردين
   inventoryValuationCost: number | null; // قيمة المخزون بسعر الشراء (null = غير متاح)
@@ -25,15 +25,15 @@ export interface DashboardMetrics {
   // New fields for enhanced analytics
   previousMonthSales: number | null;
   salesGrowthRate: number | null;
-  profitMargin: number;
+  profitMargin: number | null;
   averageOrderValue: number | null;
   topCustomer: { name: string; totalPurchases: number } | null;
   urgentDebtsCount: number | null;
 }
 
 export interface MonthlyComparison {
-  currentMonth: { sales: number; profit: number; invoices: number };
-  previousMonth: { sales: number; profit: number; invoices: number };
+  currentMonth: { sales: number; profit: number | null; invoices: number };
+  previousMonth: { sales: number; profit: number | null; invoices: number };
   salesGrowth: number | null;
   invoiceGrowth: number | null;
   currentMonthInvoices: number;

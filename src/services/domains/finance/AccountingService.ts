@@ -69,11 +69,11 @@ export class AccountingService {
     return getDashboardMetricsAsync(this.db, this.branchAccess, (from, to) => this.getDashboardProfitData(from, to));
   }
 
-  public getSalesTrendLast7Days(): { date: string; sales: number; profit: number }[] {
+  public getSalesTrendLast7Days(): { date: string; sales: number; profit: number | null }[] {
     return getSalesTrendLast7Days(this.db, this.branchAccess);
   }
 
-  public async getSalesTrendLast7DaysAsync(): Promise<{ date: string; sales: number; profit: number }[]> {
+  public async getSalesTrendLast7DaysAsync(): Promise<{ date: string; sales: number; profit: number | null }[]> {
     return getSalesTrendLast7DaysAsync(this.db, this.branchAccess);
   }
 

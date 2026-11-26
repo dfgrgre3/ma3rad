@@ -57,6 +57,11 @@ interface FleetStats {
   vehiclesMaintenance: number;
   recentDeliveries: Delivery[];
   driverStats: { name: string; trips: number; delivered: number; failed: number }[];
+  permissions: {
+    deliveries: 'allowed' | 'denied' | 'empty';
+    drivers: 'allowed' | 'denied' | 'empty';
+    vehicles: 'allowed' | 'denied' | 'empty';
+  };
 }
 
 const DELIVERY_STATUS: Record<string, { label: string; color: string; icon: React.ElementType }> = {
@@ -69,11 +74,44 @@ const DELIVERY_STATUS: Record<string, { label: string; color: string; icon: Reac
 };
 
 function buildFleetStats(service: OperationsService): FleetStats {
-  // كل مجموعة بيانات تتطلب صلاحية مجالها إضافة إلى operations.view؛ عند غيابها
-  // تُعرض فارغة بدل إفشال اللوحة كاملة.
-  const deliveries = safe(() => service.getDeliveries(), [] as Delivery[]);
-  const drivers = safe(() => service.getDrivers(), [] as ReturnType<OperationsService['getDrivers']>);
-  const vehicles = safe(() => service.getVehicles(), [] as ReturnType<OperationsService['getVehicles']>);
+  const user = AuthService.getCurrentUser();
+  const canDeliveries = user ? PermissionService.can(user, 'deliveries.view') : false;
+  const canDrivers = user ? PermissionService.can(user, 'drivers.view') : false;
+  const canVehicles = user ? PermissionService.can(user, 'vehicles.view') : false;
+
+  let deliveries: Delivery[] = [];
+  let deliveriesPermission: 'allowed' | 'denied' | 'empty' = 'denied';
+  if (canDeliveries) {
+    try {
+      deliveries = service.getDeliveries();
+      deliveriesPermission = deliveries.length > 0 ? 'allowed' : 'empty';
+    } catch {
+      deliveriesPermission = 'denied';
+    }
+  }
+
+  let drivers: ReturnType<OperationsService['getDrivers']> = [];
+  let driversPermission: 'allowed' | 'denied' | 'empty' = 'denied';
+  if (canDrivers) {
+    try {
+      drivers = service.getDrivers();
+      driversPermission = drivers.length > 0 ? 'allowed' : 'empty';
+    } catch {
+      driversPermission = 'denied';
+    }
+  }
+
+  let vehicles: ReturnType<OperationsService['getVehicles']> = [];
+  let vehiclesPermission: 'allowed' | 'denied' | 'empty' = 'denied';
+  if (canVehicles) {
+    try {
+      vehicles = service.getVehicles();
+      vehiclesPermission = vehicles.length > 0 ? 'allowed' : 'empty';
+    } catch {
+      vehiclesPermission = 'denied';
+    }
+  }
+
   const today = localDateString();
 
   const deliveredToday = deliveries.filter(d => d.status === 'DELIVERED' && d.date === today).length;
@@ -103,6 +141,11 @@ function buildFleetStats(service: OperationsService): FleetStats {
     vehiclesMaintenance: vehicles.filter(v => v.status === 'MAINTENANCE').length,
     recentDeliveries: deliveries.slice(0, 8),
     driverStats: Object.values(driverMap).sort((a, b) => b.trips - a.trips).slice(0, 5),
+    permissions: {
+      deliveries: deliveriesPermission,
+      drivers: driversPermission,
+      vehicles: vehiclesPermission,
+    },
   };
 }
 
@@ -281,19 +324,67 @@ export const FleetDashboardPage: React.FC = () => {
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
           {/* KPI Row */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <StatCard label="إجمالي التوصيلات" value={fmt(stats.totalDeliveries)} sub={`${stats.deliveredToday} سُلّمت اليوم`} icon={Package} color="text-primary" bg="bg-accent-soft" />
-            <StatCard label="إيرادات التوصيل" value={fmtM(stats.totalFees) + ' ج'} sub="من التوصيلات المكتملة" icon={DollarSign} color="text-success" bg="bg-success-soft" />
-            <StatCard label="سائقون نشطون" value={fmt(stats.activeDrivers)} sub={`مركبات متاحة: ${stats.availableVehicles}`} icon={Users} color="text-primary" bg="bg-accent-soft" />
-            <StatCard label="توصيلات فاشلة" value={fmt(stats.failedDeliveries)} sub="تحتاج مراجعة" icon={XCircle} color="text-danger" bg="bg-danger-soft" />
+            <StatCard
+              label="إجمالي التوصيلات"
+              value={stats.permissions.deliveries === 'denied' ? '—' : fmt(stats.totalDeliveries)}
+              sub={stats.permissions.deliveries === 'denied' ? 'لا تملك صلاحية' : `${stats.deliveredToday} سُلّمت اليوم`}
+              icon={Package}
+              color={stats.permissions.deliveries === 'denied' ? 'text-muted' : 'text-primary'}
+              bg={stats.permissions.deliveries === 'denied' ? 'bg-surface-muted' : 'bg-accent-soft'}
+            />
+            <StatCard
+              label="إيرادات التوصيل"
+              value={stats.permissions.deliveries === 'denied' ? '—' : fmtM(stats.totalFees) + ' ج'}
+              sub={stats.permissions.deliveries === 'denied' ? 'لا تملك صلاحية' : 'من التوصيلات المكتملة'}
+              icon={DollarSign}
+              color={stats.permissions.deliveries === 'denied' ? 'text-muted' : 'text-success'}
+              bg={stats.permissions.deliveries === 'denied' ? 'bg-surface-muted' : 'bg-success-soft'}
+            />
+            <StatCard
+              label="سائقون نشطون"
+              value={stats.permissions.drivers === 'denied' ? '—' : fmt(stats.activeDrivers)}
+              sub={stats.permissions.drivers === 'denied' ? 'لا تملك صلاحية' : `مركبات متاحة: ${stats.availableVehicles}`}
+              icon={Users}
+              color={stats.permissions.drivers === 'denied' ? 'text-muted' : 'text-primary'}
+              bg={stats.permissions.drivers === 'denied' ? 'bg-surface-muted' : 'bg-accent-soft'}
+            />
+            <StatCard
+              label="توصيلات فاشلة"
+              value={stats.permissions.deliveries === 'denied' ? '—' : fmt(stats.failedDeliveries)}
+              sub={stats.permissions.deliveries === 'denied' ? 'لا تملك صلاحية' : 'تحتاج مراجعة'}
+              icon={XCircle}
+              color={stats.permissions.deliveries === 'denied' ? 'text-muted' : 'text-danger'}
+              bg={stats.permissions.deliveries === 'denied' ? 'bg-surface-muted' : 'bg-danger-soft'}
+            />
           </div>
 
           {/* Status Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             {[
-              { label: 'في الانتظار', value: stats.pendingDeliveries, color: 'text-ink bg-surface-muted border-line', icon: Clock },
-              { label: 'في الطريق الآن', value: stats.inTransitDeliveries, color: 'text-primary bg-accent-soft border-accent-border', icon: Truck },
-              { label: 'مركبات في صيانة', value: stats.vehiclesMaintenance, color: 'text-warning bg-warning-soft border-warning-border', icon: Car },
-              { label: 'سُلِّمت اليوم', value: stats.deliveredToday, color: 'text-success bg-success-soft border-success-border', icon: CheckCircle2 },
+              {
+                label: 'في الانتظار',
+                value: stats.permissions.deliveries === 'denied' ? '—' : stats.pendingDeliveries,
+                color: stats.permissions.deliveries === 'denied' ? 'text-muted bg-surface-muted border-line' : 'text-ink bg-surface-muted border-line',
+                icon: Clock,
+              },
+              {
+                label: 'في الطريق الآن',
+                value: stats.permissions.deliveries === 'denied' ? '—' : stats.inTransitDeliveries,
+                color: stats.permissions.deliveries === 'denied' ? 'text-muted bg-surface-muted border-line' : 'text-primary bg-accent-soft border-accent-border',
+                icon: Truck,
+              },
+              {
+                label: 'مركبات في صيانة',
+                value: stats.permissions.vehicles === 'denied' ? '—' : stats.vehiclesMaintenance,
+                color: stats.permissions.vehicles === 'denied' ? 'text-muted bg-surface-muted border-line' : 'text-warning bg-warning-soft border-warning-border',
+                icon: Car,
+              },
+              {
+                label: 'سُلِّمت اليوم',
+                value: stats.permissions.deliveries === 'denied' ? '—' : stats.deliveredToday,
+                color: stats.permissions.deliveries === 'denied' ? 'text-muted bg-surface-muted border-line' : 'text-success bg-success-soft border-success-border',
+                icon: CheckCircle2,
+              },
             ].map(item => (
               <div key={item.label} className={`flex items-center gap-3 p-4 rounded-2xl border ${item.color}`}>
                 <item.icon className="w-5 h-5 shrink-0" />

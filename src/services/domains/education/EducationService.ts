@@ -229,6 +229,21 @@ export class EducationService {
     );
   }
 
+  public getAttendanceForAllClasses(date?: string): AttendanceRecord[] {
+    this.requireView();
+    const sessionDate = date ?? localDateString();
+    return this.db.query<any>(
+      `SELECT a.id, a.enrollment_id AS enrollmentId, a.class_id AS classId,
+              c.name AS studentName, a.session_date AS sessionDate,
+              a.status, a.notes
+       FROM edu_attendance a JOIN edu_enrollments en ON en.id = a.enrollment_id
+       JOIN customers c ON c.id = en.customer_id
+       WHERE a.session_date=?
+       ORDER BY a.class_id, c.name`,
+      [sessionDate]
+    );
+  }
+
   public getClassRoster(classId: string): Array<{ enrollmentId: string; studentName: string; status: AttendanceStatus | null }> {
     const roster = this.db.query<any>(
       `SELECT en.id AS enrollmentId, c.name AS studentName

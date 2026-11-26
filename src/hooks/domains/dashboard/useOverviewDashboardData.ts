@@ -1,25 +1,17 @@
-import { useCallback, useEffect, useMemo, useState, useTransition } from 'react';
+import { useCallback, useEffect, useState, useTransition } from 'react';
 import { dashboardMetricsService, type OverviewDashboardData as ServiceOverviewData, type TodayOperationsSummary } from '../../../services/domains/dashboard/DashboardMetricsService';
-import { AccountingService, type DashboardMetrics, type MonthlyComparison } from '../../../services/domains/finance/AccountingService';
-import { getProductUnitLabel } from '../../../utils/products/productUnits';
+import type { DashboardMetrics, MonthlyComparison } from '../../../services/domains/finance/AccountingService';
 import type {
   CategoryDistributionItem, PaymentDistributionItem, PurchaseHourlyBucket,
   PurchasePaymentMixItem, PurchaseTopItem, PurchaseTopSupplier, RecentActivityItem, SalesTrendPoint,
   TopCustomerItem, TopSellingProduct,
 } from '../../../types/dashboard/components';
-import type { DailyPurchaseResult } from '../../../services/domains/operations/DailyOperationsService';
 
-// Translate payment method to Arabic
-const translatePaymentMethod = (method: string): string => {
-  const translations: Record<string, string> = {
-    'CASH': 'نقدي',
-    'CARD': 'بطاقة',
-    'BANK_TRANSFER': 'تحويل بنكي',
-    'CHECK': 'شيك',
-    'VOUCHER': 'قسيمة',
-  };
-  return translations[method] ?? method;
-};
+/** مجاميع مشتريات اليوم كما يحسبها DashboardMetricsService — لا يُعاد حسابها في الواجهة. */
+type PurchaseAggregates = Pick<
+  ServiceOverviewData,
+  'purchaseHourly' | 'purchasePeakHour' | 'purchasePaymentMix' | 'purchaseTopSuppliers' | 'purchaseTopItems' | 'purchaseQuantitiesByUnit'
+>;
 
 export interface OverviewDashboardData {
   metrics: DashboardMetrics | null;
@@ -64,6 +56,7 @@ export const useOverviewDashboardData = (): OverviewDashboardData => {
   const [purchasesLoading, setPurchasesLoading] = useState(true);
   const [purchasesError, setPurchasesError] = useState<string | null>(null);
   const [todayOps, setTodayOps] = useState<TodayOperationsSummary | null>(null);
+  const [purchaseAgg, setPurchaseAgg] = useState<PurchaseAggregates | null>(null);
 
   const loadData = useCallback(async () => {
     const dashboardStartedAt = performance.now();
@@ -103,6 +96,14 @@ export const useOverviewDashboardData = (): OverviewDashboardData => {
         setTodayPurchases(data.todayPurchases);
         setPurchasesError(data.purchasesError);
         setTodayOps(data.todayOps);
+        setPurchaseAgg({
+          purchaseHourly: data.purchaseHourly,
+          purchasePeakHour: data.purchasePeakHour,
+          purchasePaymentMix: data.purchasePaymentMix,
+          purchaseTopSuppliers: data.purchaseTopSuppliers,
+          purchaseTopItems: data.purchaseTopItems,
+          purchaseQuantitiesByUnit: data.purchaseQuantitiesByUnit,
+        });
       });
     } catch (e) {
       console.error(e);
@@ -125,68 +126,6 @@ export const useOverviewDashboardData = (): OverviewDashboardData => {
     loadData();
   }, [loadData]);
 
-  const purchaseHourly = useMemo(() => {
-    const buckets = Array.from({ length: 24 }, () => ({ total: 0, count: 0 }));
-    todayPurchases?.rows.forEach((row) => {
-      const date = new Date(row.createdAt);
-      if (Number.isNaN(date.getTime())) return;
-      buckets[date.getHours()].total += Number(row.total) || 0;
-      buckets[date.getHours()].count += 1;
-    });
-    return buckets;
-  }, [todayPurchases]);
-
-  const purchasePeakHour = Math.max(...purchaseHourly.map((bucket) => bucket.total), 0);
-
-  const purchasePaymentMix = useMemo(() => {
-    const mix = new Map<string, { total: number; count: number }>();
-    todayPurchases?.rows.forEach((row) => {
-      const key = row.paymentType || 'CASH';
-      const entry = mix.get(key) || { total: 0, count: 0 };
-      entry.total += Number(row.total) || 0;
-      entry.count += 1;
-      mix.set(key, entry);
-    });
-    return [...mix.entries()]
-      .map(([method, values]) => ({ method: translatePaymentMethod(method), ...values }))
-      .sort((a, b) => b.total - a.total);
-  }, [todayPurchases]);
-
-  const purchaseTopSuppliers = useMemo(() => {
-    const suppliers = new Map<string, { name: string; total: number; paid: number; count: number }>();
-    todayPurchases?.rows.forEach((row) => {
-      const key = row.supplierId || row.supplierName || 'unknown';
-      const supplier = suppliers.get(key) || { name: row.supplierName || '—', total: 0, paid: 0, count: 0 };
-      supplier.total += Number(row.total) || 0;
-      supplier.paid += Number(row.paid) || 0;
-      supplier.count += 1;
-      suppliers.set(key, supplier);
-    });
-    return [...suppliers.values()].sort((a, b) => b.total - a.total).slice(0, 4);
-  }, [todayPurchases]);
-
-  const purchaseTopItems = useMemo(() => {
-    const products = new Map<string, { name: string; quantity: number; total: number; invoices: Set<string>; productType?: 'CERAMIC' | 'GENERAL'; baseUnit?: string; customUnit?: string }>();
-    todayPurchases?.items.forEach((item) => {
-      const key = item.productId || item.productName;
-      const product = products.get(key) || { name: item.productName || '—', quantity: 0, total: 0, invoices: new Set<string>(), productType: item.productType, baseUnit: item.baseUnit, customUnit: item.customUnit };
-      product.quantity += Number(item.quantityM2) || 0;
-      product.total += Number(item.totalCost) || 0;
-      product.invoices.add(item.purchaseId);
-      products.set(key, product);
-    });
-    return [...products.values()].sort((a, b) => b.total - a.total).slice(0, 4);
-  }, [todayPurchases]);
-
-  const purchaseQuantitiesByUnit = useMemo(() => {
-    const quantities = new Map<string, number>();
-    todayPurchases?.items.forEach((item) => {
-      const unit = getProductUnitLabel(item);
-      quantities.set(unit, (quantities.get(unit) || 0) + (Number(item.quantityM2) || 0));
-    });
-    return [...quantities.entries()];
-  }, [todayPurchases]);
-
   return {
     metrics,
     chartData,
@@ -203,12 +142,12 @@ export const useOverviewDashboardData = (): OverviewDashboardData => {
     purchasesLoading,
     purchasesError,
     loadData,
-    purchaseHourly,
-    purchasePeakHour,
-    purchasePaymentMix,
-    purchaseTopSuppliers,
-    purchaseTopItems,
-    purchaseQuantitiesByUnit,
+    purchaseHourly: purchaseAgg?.purchaseHourly ?? [],
+    purchasePeakHour: purchaseAgg?.purchasePeakHour ?? 0,
+    purchasePaymentMix: purchaseAgg?.purchasePaymentMix ?? [],
+    purchaseTopSuppliers: purchaseAgg?.purchaseTopSuppliers ?? [],
+    purchaseTopItems: purchaseAgg?.purchaseTopItems ?? [],
+    purchaseQuantitiesByUnit: purchaseAgg?.purchaseQuantitiesByUnit ?? [],
     todayOps,
   };
 };

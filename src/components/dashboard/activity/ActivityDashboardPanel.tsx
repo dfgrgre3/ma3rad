@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { AlertTriangle, BarChart3, RefreshCw } from 'lucide-react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { AlertTriangle, BarChart3, Building2, RefreshCw } from 'lucide-react';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { CeramicMath } from '../../../utils/products/ceramicMath';
 import {
@@ -9,6 +9,7 @@ import {
 } from '../../../services/domains/dashboard/ActivityDashboardService';
 import { useDashboardRefresh } from '../../../contexts/DashboardRefreshContext';
 import { useTheme } from '../../../contexts/useTheme';
+import { BranchAccessService } from '../../../services/domains/auth/BranchAccessService';
 
 const service = new ActivityDashboardService();
 
@@ -57,19 +58,34 @@ export const ActivityDashboardPanel: React.FC = () => {
   const [data, setData] = useState<ActivityDashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [branchId, setBranchId] = useState('');
   const refreshToken = useDashboardRefresh()?.refreshToken;
+
+  // الفروع المتاحة للمستخدم — يُعرض المنتقي فقط عند وجود أكثر من فرع.
+  const branches = useMemo(() => {
+    try {
+      return new BranchAccessService().getSelectableBranches();
+    } catch {
+      return [];
+    }
+  }, []);
+  const showBranchFilter = branches.length > 1;
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      setData(await service.getDashboard());
-    } catch {
-      setError('تعذر تحميل مؤشرات النشاط');
+      const result = await service.getDashboard(undefined, branchId ? { branchId } : undefined);
+      setData(result);
+      if (result.warnings && result.warnings.length > 0) {
+        console.warn('Activity dashboard warnings:', result.warnings);
+      }
+    } catch (e: any) {
+      setError(e?.message || 'تعذر تحميل مؤشرات النشاط');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [branchId]);
 
   useEffect(() => {
     load();
@@ -97,6 +113,23 @@ export const ActivityDashboardPanel: React.FC = () => {
 
   return (
     <div className="min-w-0 space-y-3">
+      {showBranchFilter && (
+        <div className="flex items-center gap-2">
+          <Building2 className="h-3.5 w-3.5 shrink-0 text-muted" />
+          <label htmlFor="activity-branch-filter" className="text-[11px] font-semibold text-muted">الفرع</label>
+          <select
+            id="activity-branch-filter"
+            value={branchId}
+            onChange={(e) => setBranchId(e.target.value)}
+            className="rounded-lg border border-line bg-surface px-2 py-1 text-[11px] font-semibold text-ink focus:border-primary focus:outline-none"
+          >
+            <option value="">الافتراضي</option>
+            {branches.map((b) => (
+              <option key={b.id} value={b.id}>{b.name}</option>
+            ))}
+          </select>
+        </div>
+      )}
       {data.warnings && data.warnings.length > 0 && (
         <div className="rounded-xl border border-warning-border bg-warning-soft px-3 py-2 text-[11px] font-semibold text-warning dark:bg-warning/20" role="status">
           تعذر تحميل بعض المؤشرات: {data.warnings.join(' · ')}

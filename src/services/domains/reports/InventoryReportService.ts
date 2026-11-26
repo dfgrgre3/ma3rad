@@ -91,5 +91,10 @@ export async function loadPurchaseKpi(from: string, to: string): Promise<Purchas
 }
 
 export async function loadInventoryKpi(): Promise<InventoryKpi> {
-  return new InventoryValuationService().getKpi('ui.reports.inventory.view');
+  const actor = AuthService.getCurrentUser();
+  if (!actor) throw new Error('المستخدم غير مسجل الدخول.');
+  const permission = PermissionService.can(actor, 'ui.reports.inventory.view')
+    ? 'ui.reports.inventory.view'
+    : 'ui.inventory.valuation.view';
+  return new InventoryValuationService().getKpi(permission);
 }
